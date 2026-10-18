@@ -12,7 +12,8 @@ Plain static files, no framework. `tools/build.py` (Python standard library only
 | `index.html`, `en/index.html` (home) | `data/apps.json` | generated |
 | `privacy/index.html`, `en/privacy/index.html` (policy list) | `data/apps.json` + effective dates read from each policy | generated |
 | `apps/<app_path>/` for apps with `"page": "generated"` | `data/apps.json` (`features`, `facts`, `privacy`, `faq`) | generated |
-| `sitemap.xml`, `llms.txt`, `404.html` | all pages + `data/apps.json` | generated |
+| `sitemap.xml` (with app icons/screenshots as image entries; browser view via the static `sitemap.xsl`), `rss.xml` (ko app pages and articles, for Naver), `llms.txt`, `404.html` | all pages + `data/apps.json` | generated |
+| articles under an app: `apps/<app_path>/<slug>/index.html` | the file's own `<main>` | you; build adds app breadcrumbs and `Article` JSON-LD |
 | every other `*.html` (hand-written app pages, all privacy policies) | the file's own `<main>` | you; build keeps `<main>` byte for byte and replaces `<head>`, header, footer, breadcrumbs and JSON-LD around it |
 | share images `assets/og/<id>-<lang>.png`, `assets/og.png`, `assets/logo.png` | `data/apps.json` | `tools/og.py` (needs Pillow) |
 
@@ -40,6 +41,7 @@ python3 tools/build.py --check   # exit 1 if a rebuild would change anything (ru
 ## Fixed URLs (do not move)
 
 - `/privacy/blocks/`, `/en/privacy/blocks/` — hard-coded in Block Turn and the Play Console.
+- `/google83e3e62aee87a145.html` (Search Console) and `/naverc6d2c9710a0b598bb0562751a0d005b7.html` (Naver Search Advisor) — ownership files, keep them.
 - `/privacy/doc-viewer/`, `/en/privacy/doc-viewer/`, `/apps/doc-viewer/`, `/en/apps/doc-viewer/` — SugarDoc app config and listing; `release_gate.sh` checks for 200.
 - Every other `/privacy/<slug>/` linked from a Play listing. `/app-ads.txt` at the root (AdMob).
 

@@ -6,7 +6,7 @@
 
 Generated from data:   index.html, en/index.html, privacy/index.html, en/privacy/index.html,
                        apps/<app_path>/ for apps with "page": "generated", 404.html,
-                       sitemap.xml, llms.txt
+                       sitemap.xml (images, XSL view: sitemap.xsl), rss.xml (ko apps and articles), llms.txt
 Hand-written pages:    every other *.html keeps its <main> content byte for byte; the build only
                        replaces <head>, the site header/footer, breadcrumbs and JSON-LD around it.
 Standard library only.
@@ -558,6 +558,19 @@ def wrap_hand(relpath):
         name = a[lang]["name"] if a else title
         items = [(name, None)]
         if a: lds.append(app_ld(a, lang, path))
+    elif parts[0] == "apps" and len(parts) == 3:
+        a = BY_APP_PATH.get(parts[1]); current = "apps"
+        if a: items.append((a[lang]["name"], app_url(a, lang)))
+        mh = re.search(r"<h1[^>]*>(.*?)</h1>", main, re.S)
+        headline = html.unescape(re.sub(r"<[^>]+>", "", mh.group(1))).strip() if mh else title
+        items.append((headline, None))
+        icon = a and a.get("icon") and os.path.exists(rel(a["icon"].lstrip("/") + ".png"))
+        lds.append({"@context": "https://schema.org", "@type": "Article", "headline": headline, "description": desc,
+                    "url": SITE + path, "mainEntityOfPage": SITE + path, "inLanguage": lang,
+                    "datePublished": git_first_date(relpath), "dateModified": git_date(relpath),
+                    "author": org_ld(), "publisher": org_ld(), "isPartOf": {"@id": SITE_ID},
+                    **({"image": SITE + a["icon"] + ".png"} if icon else {}),
+                    **({"about": {"@id": SITE + app_url(a, lang) + "#app"}} if a else {})})
     elif parts[0] == "privacy" and len(parts) == 2:
         a = BY_PRIVACY_PATH.get(parts[1]); current = "privacy"
         name = a[lang]["name"] if a else title
@@ -569,7 +582,7 @@ def wrap_hand(relpath):
     lds.append(bc)
     og = f"/assets/og/{a['id']}-{lang}.png" if a else None
     og = og if og and os.path.exists(rel(og.lstrip("/"))) else None
-    h = head(lang, title, desc, path, alt, og_type="article" if current == "privacy" else "website", og_image=og, lds=lds)
+    h = head(lang, title, desc, path, alt, og_type="article" if current == "privacy" or (parts[0] == "apps" and len(parts) == 3) else "website", og_image=og, lds=lds)
     body = accent_attr(a, "page-read")
     return page(lang, h, body, header(lang, current, alt or url("en" if lang == "ko" else "ko", "/")), f"    {nav}\n" + main, footer(lang))
 
@@ -599,11 +612,35 @@ def git_date(relpath):
         pass
     return datetime.date.today().isoformat()
 
+def git_first_date(relpath):
+    try:
+        out = subprocess.run(["git", "log", "--diff-filter=A", "--format=%cs", "--", relpath], cwd=ROOT, capture_output=True, text=True).stdout.split()
+        if out: return out[-1]
+    except OSError:
+        pass
+    return datetime.date.today().isoformat()
+
+def page_images(relpath):
+    """App pages list the app icon and that language's screenshots (Google image sitemap)."""
+    parts = relpath[:-len("index.html")].strip("/").split("/")
+    lang = "en" if parts[0] == "en" else "ko"
+    if lang == "en": parts = parts[1:]
+    if len(parts) != 2 or parts[0] != "apps" or parts[1] not in BY_APP_PATH: return []
+    a = BY_APP_PATH[parts[1]]
+    imgs = [a["icon"] + ".png"] if a.get("icon") and os.path.exists(rel(a["icon"].lstrip("/") + ".png")) else []
+    return imgs + [x["src"] for x in a[lang].get("shots") or [] if os.path.exists(rel(x["src"].lstrip("/")))]
+
+def section_rank(relpath):
+    bare = relpath[3:] if relpath.startswith("en/") else relpath
+    return 0 if bare == "index.html" else 1 if bare.startswith("apps/") else 2
+
 def build_sitemap(pages):
     out = ['<?xml version="1.0" encoding="UTF-8"?>',
-           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">']
-    for relpath in sorted(pages, key=lambda p: (p.startswith("en/"), p.count("/"), p)):
-        if relpath == "404.html": continue
+           '<?xml-stylesheet type="text/xsl" href="/sitemap.xsl"?>',
+           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml"'
+           ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">']
+    for relpath in sorted(pages, key=lambda p: (p.startswith("en/"), section_rank(p), p.count("/"), p)):
+        if not relpath.endswith("index.html"): continue
         path = "/" + relpath[:-len("index.html")]
         bare = path[3:] if path.startswith("/en/") else path
         ko_p, en_p = bare, "/en" + bare
@@ -615,8 +652,34 @@ def build_sitemap(pages):
             out.append(f'    <xhtml:link rel="alternate" hreflang="ko" href="{SITE + ko_p}"/>')
             out.append(f'    <xhtml:link rel="alternate" hreflang="en" href="{SITE + en_p}"/>')
             out.append(f'    <xhtml:link rel="alternate" hreflang="x-default" href="{SITE + ko_p}"/>')
+        for src in page_images(relpath):
+            out.append(f"    <image:image><image:loc>{SITE + src}</image:loc></image:image>")
         out.append("  </url>")
     out.append("</urlset>")
+    return "\n".join(out) + "\n"
+
+def build_rss(outputs):
+    from email.utils import format_datetime
+    items = []
+    for relpath, content in outputs.items():
+        if not relpath.startswith("apps/") or not relpath.endswith("index.html"): continue
+        mt = re.search(r"<title>(.*?)</title>", content, re.S)
+        md = re.search(r'<meta name="description" content="([^"]*)"', content)
+        if not (mt and md): continue
+        d = git_date(relpath)
+        items.append((d, git_first_date(relpath), relpath, html.unescape(mt.group(1).strip()), html.unescape(md.group(1))))
+    items.sort(key=lambda x: (x[0], x[2]), reverse=True)
+    def rfc(day): return format_datetime(datetime.datetime.fromisoformat(day + "T09:00:00+09:00"))
+    out = ['<?xml version="1.0" encoding="UTF-8"?>', '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">', "<channel>",
+           f"  <title>{esc(T['ko']['home_title'])}</title>", f"  <link>{SITE}/</link>",
+           f"  <description>{esc(T['ko']['home_lead'])}</description>", "  <language>ko</language>",
+           f'  <atom:link href="{SITE}/rss.xml" rel="self" type="application/rss+xml"/>']
+    if items: out.append(f"  <lastBuildDate>{rfc(items[0][0])}</lastBuildDate>")
+    for d, first, relpath, title, desc in items:
+        link = SITE + "/" + relpath[:-len("index.html")]
+        out += ["  <item>", f"    <title>{esc(title)}</title>", f"    <link>{link}</link>", f'    <guid isPermaLink="true">{link}</guid>',
+                f"    <description>{esc(desc)}</description>", f"    <pubDate>{rfc(first)}</pubDate>", "  </item>"]
+    out += ["</channel>", "</rss>"]
     return "\n".join(out) + "\n"
 
 def build_llms():
@@ -705,6 +768,7 @@ def main():
         if not os.path.exists(full) or open(full, encoding="utf-8").read() != content:
             CHANGED.add(p_)
     outputs["sitemap.xml"] = build_sitemap(set(all_pages()) | set(outputs) - {"sitemap.xml", "llms.txt"})
+    outputs["rss.xml"] = build_rss(outputs)
     changed = []
     for p, content in sorted(outputs.items()):
         full = rel(p)
