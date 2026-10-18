@@ -12,8 +12,9 @@
         <meta name="robots" content="noindex"/>
         <title>사이트맵 – SugarMount</title>
         <style>
-          :root { --bg:#f7f8fa; --fg:#1b1f24; --muted:#5b6470; --line:#e3e6ea; --card:#fff; --accent:#1f6feb; }
-          @media (prefers-color-scheme: dark) { :root { --bg:#0f1418; --fg:#e6e9ec; --muted:#9aa4ae; --line:#26303a; --card:#151c22; --accent:#6aa7ff; } }
+          /* SDS neutral tokens (assets/site.css ref values): paper, white, ink-900, ink-600, line-200, ink-400 link line */
+          :root { --bg:#F6F8FB; --fg:#142033; --muted:#4B5668; --line:#DCE2EA; --card:#FFFFFF; --accent:#142033; --link-line:#7C8596; color-scheme:light dark; }
+          @media (prefers-color-scheme: dark) { :root { --bg:#0F1622; --fg:#E8EDF4; --muted:#A7B1BF; --line:#2A3546; --card:#172131; --accent:#E8EDF4; --link-line:#6A7487; } }
           * { box-sizing: border-box; }
           body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.55 system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
           main { max-width:960px; margin:0 auto; padding:32px 16px 48px; }
@@ -24,7 +25,7 @@
           th, td { text-align:left; padding:10px 14px; border-bottom:1px solid var(--line); vertical-align:top; }
           th { font-size:13px; color:var(--muted); font-weight:600; }
           tr:last-child td { border-bottom:0; }
-          td.url a { color:var(--accent); text-decoration:none; word-break:break-all; }
+          td.url a { color:var(--accent); text-decoration:underline 1px; text-decoration-color:var(--link-line); text-underline-offset:3px; word-break:break-all; }
           td.n { white-space:nowrap; color:var(--muted); font-variant-numeric:tabular-nums; }
           @media (max-width:560px) { th.hide, td.hide { display:none; } }
         </style>

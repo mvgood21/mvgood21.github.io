@@ -9,22 +9,52 @@ Plain static files, no framework. `tools/build.py` (Python standard library only
 
 | What | Source of truth | Who writes it |
 |---|---|---|
-| `index.html`, `en/index.html` (home) | `data/apps.json` | generated |
-| `privacy/index.html`, `en/privacy/index.html` (policy list) | `data/apps.json` + effective dates read from each policy | generated |
-| `apps/<app_path>/` for apps with `"page": "generated"` | `data/apps.json` (`features`, `facts`, `privacy`, `faq`) | generated |
-| `sitemap.xml` (with app icons/screenshots as image entries; browser view via the static `sitemap.xsl`), `rss.xml` (ko app pages and articles, for Naver), `robots.txt` (blocks `/tools/`, `/data/`, `AGENTS.md`; lists sitemap and RSS), `llms.txt`, `404.html` | all pages + `data/apps.json` | generated |
-| articles under an app: `apps/<app_path>/<slug>/index.html` | the file's own `<main>` | you; build adds app breadcrumbs, `Article` JSON-LD, and lists the article on the app page under 도움말 / Help articles |
-| SEO/GEO extras on every app page and article | build | `FAQPage` JSON-LD from `<details><summary>` in `<main>`, `featureList`/`dateModified` in `MobileApplication`, a visible 최종 업데이트 line (git date), RSS `<link rel=alternate>`; extras sit between `<!-- build:extra -->` markers, do not edit inside them |
-| every other `*.html` (hand-written app pages, all privacy policies) | the file's own `<main>` | you; build keeps `<main>` byte for byte and replaces `<head>`, header, footer, breadcrumbs and JSON-LD around it |
-| share images `assets/og/<id>-<lang>.png`, `assets/og.png`, `assets/logo.png` | `data/apps.json` | `tools/og.py` (needs Pillow) |
+| `index.html`, `en/index.html` (home), `apps/index.html`, `en/apps/index.html` (app hub) | `data/apps.json` | generated |
+| `privacy/index.html`, `en/privacy/index.html` (policy list, incl. AXFamily delete/terms links) | `data/apps.json` + effective dates read from each policy | generated |
+| `apps/<app_path>/` for apps with `"page": "generated"` | `data/apps.json` (`title_topic`, `meta`, `summary`, `features`, `facts`, `privacy`, `limits`, `faq`, `tasks`, `releases`) | generated |
+| `sitemap.xml` (lastmod = modified; images: screenshots/article captures + app share image), `rss.xml` + `en/rss.xml` (full `<main>` per item, for Naver and subscribers; never submit RSS as a sitemap), `robots.txt` (one `User-agent: *` group, one `Sitemap:` line), `llms.txt`, `404.html`, `/<IndexNow key>.txt` (from `data/indexnow-key.txt`) | all pages + `data/apps.json` | generated |
+| `assets/sds-apps.css` (per-app accent tokens for `[data-app]`), `assets/fonts/pretendard.css` (only the Pretendard subsets the site's text needs) | `data/apps.json`, rendered pages | generated in memory by `tools/sds_apps.py` before the CSS version `?v=` is computed |
+| `data/content-dates.json` (published/modified per page) | hash of each hand page's `<main>` minus build blocks, or of a generated page's input data | `tools/dates.py` via the build; never edit dates by hand |
+| articles under an app: `apps/<app_path>/<slug>/index.html` (ko and en pair) | the file's own `<title>`, description and `<main>` | you; build adds breadcrumbs, `build:meta` (byline, read time, updated), `build:toc` (3+ `h2[id]`), `Article` JSON-LD with the `assets/og/article-*` images, and lists the article on the app page, hub and home |
+| AX notes: hub `ax/index.html` + `ax/<slug>/index.html` (ko and en) | the file's own `<main>` | you; build adds breadcrumbs, `build:meta`, `build:toc`, `Article` (hub: `CollectionPage`) JSON-LD, the hub list between `<!-- build:ax-list -->` markers, "다른 AX 노트" links, home section, RSS, sitemap and llms.txt entries. Content rule: only SugarMount's own apps and repos, numbers with source and date; no employer, job title, or link to the separate AX consulting site (re-identification risk, owner decision 2026-10-18) |
+| `/about/`, `/en/about/` | the file's own `<main>` | you; build adds `ProfilePage` + the one full `Organization` node, `build:toc` |
+| `design/index.html` (SDS demo, ko only, `noindex`, listed in `NOINDEX_PATHS`) | the file's own `<main>` | you; no canonical, hreflang, breadcrumbs, JSON-LD, sitemap/RSS/llms entry |
+| every other `*.html` (hand-written app pages, all privacy policies) | the file's own `<main>` | you; build keeps `<main>` byte for byte except the `<!-- build:NAME -->` blocks (`tasks`, `meta`, `toc`, `extra`, `ax-list`) and one rewrite: Play install links on app pages and articles get the site's `referrer` UTM. It replaces `<head>`, header (Popover menu), footer, breadcrumbs and JSON-LD around `<main>`. Policies get a `build:extra` "관련 문서" block (app page, one help article, AXFamily documents) |
+| share images `assets/og/app-<id>-<lang>.png`, `assets/og/article-*.png`, hub/about/AX/privacy cards, `assets/og.png` (ko home) + `assets/og/home-en.png` (en home), `assets/logo.png`, `favicon.ico`, `assets/favicon.png`, `assets/apple-touch-icon.png` | real screenshots in `assets/apps`, `data/apps.json` | `tools/og.py` (needs Pillow); `python tools/og.py --articles` after adding an article |
 
 Never edit generated files by hand; the next build overwrites them. Edit `data/apps.json` or `tools/build.py` instead.
+`assets/site.css` is hand-written (SDS tokens and components); `sitemap.xsl` is static (SDS neutral colours).
 
 ```bash
-python3 tools/og.py          # only when an app is added or its name/tagline/icon changes
-python3 tools/build.py       # rebuild; prints how many files changed
-python3 tools/build.py --check   # exit 1 if a rebuild would change anything (run before committing)
+python tools/og.py                 # when an app is added or its screenshots/name change (all share images)
+python tools/build.py              # rebuild; prints how many files changed and a one-line gate summary
+python tools/build.py --check      # exit 1 if a rebuild would change anything OR a gate fails (run before committing)
+python tools/checks.py --file <path>   # read-only checks for content authors (title, description, <main>)
+python -m unittest discover -s tools/tests
+python tools/indexnow.py           # dry run: URLs whose modified date is today; --send only with owner approval
+                                   # (default: the shared api.indexnow.org, which already reaches Naver)
 ```
+
+`--check` gates: `tools/checks.py` over the in-memory build (structured data, links and anchors, headings, head/hreflang/NOINDEX,
+sitemap/RSS/robots/llms, size and font budgets), plus SDS gates (accent contrast ≥ 4.5, `sds-apps.css` tokens equal the computed
+ones, header mark colours equal `tools/og.py`). Idempotency test: two builds in a row change nothing, and
+`SOURCE_DATE=<tomorrow> python tools/build.py` changes nothing either.
+
+### Who edits what (several agents may work in parallel)
+
+- Content authors own the `<title>`, `<meta name="description">` and `<main>` of hand-written pages. Do not edit inside
+  `<!-- build:NAME -->` blocks or outside `<main>`, and do not run `tools/build.py`; check with `tools/checks.py --file`.
+- `tools/build.py`, every generated file and everything outside `<main>` belong to the build owner, who runs the one
+  integration build. New build logic goes in a new module that `build.py` imports (`dates.py`, `checks.py`, `sds_apps.py`).
+- Headings in the chrome are `p.menu-title` / `p.footer-title` (no `<h*>` outside `<main>`); `data-app` goes on `<main>` only
+  (menu `.app-tile` excepted); one anchor text never points at two URLs on a page, header and footer included.
+
+### App source of truth (B0-7)
+
+Facts on app pages, articles and policies are checked against these repositories:
+`C:\Users\mvgood\sugar-utils` (canonical for sugarcompress, sugarflip, sugarconvert, sugardoc; the copy at
+`P:\Projects\Projects_SM\sugar-utils` is not used), `C:\Users\mvgood\sugar-game` (arrows, blocks),
+`P:\Projects\Projects_SM\<app>` (sugarspeller, sugarcard, sugaralbum, sugarclip). If a fact cannot be verified there, leave it out.
 
 ## Adding or updating an app
 
@@ -37,7 +67,7 @@ python3 tools/build.py --check   # exit 1 if a rebuild would change anything (ru
    - `ko` / `en`: `name`, `brand`, optional `store_title`, `tagline` (one line), `desc` (2–3 sentences), `shots`.
 3. Write the privacy policy pages `privacy/<privacy_path>/index.html` and `en/privacy/<privacy_path>/index.html` from a source audit (copy an existing policy for structure; the build replaces head/header/footer). Keep the `시행일: YYYY년 M월 D일` / `Effective: Month D, YYYY` line; the policy list reads it.
 4. Hand-written app page (if `page: hand`): `apps/<app_path>/index.html` + `en/...`, content inside `<main>`.
-5. `python3 tools/og.py && python3 tools/build.py && python3 tools/build.py --check`, check the page in a browser at 390 px and desktop, then commit.
+5. `python tools/og.py && python tools/build.py && python tools/build.py --check`, check the page in a browser at 390 px and desktop, then commit.
 
 ## Fixed URLs (do not move)
 
@@ -51,4 +81,7 @@ python3 tools/build.py --check   # exit 1 if a rebuild would change anything (ru
 - Policies describe the actual code. Don't add claims the code doesn't back.
 - No home address, phone number or secrets anywhere. Privacy officer is listed as "Stephen, Jeong (simpest)".
 - Several Claude sessions edit this repo. Pull before editing, keep changes small, run `--check` before committing.
-- Design tokens and components live in `assets/site.css`; each app's accent comes from `apps.json` via `style="--accent:…"`.
+- Design tokens and components live in `assets/site.css` (SDS; demo at `/design/`); each app's accent comes from `apps.json`
+  through the generated `assets/sds-apps.css` and `data-app="<id>"` on `<main>`. Fonts are self-hosted (no external origin).
+  `/en/` pages use the `Pretendard Latin` family (two subsets, about 62 KB); any other glyph there falls back to the system
+  font, as do `.sym`, code and the breadcrumb separator.
