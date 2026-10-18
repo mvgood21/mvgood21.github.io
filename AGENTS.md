@@ -79,7 +79,7 @@ Facts on app pages, articles and policies are checked against these repositories
 ## Rules
 
 - Policies describe the actual code. Don't add claims the code doesn't back.
-- No home address, phone number or secrets anywhere. Privacy officer is listed as "Stephen, Jeong (simpest)".
+- No home address, phone number or secrets anywhere. Privacy officer is listed as "Simpest".
 - Several Claude sessions edit this repo. Pull before editing, keep changes small, run `--check` before committing.
 - Design tokens and components live in `assets/site.css` (SDS; demo at `/design/`); each app's accent comes from `apps.json`
   through the generated `assets/sds-apps.css` and `data-app="<id>"` on `<main>`. Fonts are self-hosted (no external origin).
