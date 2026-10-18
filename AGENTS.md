@@ -13,7 +13,8 @@ Plain static files, no framework. `tools/build.py` (Python standard library only
 | `privacy/index.html`, `en/privacy/index.html` (policy list) | `data/apps.json` + effective dates read from each policy | generated |
 | `apps/<app_path>/` for apps with `"page": "generated"` | `data/apps.json` (`features`, `facts`, `privacy`, `faq`) | generated |
 | `sitemap.xml` (with app icons/screenshots as image entries; browser view via the static `sitemap.xsl`), `rss.xml` (ko app pages and articles, for Naver), `robots.txt` (blocks `/tools/`, `/data/`, `AGENTS.md`; lists sitemap and RSS), `llms.txt`, `404.html` | all pages + `data/apps.json` | generated |
-| articles under an app: `apps/<app_path>/<slug>/index.html` | the file's own `<main>` | you; build adds app breadcrumbs and `Article` JSON-LD |
+| articles under an app: `apps/<app_path>/<slug>/index.html` | the file's own `<main>` | you; build adds app breadcrumbs, `Article` JSON-LD, and lists the article on the app page under 도움말 / Help articles |
+| SEO/GEO extras on every app page and article | build | `FAQPage` JSON-LD from `<details><summary>` in `<main>`, `featureList`/`dateModified` in `MobileApplication`, a visible 최종 업데이트 line (git date), RSS `<link rel=alternate>`; extras sit between `<!-- build:extra -->` markers, do not edit inside them |
 | every other `*.html` (hand-written app pages, all privacy policies) | the file's own `<main>` | you; build keeps `<main>` byte for byte and replaces `<head>`, header, footer, breadcrumbs and JSON-LD around it |
 | share images `assets/og/<id>-<lang>.png`, `assets/og.png`, `assets/logo.png` | `data/apps.json` | `tools/og.py` (needs Pillow) |
 

@@ -56,7 +56,7 @@ T = {
     "app_title": "{name} ({brand}) – Android 앱 | SugarMount",
     "features_h": "이런 일을 합니다", "facts_h": "한눈에 보기", "status_h": "상태", "package_h": "패키지 이름", "dev_h": "개발자",
     "privacy_h": "개인정보", "privacy_more": "자세한 내용은 {link}에서 확인할 수 있습니다.", "policy_of": "{name} 개인정보처리방침",
-    "related_h": "다른 앱", "shots_label": "{name} 스크린샷",
+    "related_h": "다른 앱", "shots_label": "{name} 스크린샷", "guides_h": "도움말", "updated": "최종 업데이트",
     "footer_apps": "앱", "footer_policies": "개인정보처리방침", "copyright": "© 2026 simpest · SugarMount",
     "nf_title": "페이지를 찾을 수 없습니다 – SugarMount", "nf_h": "페이지를 찾을 수 없습니다",
     "nf_p": "주소가 바뀌었거나 없는 페이지입니다. 홈에서 앱을 찾거나 개인정보처리방침 목록을 확인해 주세요.",
@@ -96,7 +96,7 @@ T = {
     "app_title": "{name} – Android app | SugarMount",
     "features_h": "What it does", "facts_h": "At a glance", "status_h": "Status", "package_h": "Package name", "dev_h": "Developer",
     "privacy_h": "Privacy", "privacy_more": "See {link} for details.", "policy_of": "the {name} privacy policy",
-    "related_h": "More apps", "shots_label": "{name} screenshots",
+    "related_h": "More apps", "shots_label": "{name} screenshots", "guides_h": "Help articles", "updated": "Last updated",
     "footer_apps": "Apps", "footer_policies": "Privacy policies", "copyright": "© 2026 simpest · SugarMount",
     "nf_title": "Page not found – SugarMount", "nf_h": "Page not found",
     "nf_p": "This page has moved or does not exist. Find an app on the home page or check the list of privacy policies.",
@@ -214,6 +214,8 @@ def app_ld(a, lang, page_url):
           "applicationCategory": a["schema_category"], "image": SITE + a["icon"] + ".png",
           "author": {"@id": ORG_ID}, "publisher": {"@id": ORG_ID}}
     if a.get("languages"): ld["inLanguage"] = a["languages"]
+    if d.get("features"): ld["featureList"] = [f for f, _ in d["features"]]
+    ld["dateModified"] = git_date(page_url.lstrip("/") + "index.html")
     if d.get("shots"): ld["screenshot"] = [SITE + s["src"] for s in d["shots"]]
     if a.get("play"):  # only public listings get an offer and install link
         ld["offers"] = {"@type": "Offer", "price": "0", "priceCurrency": "KRW"}
@@ -264,6 +266,7 @@ def head(lang, title, desc, path, alt_path, *, og_type="website", og_image=None,
   <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
   <link rel="icon" type="image/png" href="/assets/favicon.png">
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="/rss.xml">
   <link rel="preconnect" href="https://hangeul.pstatic.net" crossorigin>
   <link rel="preload" href="https://hangeul.pstatic.net/hangeul_static/webfont/NanumSquareNeo/NanumSquareNeoTTF-bRg.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/assets/site.css?v={CSSV}">{ld_html}
@@ -520,7 +523,9 @@ def build_app(a, lang):
       <ul class="related">
 {related}
       </ul>
-    </section>'''
+    </section>
+
+    {updated_line(lang, path.lstrip("/") + "index.html")}'''
     title = t["app_title"].format(name=name, brand=d["brand"]) if d["brand"] != name else t["app_title"].replace(" ({brand})", "").format(name=name)
     desc = clip_sentences(f'{d["tagline"]} {d["desc"]}', 170)
     og = f"/assets/og/{a['id']}-{lang}.png"
@@ -530,6 +535,26 @@ def build_app(a, lang):
     return page(lang, h, accent_attr(a), header(lang, "apps", alt), main, footer(lang))
 
 # ---------------------------------------------------------------- hand-written pages
+def plain(x):
+    return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", x))).strip()
+
+def updated_line(lang, relpath):
+    d = git_date(relpath)
+    return f'<p class="muted updated">{T[lang]["updated"]} <time datetime="{d}">{d}</time></p>'
+
+def article_links(lang, app_path):
+    """Help articles under apps/<app_path>/<slug>/ in this language, newest first: [(url, h1)]."""
+    base = rel(("en/" if lang == "en" else "") + f"apps/{app_path}")
+    out = []
+    if os.path.isdir(base):
+        for slug in sorted(os.listdir(base)):
+            f = os.path.join(base, slug, "index.html")
+            if not os.path.isfile(f): continue
+            mh = re.search(r"<h1[^>]*>(.*?)</h1>", open(f, encoding="utf-8").read(), re.S)
+            relp = os.path.relpath(f, ROOT).replace(os.sep, "/")
+            out.append((git_first_date(relp), "/" + relp[:-len("index.html")], plain(mh.group(1)) if mh else slug))
+    return [(u, n) for _, u, n in sorted(out, reverse=True)]
+
 def wrap_hand(relpath):
     s = read(relpath)
     lang = "en" if relpath.startswith("en/") else "ko"
@@ -547,6 +572,7 @@ def wrap_hand(relpath):
     title = html.unescape(mt.group(1).strip())
     main = mm.group(1)
     main = re.sub(r'^\s*<nav class="crumbs".*?</nav>\n?', "", main, flags=re.S)  # ours, re-added below
+    main = re.sub(r"\s*<!-- build:extra -->.*?<!-- /build:extra -->", "", main, flags=re.S)  # ours, re-added below
     path = "/" + relpath[:-len("index.html")]
     bare = path[3:] if lang == "en" else path
     other = ("/en" + bare) if lang == "ko" else bare
@@ -578,6 +604,17 @@ def wrap_hand(relpath):
         lds.append({"@context": "https://schema.org", "@type": "WebPage", "name": title, "url": SITE + path, "inLanguage": lang,
                     "isPartOf": {"@id": SITE_ID}, "publisher": org_ld(),
                     **({"about": {"@id": SITE + app_url(a, lang) + "#app"}} if a and a.get("app_path") else {})})
+    if current != "privacy":
+        qa = [(plain(q), plain(x)) for q, x in re.findall(r"<details>\s*<summary>(.*?)</summary>(.*?)</details>", main, re.S)]
+        if qa: lds.append(faq_ld(qa))
+    if parts[0] == "apps" and len(parts) in (2, 3):
+        extra = []
+        arts = article_links(lang, parts[1]) if len(parts) == 2 else []
+        if arts:
+            lis = "".join(f'\n        <li><a href="{u}">{esc(n)}</a></li>' for u, n in arts)
+            extra.append(f'    <section aria-labelledby="guides-heading">\n      <h2 id="guides-heading">{t["guides_h"]}</h2>\n      <ul>{lis}\n      </ul>\n    </section>')
+        extra.append("    " + updated_line(lang, relpath))
+        main = main.rstrip() + "\n\n    <!-- build:extra -->\n" + "\n".join(extra) + "\n    <!-- /build:extra -->"
     nav, bc = crumbs(lang, items)
     lds.append(bc)
     og = f"/assets/og/{a['id']}-{lang}.png" if a else None
@@ -717,6 +754,16 @@ def build_llms():
     lines += ["", "## Facts", ""]
     for q, x in en["home_faq"]:
         lines.append(f"- {q} {x}")
+    arts = []
+    for relp in all_pages():
+        parts = relp[:-len("index.html")].strip("/").split("/")
+        if len(parts) == 3 and parts[0] == "apps":
+            c = read(relp)
+            mt = re.search(r"<h1[^>]*>(.*?)</h1>", c, re.S)
+            md = re.search(r'<meta name="description" content="([^"]*)"', c)
+            if mt and md: arts.append(f"- [{plain(mt.group(1))}]({SITE}/{relp[:-len('index.html')]}): {html.unescape(md.group(1))}")
+    if arts: lines += ["", "## Help articles (Korean)", ""] + arts
+    lines += ["", "## Feeds", "", f"- [Sitemap]({SITE}/sitemap.xml)", f"- [RSS (Korean app pages and articles)]({SITE}/rss.xml)"]
     lines += ["", "## Optional", "", f"- [Korean home (한국어)]({SITE}/): {ko['home_lead']}", f"- [Google Play developer page]({PLAY_DEV})", ""]
     return "\n".join(lines)
 
