@@ -6,7 +6,286 @@
   <description>Small Android apps that each do one thing simply, from shrinking photos and opening Korean HWP documents to checking Korean spelling and playing puzzle games.</description>
   <language>en</language>
   <atom:link href="https://mvgood21.github.io/en/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Mon, 19 Oct 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Tue, 20 Oct 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Finding fake tests by deleting their guards – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/guard-removal-test/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/guard-removal-test/</guid>
+    <description><![CDATA[<section class="hero">
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</h1>
+      <p class="lead">A pass count proves nothing on its own. We only count a test once we have deleted the code it protects and watched it fail.</p>
+      <p>3,066 tests were passing when the review found a blocker. The fourth adversarial review of our P2P chat app (Flutter) flagged one new SQLite setting that, traced through the plugin source, stops the database from opening on a device; the fix landed on September 11, 2026. The test SQLite hid the failure completely: reverting the fix left all 13 storage tests green. The app already had a rule that a test must fail when its guard is deleted, and the same review still caught two fixes that broke it. Our HWP viewer SugarDoc keeps that check as 12 Python scripts with 970 mutation rows and runs them at release.</p>
+      <p class="note">Sources: the chat app's commit <code>8f5a0a5</code> and the verification notes in that commit, plus SugarDoc's <code>scripts/qa</code> scripts and its 1.2.0 and 1.3.0 release records. All counts were taken again from git on October 20, 2026.</p>
+    </section>
+    <section aria-labelledby="pragma-blocker">
+      <h2 id="pragma-blocker">A row-returning PRAGMA sent through execute</h2>
+      <p>The blocker was a single line, <code>PRAGMA secure_delete = ON</code>. It was added that round so deleted messages get overwritten with zeros, and the code sent it through <code>db.execute()</code>, which expects no result rows. This pragma returns one. We reran all five pragmas from that function on October 20, 2026 with Python's <code>sqlite3</code> module (SQLite 3.45.1, in-memory database):</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">pragma</th><th scope="col">rows returned</th><th scope="col">call before the fix</th></tr></thead>
+          <tbody>
+            <tr><td><code>secure_delete = ON</code></td><td><code>[(1,)]</code></td><td><code>execute</code> (wrong)</td></tr>
+            <tr><td><code>foreign_keys = ON</code></td><td><code>[]</code></td><td><code>execute</code></td></tr>
+            <tr><td><code>synchronous = NORMAL</code></td><td><code>[]</code></td><td><code>execute</code></td></tr>
+            <tr><td><code>journal_mode = WAL</code></td><td><code>[('memory',)]</code></td><td><code>rawQuery</code></td></tr>
+            <tr><td><code>wal_autocheckpoint = 0</code></td><td><code>[(0,)]</code></td><td><code>rawQuery</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The clue was sitting in the same function. The two other pragmas that return rows already used <code>rawQuery</code>; only the new line did not. That setup code runs on every database open, before the version check. The review traced the iOS path through the plugin source: the <code>execute</code> path treats <code>SQLITE_ROW</code> as an error, so <code>openDatabase</code> itself fails and the whole storage layer goes with it. The Android side rests on the API contract of <code>SQLiteDatabase.execSQL</code>, which rejects statements that return rows. Neither platform has actually thrown the exception on a device yet.</p>
+      <p>The fix was one word:</p>
+      <pre><code>- await db.execute('PRAGMA secure_delete = ON');
++ await db.rawQuery('PRAGMA secure_delete = ON');</code></pre>
+    </section>
+    <section aria-labelledby="why-green">
+      <h2 id="why-green">The test SQLite could not see the failure</h2>
+      <p>Unit tests run on <code>sqflite_common_ffi</code>, a desktop backend, not on the phone's SQLite. Its <code>execute</code> runs a statement without arguments and silently drops whatever rows come back. No exception, so the 3,066 tests could never have said anything about this bug. The commit message puts it plainly: reverting the fix leaves all thirteen storage tests green while only the new guard fails.</p>
+      <p>Because no behavioural test can catch it, the guard reads source instead. <code>pragma_execute_guard_test.dart</code> pulls every string literal passed to <code>.execute(</code> under <code>lib/</code>, and runs each one that starts with PRAGMA through <code>rawQuery</code> on a real SQLite to see whether rows come back. The ffi backend returns rows normally from <code>rawQuery</code>, so the check tells the truth even inside the test environment. At the time <code>lib/</code> had 14 such calls: 3 pragmas and 11 table or index statements.</p>
+      <p>The scanner also checks itself. If it finds fewer than 5 <code>execute</code> literals, it assumes its regex broke and fails, so an empty scan cannot pass for free. (The same thinking is why the pragma list is not hard-coded. We ask SQLite instead, because a hand-kept list goes stale.)</p>
+    </section>
+    <section aria-labelledby="ai-wrong">
+      <h2 id="ai-wrong">Two fixes reported as verified had guards that guarded nothing</h2>
+      <p>The same review ran revert checks: undo each fix and see whether the test said to protect it turns red. Two fixes that the AI coding agent had reported as verified in the previous round failed this check.</p>
+      <ul>
+        <li>Removing the localisation wiring from the app (the part that makes screen readers speak the framework's labels in Korean) left its test green. The test launched the test harness's own <code>MaterialApp</code>, not the real app. It now drives the actual app widget and checks the localisations resolved beneath it.</li>
+        <li>Every message-eviction guard sat behind an environment variable that CI never sets. With eviction disabled, all 659 tests that run without that variable stayed green. They now run by default, and every revert in that area goes red.</li>
+      </ul>
+      <p>The review logged 26 findings, and 24 of them had been introduced by that round's own fixes. Its notes say the pattern of the previous fix creating new defects had now repeated four times. What the agent got wrong was the report more than the code. It really had added tests, and they really passed; nobody had checked what they measured.</p>
+      <p>The reviewer was an agent too. It changed no code, and it restored the tree after every revert experiment. Its brief carried this rule: if a test still passes after you revert the fix, the test is wrong. After the fixes the suite stood at 3,099 passed, 13 skipped, 0 failed.</p>
+    </section>
+    <section aria-labelledby="done-rule">
+      <h2 id="done-rule">The rule had been written down two days earlier</h2>
+      <p>When an agent says it added a test, delete the code that test is meant to protect and run it again. If it stays green, it does not count. The chat app's instruction file ties "done" to three conditions: zero analyzer errors, code reachable from <code>main.dart</code>, and code protected by a test. The release-readiness notes from September 9 already said every fix in that round was pinned by a test that fails when its guard is removed. Two days later the review still caught two that did not. Writing the rule down was not enough; it took a second agent actually reverting the fixes.</p>
+      <p>The order of checks we run before a release is in <a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>. This note is only about whether each test inside those checks can be trusted.</p>
+    </section>
+    <section aria-labelledby="harness">
+      <h2 id="harness">The guard-removal harness: plain Python, one guard per row</h2>
+      <p>SugarDoc has shipped a guard-removal script beside each feature since its first commit on October 8, 2026. As of October 18 there are 12 scripts, 970 mutation rows and 1,919 lines. Each row is a promise: change this string in this file, and this test class must fail. Below is a real row from the 1.2.0 PDF export script, followed by the core of the harness, trimmed.</p>
+      <pre><code># (id, file, [(original, replacement)], module, test class that must fail)
+("ctl.logOnlySaved", P + "ReaderController.kt",
+ [("if (result == PdfWriteResult.SAVED) log(...)", "log(...)")],
+ "sugardoc", "ReaderControllerTest"),
+for mid, rel, edits, kind, target in MUT:
+    path, orig = mutate(rel, edits)          # only ever in the copy
+    try:
+        ok, fails, out = run_row(kind, target)  # gradlew --no-daemon --tests *.target
+        if "e: file://" in out:
+            verdict = "COMPILE-ERROR"
+        else:
+            verdict = "FAILS-AS-EXPECTED" if ok else "STILL-PASSES"
+    finally:
+        open(path, "w", encoding="utf-8").write(orig)</code></pre>
+      <p>(The <code>log(...)</code> is shortened here; the real row spells out the analytics event.) Five decisions carry the design:</p>
+      <ul>
+        <li>The working tree is never touched. The repository is copied to a separate folder without <code>.git</code>, build outputs or signing keys, and every mutation happens there. Another agent session may be working in the same tree.</li>
+        <li>Each original string must match exactly once. Anything other than one match marks the row <code>BAD-PATTERN</code>, meaning the source moved and the row needs updating.</li>
+        <li>A catch needs two signals: Gradle exits with failure and the JUnit XML contains a failed test case. Compile errors are reported separately as <code>COMPILE-ERROR</code>. Going by exit code alone would count a typo in the mutation as a catch.</li>
+        <li>One Gradle run at a time, no daemon, only the named test class, with a lock file holding the process ID so two runs never share a copy.</li>
+        <li>The mutated file is always restored in <code>finally</code>.</li>
+      </ul>
+    </section>
+    <section aria-labelledby="still-passes">
+      <h2 id="still-passes">Two rows that stayed green in 1.3.0</h2>
+      <p>The SugarDoc 1.3.0 release record from October 18 holds real catches. After confirming that all 147 rows of the editing script still matched once, the 37 rows added or changed that day were run. Two came back <code>STILL-PASSES</code> on the first run.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Row</th><th scope="col">Mutation</th><th scope="col">Cause</th><th scope="col">Fix</th></tr></thead>
+          <tbody>
+            <tr><td><code>retry.partialFails</code></td><td>drop <code>partial ||</code> from the retry-save condition</td><td>weak test</td><td>test now loses only the second edit during replay</td></tr>
+            <tr><td><code>retry.cancelStops</code></td><td>delete the cancel check</td><td>the same defence existed in two places</td><td>removed the duplicate and aimed the row at the guard that remained</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The rerun after the fixes came back 4 of 4 failing, as it should. The PDF export script went 32 of 32 <code>FAILS-AS-EXPECTED</code> the same day. STILL-PASSES does not always mean a weak test. If the code defends the same thing twice, deleting one copy changes nothing, and the fix belongs in the code. (An agent wrote the tests for both features, too.)</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">What is still open</h2>
+      <p>The Android failure in the chat app has not been measured. The verification notes list it as open: build an APK from the commit before the fix, install it on an emulator and read logcat at the first database open. iOS needs a macOS machine we do not have. On the SugarDoc side, 1.3.0 reran only the 37 changed rows of the editing script; the 110 untouched rows were not rerun. Whether those older rows still go red will show at the next full run.</p>
+    </section>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>How do you find a fake test?</summary><div><p>Delete or invert the code the test claims to protect, then run only that test. If it stays green, it does not protect that code. We write each such check down as a mutation row and rerun the rows at release.</p></div></details>
+        <details><summary>Can I trust tests an AI agent wrote?</summary><div><p>Not by the pass count. In the chat app 3,066 passing tests sat on top of a blocker, and two fixes reported as verified kept their tests green after the fix was deleted. We only count a test once we have seen it fail with its guard removed.</p></div></details>
+        <details><summary>Why a hand-written script instead of a mutation testing tool?</summary><div><p>The question we needed answered was whether this test guards this line. Each row pairs one guard with the one test class that should catch it, and runs only that class. We have not compared it with off-the-shelf tools for speed or catch rate.</p></div></details>
+        <details><summary>Does STILL-PASSES always mean the test is weak?</summary><div><p>No. Of the two rows that stayed green in SugarDoc 1.3.0, one had a weak test and the other guarded code that was defended twice. In the second case we removed the duplicate defence and pointed the row at the guard that remained.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Tue, 20 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Play Console DEX optimization and an R8 keep rule – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/</guid>
+    <description><![CDATA[<section class="hero">
+      <span class="eyebrow">AX notes · Measurement</span>
+      <h1>Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</h1>
+      <p class="lead">A leftover Kakao SDK ProGuard file kept every public member of every class out of R8; deleting it moved the bundle's r8.json numbers from 39% to 85%.</p>
+      <p>Play Console still rated the latest bundle of <a href="https://mvgood21.github.io/en/apps/sugarspeller/">SugarSpeller</a>, our Korean spelling checker, as "intermediate" on September 25, 2026: optimization 36%, obfuscation 39%, shrinking 39%. Five days earlier we had removed the <code>-dontoptimize</code> line that kept R8 from optimizing at all. The rest of the gap came from one seven-line ProGuard file for the Kakao SDK, which the app does not use. With it gone the same day, the unshrunk share in the bundle's r8.json fell from 61.47% to 15.18% (85% once subtracted from 100), and the AAB went from 18.4 MB to 11.6 MB.</p>
+      <p class="note">Numbers come from SugarMount's app repository (sugarspeller): commits a597223 (2026-09-20) and e05f8e3 (2026-09-25), the changelog entries for 1.6.020 and 1.6.023, the post-release watch log, and an r8.json read again from a local release AAB while writing this note. Checked on October 20, 2026.</p>
+    </section>
+    <section aria-labelledby="play-metric">
+      <h2 id="play-metric">The Play Console figure is r8.json turned upside down</h2>
+      <p>Those percentages line up with a file the Android Gradle Plugin (AGP) already puts in every R8-processed release bundle: <code>BUNDLE-METADATA/com.android.tools/r8.json</code>. Its <code>stats</code> block records the share of code that was <em>not</em> shrunk, obfuscated or optimized.</p>
+<pre><code>unzip -p app-release.aab BUNDLE-METADATA/com.android.tools/r8.json
+"stats":{"noObfuscationPercentage":61.48,
+         "noOptimizationPercentage":64.27,
+         "noShrinkingPercentage":61.47}</code></pre>
+      <p>Subtract each value from 100 and you get what Play shows: 61.47 became 39% shrunk, 64.27 became 36% optimized. We matched that from our own before-and-after numbers, not from a Google spec, but it held for the two Play readings we have (0% before, 36/39/39% after the first fix). The practical upshot is that you can read the metric locally before uploading anything.</p>
+      <p>The build used AGP 9.4.0 with R8 full mode, resource shrinking and the stock <code>proguard-android-optimize.txt</code>. Our repository notes say Play wants this metric addressed by February 2027; we could not re-check the wording on the Play screen for this note.</p>
+    </section>
+    <section aria-labelledby="dontoptimize">
+      <h2 id="dontoptimize">Dropping -dontoptimize took optimization from 0% to 36%</h2>
+      <p>Commit a597223 on September 20 removed <code>-dontoptimize</code> from <code>proguard-common.pro</code>. It had been added on purpose, out of fear that optimization would break the Gson reflection that parses spelling results, and it pinned Play's optimization figure at 0%. The comparison baseline was the previous HEAD (1.6.019) built in the same environment.</p>
+      <p>Unoptimized code went from 100% to 64.25%, and uncompressed DEX from 16.31 MB to 14.84 MB. The AAB dropped from 29.95 MB to 18.33 MB, but most of that was a greeting-card editor and roughly 11 MB of its assets leaving in the same release. Optimization's own share sits inside the 1.5 MB of DEX.</p>
+      <p>One number moved the wrong way. Unobfuscated code <em>rose</em> from 54.16% to 61.46%. The commit put that down to "app code shrank, so the SDK keep rules weigh more" and moved on. Version 1.6.020 shipped on September 22. Three days later came the 36/39/39% reading from the top of this note.</p>
+    </section>
+    <section aria-labelledby="merged-config">
+      <h2 id="merged-config">The merged configuration.txt had a rule on class *</h2>
+      <p>Every rule R8 actually applied ends up in one file, <code>app/build/outputs/mapping/release/configuration.txt</code>: the defaults, the app's six .pro files, and the consumer rules each library AAR brings along. Reading through it on September 25 turned up this block.</p>
+<pre><code># proguard-kakao.pro (in the repo since the first commit, 2020-12-16)
+-keep class com.kakao.** { *; }
+-keepattributes Signature
+-keepclassmembers class * {
+  public static &lt;fields&gt;;
+  public *;
+}
+-dontwarn android.support.v4.**,org.slf4j.**,com.google.android.gms.**</code></pre>
+      <p>The third rule is the problem. <code>class *</code> has no condition, so it matches every class in the app and in every library. Their public fields and methods can then not be removed, renamed or inlined. And the Kakao SDK (the SDK for KakaoTalk login and sharing) was not a dependency at all; even its Maven repository line in the root build script was commented out.</p>
+      <p>Commit e05f8e3 deleted the file and both build references to it, release and debug. It also deleted <code>proguard-retrofit2.pro</code>, which no build had ever referenced. (The merged file from the October 9, 2026 release build is 1,369 lines. Short enough to read end to end.)</p>
+      <p>Do not ship an unconditional keep rule on <code>class *</code> in an Android app. Libraries that need rules already ship them as consumer rules inside their AAR.</p>
+    </section>
+    <section aria-labelledby="before-after">
+      <h2 id="before-after">Before and after: r8.json and sizes for both changes</h2>
+      <p>Each pair of columns comes from a different day and a different commit, so compare within a pair. Even the same configuration drifts in the second decimal: 64.25% on September 20, 64.27% on September 25.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Metric</th><th scope="col">1.6.019 baseline</th><th scope="col"><code>-dontoptimize</code> removed (Sep 20)</th><th scope="col">Before kakao file removal (Sep 25)</th><th scope="col">After (Sep 25)</th></tr></thead>
+          <tbody>
+            <tr><td>Not optimized</td><td>100%</td><td>64.25%</td><td>64.27%</td><td>15.68%</td></tr>
+            <tr><td>Not obfuscated</td><td>54.16%</td><td>61.46%</td><td>61.48%</td><td>15.14%</td></tr>
+            <tr><td>Not shrunk</td><td>not recorded</td><td>not recorded</td><td>61.47%</td><td>15.18%</td></tr>
+            <tr><td>As Play shows it (opt/obf/shrink)</td><td>optimization 0% (Play screen)</td><td>36/39/- (derived from r8.json)</td><td>36/39/39% (Play screen)</td><td>84/85/85 (derived from r8.json, not yet seen on Play)</td></tr>
+            <tr><td>DEX</td><td>16.31 MB (uncompressed)</td><td>14.84 MB</td><td>15.6 MB (total)</td><td>8.2 MB</td></tr>
+            <tr><td>AAB</td><td>29.95 MB</td><td>18.33 MB (asset removal included)</td><td>18.4 MB</td><td>11.6 MB</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Measured by DEX size, deleting one rule did about five times what removing <code>-dontoptimize</code> did. DEX shrank by 1.5 MB on September 20 and by 7.4 MB (47%) on September 25, and the AAB lost another 6.8 MB.</p>
+      <p>Before release, a release APK signed with the debug key ran on an API 34 emulator. A spelling check against Naver (Korea's largest web portal) came back with the two corrections the server reported, and the post-check quiz bubble, the quiz screen and Remote Config content injection all worked. The five JSON key strings Gson reads were still present verbatim in the release DEX. (A headless emulator returns black screenshots, so we read screen text with <code>uiautomator dump</code> instead.)</p>
+      <p>The post-release watch log closes the loop. From September 22 to October 3 it recorded zero crashes for 1.6.020, for 1.6.024 (the first release without the kakao rule) and for 1.6.025, and closed the item as "no regression".</p>
+    </section>
+    <section aria-labelledby="ai-errors">
+      <h2 id="ai-errors">The clue the agent explained away</h2>
+      <p>An AI coding agent (Claude) wrote both commits. On September 20 it declared in the commit message that the <code>-dontoptimize</code> line was the cause. It also recorded, accurately, that unobfuscated code had gone up by more than 7 points. What it did not do was check which rule was holding that code; it filled the gap with a guess that the keep rules had not changed and the SDKs simply weighed more.</p>
+      <p>A person caught it. On the afternoon of September 25 the operator pasted a Play Console screenshot, noted that the bundle still looked unoptimized, and asked for a deeper analysis. Only then did the agent open the merged configuration, and the seven-line file from 2020 surfaced. Opening <code>configuration.txt</code> first instead of guessing would have saved five days.</p>
+      <p>Two lines went into the repository's agent instructions afterwards: never add a keep rule on <code>class *</code>, and check the merged result in configuration.txt. The checks we run to catch release-only R8 failures before shipping are in <a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Still open</h2>
+      <ul>
+        <li>Confirming the Play screen. The repository holds only the 85% derived from r8.json; nothing records the Play Console figure after release. We will capture it on the next upload.</li>
+        <li>The ratio creeping back. A new Firebase dependency in 1.6.025 pulled the build down about 5 points, to roughly 80%. The release AAB left on disk from October 9, 2026 reads 20.23% unoptimized with 9.30 MB of DEX (9,302,488 bytes). Next step: diff configuration.txt to see which consumer rule arrived.</li>
+      </ul>
+    </section>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Does the Play Console DEX optimization warning block uploads?</summary><div><p>It did not in September 2026: bundles at 0% and at 36% optimization both shipped normally. Our repository notes say Play expects it fixed by February 2027, so it is not something to leave for later.</p></div></details>
+        <details><summary>Can I see the optimization percentage before uploading to Play?</summary><div><p>Yes. Extract <code>BUNDLE-METADATA/com.android.tools/r8.json</code> from the release AAB and subtract the three <code>stats</code> values from 100. For this app, 61.47 matched Play's 39%. That mapping is our inference from repository records, and nothing yet records whether Play showed the 85% that 15.18 implies.</p></div></details>
+        <details><summary>How do I find the keep rule that is holding the metric down?</summary><div><p>Search the merged <code>configuration.txt</code> for <code>-keep</code> or <code>-keepclassmembers</code> rules on wide patterns such as <code>class *</code> or <code>**</code> with no condition attached. Here it was a single <code>-keepclassmembers class * { public *; }</code> block in a file for an SDK the app did not use.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Tue, 20 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Accurate sitemap lastmod from a content hash – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/</guid>
+    <description><![CDATA[<section class="hero">
+      <span class="eyebrow">AX notes · Short note</span>
+      <h1>Every sitemap lastmod had the same date: deriving modified dates from a content hash</h1>
+      <p class="lead">Don't type lastmod by hand or copy it from git commit dates. Compute it from a hash of the page body, and keep the date itself out of what you hash.</p>
+      <p>Pull sitemap.xml out of commit <code>12ed443</code> and count its lastmod values: every one of the 51 URLs says <code>&lt;lastmod&gt;2026-10-18&lt;/lastmod&gt;</code>. One commit earlier there were five different dates. Today a page's modified date only moves when its body hash changes. A commit on October 19 touched 99 HTML files and moved the date on just 6 existing pages.</p>
+      <p class="note">Sources: this site's git history, <code>tools/dates.py</code> and <code>tools/indexnow.py</code>, checked on October 20, 2026.</p>
+    </section>
+    <section aria-labelledby="why-same-date">
+      <h2 id="why-same-date">Commit dates made every page look new</h2>
+      <p>The old build set each URL's lastmod to the date of the last git commit that touched the file. That helper, <code>git_date</code>, arrived on October 5 in <code>bdbbe97</code>, a commit that carries an AI coding agent's co-author line. The agent's code measured when a file changed. A sitemap needs to know when the content did.</p>
+      <p>It broke on <code>12ed443</code>, a site-wide pass. Fifty-two HTML files went into one commit, each gaining an RSS <code>&lt;link&gt;</code> in its head, and all 51 sitemap URLs ended up on that day. Re-running today's hash rule (the inside of <code>&lt;main&gt;</code>) over those 52 files, only 2 had real body changes: the SugarDoc app page in Korean and English. 42 had identical bodies. The other 8 differed by a single added line, a "last updated" date. (Counting structured data in the head as well, 11 pages changed their FAQ or feature list.)</p>
+      <p>Google's sitemap documentation says it uses lastmod only if the value is "consistently and verifiably" accurate, and gives a copyright date update as an example of a change that isn't significant. Moving 51 dates for one RSS line is how you lose that.</p>
+    </section>
+    <section aria-labelledby="hash-rule">
+      <h2 id="hash-rule">The date moves only when the body hash changes</h2>
+      <p>The October 18 restructure, <code>b82faac</code>, moved all page dates into one file, <code>data/content-dates.json</code>. The agent co-wrote that commit too. What differed was the basis: the new <code>tools/dates.py</code> opens by citing a written spec section for dates (IA spec 4.1). For a hand-written page it hashes the inside of <code>&lt;main&gt;</code> with breadcrumbs and build-generated blocks removed:</p>
+      <pre><code>def hand_input(page_html):
+    inner = main_html(page_html)       # inside &lt;main&gt; only
+    inner = _CRUMBS_RE.sub("", inner)  # drop breadcrumbs
+    inner = strip_build_blocks(inner)  # drop &lt;!-- build:* --&gt; blocks
+    return _WS_RE.sub(" ", inner).strip()
+# same hash: keep dates; new hash: modified = today
+# new page: published = modified = today</code></pre>
+      <p>The easy thing to miss is the date itself. In <code>12ed443</code> the "last updated" line sat inside <code>&lt;main&gt;</code> as plain HTML. Hash that line and every date change looks like a content change, so the next day's build moves the date again, forever. On hand-written pages the line now lives in a <code>build:meta</code> block. Those 8 app pages became generated pages built from <code>data/apps.json</code>, so their hash covers the input data, not the HTML. A unit test (<code>test_every_marker_block_is_removed</code>) asserts the phrase never reaches the hash input, and <code>test_idempotent_next_day</code> checks that a rerun the next day leaves the dates alone.</p>
+      <p>Never derive lastmod from commit dates or build dates. Don't let people edit it either: the repository's AGENTS.md says "never edit dates by hand" (how we write that file is in <a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md</a>).</p>
+    </section>
+    <section aria-labelledby="after">
+      <h2 id="after">99 files touched, 6 dates moved</h2>
+      <p>Commit <code>b79f2d1</code> on October 19 touched 99 HTML files, mostly to bump a <code>?v=</code> cache-busting value on the stylesheet links. Apart from 14 new pages, the modified date moved on 6 existing ones: the home page, the apps hub and the privacy policy list, in Korean and English, each of which now lists the new pages.</p>
+      <p>IndexNow pings follow the same dates. <code>tools/indexnow.py</code> picks only pages whose modified date is today, and it is a dry run unless you pass <code>--send</code>.</p>
+    </section>
+    <section aria-labelledby="next-checks">
+      <h2 id="next-checks">What we check next</h2>
+      <p>The related-notes list (<code>build:extra</code>) is excluded from the hash. Google counts link changes as significant, yet when a new note joins that list, older notes keep their dates. We will decide after reading Search Console's crawl data in November 2026.</p>
+    </section>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Does Google actually use sitemap lastmod?</summary><div><p>Yes, but only when the values are consistently and verifiably accurate, for example when they match the page's real last change. The same page (updated 2026-07-08) says Google ignores priority and changefreq.</p></div></details>
+        <details><summary>Do you send every URL to IndexNow on each deploy?</summary><div><p>No. Only pages modified today go out. The full list (<code>--all</code>) is meant to be sent once, right after registering the site with Naver Search Advisor, the webmaster console of the Korean search engine Naver.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Tue, 20 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>CarDrawer (차서랍) – Android app for used-car dealers in Korea | SugarMount</title>
     <link>https://mvgood21.github.io/en/apps/cardrawer/</link>
@@ -386,11 +665,12 @@ room  = is there space for a 3×3 square, a 1×4 bar, a 4×1 bar (0–3)</code><
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -491,11 +771,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -596,13 +877,14 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li>
       </ul>
-      <p><a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
     <pubDate>Mon, 19 Oct 2026 09:00:00 +0900</pubDate>
   </item>
@@ -1937,11 +2219,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2035,11 +2318,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2073,6 +2357,9 @@ done</code></pre>
     <section aria-labelledby="notes">
       <h2 id="notes">Latest notes</h2>
       <ul class="card-list">
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></h3><p class="sub">A P2P chat app passed 3,066 tests while one SQLite pragma, traced through plugin source, kept its database from opening. Now we judge tests by deleting guards.</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></h3><p class="sub">Removing -dontoptimize left Play Console&#x27;s DEX metrics at 36-39%. Deleting an unused Kakao SDK keep rule took r8.json to 85% and the AAB to 11.6 MB.</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></h3><p class="sub">All 51 sitemap URLs once shared one lastmod. Now dates follow a hash of each page&#x27;s main content, not commit dates, and a 99-file commit moved only 6 of them.</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></h3><p class="sub">Our block puzzle spec promised every tray could always be placed. A planning bot then played 80 games; all 80 hit the 3,000-move cap. How two bots set the fix.</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></h3><p class="sub">Our AI agent called a puzzle game crash-free, then it died on the first tutorial tap: a missing VIBRATE permission. adb monkey on clean data hit it at event 15.</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></h3><p class="sub">The open-source rhwp engine in an Android WebView opened 221 of 222 Korean HWP/HWPX files on a Galaxy S21; a 384-page file needed virtual scrolling.</p></li>
@@ -2085,9 +2372,10 @@ done</code></pre>
       <h2 id="topics">Browse by topic</h2>
       <ul class="card-list">
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/workflow/">Working with agents</a></h3><p class="sub">How work is split between an AI coding agent and a person, how rules reach the agent, and what we changed after several sessions collided in one repository. 1 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li></ul></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/quality/">Testing and release</a></h3><p class="sub">Unit tests, release gates and on-device checks that AI-written code goes through before each release, with the real defects those checks caught along the way. 2 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li><li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li></ul></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/android/">Android development</a></h3><p class="sub">Gradle builds, library upgrades, UI and performance problems we ran into while building Android apps with a coding agent, and how each one was solved. 1 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li></ul></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/quality/">Testing and release</a></h3><p class="sub">Unit tests, release gates and on-device checks that AI-written code goes through before each release, with the real defects those checks caught along the way. 3 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li><li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li><li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li></ul></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/android/">Android development</a></h3><p class="sub">Gradle builds, library upgrades, UI and performance problems we ran into while building Android apps with a coding agent, and how each one was solved. 2 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li><li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li></ul></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/games/">Game development</a></h3><p class="sub">Generating puzzle game levels with an agent, proving every level can be solved, and tuning difficulty: the rules we settled on and the numbers we measured. 1 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li></ul></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/web/">Website and search</a></h3><p class="sub">The page structure, Google and Naver search optimization, structured data and design system of this site, built with an agent and explained from the actual code. 1 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li></ul></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/retro/">Retrospectives and numbers</a></h3><p class="sub">Looking back over a period of work: what went fast and what went wrong, with numbers we counted ourselves from the git history and QA reports. 1 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li></ul></li>
       </ul>
     </section>
@@ -2197,11 +2485,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>

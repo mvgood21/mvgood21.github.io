@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Play Console DEX 최적화와 keep 규칙 – SugarMount</title>
+  <meta name="description" content="-dontoptimize를 빼도 Play Console DEX 지표는 36~39%였습니다. 안 쓰는 Kakao SDK keep 규칙을 지우자 r8.json 85%, AAB는 11.6MB가 됐습니다.">
+  <link rel="canonical" href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Play Console DEX 최적화와 keep 규칙 – SugarMount">
+  <meta property="og:description" content="-dontoptimize를 빼도 Play Console DEX 지표는 36~39%였습니다. 안 쓰는 Kakao SDK keep 규칙을 지우자 r8.json 85%, AAB는 11.6MB가 됐습니다.">
+  <meta property="og:url" content="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-r8-dex-optimization-keep-rule-ko.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/rss.xml">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=aae9be9a">
+  <link rel="stylesheet" href="/assets/site.css?v=aae9be9a">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=aae9be9a">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/#article","headline":"Play Console 'DEX 최적화 39%'의 범인: 쓰지도 않는 Kakao SDK keep 규칙","description":"-dontoptimize를 빼도 Play Console DEX 지표는 36~39%였습니다. 안 쓰는 Kakao SDK keep 규칙을 지우자 r8.json 85%, AAB는 11.6MB가 됐습니다.","url":"https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/","mainEntityOfPage":"https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/","inLanguage":"ko","articleSection":"Android 개발","datePublished":"2026-10-20T09:00:00+09:00","dateModified":"2026-10-20T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-r8-dex-optimization-keep-rule-ko.png"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Play Console의 DEX 코드 최적화 경고가 있으면 업로드가 막히나요?","acceptedAnswer":{"@type":"Answer","text":"2026년 9월 기준으로는 막히지 않았습니다. 최적화 0%와 36%인 번들 모두 정상 배포됐습니다. 저장소 기록에는 Play가 2027년 2월까지 해소를 요구한다고 적혀 있으니 미루지 않는 편이 낫습니다."}},{"@type":"Question","name":"Play에 올리기 전에 최적화 비율을 볼 수 있나요?","acceptedAnswer":{"@type":"Answer","text":"볼 수 있습니다. 릴리스 AAB에서 BUNDLE-METADATA/com.android.tools/r8.json 을 꺼내 stats 의 세 값을 100에서 빼면 됩니다. 이 앱에서는 61.47이 Play 화면의 축소 39%와 맞았습니다. 이 대응은 저장소 기록으로 맞춰 본 추정이고, 15.18(85%)이 배포 뒤 Play 화면에 그대로 나왔는지는 아직 기록이 없습니다."}},{"@type":"Question","name":"어떤 keep 규칙이 지표를 붙잡는지 어떻게 찾나요?","acceptedAnswer":{"@type":"Answer","text":"병합된 configuration.txt 에서 class * 나 ** 처럼 범위가 넓은데 조건이 없는 -keep , -keepclassmembers 를 찾습니다. 이 앱에서는 쓰지 않는 Kakao SDK용 파일의 -keepclassmembers class * { public *; } 한 블록이었습니다."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/"},{"@type":"ListItem","position":2,"name":"AX 노트","item":"https://mvgood21.github.io/ax/"},{"@type":"ListItem","position":3,"name":"Android 개발","item":"https://mvgood21.github.io/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"Play Console 'DEX 최적화 39%'의 범인: 쓰지도 않는 Kakao SDK keep 규칙"}]}</script>
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a class="nav-apps" href="/apps/">앱</a>
+        <a class="nav-ax" href="/ax/" aria-current="page">AX 노트</a>
+        <a class="nav-about" href="/about/">소개</a>
+        <a class="nav-privacy" href="/privacy/">개인정보처리방침</a>
+      </nav>
+      <a class="lang" href="/en/ax/r8-dex-optimization-keep-rule/" lang="en" hreflang="en">English</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>메뉴</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="전체 메뉴">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">닫기</button>
+      <p class="menu-title" id="m-photo">사진·영상</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>슈가앨범</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 용량 줄이기</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 반전·회전</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>이미지 변환 JPG·PNG·WebP</span></a></li></ul>
+      <p class="menu-title" id="m-document">문서·글</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글 띄어쓰기</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글뷰어 슈가독</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">생활</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>생생카드</span></a></li></ul>
+      <p class="menu-title" id="m-games">게임</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>화살표 매듭풀기</span></a></li><li><a class="app-tile" data-app="blocks" href="/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한판블록</span></a></li></ul>
+      <p><a href="/apps/">모든 앱 보기</a></p>
+      <ul class="menu-links"><li><a href="/ax/" aria-current="page">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container">
+    <nav class="crumbs" aria-label="이동 경로"><ol><li><a href="/">SugarMount</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/ax/topic/android/">Android 개발</a></li><li><span aria-current="page">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</span></li></ol></nav>
+    <section class="hero">
+      <span class="eyebrow">AX 노트 · 측정</span>
+      <h1>Play Console 'DEX 최적화 39%'의 범인: 쓰지도 않는 Kakao SDK keep 규칙</h1>
+      <p class="lead">R8 keep 규칙 하나가 앱과 라이브러리의 public 멤버를 전부 붙잡고 있었고, 그 파일을 지우자 r8.json 기준 39%가 85%로 올랐습니다.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/about/">작성 SugarMount</a> <span aria-hidden="true">·</span> <span>Android 개발</span> <span aria-hidden="true">·</span> <span>읽는 시간 9분</span> <span aria-hidden="true">·</span> 최종 업데이트 <time datetime="2026-10-20">2026년 10월 20일</time></p><!-- /build:meta -->
+      <p>Play Console은 2026-09-25에도 <a href="/apps/sugarspeller/">한글 띄어쓰기</a> 앱의 최신 번들을 "중급형(최적화 36%, 난독화 39%, 축소 39%)"으로 표시했습니다. 닷새 전에 R8 최적화를 막던 <code>-dontoptimize</code>를 지운 뒤였죠. 남은 원인은 앱이 쓰지도 않는 Kakao SDK용 proguard 파일이었습니다. 그날 그 파일을 지우자 번들 안 r8.json의 축소 안 된 비율이 61.47%에서 15.18%로 내려갔고(100에서 뺀 환산값 39%→85%), AAB는 18.4MB에서 11.6MB가 됐습니다.</p>
+      <p class="note">숫자는 SugarMount 앱 저장소(sugarspeller)의 커밋 a597223(2026-09-20)과 e05f8e3(2026-09-25), CHANGELOG 1.6.020·1.6.023 항목, 배포 감시 문서, 그리고 이 글을 쓰며 로컬 릴리스 AAB에서 다시 읽은 r8.json입니다. 기준일은 2026년 10월 20일입니다.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>목차 (7)</summary><ol><li><a href="#play-metric">Play Console의 퍼센트는 r8.json 비율을 뒤집은 값입니다</a></li><li><a href="#dontoptimize">-dontoptimize를 지우자 최적화 0%가 36%가 됐습니다</a></li><li><a href="#merged-config">병합된 configuration.txt에 class * 규칙이 있었습니다</a></li><li><a href="#before-after">두 번의 수정 전후 r8.json과 크기</a></li><li><a href="#ai-errors">AI가 놓친 단서는 오른 난독화 비율이었습니다</a></li><li><a href="#next">남은 일</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></details><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">목차</p><ol><li><a href="#play-metric">Play Console의 퍼센트는 r8.json 비율을 뒤집은 값입니다</a></li><li><a href="#dontoptimize">-dontoptimize를 지우자 최적화 0%가 36%가 됐습니다</a></li><li><a href="#merged-config">병합된 configuration.txt에 class * 규칙이 있었습니다</a></li><li><a href="#before-after">두 번의 수정 전후 r8.json과 크기</a></li><li><a href="#ai-errors">AI가 놓친 단서는 오른 난독화 비율이었습니다</a></li><li><a href="#next">남은 일</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></nav><!-- /build:toc -->
+
+    <section aria-labelledby="play-metric">
+      <h2 id="play-metric">Play Console의 퍼센트는 r8.json 비율을 뒤집은 값입니다</h2>
+      <p>이 퍼센트는 번들에 든 r8.json의 통계와 숫자가 맞아떨어집니다. Android Gradle Plugin(AGP)은 R8을 돌린 릴리스 AAB 안에 <code>BUNDLE-METADATA/com.android.tools/r8.json</code>을 넣습니다. 그 파일의 <code>stats</code>에는 축소·난독화·최적화를 <em>받지 않은</em> 코드 비율이 들어 있습니다.</p>
+<pre><code>unzip -p app-release.aab BUNDLE-METADATA/com.android.tools/r8.json
+"stats":{"noObfuscationPercentage":61.48,
+         "noOptimizationPercentage":64.27,
+         "noShrinkingPercentage":61.47}</code></pre>
+      <p>100에서 빼면 Play 화면이 나옵니다. 61.47은 축소 39%, 64.27은 최적화 36%였죠. 이 대응은 저장소의 전후 표에서 맞춰 본 것이고, Google 문서에서 계산식을 확인하지는 않았습니다. 그래도 쓸모가 있습니다. Play에 올리기 전에 로컬 빌드만으로 지표를 미리 볼 수 있으니까요.</p>
+      <p>빌드 환경은 AGP 9.4.0, R8 전체 모드(full mode), 리소스 축소 사용, 기본 <code>proguard-android-optimize.txt</code>였습니다. 저장소 기록에는 Play가 이 지표를 2027년 2월까지 해소하라고 요구한다고 적혀 있습니다. Play 화면의 원문은 이 글에서 다시 확인하지 못했습니다.</p>
+    </section>
+
+    <section aria-labelledby="dontoptimize">
+      <h2 id="dontoptimize">-dontoptimize를 지우자 최적화 0%가 36%가 됐습니다</h2>
+      <p>2026-09-20 커밋 a597223은 <code>proguard-common.pro</code>에서 <code>-dontoptimize</code> 한 줄을 지웠습니다. 이 줄은 Gson 리플렉션 파싱이 깨질까 봐 일부러 넣어 둔 것이었고, Play Console 최적화 지표를 0%로 묶고 있었습니다. 같은 환경에서 수정 전 HEAD(1.6.019)를 기준선으로 빌드해 비교했습니다.</p>
+      <p>최적화 안 된 비율은 100%에서 64.25%로 내려갔습니다. 압축 전 DEX는 16.31MB에서 14.84MB가 됐고요. 같은 릴리스에서 인사카드 편집기와 이미지 에셋(약 11MB)을 함께 지웠기 때문에 AAB 29.95MB → 18.33MB는 최적화 덕분이 아닙니다. 최적화가 줄인 것은 DEX 1.5MB 안쪽입니다.</p>
+      <p>이상한 숫자가 하나 있었습니다. 난독화 안 된 비율이 54.16%에서 61.46%로 <em>올랐습니다</em>. 그 커밋은 이것을 "앱 코드가 줄어 SDK keep 규칙 쪽 비중이 커진 것"이라고 설명하고 넘어갔습니다. 1.6.020은 2026-09-22에 배포됐습니다. 사흘 뒤 Play Console에 뜬 숫자가 이 글 첫머리의 36/39/39%입니다.</p>
+    </section>
+
+    <section aria-labelledby="merged-config">
+      <h2 id="merged-config">병합된 configuration.txt에 class * 규칙이 있었습니다</h2>
+      <p>R8이 실제로 읽은 규칙은 <code>app/build/outputs/mapping/release/configuration.txt</code>에 한 파일로 모여 있습니다. 기본 규칙, 앱의 .pro 파일 6개, 라이브러리 AAR이 가져온 consumer 규칙까지 전부입니다. 2026-09-25에 이 파일을 읽다가 아래 블록을 찾았습니다.</p>
+<pre><code># proguard-kakao.pro (2020-12-16 첫 커밋부터 있던 파일, 7줄)
+-keep class com.kakao.** { *; }
+-keepattributes Signature
+-keepclassmembers class * {
+  public static &lt;fields&gt;;
+  public *;
+}
+-dontwarn android.support.v4.**,org.slf4j.**,com.google.android.gms.**</code></pre>
+      <p>문제는 셋째 규칙입니다. <code>class *</code>에는 조건이 없어서, 앱과 모든 라이브러리의 모든 클래스가 걸립니다. 그 클래스들의 public 필드와 메서드는 지워지지도, 이름이 바뀌지도, 인라이닝되지도 않습니다. 그런데 Kakao SDK는 의존성 목록에도 코드에도 없었습니다. 루트 빌드 스크립트의 Kakao 저장소 줄마저 주석 처리돼 있었죠.</p>
+      <p>커밋 e05f8e3은 이 파일과 빌드 참조 두 곳(release, debug)을 지웠습니다. 한 번도 빌드에 연결된 적 없는 <code>proguard-retrofit2.pro</code>(29줄)도 같이 지웠습니다. (2026-10-09 릴리스 빌드의 병합 결과는 1,369줄입니다. 처음부터 끝까지 눈으로 읽을 만한 분량입니다.)</p>
+      <p>Android 앱이라면 <code>class *</code>에 거는 무조건 keep 규칙은 넣지 마십시오. 라이브러리에 필요한 규칙은 그 AAR의 consumer 규칙으로 이미 들어옵니다.</p>
+    </section>
+
+    <section aria-labelledby="before-after">
+      <h2 id="before-after">두 번의 수정 전후 r8.json과 크기</h2>
+      <p>두 쌍의 측정은 서로 다른 날 다른 커밋을 빌드한 값입니다. 쌍 안에서만 비교하십시오. 09-20의 64.25%와 09-25의 64.27%처럼 같은 설정에서도 소수점 아래가 조금 다릅니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">항목</th><th scope="col">1.6.019 기준선</th><th scope="col"><code>-dontoptimize</code> 제거 (09-20)</th><th scope="col">kakao 파일 제거 전 (09-25)</th><th scope="col">제거 후 (09-25)</th></tr></thead>
+          <tbody>
+            <tr><td>최적화 안 된 비율</td><td>100%</td><td>64.25%</td><td>64.27%</td><td>15.68%</td></tr>
+            <tr><td>난독화 안 된 비율</td><td>54.16%</td><td>61.46%</td><td>61.48%</td><td>15.14%</td></tr>
+            <tr><td>축소 안 된 비율</td><td>기록 없음</td><td>기록 없음</td><td>61.47%</td><td>15.18%</td></tr>
+            <tr><td>Play 방식 환산 (최적화/난독화/축소)</td><td>최적화 0% (Play 화면)</td><td>36/39/- (r8.json 환산)</td><td>36/39/39% (Play 화면)</td><td>84/85/85 (r8.json 환산, Play 미확인)</td></tr>
+            <tr><td>DEX</td><td>16.31MB (압축 전)</td><td>14.84MB</td><td>15.6MB (합계)</td><td>8.2MB</td></tr>
+            <tr><td>AAB</td><td>29.95MB</td><td>18.33MB (에셋 제거분 포함)</td><td>18.4MB</td><td>11.6MB</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>DEX 감소량으로 보면 규칙 하나를 지운 쪽이 <code>-dontoptimize</code> 제거의 다섯 배였습니다. 09-20에는 DEX가 1.5MB 줄었고, 이번에는 7.4MB(47%)가 줄었습니다. AAB도 6.8MB 작아졌습니다.</p>
+      <p>배포 전에는 디버그 키로 서명한 릴리스 APK를 API 34 에뮬레이터에 올렸습니다. 네이버 검사("안갔다→안 갔다, 좋치→좋지", 틀린 수 2가 서버 값과 일치), 검사 뒤 퀴즈 말풍선, 퀴즈 화면, Remote Config 콘텐츠 삽입이 모두 동작했습니다. Gson이 읽는 JSON 키 5종이 릴리스 dex 안에 문자열 그대로 남아 있는 것도 확인했습니다. (헤드리스 에뮬레이터는 screencap이 검게 나와서 <code>uiautomator dump</code>로 화면 글자를 읽었습니다.)</p>
+      <p>배포 뒤 감시 문서의 판정도 남아 있습니다. 2026-09-22부터 10-03까지 1.6.020, kakao 규칙을 뺀 첫 배포인 1.6.024, 1.6.025 모두 크래시 0건이었고, 판정은 "회귀 없음"이었습니다.</p>
+    </section>
+
+    <section aria-labelledby="ai-errors">
+      <h2 id="ai-errors">AI가 놓친 단서는 오른 난독화 비율이었습니다</h2>
+      <p>두 커밋 모두 AI 코딩 에이전트(Claude) 세션이 작성했습니다. 09-20 세션은 커밋 메시지에 "원인이 이 한 줄이다"라고 적었습니다. 난독화 안 된 비율이 7%p 넘게 오른 것도 표에 정확히 적었습니다. 다만 그 이유를 "keep 규칙 변화 없음, 비중이 커졌을 뿐"이라는 추정으로 메웠고, 어느 규칙이 코드를 붙잡는지는 열어 보지 않았습니다.</p>
+      <p>바로잡은 쪽은 사람이었습니다. 09-25 오후 운영자가 Play Console 화면 캡처를 붙이며, 최적화가 안 된 것처럼 나온다면서 심층 분석을 요청했습니다. 그제야 에이전트가 병합 설정을 열었고, 2020년 첫 커밋부터 있던 7줄짜리 파일이 나왔습니다. 추정 대신 <code>configuration.txt</code>를 먼저 열었다면 닷새 일찍 끝났을 겁니다.</p>
+      <p>이 일 뒤로 저장소의 에이전트 지침에 두 줄이 생겼습니다. "<code>class *</code>에 거는 keep 규칙은 넣지 않는다"와 "병합 결과는 configuration.txt로 본다"입니다. 릴리스 빌드에서만 나는 R8 문제를 출시 전에 거르는 절차는 <a href="/ax/release-gate/">AI가 만든 Android 앱, 출시 전에 무엇을 검사하나</a>에 따로 정리했습니다.</p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">남은 일</h2>
+      <ul>
+        <li>Play Console 화면 재확인. 저장소에는 r8.json에서 환산한 85%만 있고, 배포 뒤 Play 화면이 실제로 바뀌었다는 기록은 없습니다. 다음 배포 때 캡처를 남길 겁니다.</li>
+        <li>비율이 다시 오르는 이유. 1.6.025 빌드에서 새 Firebase 의존성이 들어오며 약 80%로 5%p 내려갔습니다. 2026-10-09에 로컬에 남은 릴리스 AAB의 r8.json은 최적화 안 된 비율 20.23%, DEX 9.30MB(9,302,488바이트)입니다. 어느 consumer 규칙이 늘었는지 configuration.txt로 다시 볼 차례입니다.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>Play Console의 DEX 코드 최적화 경고가 있으면 업로드가 막히나요?</summary><div><p>2026년 9월 기준으로는 막히지 않았습니다. 최적화 0%와 36%인 번들 모두 정상 배포됐습니다. 저장소 기록에는 Play가 2027년 2월까지 해소를 요구한다고 적혀 있으니 미루지 않는 편이 낫습니다.</p></div></details>
+        <details><summary>Play에 올리기 전에 최적화 비율을 볼 수 있나요?</summary><div><p>볼 수 있습니다. 릴리스 AAB에서 <code>BUNDLE-METADATA/com.android.tools/r8.json</code>을 꺼내 <code>stats</code>의 세 값을 100에서 빼면 됩니다. 이 앱에서는 61.47이 Play 화면의 축소 39%와 맞았습니다. 이 대응은 저장소 기록으로 맞춰 본 추정이고, 15.18(85%)이 배포 뒤 Play 화면에 그대로 나왔는지는 아직 기록이 없습니다.</p></div></details>
+        <details><summary>어떤 keep 규칙이 지표를 붙잡는지 어떻게 찾나요?</summary><div><p>병합된 <code>configuration.txt</code>에서 <code>class *</code>나 <code>**</code>처럼 범위가 넓은데 조건이 없는 <code>-keep</code>, <code>-keepclassmembers</code>를 찾습니다. 이 앱에서는 쓰지 않는 Kakao SDK용 파일의 <code>-keepclassmembers class * { public *; }</code> 한 블록이었습니다.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a></li>
+        <li><a href="/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다: 가드 지워 보기</a></li>
+        <li><a href="/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
+        <li><a href="/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
+        <li><a href="/ax/fresh-install-monkey-test/">AI가 &#x27;테스트 완료&#x27;라던 게임이 튜토리얼 첫 탭에서 죽었다: VIBRATE 권한과 신규 설치 몽키 테스트</a></li>
+        <li><a href="/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
+      </ul>
+      <p><a href="/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="/ax/">AX 노트 전체 보기</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>한 가지 일을 간단하게 하는 Android 앱</p>
+        <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">앱</p>
+        <ul><li><a href="/apps/sugaralbum/">슈가앨범</a></li><li><a href="/apps/image-compress/">사진 용량 줄이기</a></li><li><a href="/apps/image-flip/">사진 반전·회전</a></li><li><a href="/apps/image-convert/">이미지 변환 JPG·PNG·WebP</a></li><li><a href="/apps/sugarspeller/">한글 띄어쓰기</a></li><li><a href="/apps/sugarclip/">SugarClip</a></li><li><a href="/apps/doc-viewer/">한글뷰어 슈가독</a></li><li><a href="/apps/sugarcard/">생생카드</a></li><li><a href="/apps/arrow-knots/">화살표 매듭풀기</a></li><li><a href="/apps/blocks/">한판블록</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">사이트</p>
+        <ul><li><a href="/apps/">모든 앱</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li><li><a href="/rss.xml">RSS 피드</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play 개발자 페이지</a></div>
+    </div>
+  </footer>
+</body>
+</html>

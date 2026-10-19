@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Finding fake tests by deleting their guards – SugarMount</title>
+  <meta name="description" content="A P2P chat app passed 3,066 tests while one SQLite pragma, traced through plugin source, kept its database from opening. Now we judge tests by deleting guards.">
+  <link rel="canonical" href="https://mvgood21.github.io/en/ax/guard-removal-test/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/guard-removal-test/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/guard-removal-test/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/guard-removal-test/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Finding fake tests by deleting their guards – SugarMount">
+  <meta property="og:description" content="A P2P chat app passed 3,066 tests while one SQLite pragma, traced through plugin source, kept its database from opening. Now we judge tests by deleting guards.">
+  <meta property="og:url" content="https://mvgood21.github.io/en/ax/guard-removal-test/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-guard-removal-test-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/en/rss.xml">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=aae9be9a">
+  <link rel="stylesheet" href="/assets/site.css?v=aae9be9a">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=aae9be9a">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/en/ax/guard-removal-test/#article","headline":"3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard","description":"A P2P chat app passed 3,066 tests while one SQLite pragma, traced through plugin source, kept its database from opening. Now we judge tests by deleting guards.","url":"https://mvgood21.github.io/en/ax/guard-removal-test/","mainEntityOfPage":"https://mvgood21.github.io/en/ax/guard-removal-test/","inLanguage":"en","articleSection":"Testing and release","datePublished":"2026-10-20T09:00:00+09:00","dateModified":"2026-10-20T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-guard-removal-test-en.png"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do you find a fake test?","acceptedAnswer":{"@type":"Answer","text":"Delete or invert the code the test claims to protect, then run only that test. If it stays green, it does not protect that code. We write each such check down as a mutation row and rerun the rows at release."}},{"@type":"Question","name":"Can I trust tests an AI agent wrote?","acceptedAnswer":{"@type":"Answer","text":"Not by the pass count. In the chat app 3,066 passing tests sat on top of a blocker, and two fixes reported as verified kept their tests green after the fix was deleted. We only count a test once we have seen it fail with its guard removed."}},{"@type":"Question","name":"Why a hand-written script instead of a mutation testing tool?","acceptedAnswer":{"@type":"Answer","text":"The question we needed answered was whether this test guards this line. Each row pairs one guard with the one test class that should catch it, and runs only that class. We have not compared it with off-the-shelf tools for speed or catch rate."}},{"@type":"Question","name":"Does STILL-PASSES always mean the test is weak?","acceptedAnswer":{"@type":"Answer","text":"No. Of the two rows that stayed green in SugarDoc 1.3.0, one had a weak test and the other guarded code that was defended twice. In the second case we removed the duplicate defence and pointed the row at the guard that remained."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://mvgood21.github.io/en/ax/"},{"@type":"ListItem","position":3,"name":"Testing and release","item":"https://mvgood21.github.io/en/ax/topic/quality/"},{"@type":"ListItem","position":4,"name":"3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard"}]}</script>
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/guard-removal-test/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/quality/">Testing and release</a></li><li><span aria-current="page">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</span></li></ol></nav>
+    <section class="hero">
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</h1>
+      <p class="lead">A pass count proves nothing on its own. We only count a test once we have deleted the code it protects and watched it fail.</p>
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Testing and release</span> <span aria-hidden="true">·</span> <span>8 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-10-20">October 20, 2026</time></p><!-- /build:meta -->
+      <p>3,066 tests were passing when the review found a blocker. The fourth adversarial review of our P2P chat app (Flutter) flagged one new SQLite setting that, traced through the plugin source, stops the database from opening on a device; the fix landed on September 11, 2026. The test SQLite hid the failure completely: reverting the fix left all 13 storage tests green. The app already had a rule that a test must fail when its guard is deleted, and the same review still caught two fixes that broke it. Our HWP viewer SugarDoc keeps that check as 12 Python scripts with 970 mutation rows and runs them at release.</p>
+      <p class="note">Sources: the chat app's commit <code>8f5a0a5</code> and the verification notes in that commit, plus SugarDoc's <code>scripts/qa</code> scripts and its 1.2.0 and 1.3.0 release records. All counts were taken again from git on October 20, 2026.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (8)</summary><ol><li><a href="#pragma-blocker">A row-returning PRAGMA sent through execute</a></li><li><a href="#why-green">The test SQLite could not see the failure</a></li><li><a href="#ai-wrong">Two fixes reported as verified had guards that guarded nothing</a></li><li><a href="#done-rule">The rule had been written down two days earlier</a></li><li><a href="#harness">The guard-removal harness: plain Python, one guard per row</a></li><li><a href="#still-passes">Two rows that stayed green in 1.3.0</a></li><li><a href="#next">What is still open</a></li><li><a href="#faq">FAQ</a></li></ol></details><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#pragma-blocker">A row-returning PRAGMA sent through execute</a></li><li><a href="#why-green">The test SQLite could not see the failure</a></li><li><a href="#ai-wrong">Two fixes reported as verified had guards that guarded nothing</a></li><li><a href="#done-rule">The rule had been written down two days earlier</a></li><li><a href="#harness">The guard-removal harness: plain Python, one guard per row</a></li><li><a href="#still-passes">Two rows that stayed green in 1.3.0</a></li><li><a href="#next">What is still open</a></li><li><a href="#faq">FAQ</a></li></ol></nav><!-- /build:toc -->
+
+    <section aria-labelledby="pragma-blocker">
+      <h2 id="pragma-blocker">A row-returning PRAGMA sent through execute</h2>
+      <p>The blocker was a single line, <code>PRAGMA secure_delete = ON</code>. It was added that round so deleted messages get overwritten with zeros, and the code sent it through <code>db.execute()</code>, which expects no result rows. This pragma returns one. We reran all five pragmas from that function on October 20, 2026 with Python's <code>sqlite3</code> module (SQLite 3.45.1, in-memory database):</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">pragma</th><th scope="col">rows returned</th><th scope="col">call before the fix</th></tr></thead>
+          <tbody>
+            <tr><td><code>secure_delete = ON</code></td><td><code>[(1,)]</code></td><td><code>execute</code> (wrong)</td></tr>
+            <tr><td><code>foreign_keys = ON</code></td><td><code>[]</code></td><td><code>execute</code></td></tr>
+            <tr><td><code>synchronous = NORMAL</code></td><td><code>[]</code></td><td><code>execute</code></td></tr>
+            <tr><td><code>journal_mode = WAL</code></td><td><code>[('memory',)]</code></td><td><code>rawQuery</code></td></tr>
+            <tr><td><code>wal_autocheckpoint = 0</code></td><td><code>[(0,)]</code></td><td><code>rawQuery</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The clue was sitting in the same function. The two other pragmas that return rows already used <code>rawQuery</code>; only the new line did not. That setup code runs on every database open, before the version check. The review traced the iOS path through the plugin source: the <code>execute</code> path treats <code>SQLITE_ROW</code> as an error, so <code>openDatabase</code> itself fails and the whole storage layer goes with it. The Android side rests on the API contract of <code>SQLiteDatabase.execSQL</code>, which rejects statements that return rows. Neither platform has actually thrown the exception on a device yet.</p>
+      <p>The fix was one word:</p>
+      <pre><code>- await db.execute('PRAGMA secure_delete = ON');
++ await db.rawQuery('PRAGMA secure_delete = ON');</code></pre>
+    </section>
+
+    <section aria-labelledby="why-green">
+      <h2 id="why-green">The test SQLite could not see the failure</h2>
+      <p>Unit tests run on <code>sqflite_common_ffi</code>, a desktop backend, not on the phone's SQLite. Its <code>execute</code> runs a statement without arguments and silently drops whatever rows come back. No exception, so the 3,066 tests could never have said anything about this bug. The commit message puts it plainly: reverting the fix leaves all thirteen storage tests green while only the new guard fails.</p>
+      <p>Because no behavioural test can catch it, the guard reads source instead. <code>pragma_execute_guard_test.dart</code> pulls every string literal passed to <code>.execute(</code> under <code>lib/</code>, and runs each one that starts with PRAGMA through <code>rawQuery</code> on a real SQLite to see whether rows come back. The ffi backend returns rows normally from <code>rawQuery</code>, so the check tells the truth even inside the test environment. At the time <code>lib/</code> had 14 such calls: 3 pragmas and 11 table or index statements.</p>
+      <p>The scanner also checks itself. If it finds fewer than 5 <code>execute</code> literals, it assumes its regex broke and fails, so an empty scan cannot pass for free. (The same thinking is why the pragma list is not hard-coded. We ask SQLite instead, because a hand-kept list goes stale.)</p>
+    </section>
+
+    <section aria-labelledby="ai-wrong">
+      <h2 id="ai-wrong">Two fixes reported as verified had guards that guarded nothing</h2>
+      <p>The same review ran revert checks: undo each fix and see whether the test said to protect it turns red. Two fixes that the AI coding agent had reported as verified in the previous round failed this check.</p>
+      <ul>
+        <li>Removing the localisation wiring from the app (the part that makes screen readers speak the framework's labels in Korean) left its test green. The test launched the test harness's own <code>MaterialApp</code>, not the real app. It now drives the actual app widget and checks the localisations resolved beneath it.</li>
+        <li>Every message-eviction guard sat behind an environment variable that CI never sets. With eviction disabled, all 659 tests that run without that variable stayed green. They now run by default, and every revert in that area goes red.</li>
+      </ul>
+      <p>The review logged 26 findings, and 24 of them had been introduced by that round's own fixes. Its notes say the pattern of the previous fix creating new defects had now repeated four times. What the agent got wrong was the report more than the code. It really had added tests, and they really passed; nobody had checked what they measured.</p>
+      <p>The reviewer was an agent too. It changed no code, and it restored the tree after every revert experiment. Its brief carried this rule: if a test still passes after you revert the fix, the test is wrong. After the fixes the suite stood at 3,099 passed, 13 skipped, 0 failed.</p>
+    </section>
+
+    <section aria-labelledby="done-rule">
+      <h2 id="done-rule">The rule had been written down two days earlier</h2>
+      <p>When an agent says it added a test, delete the code that test is meant to protect and run it again. If it stays green, it does not count. The chat app's instruction file ties "done" to three conditions: zero analyzer errors, code reachable from <code>main.dart</code>, and code protected by a test. The release-readiness notes from September 9 already said every fix in that round was pinned by a test that fails when its guard is removed. Two days later the review still caught two that did not. Writing the rule down was not enough; it took a second agent actually reverting the fixes.</p>
+      <p>The order of checks we run before a release is in <a href="/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>. This note is only about whether each test inside those checks can be trusted.</p>
+    </section>
+
+    <section aria-labelledby="harness">
+      <h2 id="harness">The guard-removal harness: plain Python, one guard per row</h2>
+      <p>SugarDoc has shipped a guard-removal script beside each feature since its first commit on October 8, 2026. As of October 18 there are 12 scripts, 970 mutation rows and 1,919 lines. Each row is a promise: change this string in this file, and this test class must fail. Below is a real row from the 1.2.0 PDF export script, followed by the core of the harness, trimmed.</p>
+      <pre><code># (id, file, [(original, replacement)], module, test class that must fail)
+("ctl.logOnlySaved", P + "ReaderController.kt",
+ [("if (result == PdfWriteResult.SAVED) log(...)", "log(...)")],
+ "sugardoc", "ReaderControllerTest"),
+
+for mid, rel, edits, kind, target in MUT:
+    path, orig = mutate(rel, edits)          # only ever in the copy
+    try:
+        ok, fails, out = run_row(kind, target)  # gradlew --no-daemon --tests *.target
+        if "e: file://" in out:
+            verdict = "COMPILE-ERROR"
+        else:
+            verdict = "FAILS-AS-EXPECTED" if ok else "STILL-PASSES"
+    finally:
+        open(path, "w", encoding="utf-8").write(orig)</code></pre>
+      <p>(The <code>log(...)</code> is shortened here; the real row spells out the analytics event.) Five decisions carry the design:</p>
+      <ul>
+        <li>The working tree is never touched. The repository is copied to a separate folder without <code>.git</code>, build outputs or signing keys, and every mutation happens there. Another agent session may be working in the same tree.</li>
+        <li>Each original string must match exactly once. Anything other than one match marks the row <code>BAD-PATTERN</code>, meaning the source moved and the row needs updating.</li>
+        <li>A catch needs two signals: Gradle exits with failure and the JUnit XML contains a failed test case. Compile errors are reported separately as <code>COMPILE-ERROR</code>. Going by exit code alone would count a typo in the mutation as a catch.</li>
+        <li>One Gradle run at a time, no daemon, only the named test class, with a lock file holding the process ID so two runs never share a copy.</li>
+        <li>The mutated file is always restored in <code>finally</code>.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="still-passes">
+      <h2 id="still-passes">Two rows that stayed green in 1.3.0</h2>
+      <p>The SugarDoc 1.3.0 release record from October 18 holds real catches. After confirming that all 147 rows of the editing script still matched once, the 37 rows added or changed that day were run. Two came back <code>STILL-PASSES</code> on the first run.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Row</th><th scope="col">Mutation</th><th scope="col">Cause</th><th scope="col">Fix</th></tr></thead>
+          <tbody>
+            <tr><td><code>retry.partialFails</code></td><td>drop <code>partial ||</code> from the retry-save condition</td><td>weak test</td><td>test now loses only the second edit during replay</td></tr>
+            <tr><td><code>retry.cancelStops</code></td><td>delete the cancel check</td><td>the same defence existed in two places</td><td>removed the duplicate and aimed the row at the guard that remained</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The rerun after the fixes came back 4 of 4 failing, as it should. The PDF export script went 32 of 32 <code>FAILS-AS-EXPECTED</code> the same day. STILL-PASSES does not always mean a weak test. If the code defends the same thing twice, deleting one copy changes nothing, and the fix belongs in the code. (An agent wrote the tests for both features, too.)</p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">What is still open</h2>
+      <p>The Android failure in the chat app has not been measured. The verification notes list it as open: build an APK from the commit before the fix, install it on an emulator and read logcat at the first database open. iOS needs a macOS machine we do not have. On the SugarDoc side, 1.3.0 reran only the 37 changed rows of the editing script; the 110 untouched rows were not rerun. Whether those older rows still go red will show at the next full run.</p>
+    </section>
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>How do you find a fake test?</summary><div><p>Delete or invert the code the test claims to protect, then run only that test. If it stays green, it does not protect that code. We write each such check down as a mutation row and rerun the rows at release.</p></div></details>
+        <details><summary>Can I trust tests an AI agent wrote?</summary><div><p>Not by the pass count. In the chat app 3,066 passing tests sat on top of a blocker, and two fixes reported as verified kept their tests green after the fix was deleted. We only count a test once we have seen it fail with its guard removed.</p></div></details>
+        <details><summary>Why a hand-written script instead of a mutation testing tool?</summary><div><p>The question we needed answered was whether this test guards this line. Each row pairs one guard with the one test class that should catch it, and runs only that class. We have not compared it with off-the-shelf tools for speed or catch rate.</p></div></details>
+        <details><summary>Does STILL-PASSES always mean the test is weak?</summary><div><p>No. Of the two rows that stayed green in SugarDoc 1.3.0, one had a weak test and the other guarded code that was defended twice. In the second case we removed the duplicate defence and pointed the row at the guard that remained.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
+        <li><a href="/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li>
+        <li><a href="/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
+        <li><a href="/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
+        <li><a href="/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+        <li><a href="/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
+      </ul>
+      <p><a href="/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>
