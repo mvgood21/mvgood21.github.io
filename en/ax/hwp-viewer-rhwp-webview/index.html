@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Building an Android HWP viewer with rhwp: measured – SugarMount</title>
+  <meta name="description" content="The open-source rhwp engine in an Android WebView opened 221 of 222 Korean HWP/HWPX files on a Galaxy S21; a 384-page file needed virtual scrolling.">
+  <link rel="canonical" href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/hwp-viewer-rhwp-webview/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/hwp-viewer-rhwp-webview/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Building an Android HWP viewer with rhwp: measured – SugarMount">
+  <meta property="og:description" content="The open-source rhwp engine in an Android WebView opened 221 of 222 Korean HWP/HWPX files on a Galaxy S21; a 384-page file needed virtual scrolling.">
+  <meta property="og:url" content="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-hwp-viewer-rhwp-webview-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/en/rss.xml">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=aae9be9a">
+  <link rel="stylesheet" href="/assets/site.css?v=aae9be9a">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=aae9be9a">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/#article","headline":"Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents","description":"The open-source rhwp engine in an Android WebView opened 221 of 222 Korean HWP/HWPX files on a Galaxy S21; a 384-page file needed virtual scrolling.","url":"https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/","mainEntityOfPage":"https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/","inLanguage":"en","articleSection":"Android development","datePublished":"2026-10-19T09:00:00+09:00","dateModified":"2026-10-19T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-hwp-viewer-rhwp-webview-en.png"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Can rhwp be used in a commercial Android app?","acceptedAnswer":{"@type":"Answer","text":"Yes. rhwp is MIT-licensed, but the Rust crates compiled into its WASM (Apache-2.0, BSD and others) need their notices too. The fonts it ships carry their own licenses and need checking file by file. HWP Viewer SugarDoc bundles 10 font files with confirmed licenses, OFL and others, and leaves out Hamchorom."}},{"@type":"Question","name":"Why does a WebView HWP viewer use so much memory?","acceptedAnswer":{"@type":"Answer","text":"Every rendered page stays in the DOM as SVG. A 384-page file took the renderer to 2.8 GB with all pages drawn and 255 MB with only the visible ones, so draw one or two pages around the screen and drop the rest."}},{"@type":"Question","name":"Does one engine open both HWP and HWPX?","acceptedAnswer":{"@type":"Answer","text":"Yes. rhwp 0.8.6 opens both, and 221 of the 222 mixed files here opened. The difference between the two formats is explained in HWP vs HWPX: what differs and how to open both ."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://mvgood21.github.io/en/ax/"},{"@type":"ListItem","position":3,"name":"Android development","item":"https://mvgood21.github.io/en/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents"}]}</script>
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/hwp-viewer-rhwp-webview/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/android/">Android development</a></li><li><span aria-current="page">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</span></li></ol></nav>
+    <section class="hero">
+      <span class="eyebrow">AX notes · Measurement</span>
+      <h1>Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</h1>
+      <p class="lead">Running the open-source rhwp engine inside an Android WebView, 221 of 222 Korean HWP and HWPX files opened on a Galaxy S21, with a median of 1.2 to 1.5 seconds from tap to first page.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Android development</span> <span aria-hidden="true">·</span> <span>8 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-10-19">October 19, 2026</time></p><!-- /build:meta -->
+      <p>221 of 222 Korean word-processor files opened. Before writing <a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a>, we wanted to know whether the engine could carry an app at all, so on October 3, 2026 we opened every file from a cold start on a Galaxy S21 (Android 15, WebView 153). The engine passed, with two catches. Drawing every page of a 384-page file pushed the WebView renderer to 2.8 GB, and the set the first report called "24 government documents" held only 17 real government attachments.</p>
+      <p class="note">Numbers come from the engine spike report in SugarMount's app repository (sugar-utils; measured 2026-10-03, commit 7b0e567), the follow-up verification report (2026-10-05), and a recount from the raw result JSON done while writing this note. Checked on October 19, 2026.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (8)</summary><ol><li><a href="#hwp-format">HWP, HWPX and why a viewer is hard</a></li><li><a href="#setup">Setup: one phone, 222 files, a cold start each time</a></li><li><a href="#results">Results: 221 of 222 opened</a></li><li><a href="#virtual-scroll">A 384-page file only works if you draw the visible pages</a></li><li><a href="#fonts">Fonts went from 144 MB to 9.2 MB</a></li><li><a href="#ai-errors">What the AI got wrong, and what verification changed</a></li><li><a href="#next">Still open</a></li><li><a href="#faq">FAQ</a></li></ol></details><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#hwp-format">HWP, HWPX and why a viewer is hard</a></li><li><a href="#setup">Setup: one phone, 222 files, a cold start each time</a></li><li><a href="#results">Results: 221 of 222 opened</a></li><li><a href="#virtual-scroll">A 384-page file only works if you draw the visible pages</a></li><li><a href="#fonts">Fonts went from 144 MB to 9.2 MB</a></li><li><a href="#ai-errors">What the AI got wrong, and what verification changed</a></li><li><a href="#next">Still open</a></li><li><a href="#faq">FAQ</a></li></ol></nav><!-- /build:toc -->
+
+    <section aria-labelledby="hwp-format">
+      <h2 id="hwp-format">HWP, HWPX and why a viewer is hard</h2>
+      <p>HWP is the file format of Hancom Office Hangul, the word processor that Korean government offices, schools and many employers still use. HWP 5 is a binary compound file; HWPX is the newer ZIP-and-XML version; very old files are HWP 3.0. On a phone they usually arrive as attachments in KakaoTalk (Korea's main messenger) or email.</p>
+      <p>Layout is the hard part. Government press releases lean on dense tables, logos and fixed line breaks, and exam papers add equations and two-column pages. A viewer that gets the text but breaks the tables is useless for these.</p>
+    </section>
+
+    <section aria-labelledby="setup">
+      <h2 id="setup">Setup: one phone, 222 files, a cold start each time</h2>
+      <p><a href="https://www.npmjs.com/package/@rhwp/core" rel="noopener">rhwp</a> is an open-source HWP/HWPX parser written in Rust and compiled to WebAssembly. It renders each page as SVG and is MIT-licensed. We used the npm package <code>@rhwp/core</code> 0.8.6, and the shipped app is still pinned to that version.</p>
+      <p>The test app was a single WebView with rhwp and the font stylesheet rhwp ships (153 font rules). For every file the app was force-stopped and relaunched; the first three pages went into the DOM and the rest were only timed.</p>
+      <ul>
+        <li>Attachments from Korea's government policy portal, korea.kr: 17 files downloaded on 2026-10-02 (14 press releases; 13 HWPX, 4 HWP).</li>
+        <li>198 samples from the rhwp repository, each with a reference PDF printed from Hancom Office 2020 or 2022, so page counts and first-page images can be compared. Many are hard cases: exam papers, equations, converted HWP 3.0 files.</li>
+        <li>Seven more files, explained in the section on what the AI got wrong.</li>
+      </ul>
+      <p>We had no low-end phone. There are no numbers here for 3 to 4 GB RAM devices.</p>
+    </section>
+
+    <section aria-labelledby="results">
+      <h2 id="results">Results: 221 of 222 opened</h2>
+      <p>"Tap to first page" is app launch time plus first-page render time, so it includes the cold start. p90 is the value where the slowest 10% begin. Renderer memory is the PSS (proportional set size: private memory plus a fair share of shared pages) of the WebView renderer process.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Metric</th><th scope="col">korea.kr, 17 files</th><th scope="col">First report's "24 government documents"</th><th scope="col">rhwp samples, 198</th></tr></thead>
+          <tbody>
+            <tr><td>Opened</td><td>17/17</td><td>24/24</td><td>197/198</td></tr>
+            <tr><td>Tap to first page, median</td><td>1.4 s</td><td>1.5 s</td><td>1.2 s</td></tr>
+            <tr><td>Tap to first page, p90</td><td>1.6 s</td><td>2.1 s</td><td>1.9 s</td></tr>
+            <tr><td>Tap to first page, max</td><td>1.8 s</td><td>3.0 s</td><td>3.3 s</td></tr>
+            <tr><td>Render per page, median</td><td>-</td><td>10 ms</td><td>6 ms</td></tr>
+            <tr><td>Renderer memory (PSS), max</td><td>286 MB</td><td>391 MB</td><td>422 MB</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The one failure, <code>issue2063_huge_cellbreak_table.hwp</code>, is a stress test built around a giant table split across pages; it ran past the 120-second limit. The spike report made a fallback path a condition for adopting the engine, and the app now lets you keep waiting or hand the file to another app after 10 seconds.</p>
+      <p>Fidelity held up. Against the reference PDFs, page counts matched for 195 of 197 samples (the other two were one page off), and the median first-page image similarity was 0.997. We also put seven files (two press releases, five samples) side by side with Hancom's output. The press-release tables, logos and bold text and the exam paper's equations and two columns looked nearly the same. The one visible miss was the first question number, "문1)", dropped from one exam paper.</p>
+    </section>
+
+    <section aria-labelledby="virtual-scroll">
+      <h2 id="virtual-scroll">A 384-page file only works if you draw the visible pages</h2>
+      <p>One rhwp sample is a 384-page government administration handbook (10.7 MB). With every page's SVG in the DOM, the WebView renderer process grew to 2.8 GB. Drawing only the visible pages, the same file sat at 255 MB in one run and 366 MB in another run the same afternoon. Read it as an order of magnitude, not a precise figure.</p>
+      <p>If you build an HWP viewer on a WebView, put virtual scrolling (only the visible pages and their neighbours in the DOM) in from day one. Do not plan to add it later.</p>
+      <p>The shipped viewer gives every page an empty slot of the right size and keeps SVG only for the visible pages plus two on each side, or one on each side on low-memory devices. Rendered SVG strings live in a byte-capped LRU (least recently used) cache, so the pages viewed longest ago are dropped first.</p>
+    </section>
+
+    <section aria-labelledby="fonts">
+      <h2 id="fonts">Fonts went from 144 MB to 9.2 MB</h2>
+      <p>The font folder that comes with rhwp is 87 files and 144,327,972 bytes. The spike report called it "138 MB", which is the same number counted in mebibytes. The 222 documents actually used 17 of those files, about 37 MB.</p>
+      <p>The app ships 10 files, 9,207,952 bytes, about 6% of the original. Two rules decided what went in: a clear license and a close look. Hancom's own Hamchorom fonts were left out because Hancom's license page does not spell out whether they may be bundled in an app; Hamchorom Batang is drawn with Noto Serif KR and Hamchorom Dotum with NanumGothic, both under the SIL Open Font License. rhwp's NanumGothic was a subset that kept the reserved font name, so we swapped in the original TTF from google/fonts.</p>
+      <p>On 2026-10-05 we measured the cost on the same S21: how much first-page ink overlap (F1) against the reference drops with the substitute fonts. The pass mark, fixed in advance, was a median drop of 0.02 or less; the median came out at 0.0071. One file went over at 0.0336, a college entrance exam (Suneung) paper whose title is in Chinese characters (hanja). The difference sat in the hanja title and the circled numbers ① to ⑤, which the bundled fonts lack, so the system font draws them.</p>
+    </section>
+
+    <section aria-labelledby="ai-errors">
+      <h2 id="ai-errors">What the AI got wrong, and what verification changed</h2>
+      <p>An AI coding agent (Claude) session ran the engine spike and wrote its report. Two days later, the follow-up experiments split the work: one agent measured, a separate verifier agent reopened the evidence files and recomputed every number, and only corrected values went into the docs. The first report's statistics were recounted at that point.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">First report</th><th scope="col">After verification</th></tr></thead>
+          <tbody>
+            <tr><td>24 real government documents</td><td>17 korea.kr files (14 press releases) plus 7 others: 4 byte-identical to samples, 3 rhwp test fixtures</td></tr>
+            <tr><td>Samples: 177 HWP, 21 HWPX</td><td>180 HWP, 18 HWPX (9 of them HWP 3.0)</td></tr>
+            <tr><td>Number recall around 0.9</td><td>A bug in the comparison script: text runs were joined with no separator, so <code>11:00</code> and <code>10. 2.</code> became <code>11:0010. 2.</code>. Fixed, all 17 korea.kr files score 1.0 (a lenient upper bound)</td></tr>
+            <tr><td>Bundled fonts 9,700 KB (the follow-up's measuring agent)</td><td>KiB written as KB; 9,933,636 bytes is 9.93 MB (later cut to 9,207,952 bytes)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The first row stung. "24 of 24 government documents" reads well, and 7 of the 24 were not government documents. That is why the results table has a separate korea.kr column. Counted alone, the 17 real files were faster (1.4 s median) and lighter (286 MB max). The engine decision did not change, but without the verifier we would have published a number with the wrong provenance.</p>
+      <p>Writing this note, we recomputed the medians once more from the raw <code>s21b.json</code>. The report's 1.5, 2.1 and 3.0 seconds came out exactly; the 366 MB run of the 384-page file turned up then. (The verification report also flagged that another script had overwritten one raw file, which must be regenerated before anyone quotes it.)</p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">Still open</h2>
+      <ul>
+        <li>Low-end phones. According to the development plan, the Firebase Test Lab low-end run has not happened yet, so we do not know how a 400 MB renderer behaves on a 3 to 4 GB phone.</li>
+        <li>Hanja-heavy documents. The bundled fonts have no hanja and the system font draws them; the 0.0336 is recorded as that cost, from a sample of two.</li>
+        <li>Upgrading rhwp. It is pre-1.0, so the app pins 0.8.6 and every build checks that the engine files match the pinned copy. An upgrade will be re-measured on the same 222 files. The other pre-release checks are in <a href="/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Can rhwp be used in a commercial Android app?</summary><div><p>Yes. rhwp is MIT-licensed, but the Rust crates compiled into its WASM (Apache-2.0, BSD and others) need their notices too. The fonts it ships carry their own licenses and need checking file by file. HWP Viewer SugarDoc bundles 10 font files with confirmed licenses, OFL and others, and leaves out Hamchorom.</p></div></details>
+        <details><summary>Why does a WebView HWP viewer use so much memory?</summary><div><p>Every rendered page stays in the DOM as SVG. A 384-page file took the renderer to 2.8 GB with all pages drawn and 255 MB with only the visible ones, so draw one or two pages around the screen and drop the rest.</p></div></details>
+        <details><summary>Does one engine open both HWP and HWPX?</summary><div><p>Yes. rhwp 0.8.6 opens both, and 221 of the 222 mixed files here opened. The difference between the two formats is explained in <a href="/en/apps/doc-viewer/hwp-vs-hwpx/">HWP vs HWPX: what differs and how to open both</a>.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+        <li><a href="/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
+        <li><a href="/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
+        <li><a href="/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li>
+        <li><a href="/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li>
+      </ul>
+      <p><a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>

@@ -292,6 +292,321 @@
     <pubDate>Mon, 19 Oct 2026 09:00:00 +0900</pubDate>
   </item>
   <item>
+    <title>Block puzzle difficulty tuned with simulation bots – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/</guid>
+    <description><![CDATA[<section class="hero">
+      <span class="eyebrow">AX notes · How-to</span>
+      <h1>Block puzzle difficulty: how simulation bots caught a game you could never lose</h1>
+      <p class="lead">If every tray of three pieces is guaranteed to fit, a player who finds each tray's solution never loses. Block Turn now keeps that guarantee for the first 10 trays only.</p>
+      <p>As first specified, the classic mode of <a href="https://mvgood21.github.io/en/apps/blocks/">Block Turn</a> had no game over. We found out from bots, not players: on October 3, 2026, under the supply rule written in the spec (v1), a bot that plans the whole tray played 80 games, and all 80 hit the 3,000-move cap. The shipped rule, v7, ends a planner's game after a median of 122 moves and a greedy bot's after 47.</p>
+      <p class="note">Numbers come from the sugar-game repository: the supply experiment log (<code>docs/block/lab.md</code>, measured 2026-10-03), the spec review, and the engine code and tests. Checked on October 19, 2026.</p>
+    </section>
+    <section aria-labelledby="unlosable-promise">
+      <h2 id="unlosable-promise">One friendly promise removed the game over</h2>
+      <p>Block Turn is an 8×8 block puzzle in the Block Blast mold: you get three pieces, place them, full rows and columns clear, and then you get three more. The spec we started from (v2.0) promised this in section 7.1: "When a new set of three pieces is dealt, there is at least one order in which all three fit on the current board." It was meant to answer players who feel the piece supply is rigged. The spec even added that a player can still get stuck by placing badly.</p>
+      <p>That caveat only covers weak play. For a player who finds the solution, the promise turns into a loop:</p>
+      <ol>
+        <li>When a tray arrives, some order places all three pieces.</li>
+        <li>Play that order and the tray is empty.</li>
+        <li>The next tray gets the same guarantee. Back to step 1.</li>
+      </ol>
+      <p>The run never ends. Nothing in that argument depends on piece weights, so dealing more awkward pieces cannot break it. The bots confirmed that too (v3 and v4 below).</p>
+    </section>
+    <section aria-labelledby="two-bots">
+      <h2 id="two-bots">A greedy bot and a planning bot on the same seeds</h2>
+      <p>The engine stores the board as a single 64-bit integer, so scoring a position takes a handful of bit operations. That speed is what made the planning bot practical.</p>
+      <ul>
+        <li>Greedy bot: it scores every legal move right now with the formula below and plays the best one. A cleared line is worth 10, so it usually picks the move that clears the most lines.</li>
+        <li>Planning bot: it searches every order and placement of the pieces left in the tray, plays the first move of the best plan, and searches again on the next move.</li>
+      </ul>
+      <p>Both use the same board score:</p>
+      <pre><code>score = lines cleared × 10 − 3 × holes − 0.3 × filled cells + 2 × room
+holes = empty cells boxed in on all four sides
+room  = is there space for a 3×3 square, a 1×4 bar, a 4×1 bar (0–3)</code></pre>
+      <p>In the final comparison each supply version got 160 greedy games and 80 planner games, and every version used the same seeds. A game stops at 3,000 moves. The bots are not models of people. We assume a person lands somewhere between them, and we use the bot numbers only to rank supply rules against each other.</p>
+    </section>
+    <section aria-labelledby="metrics">
+      <h2 id="metrics">The four numbers that decided it</h2>
+      <ul>
+        <li>Planner games that hit the 3,000-move cap. Anything above zero rejects the version, because it means the game cannot be lost.</li>
+        <li>Planner median divided by greedy median. In a high-score mode, "play better, last longer" is most of the fun, so we wanted skill to show up as run length.</li>
+        <li>Greedy run length, so a careless player doesn't wash out in a few trays.</li>
+        <li>Tray generation time at p95, to see whether supply cost matters on a phone.</li>
+      </ul>
+    </section>
+    <section aria-labelledby="versions">
+      <h2 id="versions">Supply rules v1 to v7, side by side</h2>
+      <p>The awkward pieces are the 3×3 square, the 2×3 rectangle in both orientations and the four-cell bar in both orientations. "Pressure" means that every N moves those pieces gain one more multiple of their base weight, up to a cap.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Version</th><th scope="col">Supply rule</th><th scope="col">Greedy median</th><th scope="col">Planner median</th><th scope="col">Planner games at cap</th><th scope="col">Outcome</th></tr></thead>
+          <tbody>
+            <tr><td>v1</td><td>The spec: every tray fully placeable</td><td>56 moves</td><td>3,000 moves</td><td>80/80</td><td>Rejected</td></tr>
+            <tr><td>v2</td><td>v1, plus 3× weight for pieces of 3 cells or fewer when fewer than 28 cells are empty</td><td colspan="3">Not in the results table</td><td>Dropped (made the game easier)</td></tr>
+            <tr><td>v3</td><td>v1 plus pressure every 30 moves, up to 5×</td><td colspan="2">Not in the results table</td><td>60/60</td><td>Rejected</td></tr>
+            <tr><td>v4</td><td>v1 plus pressure every 20 moves, up to 8×</td><td colspan="2">Not in the results table</td><td>60/60</td><td>Rejected</td></tr>
+            <tr><td>v5</td><td>v7 plus pressure every 30 moves, up to 5×</td><td>44 moves</td><td>80 moves</td><td>0</td><td>A/B candidate</td></tr>
+            <tr><td>v6</td><td>v7 plus pressure every 20 moves, up to 8×</td><td>44 moves</td><td>82 moves</td><td>0</td><td>Not used</td></tr>
+            <tr><td>v7</td><td>Full guarantee for the first 10 trays, then only "at least one piece fits"</td><td>47 moves</td><td>122 moves</td><td>0</td><td>Default</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Under v1 the planner's median game lasted 1,001 trays and scored 26,772 points. Under v7 it was 41 trays and 998 points. In the four versions with full numbers (v1, v5, v6, v7), the greedy bot never reached the cap.</p>
+      <p>We picked v7 for the skill gap: 122 moves against 47 is 2.6×. Adding pressure (v5, v6) cut that gap to 1.8 to 1.9×, mostly by cutting the strong player's runs short. Shorter runs mean more game-over screens, but they also mean a good player gets less for being good. So v7 shipped as the default, and v5 is parked as an A/B candidate.</p>
+      <p>Supply cost turned out to be a non-issue. Tray generation stayed at or under 0.2 ms at p95 for every version with timings in the table, and the spec's last-resort fallback (deal three single cells) never fired in 2,710 trays of the earlier Python simulation.</p>
+      <p>If a game spec says the player can "always" do something, run a bot that exploits that promise to the end before you build on it. Reading the sentence will not show you the problem.</p>
+    </section>
+    <section aria-labelledby="ai-mistake">
+      <h2 id="ai-mistake">The AI's first review pushed the other way</h2>
+      <p>Earlier the same day, the spec review written by our AI coding agent had already simulated the supply rule in Python. It ran a random bot and a one-move greedy bot for 150 games each, with medians of 17 and 26 moves. It also tried a bot that reads the whole tray, then gave up on it: searching a single tray on an empty board took more than ten minutes in Python.</p>
+      <p>From those short runs, the review concluded that a solvable tray does not guarantee a long game, and recommended "relief" supply: deal smaller pieces when the board gets crowded. That is v2 in the table. The real problem was the opposite one.</p>
+      <p>The mistake was structural. A promise that only matters to the strongest player had been tested with the weakest bots. Once the Kotlin engine existed, the planning bot ran in reasonable time and every v1 planner game hit the cap. v2 was dropped, and spec v2.1 rewrote the supply promise as v7. The engine, the experiment tool and the tests landed together in commit <code>cd62087</code> (October 4, 2026, Korea time).</p>
+      <p>(The Python greedy bot used a different board score with no "room" term, so its 26 moves and the Kotlin greedy bot's 56 under v1 are not a like-for-like comparison.)</p>
+      <p>The v1 finding is pinned by a unit test, <code>a planner cannot be stopped under the full guarantee</code>: on 20 seeds, playing each tray's solution must pass 300 moves.</p>
+    </section>
+    <section aria-labelledby="next-checks">
+      <h2 id="next-checks">What we still have to check</h2>
+      <ul>
+        <li>We don't know how long a human run is yet. The target is a median of 60 to 150 moves (roughly 4 to 10 minutes), and if real runs fall outside it we switch to v5. The end-of-run event that carries the move count, <code>post_score</code>, had fired only twice in total as of our October 17 GA4 review. The same review noted that the first-run flow never showed classic mode, so commit <code>d1f6de1</code> (1.1.2) added a button into classic mode after the last tutorial.</li>
+        <li>Since 1.1.4 (<code>b2d305d</code>, October 17) a classic run allows two revives. The supply experiment ran without revives, so run length with revives needs measuring again.</li>
+        <li>The default supply rule itself is pinned by a test (<code>default supply guarantees the first ten trays fully and never deals a dead tray after</code>), so switching the default back to v1 would fail it. What no test checks is that a planner actually loses before the cap under the default supply. Today only a fresh supply experiment run shows that.</li>
+      </ul>
+      <p>How the earlier apps came out of the same agent-driven workflow is in <a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a>.</p>
+    </section>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>What should the game over condition be in a block puzzle?</summary><div><p>The game ends when none of the remaining pieces fits anywhere. If the supply only ever deals trays that fully fit, a strong player never meets that condition. Block Turn guarantees full trays for the first 10 and, after that, only that at least one piece fits.</p></div></details>
+        <details><summary>Can't you fix it by dealing more hard pieces?</summary><div><p>No. Even with awkward pieces weighted up to 8× (v4), every planner game reached the 3,000-move cap. While the full guarantee stands, weights only change which solvable tray you get.</p></div></details>
+        <details><summary>How many games does a balance simulation need?</summary><div><p>In the final comparison we ran 160 greedy and 80 planner games per version, on the same seeds for every version (the earlier v3 and v4 runs used 60 planner games). That was enough to separate results like 80/80 games at the cap versus 0/80.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Mon, 19 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>VIBRATE crash and the fresh-install monkey test – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/fresh-install-monkey-test/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/fresh-install-monkey-test/</guid>
+    <description><![CDATA[<section class="hero">
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</h1>
+      <p class="lead">Scripted device tests missed a crash caused by one missing permission line. Running adb monkey on a freshly cleared app reproduced it at the 15th of 800 events.</p>
+      <p>At 22:58 on October 1, 2026 (Korea time), our AI coding agent installed a pre-release build of the puzzle game <a href="https://mvgood21.github.io/en/apps/arrow-knots/">Arrow Knots</a> on a Galaxy S24 and reported "launched in 857 ms, no crash". Four minutes later the operator reported that it errored out in the tutorial: the app closed on the first arrow tap. The code called <code>Vibrator.vibrate</code>, the manifest did not declare <code>android.permission.VIBRATE</code>, and the call threw a <code>SecurityException</code>. The fix, commit <code>65dcf41</code>, landed 5 minutes 29 seconds after the crash report, and a fresh-install monkey script (<code>f7beb3d</code>) followed 15 seconds later.</p>
+      <p class="note">Sources: the game repository's git history, the agent's session log from that night, and the agent's memory files. Times are Korea Standard Time (UTC+9). Checked on October 19, 2026.</p>
+    </section>
+    <section aria-labelledby="timeline">
+      <h2 id="timeline">Four minutes from "installed" to "it crashes"</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Time</th><th scope="col">What happened</th></tr></thead>
+          <tbody>
+            <tr><td>22:47</td><td>Commit <code>3eb21df</code> adds the tutorial and switches haptics to <code>VibrationEffect</code> composition primitives</td></tr>
+            <tr><td>22:58</td><td>Agent reports the S24 install as "no crash". The S24 then drops off adb, so no screenshot. Asked "So is it tested?", it says the S24 was only installed and launched, and the S21 had "automated tests complete"</td></tr>
+            <tr><td>23:02</td><td>Operator: it errors out in the tutorial. On the S21, with progress cleared, monkey seed 7 crashes the app at event 15 of 800</td></tr>
+            <tr><td>23:07</td><td>Fix committed as <code>65dcf41</code>; <code>tools/monkey_check.sh</code> follows 15 seconds later as <code>f7beb3d</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The agent's mistake was in what "no crash" rested on: <code>am start -W</code> returning <code>Status: ok</code> and a 857 ms launch time. Nothing on screen was ever tapped, and tapping was exactly what killed the app. (The logcat it read did contain a <code>FATAL EXCEPTION</code>, from a Samsung system app on September 30. The agent correctly ignored it. It checked carefully, just the wrong thing.)</p>
+    </section>
+    <section aria-labelledby="cause">
+      <h2 id="cause">Cause: Vibrator.vibrate without the VIBRATE permission</h2>
+      <p>Ten minutes before the install, commit <code>3eb21df</code> replaced <code>View.performHapticFeedback</code> with <code>Vibrator.vibrate(VibrationEffect.startComposition()…)</code>. The code comment gives the reason: on Samsung devices <code>CONTEXT_CLICK</code> is barely felt. It was a game-feel change.</p>
+      <p>The two APIs have different rules. View haptics need no permission. <code>Vibrator.vibrate</code> needs <code>android.permission.VIBRATE</code>, and the manifest did not declare it. The game buzzes every time an arrow leaves the board, so the very first tutorial tap was the crash.</p>
+      <pre><code>E AndroidRuntime: FATAL EXCEPTION: main
+E AndroidRuntime: Process: (pre-release package name), PID: 12034
+E AndroidRuntime: java.lang.SecurityException: vibrate: Neither user 10322 nor current process has android.permission.VIBRATE.</code></pre>
+      <p>The fix touched two files, six lines added and one removed: declare the permission, and fall back to view haptics if the vibrator call fails for any reason.</p>
+      <pre><code>&lt;uses-permission android:name="android.permission.VIBRATE" /&gt;
+runCatching { v.vibrate(VibrationEffect.startComposition().addPrimitive(primitive, scale).compose()) }
+    .onFailure { view.performHapticFeedback(fallback) }</code></pre>
+      <p>VIBRATE is a normal permission, granted at install with no dialog. Leave it out and the debug build still compiles. Nothing visible warns you.</p>
+    </section>
+    <section aria-labelledby="why-missed">
+      <h2 id="why-missed">Why the scripted tests missed it</h2>
+      <p>Two device scripts were running on the S21 at the time. <code>tutorial_check.py</code> taps the three tutorial lessons in a fixed order. <code>device_check.py</code> writes a progress file to jump to a given level, then solves the board. Neither had a real pass condition. The tutorial script stops only if it cannot find the "Next" button, and the level script prints how many taps it sent. Neither looked for a crash in logcat or checked that the process was still alive.</p>
+      <p>The agent's own explanation was that the scripts only tap a fixed path. That is half right. The bigger hole was a check that never looked at crashes. (The tutorial script did run to the end on the S21 at about 22:45. Whether that build already had the vibration change was not checked that night, and the log does not say.)</p>
+      <p><code>device_check.py</code> also writes <code>tutorialDone=true</code> when it jumps to a level, so it skips the first screens a new player sees by design. The new-player path only exists when the app has no data.</p>
+    </section>
+    <section aria-labelledby="monkey-script">
+      <h2 id="monkey-script">The fresh-install monkey script</h2>
+      <p><code>tools/monkey_check.sh</code> loops over three fixed seeds (7, 21, 99). For each one it wipes the app's data, launches it, sends 800 random events, and counts <code>FATAL EXCEPTION</code> lines in logcat. Any non-zero count fails the run. Below is the core of the current version, without device selection, output cleanup and the exit code. The script defaults to the debug package; here it uses the release package published on Play.</p>
+      <pre><code>PKG=com.sugarmount.arrows
+adb shell setprop debug.firebase.analytics.app $PKG
+for seed in 7 21 99; do
+  adb shell am force-stop $PKG
+  adb shell pm clear $PKG
+  adb logcat -c
+  adb shell am start -W -n $PKG/sugar.arrows.MainActivity
+  sleep 2
+  adb shell monkey -p $PKG --pct-touch 90 --pct-motion 10 --pct-nav 0 --pct-majornav 0 \
+    --pct-syskeys 0 --pct-appswitch 0 --throttle 120 -s $seed 800
+  n=$(adb logcat -d | grep -c "FATAL EXCEPTION")
+  echo "seed=$seed fatal=$n"
+done</code></pre>
+      <ul>
+        <li><code>-p</code> keeps events inside this package.</li>
+        <li><code>--pct-touch 90 --pct-motion 10</code>: 90% taps, 10% drags. Navigation, system keys and app switching are set to 0 so the run stays in the game.</li>
+        <li><code>--throttle 120</code> waits 120 ms between events. The last argument, 800, is the event count, so a run takes at least 96 seconds.</li>
+        <li><code>-s</code> fixes the seed, which replays the same event sequence. Before the fix, seed 7 printed <code>System appears to have crashed at event 15 of 800 using seed 7</code>. After it, the same seed injected all 800.</li>
+      </ul>
+      <p>"Fresh install" here means no app data at all. The first version deleted a single progress file through <code>run-as</code>, which only works on debuggable builds. When release signing went in on October 3 (commit <code>f421333</code>), it became <code>pm clear</code>, with the comment "works on release (non-debuggable) builds too". If you suspect the install itself, run <code>adb uninstall</code> and install again. The script does not reinstall per seed; it clears data.</p>
+      <p>The pass condition changed too. The first version counted every <code>FATAL EXCEPTION</code> on the device, which also counts other apps' crashes, like the Samsung one on the S24. On October 4 the block puzzle game's <code>block_monkey.sh</code> (commit <code>575aaa1</code>) began counting only <code>Process: &lt;package&gt;,</code> lines plus <code>am_anr</code> entries from the events buffer. Its comment notes that uiautomator and the monkey tool can die on their own. On October 18 (<code>dca02f2</code>) both scripts gained a <code>setprop debug.firebase.analytics.app</code> call before the loop, so test runs land in Firebase DebugView instead of the GA4 reports.</p>
+      <p>(During the post-fix check, the S21 briefly disconnected in the middle of seed 21. Any run that printed <code>- waiting for device -</code> was thrown out and repeated.)</p>
+    </section>
+    <section aria-labelledby="done-rule">
+      <h2 id="done-rule">The rule: no "done" without a fresh-install monkey run</h2>
+      <p>After that night the agent's memory gained one rule. Before calling an Android build tested, run <code>monkey_check.sh</code> on the connected device, on top of the fixed-path scripts, and name every device it ran on. Always run it when the manifest, a permission or a system-service call changes. The rule also says it plainly: installing is not verifying.</p>
+      <p>Commit messages changed after that. As of October 19, 2026, 19 of the 144 commits since <code>f7beb3d</code> mention monkey in the message, and 16 of those report a result, in lines like "release (R8, test ads) monkey 3x1500 0 fatals" and "Android 7 launch and monkey pass on API 24". The other three are a tool list or a "still to run". Reported event counts range from 600 to 4,000.</p>
+      <p>When an agent says "done", ask which device and what ran on it. Without a monkey result from clean app data, we do not accept it as done. The wider pre-release routine is in <a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>, and how we pin rules like this one for the agent is in <a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md for an AI coding agent</a>.</p>
+      <p>Monkey runs are not the whole answer. The next day (October 2) a new stress suite crashed the game 28 times on its first pass through 300 levels: a blocked arrow springing back from far away overshot and read <code>points[-1]</code>, an <code>IndexOutOfBoundsException</code> fixed in <code>69781a7</code>. A fresh-install monkey run starts at the tutorial and the first level, so deep levels need their own runs.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">What is still open</h2>
+      <p>Arrow Knots' <code>monkey_check.sh</code> still counts every <code>FATAL EXCEPTION</code> on the device and ignores ANRs. It should match the block game's script and count only its own process's crashes plus ANRs. Several agent sessions share the same phones, so another app's crash failing our run is the first thing to fix.</p>
+    </section>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Do I need to ask the user for the VIBRATE permission?</summary><div><p>No. VIBRATE is a normal permission, granted at install once it is declared in AndroidManifest.xml. <code>View.performHapticFeedback</code> works without it, but calling <code>Vibrator.vibrate</code> without the declaration throws a SecurityException and kills the app.</p></div></details>
+        <details><summary>How many seeds and events should an adb monkey run use?</summary><div><p>Our default is three seeds (7, 21, 99) at 800 events each, and five commits record release builds with test ads run at 1,500 events per seed. Fixing the seed is what lets you replay the exact sequence that failed.</p></div></details>
+        <details><summary>Can I run monkey on a build with live ads?</summary><div><p>We never do. Random taps on real ads are invalid clicks and put the AdMob account at risk, so monkey and other automated taps only run on builds using Google's test ad IDs.</p></div></details>
+        <details><summary>If unit tests pass, can I skip the monkey run?</summary><div><p>Not if you want to catch this kind of crash. All 31 engine unit tests passed that night. Permission checks happen in the device's system service, so a JVM unit test never sees them.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Mon, 19 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Building an Android HWP viewer with rhwp: measured – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/</guid>
+    <description><![CDATA[<section class="hero">
+      <span class="eyebrow">AX notes · Measurement</span>
+      <h1>Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</h1>
+      <p class="lead">Running the open-source rhwp engine inside an Android WebView, 221 of 222 Korean HWP and HWPX files opened on a Galaxy S21, with a median of 1.2 to 1.5 seconds from tap to first page.</p>
+      <p>221 of 222 Korean word-processor files opened. Before writing <a href="https://mvgood21.github.io/en/apps/doc-viewer/">HWP Viewer SugarDoc</a>, we wanted to know whether the engine could carry an app at all, so on October 3, 2026 we opened every file from a cold start on a Galaxy S21 (Android 15, WebView 153). The engine passed, with two catches. Drawing every page of a 384-page file pushed the WebView renderer to 2.8 GB, and the set the first report called "24 government documents" held only 17 real government attachments.</p>
+      <p class="note">Numbers come from the engine spike report in SugarMount's app repository (sugar-utils; measured 2026-10-03, commit 7b0e567), the follow-up verification report (2026-10-05), and a recount from the raw result JSON done while writing this note. Checked on October 19, 2026.</p>
+    </section>
+    <section aria-labelledby="hwp-format">
+      <h2 id="hwp-format">HWP, HWPX and why a viewer is hard</h2>
+      <p>HWP is the file format of Hancom Office Hangul, the word processor that Korean government offices, schools and many employers still use. HWP 5 is a binary compound file; HWPX is the newer ZIP-and-XML version; very old files are HWP 3.0. On a phone they usually arrive as attachments in KakaoTalk (Korea's main messenger) or email.</p>
+      <p>Layout is the hard part. Government press releases lean on dense tables, logos and fixed line breaks, and exam papers add equations and two-column pages. A viewer that gets the text but breaks the tables is useless for these.</p>
+    </section>
+    <section aria-labelledby="setup">
+      <h2 id="setup">Setup: one phone, 222 files, a cold start each time</h2>
+      <p><a href="https://www.npmjs.com/package/@rhwp/core" rel="noopener">rhwp</a> is an open-source HWP/HWPX parser written in Rust and compiled to WebAssembly. It renders each page as SVG and is MIT-licensed. We used the npm package <code>@rhwp/core</code> 0.8.6, and the shipped app is still pinned to that version.</p>
+      <p>The test app was a single WebView with rhwp and the font stylesheet rhwp ships (153 font rules). For every file the app was force-stopped and relaunched; the first three pages went into the DOM and the rest were only timed.</p>
+      <ul>
+        <li>Attachments from Korea's government policy portal, korea.kr: 17 files downloaded on 2026-10-02 (14 press releases; 13 HWPX, 4 HWP).</li>
+        <li>198 samples from the rhwp repository, each with a reference PDF printed from Hancom Office 2020 or 2022, so page counts and first-page images can be compared. Many are hard cases: exam papers, equations, converted HWP 3.0 files.</li>
+        <li>Seven more files, explained in the section on what the AI got wrong.</li>
+      </ul>
+      <p>We had no low-end phone. There are no numbers here for 3 to 4 GB RAM devices.</p>
+    </section>
+    <section aria-labelledby="results">
+      <h2 id="results">Results: 221 of 222 opened</h2>
+      <p>"Tap to first page" is app launch time plus first-page render time, so it includes the cold start. p90 is the value where the slowest 10% begin. Renderer memory is the PSS (proportional set size: private memory plus a fair share of shared pages) of the WebView renderer process.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Metric</th><th scope="col">korea.kr, 17 files</th><th scope="col">First report's "24 government documents"</th><th scope="col">rhwp samples, 198</th></tr></thead>
+          <tbody>
+            <tr><td>Opened</td><td>17/17</td><td>24/24</td><td>197/198</td></tr>
+            <tr><td>Tap to first page, median</td><td>1.4 s</td><td>1.5 s</td><td>1.2 s</td></tr>
+            <tr><td>Tap to first page, p90</td><td>1.6 s</td><td>2.1 s</td><td>1.9 s</td></tr>
+            <tr><td>Tap to first page, max</td><td>1.8 s</td><td>3.0 s</td><td>3.3 s</td></tr>
+            <tr><td>Render per page, median</td><td>-</td><td>10 ms</td><td>6 ms</td></tr>
+            <tr><td>Renderer memory (PSS), max</td><td>286 MB</td><td>391 MB</td><td>422 MB</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The one failure, <code>issue2063_huge_cellbreak_table.hwp</code>, is a stress test built around a giant table split across pages; it ran past the 120-second limit. The spike report made a fallback path a condition for adopting the engine, and the app now lets you keep waiting or hand the file to another app after 10 seconds.</p>
+      <p>Fidelity held up. Against the reference PDFs, page counts matched for 195 of 197 samples (the other two were one page off), and the median first-page image similarity was 0.997. We also put seven files (two press releases, five samples) side by side with Hancom's output. The press-release tables, logos and bold text and the exam paper's equations and two columns looked nearly the same. The one visible miss was the first question number, "문1)", dropped from one exam paper.</p>
+    </section>
+    <section aria-labelledby="virtual-scroll">
+      <h2 id="virtual-scroll">A 384-page file only works if you draw the visible pages</h2>
+      <p>One rhwp sample is a 384-page government administration handbook (10.7 MB). With every page's SVG in the DOM, the WebView renderer process grew to 2.8 GB. Drawing only the visible pages, the same file sat at 255 MB in one run and 366 MB in another run the same afternoon. Read it as an order of magnitude, not a precise figure.</p>
+      <p>If you build an HWP viewer on a WebView, put virtual scrolling (only the visible pages and their neighbours in the DOM) in from day one. Do not plan to add it later.</p>
+      <p>The shipped viewer gives every page an empty slot of the right size and keeps SVG only for the visible pages plus two on each side, or one on each side on low-memory devices. Rendered SVG strings live in a byte-capped LRU (least recently used) cache, so the pages viewed longest ago are dropped first.</p>
+    </section>
+    <section aria-labelledby="fonts">
+      <h2 id="fonts">Fonts went from 144 MB to 9.2 MB</h2>
+      <p>The font folder that comes with rhwp is 87 files and 144,327,972 bytes. The spike report called it "138 MB", which is the same number counted in mebibytes. The 222 documents actually used 17 of those files, about 37 MB.</p>
+      <p>The app ships 10 files, 9,207,952 bytes, about 6% of the original. Two rules decided what went in: a clear license and a close look. Hancom's own Hamchorom fonts were left out because Hancom's license page does not spell out whether they may be bundled in an app; Hamchorom Batang is drawn with Noto Serif KR and Hamchorom Dotum with NanumGothic, both under the SIL Open Font License. rhwp's NanumGothic was a subset that kept the reserved font name, so we swapped in the original TTF from google/fonts.</p>
+      <p>On 2026-10-05 we measured the cost on the same S21: how much first-page ink overlap (F1) against the reference drops with the substitute fonts. The pass mark, fixed in advance, was a median drop of 0.02 or less; the median came out at 0.0071. One file went over at 0.0336, a college entrance exam (Suneung) paper whose title is in Chinese characters (hanja). The difference sat in the hanja title and the circled numbers ① to ⑤, which the bundled fonts lack, so the system font draws them.</p>
+    </section>
+    <section aria-labelledby="ai-errors">
+      <h2 id="ai-errors">What the AI got wrong, and what verification changed</h2>
+      <p>An AI coding agent (Claude) session ran the engine spike and wrote its report. Two days later, the follow-up experiments split the work: one agent measured, a separate verifier agent reopened the evidence files and recomputed every number, and only corrected values went into the docs. The first report's statistics were recounted at that point.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">First report</th><th scope="col">After verification</th></tr></thead>
+          <tbody>
+            <tr><td>24 real government documents</td><td>17 korea.kr files (14 press releases) plus 7 others: 4 byte-identical to samples, 3 rhwp test fixtures</td></tr>
+            <tr><td>Samples: 177 HWP, 21 HWPX</td><td>180 HWP, 18 HWPX (9 of them HWP 3.0)</td></tr>
+            <tr><td>Number recall around 0.9</td><td>A bug in the comparison script: text runs were joined with no separator, so <code>11:00</code> and <code>10. 2.</code> became <code>11:0010. 2.</code>. Fixed, all 17 korea.kr files score 1.0 (a lenient upper bound)</td></tr>
+            <tr><td>Bundled fonts 9,700 KB (the follow-up's measuring agent)</td><td>KiB written as KB; 9,933,636 bytes is 9.93 MB (later cut to 9,207,952 bytes)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The first row stung. "24 of 24 government documents" reads well, and 7 of the 24 were not government documents. That is why the results table has a separate korea.kr column. Counted alone, the 17 real files were faster (1.4 s median) and lighter (286 MB max). The engine decision did not change, but without the verifier we would have published a number with the wrong provenance.</p>
+      <p>Writing this note, we recomputed the medians once more from the raw <code>s21b.json</code>. The report's 1.5, 2.1 and 3.0 seconds came out exactly; the 366 MB run of the 384-page file turned up then. (The verification report also flagged that another script had overwritten one raw file, which must be regenerated before anyone quotes it.)</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Still open</h2>
+      <ul>
+        <li>Low-end phones. According to the development plan, the Firebase Test Lab low-end run has not happened yet, so we do not know how a 400 MB renderer behaves on a 3 to 4 GB phone.</li>
+        <li>Hanja-heavy documents. The bundled fonts have no hanja and the system font draws them; the 0.0336 is recorded as that cost, from a sample of two.</li>
+        <li>Upgrading rhwp. It is pre-1.0, so the app pins 0.8.6 and every build checks that the engine files match the pinned copy. An upgrade will be re-measured on the same 222 files. The other pre-release checks are in <a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>.</li>
+      </ul>
+    </section>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Can rhwp be used in a commercial Android app?</summary><div><p>Yes. rhwp is MIT-licensed, but the Rust crates compiled into its WASM (Apache-2.0, BSD and others) need their notices too. The fonts it ships carry their own licenses and need checking file by file. HWP Viewer SugarDoc bundles 10 font files with confirmed licenses, OFL and others, and leaves out Hamchorom.</p></div></details>
+        <details><summary>Why does a WebView HWP viewer use so much memory?</summary><div><p>Every rendered page stays in the DOM as SVG. A 384-page file took the renderer to 2.8 GB with all pages drawn and 255 MB with only the visible ones, so draw one or two pages around the screen and drop the rest.</p></div></details>
+        <details><summary>Does one engine open both HWP and HWPX?</summary><div><p>Yes. rhwp 0.8.6 opens both, and 221 of the 222 mixed files here opened. The difference between the two formats is explained in <a href="https://mvgood21.github.io/en/apps/doc-viewer/hwp-vs-hwpx/">HWP vs HWPX: what differs and how to open both</a>.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Mon, 19 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
     <title>About SugarMount: independent Android apps</title>
     <link>https://mvgood21.github.io/en/about/</link>
     <guid isPermaLink="true">https://mvgood21.github.io/en/about/</guid>
@@ -1585,10 +1900,10 @@
     <section aria-labelledby="four-rules">
       <h2 id="four-rules">Four rules that made it fast</h2>
       <ol class="steps">
-        <li><strong>One app at a time, shared code in modules</strong> — File saving, image processing, job state, ads, billing and analytics live in <code>core/</code> modules, not in an app. From the second app on, only the screens and the app's own feature are new.</li>
-        <li><strong>Stamp out the next app with a script</strong> — <code>new_app.sh</code> copies the first app, changes its name, colour and icon, and blanks every per-app identifier to PLACEHOLDER. Its first real run (09-23) exposed four bugs, which were fixed; the next day the third app was generated without a single change.</li>
-        <li><strong>Let a gate stop easy mistakes</strong> — A release build is not produced while an ad test ID remains or an identifier is empty. Rules do not stop at the instruction file; tests enforce them (<a href="https://mvgood21.github.io/en/ax/agents-md/">the AGENTS.md note</a>).</li>
-        <li><strong>Console work through APIs</strong> — AAB uploads, ko and en store listings, 30 screenshots per app, in-app products, Firebase projects and GA4 properties are all created by scripts. What a person does in the console is only what the APIs do not expose.</li>
+        <li><strong>One app at a time, shared code in modules</strong>: File saving, image processing, job state, ads, billing and analytics live in <code>core/</code> modules, not in an app. From the second app on, only the screens and the app's own feature are new.</li>
+        <li><strong>Stamp out the next app with a script</strong>: <code>new_app.sh</code> copies the first app, changes its name, colour and icon, and blanks every per-app identifier to PLACEHOLDER. Its first real run (09-23) exposed four bugs, which were fixed; the next day the third app was generated without a single change.</li>
+        <li><strong>Let a gate stop easy mistakes</strong>: A release build is not produced while an ad test ID remains or an identifier is empty. Rules do not stop at the instruction file; tests enforce them (<a href="https://mvgood21.github.io/en/ax/agents-md/">the AGENTS.md note</a>).</li>
+        <li><strong>Console work through APIs</strong>: AAB uploads, ko and en store listings, 30 screenshots per app, in-app products, Firebase projects and GA4 properties are all created by scripts. What a person does in the console is only what the APIs do not expose.</li>
       </ol>
       <p class="muted">Some things the APIs would not do. A new app refused API requests until it had been touched in the console first (the first AAB upload, or granting the service account access), and AdMob's app-creation API is limited-access and returned 403. So AdMob apps and ad units are created in the console, and a script reads their IDs into the config file.</p>
     </section>
@@ -1603,10 +1918,10 @@
     <section aria-labelledby="try-it-yourself">
       <h2 id="try-it-yourself">If you want to try it</h2>
       <ol class="steps">
-        <li><strong>Start with the instruction file</strong> — Write down only the rules the agent tends to get wrong, briefly. Keep history elsewhere.</li>
-        <li><strong>Take the first app all the way</strong> — Only after one app reaches a public store page do you see what to automate.</li>
-        <li><strong>Script the pre-release checks</strong> — Make the gate, a release-build launch and an on-device check mandatory before any upload.</li>
-        <li><strong>Record what was and wasn't verified</strong> — In the changelog, write which device checked what, and what was not checked.</li>
+        <li><strong>Start with the instruction file</strong>: Write down only the rules the agent tends to get wrong, briefly. Keep history elsewhere.</li>
+        <li><strong>Take the first app all the way</strong>: Only after one app reaches a public store page do you see what to automate.</li>
+        <li><strong>Script the pre-release checks</strong>: Make the gate, a release-build launch and an on-device check mandatory before any upload.</li>
+        <li><strong>Record what was and wasn't verified</strong>: In the changelog, write which device checked what, and what was not checked.</li>
       </ol>
     </section>
     <section aria-labelledby="faq">
@@ -1622,6 +1937,9 @@
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li>
       </ul>
@@ -1663,14 +1981,14 @@
     <section aria-labelledby="what-stays-out">
       <h2 id="what-stays-out">What stays out?</h2>
       <ul>
-        <li><strong>History</strong> — The top of the file says "This file holds current facts only; history goes to CHANGELOG.md." Mix in old versions and the agent reads old rules as current ones.</li>
-        <li><strong>Secrets</strong> — Key files get a location and "never commit"; their contents never appear.</li>
-        <li><strong>General advice</strong> — The agent already knows "keep the code clean". Keep only what is true of this repository.</li>
+        <li><strong>History</strong>: The top of the file says "This file holds current facts only; history goes to CHANGELOG.md." Mix in old versions and the agent reads old rules as current ones.</li>
+        <li><strong>Secrets</strong>: Key files get a location and "never commit"; their contents never appear.</li>
+        <li><strong>General advice</strong>: The agent already knows "keep the code clean". Keep only what is true of this repository.</li>
       </ul>
     </section>
     <section aria-labelledby="writing-rules">
       <h2 id="writing-rules">How do you write a rule that is easy to get wrong?</h2>
-      <p>Each rule says <strong>what not to do</strong>, <strong>why</strong>, and <strong>how far any exception reaches</strong>. A few of the actual rules:</p>
+      <p>Each rule says what not to do, why, and how far any exception reaches. A few of the actual rules:</p>
       <ol>
         <li><strong>Identifiers are per app.</strong> Package name, ad IDs, Firebase project and billing product live only in the app's config file. Reusing code never means reusing IDs.</li>
         <li><strong>Debug uses ad test IDs only; release must not.</strong> Both directions are checked.</li>
@@ -1700,9 +2018,9 @@
     <section aria-labelledby="keeping-it-current">
       <h2 id="keeping-it-current">How is it kept up to date?</h2>
       <ol class="steps">
-        <li><strong>Add a line where the mistake happened</strong> — After a release build of the first app, <a href="https://mvgood21.github.io/en/apps/image-compress/">Compress Image</a>, crashed on launch, a line was added: "run <code>release_launch.sh</code> before every upload", with the reason (which version crashed, and on what).</li>
-        <li><strong>Change facts in the same commit</strong> — When an app goes public or a version moves, AGENTS.md changes in that same commit. Nearly all 19 revisions sit inside feature or release commits.</li>
-        <li><strong>Move long parts out</strong> — Ad policy, design rules and the document viewer design live in their own documents; AGENTS.md keeps only the paths.</li>
+        <li><strong>Add a line where the mistake happened</strong>: After a release build of the first app, <a href="https://mvgood21.github.io/en/apps/image-compress/">Compress Image</a>, crashed on launch, a line was added: "run <code>release_launch.sh</code> before every upload", with the reason (which version crashed, and on what).</li>
+        <li><strong>Change facts in the same commit</strong>: When an app goes public or a version moves, AGENTS.md changes in that same commit. Nearly all 19 revisions sit inside feature or release commits.</li>
+        <li><strong>Move long parts out</strong>: Ad policy, design rules and the document viewer design live in their own documents; AGENTS.md keeps only the paths.</li>
       </ol>
     </section>
     <section aria-labelledby="faq">
@@ -1717,6 +2035,9 @@
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li>
       </ul>
@@ -1750,11 +2071,24 @@
       </div>
     </section>
     <section aria-labelledby="notes">
-      <h2 id="notes">Notes</h2>
+      <h2 id="notes">Latest notes</h2>
       <ul class="card-list">
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></h3><p class="sub">Our block puzzle spec promised every tray could always be placed. A planning bot then played 80 games; all 80 hit the 3,000-move cap. How two bots set the fix.</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></h3><p class="sub">Our AI agent called a puzzle game crash-free, then it died on the first tutorial tap: a missing VIBRATE permission. adb monkey on clean data hit it at event 15.</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></h3><p class="sub">The open-source rhwp engine in an Android WebView opened 221 of 222 Korean HWP/HWPX files on a Galaxy S21; a 384-page file needed virtual scrolling.</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></h3><p class="sub">A solo developer and Claude Code put four Android apps on Google Play within 20 days of the first commit. 52 of 59 commits were co-authored with the agent.</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></h3><p class="sub">AGENTS.md is the file an AI coding agent reads before it works. Ours has 96 lines, lists only the rules the agent gets wrong, and enforces key ones with tests.</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></h3><p class="sub">Our Android app ran fine in debug but crashed at launch in release after R8 removed a constructor. Now every upload passes three pre-release checks.</p></li>
+      </ul>
+    </section>
+    <section aria-labelledby="topics">
+      <h2 id="topics">Browse by topic</h2>
+      <ul class="card-list">
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/workflow/">Working with agents</a></h3><p class="sub">How work is split between an AI coding agent and a person, how rules reach the agent, and what we changed after several sessions collided in one repository. 1 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li></ul></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/quality/">Testing and release</a></h3><p class="sub">Unit tests, release gates and on-device checks that AI-written code goes through before each release, with the real defects those checks caught along the way. 2 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li><li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li></ul></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/android/">Android development</a></h3><p class="sub">Gradle builds, library upgrades, UI and performance problems we ran into while building Android apps with a coding agent, and how each one was solved. 1 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li></ul></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/games/">Game development</a></h3><p class="sub">Generating puzzle game levels with an agent, proving every level can be solved, and tuning difficulty: the rules we settled on and the numbers we measured. 1 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li></ul></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/retro/">Retrospectives and numbers</a></h3><p class="sub">Looking back over a period of work: what went fast and what went wrong, with numbers we counted ourselves from the git history and QA reports. 1 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li></ul></li>
       </ul>
     </section>
     <section aria-labelledby="principles">
@@ -1774,7 +2108,7 @@
         <details><summary>Where do the numbers come from?</summary><div><p>From the git history, CHANGELOG and QA reports of SugarMount's app repository (sugar-utils, private). Each note gives the date its numbers were taken.</p></div></details>
       </div>
     </section>
-    <p class="meta updated">Last updated <time datetime="2026-10-18">October 18, 2026</time></p>]]></description>
+    <p class="meta updated">Last updated <time datetime="2026-10-19">October 19, 2026</time></p>]]></description>
     <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
   </item>
   <item>
@@ -1792,10 +2126,10 @@
       <h2 id="why-release-crashed">Why did it crash when debug was fine?</h2>
       <p>Debug builds are not shrunk; release builds use R8 to strip code that looks unused. So there are problems that only the release build has, even when every unit test and the debug build pass.</p>
       <ul>
-        <li><strong>Cause</strong> — The ads SDK pulls in WorkManager 2.7 and Room 2.2.5. Their keep rule keeps <code>RoomDatabase</code> subclasses but not their constructors. R8 full mode, the default in AGP 9, removed the constructor of <code>WorkDatabase_Impl</code>.</li>
-        <li><strong>Symptom</strong> — The app dies right at launch in <code>androidx.startup</code> with "Failed to create an instance of WorkDatabase". The debug build does not reproduce it.</li>
-        <li><strong>Found</strong> — By installing and launching the release APK on a real device (Galaxy S23). Until then no release build had been run on a device.</li>
-        <li><strong>Fix</strong> — One line in the shared ads module's consumer rules. Room 2.3 and later ship this rule themselves.</li>
+        <li><strong>Cause</strong>: The ads SDK pulls in WorkManager 2.7 and Room 2.2.5. Their keep rule keeps <code>RoomDatabase</code> subclasses but not their constructors. R8 full mode, the default in AGP 9, removed the constructor of <code>WorkDatabase_Impl</code>.</li>
+        <li><strong>Symptom</strong>: The app dies right at launch in <code>androidx.startup</code> with "Failed to create an instance of WorkDatabase". The debug build does not reproduce it.</li>
+        <li><strong>Found</strong>: By installing and launching the release APK on a real device (Galaxy S23). Until then no release build had been run on a device.</li>
+        <li><strong>Fix</strong>: One line in the shared ads module's consumer rules. Room 2.3 and later ship this rule themselves.</li>
       </ul>
       <div class="table-wrap"><table><tbody><tr><td><code>-keep class * extends androidx.room.RoomDatabase { &lt;init&gt;(); }</code></td></tr></tbody></table></div>
       <p>The fix was one line. The lesson was bigger: nothing is verified until the release build has run on a device.</p>
@@ -1863,10 +2197,13 @@
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li>
       </ul>
-      <p><a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
     <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
   </item>

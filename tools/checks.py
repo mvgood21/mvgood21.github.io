@@ -54,7 +54,7 @@ LEN = {  # IA 3.1, Python len()
 TITLE_SUFFIX = " – SugarMount"
 GENERIC_ANCHORS = {"자세히 보기", "자세히", "더 보기", "더보기", "여기", "바로가기", "learn more", "read more", "more", "here",
                    "click here", "details"}
-LEAD_KINDS = {"home", "hub", "app", "article", "ax-hub", "ax-note", "about"}
+LEAD_KINDS = {"home", "hub", "app", "article", "ax-hub", "ax-note", "ax-topic", "about"}
 ARTICLE_KINDS = {"article", "ax-note"}
 TZ_RE = re.compile(r"T\d{2}:\d{2}(:\d{2})?([+-]\d{2}:\d{2}|Z)$")
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
@@ -191,7 +191,7 @@ def page_kind(relpath):
     if not parts: return "home"
     head, n = parts[0], len(parts)
     if head == "apps": return {1: "hub", 2: "app", 3: "article"}.get(n, "other")
-    if head == "ax": return {1: "ax-hub", 2: "ax-note"}.get(n, "other")
+    if head == "ax": return "ax-topic" if n == 3 and parts[1] == "topic" else {1: "ax-hub", 2: "ax-note"}.get(n, "other")
     if head == "about" and n == 1: return "about"
     if head == "privacy": return "privacy-list" if n == 1 else "policy"
     if head == "design" and n == 1: return "design"

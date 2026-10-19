@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VIBRATE 권한 크래시와 신규 설치 몽키 테스트 – SugarMount</title>
+  <meta name="description" content="AI 에이전트가 &#x27;크래시 없음&#x27;으로 보고한 퍼즐 게임이 튜토리얼 첫 탭에서 죽었습니다. 원인은 VIBRATE 권한 누락이었고, 신규 설치 상태의 adb 몽키가 15번째 이벤트에서 재현했습니다.">
+  <link rel="canonical" href="https://mvgood21.github.io/ax/fresh-install-monkey-test/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/fresh-install-monkey-test/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/fresh-install-monkey-test/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="VIBRATE 권한 크래시와 신규 설치 몽키 테스트 – SugarMount">
+  <meta property="og:description" content="AI 에이전트가 &#x27;크래시 없음&#x27;으로 보고한 퍼즐 게임이 튜토리얼 첫 탭에서 죽었습니다. 원인은 VIBRATE 권한 누락이었고, 신규 설치 상태의 adb 몽키가 15번째 이벤트에서 재현했습니다.">
+  <meta property="og:url" content="https://mvgood21.github.io/ax/fresh-install-monkey-test/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-fresh-install-monkey-test-ko.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/rss.xml">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=aae9be9a">
+  <link rel="stylesheet" href="/assets/site.css?v=aae9be9a">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=aae9be9a">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/ax/fresh-install-monkey-test/#article","headline":"AI가 '테스트 완료'라던 게임이 튜토리얼 첫 탭에서 죽었다: VIBRATE 권한과 신규 설치 몽키 테스트","description":"AI 에이전트가 '크래시 없음'으로 보고한 퍼즐 게임이 튜토리얼 첫 탭에서 죽었습니다. 원인은 VIBRATE 권한 누락이었고, 신규 설치 상태의 adb 몽키가 15번째 이벤트에서 재현했습니다.","url":"https://mvgood21.github.io/ax/fresh-install-monkey-test/","mainEntityOfPage":"https://mvgood21.github.io/ax/fresh-install-monkey-test/","inLanguage":"ko","articleSection":"검증과 출시","datePublished":"2026-10-19T09:00:00+09:00","dateModified":"2026-10-19T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-fresh-install-monkey-test-ko.png"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"VIBRATE 권한은 사용자에게 따로 요청해야 하나요?","acceptedAnswer":{"@type":"Answer","text":"요청하지 않아도 됩니다. VIBRATE는 일반 권한이라 AndroidManifest.xml에 선언하면 설치 때 부여됩니다. View.performHapticFeedback 만 쓰면 선언이 필요 없지만, Vibrator.vibrate 를 직접 부르면 선언이 없을 때 SecurityException으로 앱이 죽습니다."}},{"@type":"Question","name":"adb 몽키 테스트는 몇 번, 몇 이벤트를 돌려야 하나요?","acceptedAnswer":{"@type":"Answer","text":"SugarMount는 시드 3개(7, 21, 99)에 시드당 800 이벤트를 기본으로 씁니다. 테스트 광고를 넣은 릴리스 빌드는 시드당 1,500 이벤트로 돌린 커밋이 5개입니다. 시드를 고정해야 실패한 순서를 그대로 다시 재현할 수 있습니다."}},{"@type":"Question","name":"몽키 테스트를 실제 광고가 붙은 빌드에서 돌려도 되나요?","acceptedAnswer":{"@type":"Answer","text":"돌리지 않습니다. 무작위 탭이 실제 광고를 누르면 무효 클릭이 되어 AdMob 계정이 위험해집니다. 몽키와 자동 탭은 Google 테스트 광고 ID로 만든 빌드에서만 돌립니다."}},{"@type":"Question","name":"단위 테스트가 통과하면 몽키는 생략해도 되나요?","acceptedAnswer":{"@type":"Answer","text":"생략하면 이번 같은 크래시를 놓칩니다. 그날 엔진 단위 테스트 31개는 모두 통과했지만, 권한 검사는 기기의 시스템 서비스가 하기 때문에 JVM 단위 테스트에는 나타나지 않습니다."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/"},{"@type":"ListItem","position":2,"name":"AX 노트","item":"https://mvgood21.github.io/ax/"},{"@type":"ListItem","position":3,"name":"검증과 출시","item":"https://mvgood21.github.io/ax/topic/quality/"},{"@type":"ListItem","position":4,"name":"AI가 '테스트 완료'라던 게임이 튜토리얼 첫 탭에서 죽었다: VIBRATE 권한과 신규 설치 몽키 테스트"}]}</script>
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a class="nav-apps" href="/apps/">앱</a>
+        <a class="nav-ax" href="/ax/" aria-current="page">AX 노트</a>
+        <a class="nav-about" href="/about/">소개</a>
+        <a class="nav-privacy" href="/privacy/">개인정보처리방침</a>
+      </nav>
+      <a class="lang" href="/en/ax/fresh-install-monkey-test/" lang="en" hreflang="en">English</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>메뉴</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="전체 메뉴">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">닫기</button>
+      <p class="menu-title" id="m-photo">사진·영상</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>슈가앨범</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 용량 줄이기</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 반전·회전</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>이미지 변환 JPG·PNG·WebP</span></a></li></ul>
+      <p class="menu-title" id="m-document">문서·글</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글 띄어쓰기</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글뷰어 슈가독</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">생활</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>생생카드</span></a></li></ul>
+      <p class="menu-title" id="m-games">게임</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>화살표 매듭풀기</span></a></li><li><a class="app-tile" data-app="blocks" href="/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한판블록</span></a></li></ul>
+      <p><a href="/apps/">모든 앱 보기</a></p>
+      <ul class="menu-links"><li><a href="/ax/" aria-current="page">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container">
+    <nav class="crumbs" aria-label="이동 경로"><ol><li><a href="/">SugarMount</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/ax/topic/quality/">검증과 출시</a></li><li><span aria-current="page">AI가 &#x27;테스트 완료&#x27;라던 게임이 튜토리얼 첫 탭에서 죽었다: VIBRATE 권한과 신규 설치 몽키 테스트</span></li></ol></nav>
+    <section class="hero">
+      <span class="eyebrow">AX 노트 · 사고 기록</span>
+      <h1>AI가 '테스트 완료'라던 게임이 튜토리얼 첫 탭에서 죽었다: VIBRATE 권한과 신규 설치 몽키 테스트</h1>
+      <p class="lead">진동 권한 한 줄이 빠진 크래시를 스크립트 테스트는 놓쳤고, 앱 데이터를 지운 뒤 돌린 adb 몽키는 15번째 이벤트에서 잡았습니다.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/about/">작성 SugarMount</a> <span aria-hidden="true">·</span> <span>검증과 출시</span> <span aria-hidden="true">·</span> <span>읽는 시간 11분</span> <span aria-hidden="true">·</span> 최종 업데이트 <time datetime="2026-10-19">2026년 10월 19일</time></p><!-- /build:meta -->
+      <p>2026년 10월 1일 22시 58분, AI 코딩 에이전트가 출시 전이던 퍼즐 게임 <a href="/apps/arrow-knots/">화살표 매듭풀기</a>를 Galaxy S24에 설치하고 "실행 시간 857ms, 크래시 없음"이라고 보고했습니다. 4분 뒤 운영자가 튜토리얼부터 에러가 난다고 알려 왔습니다. 첫 화살표를 누르는 순간 앱이 꺼지는 크래시였죠. 코드는 <code>Vibrator.vibrate</code>를 부르는데 매니페스트에 <code>VIBRATE</code> 권한이 없어서 <code>SecurityException</code>이 났습니다. 수정 커밋 <code>65dcf41</code>은 크래시 보고 5분 29초 뒤에 들어갔고, 15초 뒤 신규 설치 몽키 테스트 스크립트(<code>f7beb3d</code>)가 커밋됐습니다.</p>
+      <p class="note">근거는 게임 저장소(sugar-game)의 git 기록, 그날 에이전트 세션 기록, 에이전트 메모리 파일입니다. 시각은 한국 시간이고, 기준일은 2026년 10월 19일입니다.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>목차 (7)</summary><ol><li><a href="#timeline">설치 보고에서 크래시 보고까지 4분</a></li><li><a href="#cause">원인: VIBRATE 권한 없이 부른 Vibrator.vibrate</a></li><li><a href="#why-missed">스크립트 테스트가 놓친 이유</a></li><li><a href="#monkey-script">신규 설치 몽키 테스트 스크립트</a></li><li><a href="#done-rule">규칙: 신규 설치 몽키 없이 &quot;완료&quot;라고 하지 않는다</a></li><li><a href="#next">남은 일</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></details><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">목차</p><ol><li><a href="#timeline">설치 보고에서 크래시 보고까지 4분</a></li><li><a href="#cause">원인: VIBRATE 권한 없이 부른 Vibrator.vibrate</a></li><li><a href="#why-missed">스크립트 테스트가 놓친 이유</a></li><li><a href="#monkey-script">신규 설치 몽키 테스트 스크립트</a></li><li><a href="#done-rule">규칙: 신규 설치 몽키 없이 &quot;완료&quot;라고 하지 않는다</a></li><li><a href="#next">남은 일</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></nav><!-- /build:toc -->
+
+    <section aria-labelledby="timeline">
+      <h2 id="timeline">설치 보고에서 크래시 보고까지 4분</h2>
+      <p>그날 밤 기록을 시각순으로 옮겼습니다. 운영자의 말은 요지만 남겼습니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">시각</th><th scope="col">일어난 일</th></tr></thead>
+          <tbody>
+            <tr><td>22:47</td><td>튜토리얼을 넣으면서 진동을 <code>VibrationEffect</code> 합성 방식으로 바꾼 커밋 <code>3eb21df</code></td></tr>
+            <tr><td>22:58</td><td>에이전트가 S24 설치 뒤 "크래시 없음"으로 보고. 직후 S24 연결이 끊겨 화면은 못 봄. 운영자가 "테스트 완료된 거야?"라고 묻자 S24는 설치와 실행만 확인했고 S21은 "자동 테스트까지 완료"라고 답함</td></tr>
+            <tr><td>23:02</td><td>운영자가 튜토리얼부터 에러가 난다고 알림. S21에서 진행 기록을 지우고 몽키 시드 7을 돌리자 800회 중 15번째 이벤트에서 크래시</td></tr>
+            <tr><td>23:07</td><td>수정 커밋 <code>65dcf41</code>, 15초 뒤 <code>tools/monkey_check.sh</code> 커밋 <code>f7beb3d</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>에이전트가 틀린 곳은 "크래시 없음"의 근거였습니다. 근거는 <code>am start -W</code>가 돌려준 <code>Status: ok</code>와 실행 시간 857ms뿐이었습니다. 앱을 띄웠을 뿐, 화면을 한 번도 누르지 않았죠. 크래시는 누르는 순간에 났습니다. (그때 본 logcat에도 <code>FATAL EXCEPTION</code> 한 줄이 있었는데, 9월 30일에 삼성 시스템 앱이 남긴 것이라 에이전트가 제대로 걸러 냈습니다. 확인은 꼼꼼했고 대상이 틀렸습니다.)</p>
+    </section>
+
+    <section aria-labelledby="cause">
+      <h2 id="cause">원인: VIBRATE 권한 없이 부른 Vibrator.vibrate</h2>
+      <p>설치 10분 전 커밋 <code>3eb21df</code>가 진동을 <code>View.performHapticFeedback</code>에서 <code>Vibrator.vibrate(VibrationEffect.startComposition()…)</code>로 바꿨습니다. 코드 주석에 적힌 이유는 "삼성 기기에서는 CONTEXT_CLICK이 거의 느껴지지 않는다"였습니다. 손맛을 살리려던 변경입니다.</p>
+      <p>두 API는 권한 조건이 다릅니다. <code>View.performHapticFeedback</code>은 권한 없이 동작하고, <code>Vibrator.vibrate</code>는 <code>android.permission.VIBRATE</code>를 요구합니다. 매니페스트에는 이 권한이 없었습니다. 화살표가 빠질 때마다 진동을 부르는 코드라서, 튜토리얼 첫 탭이 곧 크래시 지점이었습니다.</p>
+      <pre><code>E AndroidRuntime: FATAL EXCEPTION: main
+E AndroidRuntime: Process: (개발용 패키지명), PID: 12034
+E AndroidRuntime: java.lang.SecurityException: vibrate: Neither user 10322 nor current process has android.permission.VIBRATE.</code></pre>
+      <p>수정은 두 파일, 추가 6줄과 삭제 1줄입니다. 권한을 선언하고, 진동 호출이 어떤 이유로 실패해도 <code>View.performHapticFeedback</code>으로 넘어가도록 예외 처리를 넣었습니다.</p>
+      <pre><code>&lt;uses-permission android:name="android.permission.VIBRATE" /&gt;
+
+runCatching { v.vibrate(VibrationEffect.startComposition().addPrimitive(primitive, scale).compose()) }
+    .onFailure { view.performHapticFeedback(fallback) }</code></pre>
+      <p>VIBRATE는 일반(normal) 권한이라 사용자에게 묻는 창이 뜨지 않습니다. 선언하면 설치할 때 부여되고, 빠뜨려도 디버그 빌드는 문제없이 만들어집니다. 눈에 띄는 신호가 없는 실수입니다.</p>
+    </section>
+
+    <section aria-labelledby="why-missed">
+      <h2 id="why-missed">스크립트 테스트가 놓친 이유</h2>
+      <p>그때 S21에서 돌던 기기 테스트는 두 개였습니다. <code>tutorial_check.py</code>는 튜토리얼 세 단계를 정해진 화살표 순서대로 누르고, <code>device_check.py</code>는 진행 기록 파일을 써 넣어 원하는 레벨로 건너뛴 뒤 판을 진행합니다. 둘 다 합격 기준이 따로 없었습니다. 튜토리얼 스크립트는 "다음" 버튼을 찾지 못할 때만 멈추고, 레벨 스크립트는 자기가 보낸 탭 수를 출력하고 끝납니다. logcat의 크래시와 프로세스 생존 여부는 어느 쪽도 보지 않았습니다.</p>
+      <p>에이전트는 "정해진 경로만 누르는 스크립트라서 못 잡았다"고 설명했습니다. 반만 맞는 설명입니다. 경로가 고정된 것보다 크래시를 보지 않는 판정이 더 큰 구멍이었습니다. (22시 45분쯤 튜토리얼 스크립트는 S21에서 끝까지 돌았습니다. 그 빌드에 진동 변경이 들어 있었는지는 그날 따지지 않았고, 남은 기록으로도 알 수 없습니다.)</p>
+      <p><code>device_check.py</code>는 레벨로 건너뛸 때 <code>tutorialDone=true</code>도 함께 써 넣습니다. 설치 직후 사용자가 처음 보는 화면을 일부러 건너뛰는 구조죠. 처음 설치한 사람의 경로는 앱 데이터가 없는 상태에서만 재현됩니다.</p>
+    </section>
+
+    <section aria-labelledby="monkey-script">
+      <h2 id="monkey-script">신규 설치 몽키 테스트 스크립트</h2>
+      <p><code>tools/monkey_check.sh</code>는 시드 3개(7, 21, 99)마다 앱 데이터를 지우고, 앱을 띄우고, 무작위 이벤트 800회를 넣은 뒤 logcat에서 <code>FATAL EXCEPTION</code>을 셉니다. 한 시드라도 0이 아니면 실패로 끝납니다. 지금 버전에서 기기 지정, 출력 정리, 실패 종료 코드를 빼고 핵심만 옮겼습니다. 스크립트 기본값은 디버그 빌드 패키지이고, 아래는 Play에 올라간 릴리스 패키지로 적었습니다.</p>
+      <pre><code>PKG=com.sugarmount.arrows
+adb shell setprop debug.firebase.analytics.app $PKG
+for seed in 7 21 99; do
+  adb shell am force-stop $PKG
+  adb shell pm clear $PKG
+  adb logcat -c
+  adb shell am start -W -n $PKG/sugar.arrows.MainActivity
+  sleep 2
+  adb shell monkey -p $PKG --pct-touch 90 --pct-motion 10 --pct-nav 0 --pct-majornav 0 \
+    --pct-syskeys 0 --pct-appswitch 0 --throttle 120 -s $seed 800
+  n=$(adb logcat -d | grep -c "FATAL EXCEPTION")
+  echo "seed=$seed fatal=$n"
+done</code></pre>
+      <ul>
+        <li><code>-p</code>: 이 패키지 안에서만 이벤트를 넣습니다.</li>
+        <li><code>--pct-touch 90 --pct-motion 10</code>: 탭 90%, 드래그 10%입니다. 내비게이션, 시스템 키, 앱 전환은 0으로 두어 게임 화면을 벗어나지 않게 했습니다.</li>
+        <li><code>--throttle 120</code>: 이벤트 사이에 120ms를 둡니다. 마지막 인자 800이 이벤트 수라서, 대기 시간만 96초입니다.</li>
+        <li><code>-s</code>: 시드를 고정하면 같은 이벤트 순서가 다시 나옵니다. 수정 전 시드 7은 <code>System appears to have crashed at event 15 of 800 using seed 7</code>을 남겼고, 수정 뒤 같은 시드는 800회를 모두 넣었습니다.</li>
+      </ul>
+      <p>여기서 "신규 설치"는 앱 데이터가 하나도 없는 상태를 말합니다. 첫 버전은 <code>run-as</code>로 진행 기록 파일 하나만 지웠습니다. <code>run-as</code>는 디버그 가능한 빌드에서만 되기 때문에, 릴리스 설정을 넣은 10월 3일 커밋 <code>f421333</code>에서 <code>pm clear</code>로 바꿨습니다. 주석은 "릴리스(디버그 불가) 빌드에서도 동작"입니다. 설치 과정 자체가 의심스러울 때는 <code>adb uninstall</code> 뒤 다시 설치하십시오. 스크립트는 시드마다 재설치하지 않고 데이터만 삭제합니다.</p>
+      <p>판정 방식도 바뀌었습니다. 첫 버전은 기기 전체 logcat의 <code>FATAL EXCEPTION</code>을 세었는데, 이러면 S24 로그의 삼성 시스템 앱처럼 남의 크래시까지 셉니다. 10월 4일 한판블록용 <code>block_monkey.sh</code>(커밋 <code>575aaa1</code>)는 <code>Process: 패키지명,</code> 줄만 세고, events 버퍼의 <code>am_anr</code>로 ANR도 셉니다. 주석에는 "uiautomator나 monkey 도구가 스스로 죽을 수 있다"고 적혀 있습니다. 10월 18일(<code>dca02f2</code>)에는 두 스크립트의 반복문 앞에 <code>setprop debug.firebase.analytics.app</code>을 넣었습니다. 테스트 실행은 Firebase DebugView로만 가고 GA4 보고서에는 섞이지 않습니다.</p>
+      <p>(수정 뒤 검증 중에 시드 21을 돌리다 S21 연결이 잠깐 끊겼습니다. 출력에 <code>- waiting for device -</code>가 찍힌 실행은 무효로 치고 다시 돌렸습니다.)</p>
+    </section>
+
+    <section aria-labelledby="done-rule">
+      <h2 id="done-rule">규칙: 신규 설치 몽키 없이 "완료"라고 하지 않는다</h2>
+      <p>이 사고 뒤 에이전트 메모리에 규칙이 하나 생겼습니다. Android 빌드를 "테스트 완료"라고 보고하기 전에 정해진 경로를 누르는 스크립트에 더해 연결된 기기에서 <code>monkey_check.sh</code>를 돌리고, 어떤 기기에서 돌렸는지 정확히 적는다는 내용입니다. 매니페스트, 권한, 시스템 서비스 호출이 바뀌면 반드시 돌린다는 조건과 "설치만으로는 검증이 아니다"라는 문장도 들어 있습니다.</p>
+      <p>그 뒤로 커밋 메시지가 달라졌습니다. 2026년 10월 19일 기준, <code>f7beb3d</code> 이후 커밋 144개 중 19개의 메시지에 monkey가 들어 있고, 그중 16개가 결과를 적었습니다. "release (R8, test ads) monkey 3x1500 0 fatals", "Android 7 launch and monkey pass on API 24" 같은 줄입니다. 나머지 3개는 도구 목록이나 "아직 안 돌림" 같은 언급이었습니다. 결과에 적힌 이벤트 수는 600회부터 4,000회까지였습니다.</p>
+      <p>에이전트가 "완료"라고 하면 어느 기기에서 무엇을 돌렸는지부터 물으십시오. 신규 설치 상태의 몽키 결과가 없으면 완료로 받지 않습니다. 출시 전 검사 전체는 <a href="/ax/release-gate/">AI가 만든 Android 앱, 출시 전에 무엇을 검사하나</a>에, 이런 규칙을 지침 파일에 남기는 방법은 <a href="/ax/agents-md/">AGENTS.md 작성법</a>에 적었습니다.</p>
+      <p>몽키가 전부는 아닙니다. 다음 날(10월 2일) 만든 스트레스 스위트는 300레벨을 도는 첫 실행에서 다른 크래시를 28번 냈습니다. 멀리 막힌 화살표가 되돌아올 때 스프링이 넘치면서 <code>points[-1]</code>을 읽은 <code>IndexOutOfBoundsException</code>이었고, 커밋 <code>69781a7</code>에서 고쳤습니다. 신규 설치 몽키는 튜토리얼과 첫 레벨에서 출발하니, 깊은 레벨까지 가는 경로는 따로 돌려야 했습니다.</p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">남은 일</h2>
+      <p>화살표 매듭풀기의 <code>monkey_check.sh</code>는 지금도 기기 전체의 <code>FATAL EXCEPTION</code>을 세고 ANR은 보지 않습니다. 한판블록 스크립트처럼 자기 프로세스의 크래시와 ANR을 함께 세도록 두 스크립트를 맞춰야 합니다. 여러 세션이 같은 기기를 쓰는 환경이라, 다른 앱의 크래시로 실패가 나는 일을 먼저 막을 생각입니다.</p>
+    </section>
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>VIBRATE 권한은 사용자에게 따로 요청해야 하나요?</summary><div><p>요청하지 않아도 됩니다. VIBRATE는 일반 권한이라 AndroidManifest.xml에 선언하면 설치 때 부여됩니다. <code>View.performHapticFeedback</code>만 쓰면 선언이 필요 없지만, <code>Vibrator.vibrate</code>를 직접 부르면 선언이 없을 때 SecurityException으로 앱이 죽습니다.</p></div></details>
+        <details><summary>adb 몽키 테스트는 몇 번, 몇 이벤트를 돌려야 하나요?</summary><div><p>SugarMount는 시드 3개(7, 21, 99)에 시드당 800 이벤트를 기본으로 씁니다. 테스트 광고를 넣은 릴리스 빌드는 시드당 1,500 이벤트로 돌린 커밋이 5개입니다. 시드를 고정해야 실패한 순서를 그대로 다시 재현할 수 있습니다.</p></div></details>
+        <details><summary>몽키 테스트를 실제 광고가 붙은 빌드에서 돌려도 되나요?</summary><div><p>돌리지 않습니다. 무작위 탭이 실제 광고를 누르면 무효 클릭이 되어 AdMob 계정이 위험해집니다. 몽키와 자동 탭은 Google 테스트 광고 ID로 만든 빌드에서만 돌립니다.</p></div></details>
+        <details><summary>단위 테스트가 통과하면 몽키는 생략해도 되나요?</summary><div><p>생략하면 이번 같은 크래시를 놓칩니다. 그날 엔진 단위 테스트 31개는 모두 통과했지만, 권한 검사는 기기의 시스템 서비스가 하기 때문에 JVM 단위 테스트에는 나타나지 않습니다.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="/ax/release-gate/">AI가 만든 Android 앱, 출시 전에 무엇을 검사하나: 릴리스 게이트와 R8 크래시</a></li>
+        <li><a href="/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
+        <li><a href="/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a></li>
+        <li><a href="/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
+        <li><a href="/ax/agents-md/">AGENTS.md 작성법: AI 코딩 에이전트가 틀리기 쉬운 규칙만 적는다</a></li>
+      </ul>
+      <p><a href="/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="/ax/">AX 노트 전체 보기</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>한 가지 일을 간단하게 하는 Android 앱</p>
+        <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">앱</p>
+        <ul><li><a href="/apps/sugaralbum/">슈가앨범</a></li><li><a href="/apps/image-compress/">사진 용량 줄이기</a></li><li><a href="/apps/image-flip/">사진 반전·회전</a></li><li><a href="/apps/image-convert/">이미지 변환 JPG·PNG·WebP</a></li><li><a href="/apps/sugarspeller/">한글 띄어쓰기</a></li><li><a href="/apps/sugarclip/">SugarClip</a></li><li><a href="/apps/doc-viewer/">한글뷰어 슈가독</a></li><li><a href="/apps/sugarcard/">생생카드</a></li><li><a href="/apps/arrow-knots/">화살표 매듭풀기</a></li><li><a href="/apps/blocks/">한판블록</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">사이트</p>
+        <ul><li><a href="/apps/">모든 앱</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li><li><a href="/rss.xml">RSS 피드</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play 개발자 페이지</a></div>
+    </div>
+  </footer>
+</body>
+</html>

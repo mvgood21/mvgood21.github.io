@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Block puzzle difficulty tuned with simulation bots – SugarMount</title>
+  <meta name="description" content="Our block puzzle spec promised every tray could always be placed. A planning bot then played 80 games; all 80 hit the 3,000-move cap. How two bots set the fix.">
+  <link rel="canonical" href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Block puzzle difficulty tuned with simulation bots – SugarMount">
+  <meta property="og:description" content="Our block puzzle spec promised every tray could always be placed. A planning bot then played 80 games; all 80 hit the 3,000-move cap. How two bots set the fix.">
+  <meta property="og:url" content="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-block-puzzle-bot-playtest-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/en/rss.xml">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=aae9be9a">
+  <link rel="stylesheet" href="/assets/site.css?v=aae9be9a">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=aae9be9a">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/#article","headline":"Block puzzle difficulty: how simulation bots caught a game you could never lose","description":"Our block puzzle spec promised every tray could always be placed. A planning bot then played 80 games; all 80 hit the 3,000-move cap. How two bots set the fix.","url":"https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/","mainEntityOfPage":"https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/","inLanguage":"en","articleSection":"Game development","datePublished":"2026-10-19T09:00:00+09:00","dateModified":"2026-10-19T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-block-puzzle-bot-playtest-en.png"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What should the game over condition be in a block puzzle?","acceptedAnswer":{"@type":"Answer","text":"The game ends when none of the remaining pieces fits anywhere. If the supply only ever deals trays that fully fit, a strong player never meets that condition. Block Turn guarantees full trays for the first 10 and, after that, only that at least one piece fits."}},{"@type":"Question","name":"Can't you fix it by dealing more hard pieces?","acceptedAnswer":{"@type":"Answer","text":"No. Even with awkward pieces weighted up to 8× (v4), every planner game reached the 3,000-move cap. While the full guarantee stands, weights only change which solvable tray you get."}},{"@type":"Question","name":"How many games does a balance simulation need?","acceptedAnswer":{"@type":"Answer","text":"In the final comparison we ran 160 greedy and 80 planner games per version, on the same seeds for every version (the earlier v3 and v4 runs used 60 planner games). That was enough to separate results like 80/80 games at the cap versus 0/80."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://mvgood21.github.io/en/ax/"},{"@type":"ListItem","position":3,"name":"Game development","item":"https://mvgood21.github.io/en/ax/topic/games/"},{"@type":"ListItem","position":4,"name":"Block puzzle difficulty: how simulation bots caught a game you could never lose"}]}</script>
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/block-puzzle-bot-playtest/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/games/">Game development</a></li><li><span aria-current="page">Block puzzle difficulty: how simulation bots caught a game you could never lose</span></li></ol></nav>
+    <section class="hero">
+      <span class="eyebrow">AX notes · How-to</span>
+      <h1>Block puzzle difficulty: how simulation bots caught a game you could never lose</h1>
+      <p class="lead">If every tray of three pieces is guaranteed to fit, a player who finds each tray's solution never loses. Block Turn now keeps that guarantee for the first 10 trays only.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Game development</span> <span aria-hidden="true">·</span> <span>8 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-10-19">October 19, 2026</time></p><!-- /build:meta -->
+      <p>As first specified, the classic mode of <a href="/en/apps/blocks/">Block Turn</a> had no game over. We found out from bots, not players: on October 3, 2026, under the supply rule written in the spec (v1), a bot that plans the whole tray played 80 games, and all 80 hit the 3,000-move cap. The shipped rule, v7, ends a planner's game after a median of 122 moves and a greedy bot's after 47.</p>
+      <p class="note">Numbers come from the sugar-game repository: the supply experiment log (<code>docs/block/lab.md</code>, measured 2026-10-03), the spec review, and the engine code and tests. Checked on October 19, 2026.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (7)</summary><ol><li><a href="#unlosable-promise">One friendly promise removed the game over</a></li><li><a href="#two-bots">A greedy bot and a planning bot on the same seeds</a></li><li><a href="#metrics">The four numbers that decided it</a></li><li><a href="#versions">Supply rules v1 to v7, side by side</a></li><li><a href="#ai-mistake">The AI&#x27;s first review pushed the other way</a></li><li><a href="#next-checks">What we still have to check</a></li><li><a href="#faq">FAQ</a></li></ol></details><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#unlosable-promise">One friendly promise removed the game over</a></li><li><a href="#two-bots">A greedy bot and a planning bot on the same seeds</a></li><li><a href="#metrics">The four numbers that decided it</a></li><li><a href="#versions">Supply rules v1 to v7, side by side</a></li><li><a href="#ai-mistake">The AI&#x27;s first review pushed the other way</a></li><li><a href="#next-checks">What we still have to check</a></li><li><a href="#faq">FAQ</a></li></ol></nav><!-- /build:toc -->
+
+    <section aria-labelledby="unlosable-promise">
+      <h2 id="unlosable-promise">One friendly promise removed the game over</h2>
+      <p>Block Turn is an 8×8 block puzzle in the Block Blast mold: you get three pieces, place them, full rows and columns clear, and then you get three more. The spec we started from (v2.0) promised this in section 7.1: "When a new set of three pieces is dealt, there is at least one order in which all three fit on the current board." It was meant to answer players who feel the piece supply is rigged. The spec even added that a player can still get stuck by placing badly.</p>
+      <p>That caveat only covers weak play. For a player who finds the solution, the promise turns into a loop:</p>
+      <ol>
+        <li>When a tray arrives, some order places all three pieces.</li>
+        <li>Play that order and the tray is empty.</li>
+        <li>The next tray gets the same guarantee. Back to step 1.</li>
+      </ol>
+      <p>The run never ends. Nothing in that argument depends on piece weights, so dealing more awkward pieces cannot break it. The bots confirmed that too (v3 and v4 below).</p>
+    </section>
+
+    <section aria-labelledby="two-bots">
+      <h2 id="two-bots">A greedy bot and a planning bot on the same seeds</h2>
+      <p>The engine stores the board as a single 64-bit integer, so scoring a position takes a handful of bit operations. That speed is what made the planning bot practical.</p>
+      <ul>
+        <li>Greedy bot: it scores every legal move right now with the formula below and plays the best one. A cleared line is worth 10, so it usually picks the move that clears the most lines.</li>
+        <li>Planning bot: it searches every order and placement of the pieces left in the tray, plays the first move of the best plan, and searches again on the next move.</li>
+      </ul>
+      <p>Both use the same board score:</p>
+      <pre><code>score = lines cleared × 10 − 3 × holes − 0.3 × filled cells + 2 × room
+holes = empty cells boxed in on all four sides
+room  = is there space for a 3×3 square, a 1×4 bar, a 4×1 bar (0–3)</code></pre>
+      <p>In the final comparison each supply version got 160 greedy games and 80 planner games, and every version used the same seeds. A game stops at 3,000 moves. The bots are not models of people. We assume a person lands somewhere between them, and we use the bot numbers only to rank supply rules against each other.</p>
+    </section>
+
+    <section aria-labelledby="metrics">
+      <h2 id="metrics">The four numbers that decided it</h2>
+      <ul>
+        <li>Planner games that hit the 3,000-move cap. Anything above zero rejects the version, because it means the game cannot be lost.</li>
+        <li>Planner median divided by greedy median. In a high-score mode, "play better, last longer" is most of the fun, so we wanted skill to show up as run length.</li>
+        <li>Greedy run length, so a careless player doesn't wash out in a few trays.</li>
+        <li>Tray generation time at p95, to see whether supply cost matters on a phone.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="versions">
+      <h2 id="versions">Supply rules v1 to v7, side by side</h2>
+      <p>The awkward pieces are the 3×3 square, the 2×3 rectangle in both orientations and the four-cell bar in both orientations. "Pressure" means that every N moves those pieces gain one more multiple of their base weight, up to a cap.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Version</th><th scope="col">Supply rule</th><th scope="col">Greedy median</th><th scope="col">Planner median</th><th scope="col">Planner games at cap</th><th scope="col">Outcome</th></tr></thead>
+          <tbody>
+            <tr><td>v1</td><td>The spec: every tray fully placeable</td><td>56 moves</td><td>3,000 moves</td><td>80/80</td><td>Rejected</td></tr>
+            <tr><td>v2</td><td>v1, plus 3× weight for pieces of 3 cells or fewer when fewer than 28 cells are empty</td><td colspan="3">Not in the results table</td><td>Dropped (made the game easier)</td></tr>
+            <tr><td>v3</td><td>v1 plus pressure every 30 moves, up to 5×</td><td colspan="2">Not in the results table</td><td>60/60</td><td>Rejected</td></tr>
+            <tr><td>v4</td><td>v1 plus pressure every 20 moves, up to 8×</td><td colspan="2">Not in the results table</td><td>60/60</td><td>Rejected</td></tr>
+            <tr><td>v5</td><td>v7 plus pressure every 30 moves, up to 5×</td><td>44 moves</td><td>80 moves</td><td>0</td><td>A/B candidate</td></tr>
+            <tr><td>v6</td><td>v7 plus pressure every 20 moves, up to 8×</td><td>44 moves</td><td>82 moves</td><td>0</td><td>Not used</td></tr>
+            <tr><td>v7</td><td>Full guarantee for the first 10 trays, then only "at least one piece fits"</td><td>47 moves</td><td>122 moves</td><td>0</td><td>Default</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Under v1 the planner's median game lasted 1,001 trays and scored 26,772 points. Under v7 it was 41 trays and 998 points. In the four versions with full numbers (v1, v5, v6, v7), the greedy bot never reached the cap.</p>
+      <p>We picked v7 for the skill gap: 122 moves against 47 is 2.6×. Adding pressure (v5, v6) cut that gap to 1.8 to 1.9×, mostly by cutting the strong player's runs short. Shorter runs mean more game-over screens, but they also mean a good player gets less for being good. So v7 shipped as the default, and v5 is parked as an A/B candidate.</p>
+      <p>Supply cost turned out to be a non-issue. Tray generation stayed at or under 0.2 ms at p95 for every version with timings in the table, and the spec's last-resort fallback (deal three single cells) never fired in 2,710 trays of the earlier Python simulation.</p>
+      <p>If a game spec says the player can "always" do something, run a bot that exploits that promise to the end before you build on it. Reading the sentence will not show you the problem.</p>
+    </section>
+
+    <section aria-labelledby="ai-mistake">
+      <h2 id="ai-mistake">The AI's first review pushed the other way</h2>
+      <p>Earlier the same day, the spec review written by our AI coding agent had already simulated the supply rule in Python. It ran a random bot and a one-move greedy bot for 150 games each, with medians of 17 and 26 moves. It also tried a bot that reads the whole tray, then gave up on it: searching a single tray on an empty board took more than ten minutes in Python.</p>
+      <p>From those short runs, the review concluded that a solvable tray does not guarantee a long game, and recommended "relief" supply: deal smaller pieces when the board gets crowded. That is v2 in the table. The real problem was the opposite one.</p>
+      <p>The mistake was structural. A promise that only matters to the strongest player had been tested with the weakest bots. Once the Kotlin engine existed, the planning bot ran in reasonable time and every v1 planner game hit the cap. v2 was dropped, and spec v2.1 rewrote the supply promise as v7. The engine, the experiment tool and the tests landed together in commit <code>cd62087</code> (October 4, 2026, Korea time).</p>
+      <p>(The Python greedy bot used a different board score with no "room" term, so its 26 moves and the Kotlin greedy bot's 56 under v1 are not a like-for-like comparison.)</p>
+      <p>The v1 finding is pinned by a unit test, <code>a planner cannot be stopped under the full guarantee</code>: on 20 seeds, playing each tray's solution must pass 300 moves.</p>
+    </section>
+
+    <section aria-labelledby="next-checks">
+      <h2 id="next-checks">What we still have to check</h2>
+      <ul>
+        <li>We don't know how long a human run is yet. The target is a median of 60 to 150 moves (roughly 4 to 10 minutes), and if real runs fall outside it we switch to v5. The end-of-run event that carries the move count, <code>post_score</code>, had fired only twice in total as of our October 17 GA4 review. The same review noted that the first-run flow never showed classic mode, so commit <code>d1f6de1</code> (1.1.2) added a button into classic mode after the last tutorial.</li>
+        <li>Since 1.1.4 (<code>b2d305d</code>, October 17) a classic run allows two revives. The supply experiment ran without revives, so run length with revives needs measuring again.</li>
+        <li>The default supply rule itself is pinned by a test (<code>default supply guarantees the first ten trays fully and never deals a dead tray after</code>), so switching the default back to v1 would fail it. What no test checks is that a planner actually loses before the cap under the default supply. Today only a fresh supply experiment run shows that.</li>
+      </ul>
+      <p>How the earlier apps came out of the same agent-driven workflow is in <a href="/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a>.</p>
+    </section>
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>What should the game over condition be in a block puzzle?</summary><div><p>The game ends when none of the remaining pieces fits anywhere. If the supply only ever deals trays that fully fit, a strong player never meets that condition. Block Turn guarantees full trays for the first 10 and, after that, only that at least one piece fits.</p></div></details>
+        <details><summary>Can't you fix it by dealing more hard pieces?</summary><div><p>No. Even with awkward pieces weighted up to 8× (v4), every planner game reached the 3,000-move cap. While the full guarantee stands, weights only change which solvable tray you get.</p></div></details>
+        <details><summary>How many games does a balance simulation need?</summary><div><p>In the final comparison we ran 160 greedy and 80 planner games per version, on the same seeds for every version (the earlier v3 and v4 runs used 60 planner games). That was enough to separate results like 80/80 games at the cap versus 0/80.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
+        <li><a href="/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
+        <li><a href="/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
+        <li><a href="/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li>
+        <li><a href="/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li>
+      </ul>
+      <p><a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>

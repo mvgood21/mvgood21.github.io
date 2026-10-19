@@ -41,6 +41,9 @@ SUFFIX = " – SugarMount"
 # pages that are noindex: no canonical/og:url/hreflang, and left out of sitemap, RSS and llms.txt (IA spec 2).
 # Keep this a plain set literal: tools/indexnow.py reads it with ast.literal_eval.
 NOINDEX_PATHS = {"404.html", "design/index.html"}
+AX_HUB_LATEST = 12   # newest AX notes listed on the hub; the rest are reached through the topic pages
+AX_RELATED = 6       # "더 읽기" links under an AX note
+RSS_MAX = 60         # newest items per feed (Naver reads the newest; a full-<main> feed grows by 3 notes a day)
 TITLE_LEN = {"ko": (30, 44), "en": (50, 65)}  # (topic, whole title), IA spec 3.1
 
 T = {
@@ -173,6 +176,13 @@ APPS = DATA["apps"]
 BY_APP_PATH = {a["app_path"]: a for a in APPS if a.get("app_path")}
 BY_PRIVACY_PATH = {a["privacy_path"]: a for a in APPS if a.get("privacy_path")}
 BY_PACKAGE = {a["package"]: a for a in APPS}
+# AX notes: topic list and each note's topic (data/ax.json); topic pages live at /ax/topic/<id>/
+AXD = json.load(open(rel("data/ax.json"), encoding="utf-8"))
+# AX topic strings live apart from T: T is part of every generated page's hash input, so new keys there would bump them all
+AX_T = {"ko": {"ax_topic_eyebrow": "AX 노트 · 주제", "ax_n": "글 {n}개", "ax_topic_all": "{name} 글 전체 보기", "ax_topic_title": "{name} – AX 노트", "ax_list_h": "글 목록"},
+        "en": {"ax_topic_eyebrow": "AX notes · Topic", "ax_n": "{n} notes", "ax_topic_all": "All notes on {name}", "ax_topic_title": "{name} – AX notes", "ax_list_h": "Notes"}}
+AX_TOPICS = {tp["id"]: tp for tp in AXD["topics"]}
+AX_NOTE_TOPIC = AXD["notes"]
 
 def css_version(generated):
     """One version for all three stylesheets: site.css (committed LF bytes; a Windows checkout with core.autocrlf
@@ -273,6 +283,8 @@ def generated_inputs():
         for a in APPS:
             if a.get("page") == "generated":
                 out[f"{p}apps/{a['app_path']}/index.html"] = dates.data_input("app", T[lang], app_core(a), a[lang])
+    for relp, (tp, lang) in ax_topic_pages().items():  # a topic page changes when its topic text or its notes change
+        out[relp] = dates.data_input("ax-topic", tp[lang], [ax_slug(u) for x, a in ax_by_topic(lang) if x["id"] == tp["id"] for u, _, _ in a])
     return out
 
 # ---------------------------------------------------------------- shared chrome (SDS 6.1, 6.2; IA 6.1, 6.2, 13)
@@ -578,7 +590,9 @@ def build_home(lang):
 {lis}
       </ul>
     </section>'''
-    ax_li = "\n".join(f'        <li><a href="{u}">{esc(n)}</a></li>' for u, n, _ in ax_articles(lang)[:3])
+    # topics, not the newest titles: titles change daily and would move the home page's font subsets (budget 400 KB)
+    ax_li = "\n".join(f'        <li><a href="{ax_topic_url(tp, lang)}">{esc(tp[lang]["name"])}</a> '
+                      f'<span class="muted">{AX_T[lang]["ax_n"].format(n=len(a))}</span></li>' for tp, a in ax_by_topic(lang))
     ax_section = f'''
 
     <section aria-labelledby="ax-heading">
@@ -948,6 +962,64 @@ def ax_articles(lang):
     out.sort(key=lambda x: x[1]); out.sort(key=lambda x: x[0], reverse=True)
     return [(u, n, d) for _, _, u, n, d in out]
 
+def ax_slug(u): return u.rstrip("/").rsplit("/", 1)[-1]
+def ax_topic_of(u): return AX_TOPICS.get(AX_NOTE_TOPIC.get(ax_slug(u)))
+def ax_topic_url(tp, lang): return url(lang, f"/ax/topic/{tp['id']}/")
+
+def ax_by_topic(lang):
+    """[(topic, [(url, h1, description)])] in data/ax.json order, newest first inside a topic; empty topics left out."""
+    arts = ax_articles(lang)
+    out = []
+    for tp in AXD["topics"]:
+        mine = [x for x in arts if AX_NOTE_TOPIC.get(ax_slug(x[0])) == tp["id"]]
+        if mine: out.append((tp, mine))
+    return out
+
+def ax_cards(arts, indent="      "):
+    return "".join(f'\n{indent}  <li class="card"><h3><a href="{u}">{esc(n)}</a></h3><p class="sub">{esc(d)}</p></li>' for u, n, d in arts)
+
+def ax_topic_pages():
+    """relpaths of the topic pages to generate: one per topic that has at least one note in that language."""
+    return {("en/" if lang == "en" else "") + f"ax/topic/{tp['id']}/index.html": (tp, lang)
+            for lang in ("ko", "en") for tp, _ in ax_by_topic(lang)}
+
+def build_ax_topic(tp, lang):
+    t = T[lang]
+    d = tp[lang]
+    arts = next(a for x, a in ax_by_topic(lang) if x["id"] == tp["id"])
+    path = ax_topic_url(tp, lang)
+    alt_p = ax_topic_url(tp, other(lang))
+    alt = alt_p if any(x["id"] == tp["id"] for x, _ in ax_by_topic(other(lang))) else None
+    nav, bc = crumbs(lang, [(t["ax"], url(lang, "/ax/")), (d["name"], None)])
+    others = [(x, a) for x, a in ax_by_topic(lang) if x["id"] != tp["id"]]
+    chips = "".join(f'<li><a href="{ax_topic_url(x, lang)}">{esc(x[lang]["name"])}</a></li>' for x, _ in others)
+    chips_html = f'\n      <ul class="chips" aria-label="{t["ax"]}">{chips}</ul>' if chips else ""
+    main = f'''    {nav}
+    <header class="hero">
+      <span class="eyebrow">{AX_T[lang]["ax_topic_eyebrow"]}</span>
+      <h1>{esc(d["name"])}</h1>
+      <p class="lead">{esc(d["desc"])}</p>
+      <p class="meta">{AX_T[lang]["ax_n"].format(n=len(arts))}</p>{chips_html}
+    </header>
+
+    <section aria-labelledby="notes-h">
+      <h2 id="notes-h">{AX_T[lang]["ax_list_h"]}</h2>
+      <ul class="card-list">{ax_cards(arts, "      ")}
+      </ul>
+      <p><a href="{url(lang, "/ax/")}">{t["ax_more"]}</a></p>
+    </section>'''
+    title = fit_title(AX_T[lang]["ax_topic_title"].format(name=d["name"]), lang)
+    relp = relpath_of(path)
+    lds = [{"@context": "https://schema.org", "@graph": [
+        {"@type": "CollectionPage", "@id": SITE + path, "url": SITE + path, "name": title, "description": d["desc"], "inLanguage": lang,
+         "isPartOf": SITE_REF, "publisher": ORG_REF, "mainEntity": {"@id": SITE + path + "#list"},
+         "dateModified": dates.iso_datetime(modified(relp))},
+        {"@type": "ItemList", "@id": SITE + path + "#list", "itemListElement": [
+            {"@type": "ListItem", "position": i + 1, "url": SITE + u} for i, (u, _, _) in enumerate(arts)]},
+    ]}, bc]
+    h = head(lang, title, d["desc"], path, alt, og_image=f"/assets/og/ax-{lang}.png", lds=lds)
+    return page(lang, h, ' class="page-read"', header(lang, "ax", alt or url(other(lang), "/ax/")), main, footer(lang))
+
 BLOCK_RE = lambda name: re.compile(r"<!-- build:" + name + r" -->.*?<!-- /build:" + name + r" -->", re.S)
 
 def set_block(main, name, inner, insert_at=None):
@@ -1122,9 +1194,15 @@ def wrap_hand(relpath):
         current = "ax"; og = f"/assets/og/ax-{lang}.png"
         items = [(t["ax"], None)]
         arts = ax_articles(lang)
-        # the hub's article list is ours: rebuilt between the markers from ax/<slug>/ on every build
-        lis = "".join(f'\n        <li class="card"><h3><a href="{u}">{esc(n)}</a></h3><p class="sub">{esc(d)}</p></li>' for u, n, d in arts)
-        main = set_block(main, "ax-list", f'\n      <ul class="card-list">{lis}\n      </ul>\n      ')
+        # the hub's lists are ours: the latest notes and one card per topic, rebuilt from ax/<slug>/ + data/ax.json on every build
+        main = set_block(main, "ax-list", f'\n      <ul class="card-list">{ax_cards(arts[:AX_HUB_LATEST])}\n      </ul>\n      ')
+        tcards = "".join(
+            f'\n        <li class="card"><h3><a href="{ax_topic_url(tp, lang)}">{esc(tp[lang]["name"])}</a></h3>'
+            f'<p class="sub">{esc(tp[lang]["desc"])} {AX_T[lang]["ax_n"].format(n=len(a))}</p>'
+            '<ul class="related-links">' + "".join(f'<li><a href="{u}">{esc(n)}</a></li>' for u, n, _ in a[:3]) + '</ul></li>'
+            for tp, a in ax_by_topic(lang))
+        if BLOCK_RE("ax-topics").search(main):
+            main = set_block(main, "ax-topics", f'\n      <ul class="card-list">{tcards}\n      </ul>\n      ')
         lds.append({"@context": "https://schema.org", "@type": "CollectionPage", "@id": SITE + path, "name": title, "description": desc,
                     "url": SITE + path, "inLanguage": lang, "isPartOf": SITE_REF, "publisher": ORG_REF, "dateModified": page_dm,
                     "hasPart": [{"@id": SITE + u + "#article"} for u, _, _ in arts],
@@ -1134,21 +1212,27 @@ def wrap_hand(relpath):
     elif parts[0] == "ax" and len(parts) == 2:
         current = "ax"; og_type = "article"
         og = f"/assets/og/ax-{parts[1]}-{lang}.png"
-        items = [(t["ax"], url(lang, "/ax/")), (headline, None)]
+        tp = ax_topic_of(path)
+        items = [(t["ax"], url(lang, "/ax/"))] + ([(tp[lang]["name"], ax_topic_url(tp, lang))] if tp else []) + [(headline, None)]
         lds.append({"@context": "https://schema.org", "@type": "Article", "@id": SITE + path + "#article",
                     "headline": headline, "description": desc,
-                    "url": SITE + path, "mainEntityOfPage": SITE + path, "inLanguage": lang, "articleSection": t["ax"],
+                    "url": SITE + path, "mainEntityOfPage": SITE + path, "inLanguage": lang,
+                    "articleSection": tp[lang]["name"] if tp else t["ax"],
                     "datePublished": dates.iso_datetime(published(relpath)), "dateModified": page_dm,
                     **({"image": [SITE + og]} if exists(og.lstrip("/")) else {}),
                     "author": ORG_REF, "publisher": ORG_REF, "isPartOf": SITE_REF})
-        main = set_block(main, "meta", meta_line(lang, relpath, main, t["ax"]), after_lead(main))
+        main = set_block(main, "meta", meta_line(lang, relpath, main, tp[lang]["name"] if tp else t["ax"]), after_lead(main))
         main = set_block(main, "toc", toc_inner(main, lang), after_hero(main))
-        others = [(u, n) for u, n, _ in ax_articles(lang) if u != path]
+        # related: newest notes of the same topic first, then the newest of other topics, AX_RELATED in all
+        allx = [(u, n) for u, n, _ in ax_articles(lang) if u != path]
+        same = [x for x in allx if tp and ax_topic_of(x[0]) is tp][:AX_RELATED - 2]
+        others = same + [x for x in allx if x not in same][:AX_RELATED - len(same)]
         extra = ""
         if others:
             lis = "".join(f'\n        <li><a href="{u}">{esc(n)}</a></li>' for u, n in others)
+            more = (f'<a href="{ax_topic_url(tp, lang)}">{esc(AX_T[lang]["ax_topic_all"].format(name=tp[lang]["name"]))}</a> · ' if tp and same else "")
             extra = (f'\n    <section aria-labelledby="ax-related-heading">\n      <h2 id="ax-related-heading">{t["ax_related_h"]}</h2>\n      <ul>{lis}\n      </ul>\n'
-                     f'      <p><a href="{url(lang, "/ax/")}">{t["ax_more"]}</a></p>\n    </section>\n    ')
+                     f'      <p>{more}<a href="{url(lang, "/ax/")}">{t["ax_more"]}</a></p>\n    </section>\n    ')
         main = set_block(main, "extra", extra)
     elif parts[0] == "about" and len(parts) == 1:
         current = "about"; og = f"/assets/og/about-{lang}.png"
@@ -1250,7 +1334,7 @@ def feed_kind(relpath):
     """RSS item scope (IA spec 4.3): help articles, AX notes and hub, app pages, /apps/, /about/. Not policies."""
     parts = bare_of(relpath)[:-len("index.html")].strip("/").split("/") if relpath.endswith("index.html") else [""]
     if parts[0] == "apps" and len(parts) in (1, 2, 3): return True
-    if parts[0] == "ax" and len(parts) in (1, 2): return True
+    if parts[0] == "ax" and len(parts) in (1, 2) and parts[-1] != "topic": return True
     return parts == ["about"]
 
 def feed_body(content, page_url):
@@ -1284,6 +1368,7 @@ def build_rss(outputs, lang):
         pub, mod = page_dates(relpath)
         items.append((pub, mod, relpath, html.unescape(mt.group(1).strip()), content))
     items.sort(key=lambda x: x[2]); items.sort(key=lambda x: x[0], reverse=True)
+    items = items[:RSS_MAX]
     def rfc(day): return format_datetime(datetime.datetime.fromisoformat(day + "T09:00:00+09:00"))
     t = T[lang]
     self_url = f"{SITE}{prefix(lang)}/rss.xml"
@@ -1373,9 +1458,11 @@ def build_llms(outputs):
             h1 = h1_text(main_html(c))
             if h1 and md: arts.append(f"- [{h1}]({SITE}/{relp[:-len('index.html')]}): {html.unescape(md.group(1))}")
         if arts: lines += ["", h, ""] + arts
-    ax = [f"- [{n}]({SITE}{u}): {d}" for u, n, d in ax_articles("en")]
-    if ax:
-        lines += ["", "## AX notes", "", f"How SugarMount apps are built and shipped with an AI coding agent, with measured numbers. Index: {SITE}/en/ax/ · Korean: {SITE}/ax/", ""] + ax
+    groups = ax_by_topic("en")
+    if groups:
+        lines += ["", "## AX notes", "", f"How SugarMount apps are built and shipped with an AI coding agent, with measured numbers. Index: {SITE}/en/ax/ · Korean: {SITE}/ax/"]
+        for tp, arts in groups:
+            lines += ["", f"### [{tp['en']['name']}]({SITE}{ax_topic_url(tp, 'en')})", ""] + [f"- [{n}]({SITE}{u}): {d}" for u, n, d in arts]
     lines += ["", "## Optional", "", f"- [Korean home (한국어)]({SITE}/): {ko['home_lead']}", f"- [Google Play developer page]({PLAY_DEV})", ""]
     return "\n".join(lines)
 
@@ -1478,6 +1565,19 @@ def validate():
             for r in a.get(lang, {}).get("releases") or []:
                 if not (isinstance(r, dict) and {"version", "date", "note"} <= set(r) and dates.DAY_RE.match(r["date"])):
                     errors.append(f"{a['id']}.{lang}.releases: want {{version, date YYYY-MM-DD, note}}, got {r!r}")
+    for tp in AXD["topics"]:
+        if not re.fullmatch(r"[a-z0-9-]+", tp["id"]): errors.append(f"data/ax.json: bad topic id {tp['id']!r}")
+        for lang in ("ko", "en"):
+            if not (tp.get(lang, {}).get("name") and tp[lang].get("desc")): errors.append(f"data/ax.json: topic {tp['id']}.{lang} needs name and desc")
+    for lang in ("", "en/"):
+        base = rel(lang + "ax")
+        for slug in (sorted(os.listdir(base)) if os.path.isdir(base) else []):
+            if not os.path.isfile(os.path.join(base, slug, "index.html")): continue
+            if AX_NOTE_TOPIC.get(slug) not in AX_TOPICS:
+                errors.append(f"{lang}ax/{slug}/: add \"{slug}\": \"<topic id>\" to notes in data/ax.json")
+    for slug in AX_NOTE_TOPIC:
+        if slug == "topic": errors.append("data/ax.json: the note slug 'topic' is reserved for topic pages")
+        if not os.path.isfile(rel(f"ax/{slug}/index.html")): errors.append(f"data/ax.json: note {slug} has no ax/{slug}/index.html")
     known = {a.get("privacy_path") for a in APPS} | {a.get("app_path") for a in APPS}
     for p in all_pages():
         parts = p.split("/")
@@ -1485,7 +1585,7 @@ def validate():
         if len(parts) == 3 and parts[0] in ("apps", "privacy") and parts[1] not in known:
             print(f"warning: {p} is not in data/apps.json (no home card, list entry or footer link)", file=sys.stderr)
     if errors:
-        raise SystemExit("data/apps.json problems:\n  " + "\n  ".join(errors))
+        raise SystemExit("data/apps.json / data/ax.json problems:\n  " + "\n  ".join(errors))
 
 def main():
     global STORE
@@ -1505,11 +1605,14 @@ def main():
             if a.get("page") == "generated":
                 gp = f"{p}apps/{a['app_path']}/index.html"
                 generated.add(gp); outputs[gp] = build_app(a, lang)
+    for gp, (tp, lang) in ax_topic_pages().items():
+        generated.add(gp); outputs[gp] = build_ax_topic(tp, lang)
     outputs["404.html"] = build_404()
+    stale = [p for p in all_pages() if bare_of(p).startswith("ax/topic/") and p not in generated]  # topic left without notes
     for p in all_pages():
-        if p not in generated:
+        if p not in generated and p not in stale:
             outputs[p] = wrap_hand(p)
-    pages = set(all_pages()) | {p for p in outputs if p.endswith("index.html")}
+    pages = (set(all_pages()) - set(stale)) | {p for p in outputs if p.endswith("index.html")}
     for p in sorted(pages):
         if p not in NOINDEX_PATHS: page_dates(p)  # every indexable page has an entry, even if nothing above asked
     # generated CSS first (in memory, from the rendered pages' characters), then ONE version for all three stylesheets,
@@ -1541,6 +1644,9 @@ def main():
             if not check:
                 os.makedirs(os.path.dirname(full) or ROOT, exist_ok=True)
                 with open(full, "w", encoding="utf-8") as f: f.write(content)
+    for p in stale:
+        changed.append(p + " (stale AX topic page)")
+        if not check: os.remove(rel(p))
     errors = report.errors + sds_errs
     if check:
         failed = False
