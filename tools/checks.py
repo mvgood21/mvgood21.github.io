@@ -21,6 +21,7 @@ from urllib.parse import unquote, urljoin, urlsplit
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dates  # noqa: E402
+from legal_chrome import STANDALONE_PATHS  # noqa: E402  (pages the build never wraps; not checked)
 
 ROOT = dates.ROOT
 SITE = "https://mvgood21.github.io"
@@ -346,7 +347,7 @@ class Site:
             top = k.split("/", 1)[0]
             if top in ("tools", "data", "assets"): continue
             if k.endswith("index.html") or k == "404.html": out.add(k)
-        return sorted(out)
+        return sorted(out - STANDALONE_PATHS)
 
     def files_under(self, prefix):
         out = set()

@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dates  # noqa: E402
 import sds_apps  # noqa: E402  (generated CSS text: assets/sds-apps.css, assets/fonts/pretendard.css)
 import checks  # noqa: E402  (site gates run by --check)
+import legal_chrome  # noqa: E402  (isolated header/footer for legal pages an app opens; standalone pages)
 from html.parser import HTMLParser  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -1072,6 +1073,7 @@ def wrap_hand(relpath):
     parts = bare.strip("/").split("/")
     noindex = relpath in NOINDEX_PATHS
     a, items, lds, current, og, og_type, app_scope = None, [], [], None, None, "website", None
+    isolated = False
     headline = h1_text(main) or title
     page_dm = dates.iso_datetime(modified(relpath)) if not noindex else None
     if parts[0] == "apps" and len(parts) == 2:
@@ -1113,7 +1115,9 @@ def wrap_hand(relpath):
         lds.append({"@context": "https://schema.org", "@type": "WebPage", "@id": SITE + path, "name": title, "url": SITE + path,
                     "inLanguage": lang, "isPartOf": SITE_REF, "publisher": ORG_REF, "dateModified": page_dm,
                     **({"about": {"@id": SITE + app_url(a, lang) + "#app"}} if a and a.get("app_path") and len(parts) == 2 else {})})
-        main = set_block(main, "extra", policy_extra(a, lang, parts[1:]))
+        isolated = legal_chrome.is_isolated(a, parts)
+        # isolated: no related links either (the app page leads to pricing); an empty block keeps <main> stable
+        main = set_block(main, "extra", "" if isolated else policy_extra(a, lang, parts[1:]))
     elif parts[0] == "ax" and len(parts) == 1:
         current = "ax"; og = f"/assets/og/ax-{lang}.png"
         items = [(t["ax"], None)]
@@ -1166,7 +1170,12 @@ def wrap_hand(relpath):
         lds.append(bc)
         nav = f"    {nav}\n"
     h = head(lang, title, desc, path, alt, og_type=og_type, og_image=og, lds=lds)
-    return page(lang, h, ' class="page-read"', header(lang, current, alt or url(other(lang), "/")), nav + main, footer(lang), app=app_scope)
+    other_href = alt or url(other(lang), "/")
+    if isolated:  # legal page an app opens: no breadcrumbs, no site header/footer (they lead to home, hub, pricing)
+        base = privacy_url(a, lang)
+        return page(lang, h, ' class="page-read"', legal_chrome.header(t, a, lang, base, other_href, BRAND_MARK), main,
+                    legal_chrome.footer(t, a, lang, base, EMAIL, here_href=path), app=app_scope)
+    return page(lang, h, ' class="page-read"', header(lang, current, other_href), nav + main, footer(lang), app=app_scope)
 
 def build_404():
     """noindex only: no canonical, og:url, hreflang, breadcrumbs or JSON-LD (IA spec 3.2(8)). Links: /, /apps/, /ax/, /privacy/, /en/."""
@@ -1438,7 +1447,7 @@ def all_pages():
         for f in fn:
             if f == "index.html" or (dp == ROOT and f == "404.html"):
                 out.append(os.path.relpath(os.path.join(dp, f), ROOT).replace(os.sep, "/"))
-    return sorted(out)
+    return sorted(p for p in out if p not in legal_chrome.STANDALONE_PATHS)
 
 def validate():
     """Fail on data that would produce broken links; warn about policy pages missing from apps.json."""

@@ -1,0 +1,3 @@
+(function(){var C=window.CARDRAWER_CONFIG||{},s="";try{s=new URLSearchParams(location.search).get("src")||""}catch(e){}if(!/^[a-z0-9_]{1,40}$/.test(s))s="";
+if(s)document.querySelectorAll("a[data-cd-keep-src]").forEach(function(a){var h=a.getAttribute("href");h.indexOf("src=")<0&&a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"src="+s)});
+var o=document.getElementById("cd-form-slot"),u=C.FORM_EMBED_URL||"";if(o&&/^https:\/\/docs\.google\.com\/forms\/d\/e\/[\w-]+\/viewform\?embedded=true$/.test(u)){if(s&&/^entry\.\d{4,12}$/.test(C.FORM_SRC_ENTRY||""))u+="&"+C.FORM_SRC_ENTRY+"="+s;var f=document.createElement("iframe");f.src=u;f.title=o.dataset.title||"Form";f.referrerPolicy="no-referrer";o.innerHTML="";o.appendChild(f);o.classList.add("is-live")}})();
