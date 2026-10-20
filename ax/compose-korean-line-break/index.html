@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Compose 한글 줄바꿈과 세로로 쌓인 라벨 – SugarMount</title>
+  <meta name="description" content="Compose는 한글을 음절 사이에서도 줄바꿈합니다. S21 QA의 &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이라 PairLayout으로 한글은 Phrase와 단어 폭 측정으로 고쳤습니다.">
+  <link rel="canonical" href="https://mvgood21.github.io/ax/compose-korean-line-break/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/compose-korean-line-break/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/compose-korean-line-break/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Compose 한글 줄바꿈과 세로로 쌓인 라벨 – SugarMount">
+  <meta property="og:description" content="Compose는 한글을 음절 사이에서도 줄바꿈합니다. S21 QA의 &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이라 PairLayout으로 한글은 Phrase와 단어 폭 측정으로 고쳤습니다.">
+  <meta property="og:url" content="https://mvgood21.github.io/ax/compose-korean-line-break/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-compose-korean-line-break-ko.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/rss.xml">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=aae9be9a">
+  <link rel="stylesheet" href="/assets/site.css?v=aae9be9a">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=aae9be9a">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/ax/compose-korean-line-break/#article","headline":"Compose 한글 줄바꿈은 음절에서 끊기고, 'R/u/l/e' 세로 깨짐은 Row 측정 순서 탓이었다","description":"Compose는 한글을 음절 사이에서도 줄바꿈합니다. S21 QA의 'R/u/l/e' 세로 깨짐은 Row 측정 순서 탓이라 PairLayout으로 한글은 Phrase와 단어 폭 측정으로 고쳤습니다.","url":"https://mvgood21.github.io/ax/compose-korean-line-break/","mainEntityOfPage":"https://mvgood21.github.io/ax/compose-korean-line-break/","inLanguage":"ko","articleSection":"Android 개발","datePublished":"2026-10-21T09:00:00+09:00","dateModified":"2026-10-21T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-compose-korean-line-break-ko.png"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Jetpack Compose에서 한글을 단어 단위로 줄바꿈하려면 어떻게 하나요?","acceptedAnswer":{"@type":"Answer","text":"TextStyle의 lineBreak에 LineBreak.Simple.copy(wordBreak = LineBreak.WordBreak.Phrase)를 넣습니다. 공용 타이포그래피에 한 번 넣으면 모든 Text가 따릅니다. Android 13 미만에서는 무시되므로 가장 긴 단어 폭을 재는 레이아웃 판단을 함께 넣습니다."}},{"@type":"Question","name":"WordBreak.Phrase를 넣었는데도 단어가 중간에서 잘리는 이유는 뭔가요?","acceptedAnswer":{"@type":"Answer","text":"줄이나 칸보다 넓은 단어는 Phrase도 자르기 때문입니다. 칸을 넓히거나 열 수를 줄이거나 글자를 줄여야 합니다. 한글뷰어 슈가독은 200% 글꼴에서 'HWPX' 자리 표시가 'HW/PX'로 갈라져 한 줄 고정과 자동 축소를 넣었고, 그래도 잘린 'HWP 3.0'은 'HWP3'로 줄였습니다."}},{"@type":"Question","name":"Compose 레이아웃은 글꼴 크기 몇 배까지 확인해야 하나요?","acceptedAnswer":{"@type":"Answer","text":"이 앱들은 1.0, 1.3, 2.0배를 ko/en, 라이트/다크, 가로 화면과 조합해 확인했습니다. 레이아웃은 1.5배부터 세로 배치로 바뀌므로, 그 앞뒤 값을 모두 봐야 전환이 맞는지 알 수 있습니다."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/"},{"@type":"ListItem","position":2,"name":"AX 노트","item":"https://mvgood21.github.io/ax/"},{"@type":"ListItem","position":3,"name":"Android 개발","item":"https://mvgood21.github.io/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"Compose 한글 줄바꿈은 음절에서 끊기고, 'R/u/l/e' 세로 깨짐은 Row 측정 순서 탓이었다"}]}</script>
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a class="nav-apps" href="/apps/">앱</a>
+        <a class="nav-ax" href="/ax/" aria-current="page">AX 노트</a>
+        <a class="nav-about" href="/about/">소개</a>
+        <a class="nav-privacy" href="/privacy/">개인정보처리방침</a>
+      </nav>
+      <a class="lang" href="/en/ax/compose-korean-line-break/" lang="en" hreflang="en">English</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>메뉴</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="전체 메뉴">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">닫기</button>
+      <p class="menu-title" id="m-photo">사진·영상</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>슈가앨범</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 용량 줄이기</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 반전·회전</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>이미지 변환 JPG·PNG·WebP</span></a></li></ul>
+      <p class="menu-title" id="m-document">문서·글</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글 띄어쓰기</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글뷰어 슈가독</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">생활</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>생생카드</span></a></li></ul>
+      <p class="menu-title" id="m-games">게임</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>화살표 매듭풀기</span></a></li><li><a class="app-tile" data-app="blocks" href="/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한판블록</span></a></li></ul>
+      <p><a href="/apps/">모든 앱 보기</a></p>
+      <ul class="menu-links"><li><a href="/ax/" aria-current="page">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container">
+    <nav class="crumbs" aria-label="이동 경로"><ol><li><a href="/">SugarMount</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/ax/topic/android/">Android 개발</a></li><li><span aria-current="page">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</span></li></ol></nav>
+    <section class="hero">
+      <span class="eyebrow">AX 노트 · 방법</span>
+      <h1>Compose 한글 줄바꿈은 음절에서 끊기고, 'R/u/l/e' 세로 깨짐은 Row 측정 순서 탓이었다</h1>
+      <p class="lead">'R/u/l/e'는 Row 측정 순서를, 한글 음절 줄바꿈은 WordBreak.Phrase와 단어 폭 측정을 바꿔 공용 디자인 시스템에서 따로 고쳤습니다.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/about/">작성 SugarMount</a> <span aria-hidden="true">·</span> <span>Android 개발</span> <span aria-hidden="true">·</span> <span>읽는 시간 11분</span> <span aria-hidden="true">·</span> 최종 업데이트 <time datetime="2026-10-21">2026년 10월 21일</time></p><!-- /build:meta -->
+      <p>라벨과 값이 나란히 놓이는 행에서 'Rule'이라는 단어가 R, u, l, e 한 글자씩 네 줄로 쌓여 있었습니다. 2026년 9월 25일 Galaxy S21(Android 15)에서 사진 앱 세 개를 실기기로 점검하던 중이었고, 'Versio/n', '1.0.1-debu/g', '오른쪽으/로'도 같은 모양으로 갈라졌습니다. 겉모습은 같아도 원인은 둘이었습니다. 앞의 세 개는 값을 먼저 재는 Row가 라벨 폭을 빼앗아서 생겼고, '오른쪽으/로'는 Compose가 한글 음절 사이를 줄바꿈 지점으로 보는 탓이었습니다. 두 원인 모두 세 앱이 함께 쓰는 디자인 시스템 코드에서 따로 고쳤습니다(커밋 633c3dd).</p>
+      <p class="note">근거는 SugarMount 앱 저장소(sugar-utils)의 커밋 633c3dd와 같은 날짜의 CHANGELOG·백로그 항목, 한글뷰어 슈가독 기기 테스트 문서(2026-10-06), Android Developers 참조 문서입니다. 기준일은 2026년 10월 21일입니다.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>목차 (8)</summary><ol><li><a href="#symptoms">깨진 화면 다섯 곳과 고친 공용 컴포넌트</a></li><li><a href="#why-syllable">Compose는 한글 음절 사이도 줄바꿈 지점으로 봅니다</a></li><li><a href="#phrase">WordBreak.Phrase는 공용 TextStyle 한 곳에 넣었습니다</a></li><li><a href="#longest-word">가장 긴 단어의 폭으로 칸 수를 정합니다</a></li><li><a href="#large-font">150% 글꼴부터는 세로로, 칩 줄은 FlowRow로</a></li><li><a href="#ai-miss">4일 전 커밋의 Row와 2px 차이로 빗나간 버튼 폭</a></li><li><a href="#checklist">점검 목록</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></details><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">목차</p><ol><li><a href="#symptoms">깨진 화면 다섯 곳과 고친 공용 컴포넌트</a></li><li><a href="#why-syllable">Compose는 한글 음절 사이도 줄바꿈 지점으로 봅니다</a></li><li><a href="#phrase">WordBreak.Phrase는 공용 TextStyle 한 곳에 넣었습니다</a></li><li><a href="#longest-word">가장 긴 단어의 폭으로 칸 수를 정합니다</a></li><li><a href="#large-font">150% 글꼴부터는 세로로, 칩 줄은 FlowRow로</a></li><li><a href="#ai-miss">4일 전 커밋의 Row와 2px 차이로 빗나간 버튼 폭</a></li><li><a href="#checklist">점검 목록</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></nav><!-- /build:toc -->
+
+    <section aria-labelledby="symptoms">
+      <h2 id="symptoms">깨진 화면 다섯 곳과 고친 공용 컴포넌트</h2>
+      <p>깨진 곳은 모두 공용 컴포넌트 안에 있었습니다. 9월 25일 QA는 AI 코딩 에이전트 네 명이 차례로 맡았습니다. 앱마다 한 명이 돌았고, 마지막 한 명은 앞선 발견을 모두 자기 화면 캡처로 다시 재현한 뒤 원인 코드를 읽었죠. 아래 표는 그날 CHANGELOG와 코드 주석에 남은 증상을 옮긴 것입니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">증상</th><th scope="col">화면 요소</th><th scope="col">원인</th><th scope="col">고친 방법</th></tr></thead>
+          <tbody>
+            <tr><td>'R/u/l/e', 'Versio/n', '1.0.1-debu/g'</td><td>라벨·값 행, 설정 행</td><td>Row가 값을 먼저 재고 라벨에는 남은 폭만 줌</td><td><code>PairLayout</code>: 둘 다 들어가면 나란히, 아니면 값을 아래 줄로</td></tr>
+            <tr><td>'오른쪽으/로', 'Transparen/t PNG'</td><td>옵션 타일 그리드, 동작 버튼</td><td>칸보다 넓은 단어. Compose가 한글의 최소 폭을 음절 하나로 보고함</td><td>가장 긴 단어 폭을 재서 1열로 전환</td></tr>
+            <tr><td>'Quick compress'가 세그먼트 3분의 1 폭에 안 들어감</td><td>세그먼트 컨트롤</td><td>큰 글꼴</td><td>150% 글꼴부터 세로 타일</td></tr>
+            <tr><td>'Web', 'Custom' 선택지가 화면 밖에 숨음</td><td>선택 칩 줄</td><td>가로 스크롤</td><td><code>FlowRow</code>로 줄바꿈</td></tr>
+            <tr><td>200% 글꼴에서 '메일', '왼쪽으로' 같은 어절이 갈라질 수 있음</td><td>모든 텍스트 스타일</td><td>음절 사이도 줄바꿈 지점</td><td><code>WordBreak.Phrase</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>세 앱은 <a href="/apps/image-compress/">사진 용량 줄이기</a>, <a href="/apps/image-flip/">사진 반전·회전</a>, 이미지 변환 JPG·PNG·WebP입니다. 모두 같은 <code>core/designsystem</code> 코드를 가져다 사용합니다. 커밋 633c3dd는 파일 57개를 고쳤지만, 줄바꿈 수정의 중심은 이 디자인 시스템의 파일 몇 개입니다.</p>
+    </section>
+
+    <section aria-labelledby="why-syllable">
+      <h2 id="why-syllable">Compose는 한글 음절 사이도 줄바꿈 지점으로 봅니다</h2>
+      <p>Compose 텍스트에서 단어를 어디서 나눌지는 <code>LineBreak.WordBreak</code>가 정합니다. Android Developers의 <a href="https://developer.android.com/reference/kotlin/androidx/compose/ui/text/style/LineBreak.WordBreak" rel="noopener">LineBreak.WordBreak 참조 문서</a>는 <code>Default</code>를 "로캘의 기본 단어 나누기 규칙"이라고 설명합니다. 라틴 문자는 단어 사이에서 줄을 바꾸고, 공백을 쓰지 않는 언어(문서의 예는 일본어)는 글자 사이에서도 바꿀 수 있다고 적었습니다. <code>Phrase</code>는 같은 구 단위에 속한 글자 사이에는 줄을 바꾸지 않는 규칙이고, 제목과 UI 라벨 같은 짧은 텍스트에 알맞다고 합니다. 두 값 모두 Compose 1.3.0에 들어왔습니다.</p>
+      <p>한국어는 띄어쓰기를 합니다. 그런데도 앱에서는 음절 사이가 갈라졌습니다. 저장소의 <code>WordWidth.kt</code> 주석은 원인을 이렇게 적어 두었습니다. Compose가 계산하는 최소 고유 폭(min intrinsic width)이 한글 음절 하나하나를 줄바꿈 지점으로 본다는 겁니다. 그래서 '오른쪽으로'가 음절 한 개 폭이면 들어간다고 계산됐고, 그리드는 두 열을 유지한 채 단어를 중간에서 잘랐습니다.</p>
+      <p>플랫폼 쪽 사정도 있습니다. <a href="https://developer.android.com/reference/android/graphics/text/LineBreakConfig" rel="noopener">LineBreakConfig 문서</a>를 보면 구 단위 줄바꿈 <code>LINE_BREAK_WORD_STYLE_PHRASE</code>는 API 33(Android 13)에 추가됐고, 지원 여부가 로캘에 따라 다르며 지원하지 않는 로캘에서는 효과가 없습니다. 이 앱들의 minSdk는 29입니다. Android 10~12 기기에서는 <code>Phrase</code>를 넣어도 아무 일도 일어나지 않죠. 줄바꿈 규칙 하나로 끝낼 수 없는 이유입니다.</p>
+    </section>
+
+    <section aria-labelledby="phrase">
+      <h2 id="phrase">WordBreak.Phrase는 공용 TextStyle 한 곳에 넣었습니다</h2>
+      <p>타이포그래피를 만드는 <code>SugarType.kt</code>의 <code>style()</code> 함수 하나가 모든 글꼴 단계에 같은 <code>lineBreak</code>를 붙입니다. 화면 코드는 한 줄도 바꾸지 않았습니다.</p>
+      <pre><code>private val WordAwareBreak =
+    LineBreak.Simple.copy(wordBreak = LineBreak.WordBreak.Phrase)
+
+private fun style(weight: FontWeight, size: Int, line: Int, spacing: Boolean = false) = TextStyle(
+    // fontFamily, fontSize, lineHeight, letterSpacing ...
+    lineBreak = WordAwareBreak,
+)</code></pre>
+      <p>한국어 화면이 있는 Compose 앱이라면 <code>Phrase</code>를 <code>Text</code>마다 붙이지 말고 공용 <code>TextStyle</code>에 한 번만 넣으십시오. 화면마다 붙이면 새 화면을 만들 때마다 빠뜨립니다. 다만 이 설정에도 한계가 있습니다. 같은 주석에 "줄보다 넓은 단어는 여전히 잘린다"고 적어 두었습니다. (한국어 첫 화면의 큰 제목은 따로 "·" 뒤에 폭이 0인 줄바꿈 지점을 넣었습니다.)</p>
+    </section>
+
+    <section aria-labelledby="longest-word">
+      <h2 id="longest-word">가장 긴 단어의 폭으로 칸 수를 정합니다</h2>
+      <p>옵션 타일 그리드는 타일이 보고하는 최소 고유 폭을 보고 열 수를 정합니다. 한글은 이 값이 음절 하나 폭으로 나오니, 디자인 시스템에 단어 폭을 직접 재는 함수를 새로 넣었습니다. 공백으로 나눈 단어를 한 줄로 재고, 가장 넓은 값을 돌려줍니다.</p>
+      <pre><code>text.split(Regex("\\s+")).filter { it.isNotEmpty() }.maxOfOrNull { word -&gt;
+    measurer.measure(word, style, softWrap = false, maxLines = 1).size.width
+} ?: 0</code></pre>
+      <p>타일의 제목과 부제는 이 값을 최소 고유 폭으로 보고합니다(<code>minIntrinsicWidthAtLeast</code>, <code>LayoutModifier</code>로 구현). 그리드는 그 값을 칸 폭과 비교합니다.</p>
+      <pre><code>val cols = when {
+    requested == 1 -&gt; 1
+    largeFont -&gt; 1
+    measurables.any { it.minIntrinsicWidth(Constraints.Infinity) &gt; cellWidthFor(requested) } -&gt; 1
+    else -&gt; requested
+}</code></pre>
+      <p>앱 코드 중에서는 사진 반전·회전의 동작 버튼 네 개가 같은 함수를 씁니다. 라벨의 가장 긴 단어가 화면 절반에서 버튼 좌우 여백과 아이콘을 제외한 폭보다 넓으면, 한 줄에 버튼 두 개 대신 하나만 놓습니다.</p>
+    </section>
+
+    <section aria-labelledby="large-font">
+      <h2 id="large-font">150% 글꼴부터는 세로로, 칩 줄은 FlowRow로</h2>
+      <p>큰 글꼴 기준은 상수 하나입니다. <code>Chips.kt</code>의 <code>LARGE_FONT_SCALE = 1.5f</code> 이상이면 세 군데가 세로 배치로 전환됩니다.</p>
+      <ul>
+        <li>세그먼트 컨트롤: 한 줄 세그먼트 대신 옵션 타일을 위아래로 쌓습니다. 체크 아이콘도 지웠습니다. 아이콘이 세그먼트 폭의 3분의 1을 먹고 있었기 때문입니다.</li>
+        <li>옵션 타일 그리드: 요청한 열 수와 상관없이 1열입니다.</li>
+        <li>사진 반전·회전의 동작 버튼: 한 줄에 하나씩 놓습니다.</li>
+      </ul>
+      <p>선택 칩 줄은 원래 <code>Row</code>에 <code>horizontalScroll</code>을 건 구조였습니다. 화면을 넘는 칩은 오른쪽 밖에 숨었고, 사용자는 'Web'이나 'Custom'이 있는지 알 수 없었죠. <code>FlowRow</code>로 바꾸자 칩이 다음 줄로 내려옵니다.</p>
+      <pre><code>// 전: Row(modifier = modifier.horizontalScroll(rememberScrollState()), ...)
+FlowRow(
+    modifier = modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.spacedBy(SugarSpacing.sm),
+) { /* FilterChip ... */ }</code></pre>
+    </section>
+
+    <section aria-labelledby="ai-miss">
+      <h2 id="ai-miss">4일 전 커밋의 Row와 2px 차이로 빗나간 버튼 폭</h2>
+      <p>'R/u/l/e'는 한글 문제가 아니었습니다. 라벨·값 행은 2026-09-21 디자인 v2 커밋(33e6cc0)에서 AI 코딩 에이전트와 함께 만든 코드입니다. 라벨에는 <code>Modifier.weight(1f, fill = false)</code>를 주고 값에는 가중치를 주지 않은 <code>Row</code>였습니다. <code>Row</code>는 가중치 없는 자식을 먼저 측정합니다. 긴 값이 폭을 다 가져가고, 라벨은 남은 몇 픽셀에 한 글자씩 접혔습니다.</p>
+      <p>이 구조는 4일 뒤 실기기 QA에서 교차 검증 에이전트가 원인 코드를 읽으며 찾아냈습니다. 새 <code>PairLayout</code>은 두 칸의 자연 폭(<code>maxIntrinsicWidth</code>)을 먼저 재고, 합이 줄 폭 안이면 나란히, 넘으면 값을 라벨 아래로 내립니다.</p>
+      <p>두 번째 실수는 숫자였습니다. 동작 버튼에서 글자 외의 폭은 OutlinedButton 좌우 여백 24dp씩, 아이콘 20dp, 아이콘 간격 8dp를 더하면 정확히 76dp입니다. 코드 주석에 따르면 이 정확한 폭으로 계산했을 때 130% 글꼴의 '오른쪽으로'는 남는 공간보다 2px 작았는데도 줄이 바뀌었습니다. 결국 여유 8dp를 더해 <code>BUTTON_CHROME = 84.dp</code>로 고정했습니다. 덧셈은 맞았습니다. 기기에서 몇 픽셀이 어긋났을 뿐입니다.</p>
+      <p>같은 결함은 다른 경로로도 나왔습니다. 2026-10-06 <a href="/apps/doc-viewer/">한글뷰어 슈가독</a> 기기 테스트에서 200% 글꼴의 형식 자리 표시가 'HW/PX'(S21), 'HW/P'(S20)로 갈라졌습니다. 이 앱도 같은 디자인 시스템을 사용하니 <code>Phrase</code>는 이미 켜져 있었습니다. 'HWPX'는 단어 하나라서 칸보다 넓으면 잘립니다. 자리 표시를 한 줄로 고정하고 칸에 맞춰 글자를 줄이게 하자 이번에는 'HWP 3.0'이 가장 작은 크기로도 들어가지 않아 'HWP 3.('으로 잘렸습니다. 최종 수정은 자리 표시 이름을 4자 이하('HWP3')로 줄이는 것이었습니다. 배지와 TalkBack 설명은 'HWP 3.0' 그대로입니다.</p>
+    </section>
+
+    <section aria-labelledby="checklist">
+      <h2 id="checklist">점검 목록</h2>
+      <p>9월 25일 수정 뒤에는 별도 에이전트가 한 번, 사람이 손으로 한 번 더 확인했습니다. 조합은 글꼴 1.0/1.3/2.0배, ko/en, 라이트/다크, 가로 화면이었고 회귀는 없었습니다. 아래 목록은 이번 수정에서 뽑은 확인 항목입니다.</p>
+      <ul>
+        <li>공용 <code>TextStyle</code>에 <code>lineBreak = LineBreak.Simple.copy(wordBreak = LineBreak.WordBreak.Phrase)</code>가 있는가. Android 12 이하는 무시하므로 아래 항목이 여전히 필요합니다.</li>
+        <li>칸 수를 정하는 레이아웃이 Compose의 최소 고유 폭 대신 가장 긴 단어 폭을 보는가.</li>
+        <li><code>fontScale</code> 1.5 이상에서 세그먼트, 그리드, 버튼 줄이 세로 배치로 바뀌는가.</li>
+        <li>선택지가 가로 스크롤 뒤에 숨지 않는가(<code>FlowRow</code>).</li>
+        <li>라벨·값 행을 <code>Row</code>의 가중치에 맡기지 않았는가.</li>
+        <li>계산으로 정한 여백에 기기에서 본 오차를 더했는가(이번에는 8dp).</li>
+        <li>단어 하나짜리 짧은 라벨('HWPX' 같은 형식 이름)이 200% 글꼴에서 칸에 들어가는가.</li>
+      </ul>
+      <p>아직 남은 것도 있습니다. 이미지 변환 JPG·PNG·WebP의 입력 화면에서 크기 배지가 "JPEG · 1.3 / MB"로 두 줄이 됩니다. CHANGELOG 2026-09-25 항목에 사소한 미해결로 적혀 있습니다. 출시 전에 거치는 검사 전체는 <a href="/ax/release-gate/">AI가 만든 Android 앱, 출시 전에 무엇을 검사하나: 릴리스 게이트와 R8 크래시</a>에 정리했습니다.</p>
+    </section>
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>Jetpack Compose에서 한글을 단어 단위로 줄바꿈하려면 어떻게 하나요?</summary><div><p>TextStyle의 lineBreak에 LineBreak.Simple.copy(wordBreak = LineBreak.WordBreak.Phrase)를 넣습니다. 공용 타이포그래피에 한 번 넣으면 모든 Text가 따릅니다. Android 13 미만에서는 무시되므로 가장 긴 단어 폭을 재는 레이아웃 판단을 함께 넣습니다.</p></div></details>
+        <details><summary>WordBreak.Phrase를 넣었는데도 단어가 중간에서 잘리는 이유는 뭔가요?</summary><div><p>줄이나 칸보다 넓은 단어는 Phrase도 자르기 때문입니다. 칸을 넓히거나 열 수를 줄이거나 글자를 줄여야 합니다. 한글뷰어 슈가독은 200% 글꼴에서 'HWPX' 자리 표시가 'HW/PX'로 갈라져 한 줄 고정과 자동 축소를 넣었고, 그래도 잘린 'HWP 3.0'은 'HWP3'로 줄였습니다.</p></div></details>
+        <details><summary>Compose 레이아웃은 글꼴 크기 몇 배까지 확인해야 하나요?</summary><div><p>이 앱들은 1.0, 1.3, 2.0배를 ko/en, 라이트/다크, 가로 화면과 조합해 확인했습니다. 레이아웃은 1.5배부터 세로 배치로 바뀌므로, 그 앞뒤 값을 모두 봐야 전환이 맞는지 알 수 있습니다.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li>
+        <li><a href="/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a></li>
+        <li><a href="/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li>
+        <li><a href="/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
+        <li><a href="/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다: 가드 지워 보기</a></li>
+        <li><a href="/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
+      </ul>
+      <p><a href="/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="/ax/">AX 노트 전체 보기</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>한 가지 일을 간단하게 하는 Android 앱</p>
+        <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">앱</p>
+        <ul><li><a href="/apps/sugaralbum/">슈가앨범</a></li><li><a href="/apps/image-compress/">사진 용량 줄이기</a></li><li><a href="/apps/image-flip/">사진 반전·회전</a></li><li><a href="/apps/image-convert/">이미지 변환 JPG·PNG·WebP</a></li><li><a href="/apps/sugarspeller/">한글 띄어쓰기</a></li><li><a href="/apps/sugarclip/">SugarClip</a></li><li><a href="/apps/doc-viewer/">한글뷰어 슈가독</a></li><li><a href="/apps/sugarcard/">생생카드</a></li><li><a href="/apps/arrow-knots/">화살표 매듭풀기</a></li><li><a href="/apps/blocks/">한판블록</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">사이트</p>
+        <ul><li><a href="/apps/">모든 앱</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li><li><a href="/rss.xml">RSS 피드</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play 개발자 페이지</a></div>
+    </div>
+  </footer>
+</body>
+</html>

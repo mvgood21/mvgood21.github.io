@@ -6,7 +6,329 @@
   <description>한 가지 일을 간단하게 하는 Android 앱을 만듭니다. 사진 용량 줄이기부터 한글 문서 보기, 한글 맞춤법, 퍼즐 게임까지 앱마다 하는 일은 하나입니다.</description>
   <language>ko</language>
   <atom:link href="https://mvgood21.github.io/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Tue, 20 Oct 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Wed, 21 Oct 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Compose 한글 줄바꿈과 세로로 쌓인 라벨 – SugarMount</title>
+    <link>https://mvgood21.github.io/ax/compose-korean-line-break/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/ax/compose-korean-line-break/</guid>
+    <description><![CDATA[<section class="hero">
+      <span class="eyebrow">AX 노트 · 방법</span>
+      <h1>Compose 한글 줄바꿈은 음절에서 끊기고, 'R/u/l/e' 세로 깨짐은 Row 측정 순서 탓이었다</h1>
+      <p class="lead">'R/u/l/e'는 Row 측정 순서를, 한글 음절 줄바꿈은 WordBreak.Phrase와 단어 폭 측정을 바꿔 공용 디자인 시스템에서 따로 고쳤습니다.</p>
+      <p>라벨과 값이 나란히 놓이는 행에서 'Rule'이라는 단어가 R, u, l, e 한 글자씩 네 줄로 쌓여 있었습니다. 2026년 9월 25일 Galaxy S21(Android 15)에서 사진 앱 세 개를 실기기로 점검하던 중이었고, 'Versio/n', '1.0.1-debu/g', '오른쪽으/로'도 같은 모양으로 갈라졌습니다. 겉모습은 같아도 원인은 둘이었습니다. 앞의 세 개는 값을 먼저 재는 Row가 라벨 폭을 빼앗아서 생겼고, '오른쪽으/로'는 Compose가 한글 음절 사이를 줄바꿈 지점으로 보는 탓이었습니다. 두 원인 모두 세 앱이 함께 쓰는 디자인 시스템 코드에서 따로 고쳤습니다(커밋 633c3dd).</p>
+      <p class="note">근거는 SugarMount 앱 저장소(sugar-utils)의 커밋 633c3dd와 같은 날짜의 CHANGELOG·백로그 항목, 한글뷰어 슈가독 기기 테스트 문서(2026-10-06), Android Developers 참조 문서입니다. 기준일은 2026년 10월 21일입니다.</p>
+    </section>
+    <section aria-labelledby="symptoms">
+      <h2 id="symptoms">깨진 화면 다섯 곳과 고친 공용 컴포넌트</h2>
+      <p>깨진 곳은 모두 공용 컴포넌트 안에 있었습니다. 9월 25일 QA는 AI 코딩 에이전트 네 명이 차례로 맡았습니다. 앱마다 한 명이 돌았고, 마지막 한 명은 앞선 발견을 모두 자기 화면 캡처로 다시 재현한 뒤 원인 코드를 읽었죠. 아래 표는 그날 CHANGELOG와 코드 주석에 남은 증상을 옮긴 것입니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">증상</th><th scope="col">화면 요소</th><th scope="col">원인</th><th scope="col">고친 방법</th></tr></thead>
+          <tbody>
+            <tr><td>'R/u/l/e', 'Versio/n', '1.0.1-debu/g'</td><td>라벨·값 행, 설정 행</td><td>Row가 값을 먼저 재고 라벨에는 남은 폭만 줌</td><td><code>PairLayout</code>: 둘 다 들어가면 나란히, 아니면 값을 아래 줄로</td></tr>
+            <tr><td>'오른쪽으/로', 'Transparen/t PNG'</td><td>옵션 타일 그리드, 동작 버튼</td><td>칸보다 넓은 단어. Compose가 한글의 최소 폭을 음절 하나로 보고함</td><td>가장 긴 단어 폭을 재서 1열로 전환</td></tr>
+            <tr><td>'Quick compress'가 세그먼트 3분의 1 폭에 안 들어감</td><td>세그먼트 컨트롤</td><td>큰 글꼴</td><td>150% 글꼴부터 세로 타일</td></tr>
+            <tr><td>'Web', 'Custom' 선택지가 화면 밖에 숨음</td><td>선택 칩 줄</td><td>가로 스크롤</td><td><code>FlowRow</code>로 줄바꿈</td></tr>
+            <tr><td>200% 글꼴에서 '메일', '왼쪽으로' 같은 어절이 갈라질 수 있음</td><td>모든 텍스트 스타일</td><td>음절 사이도 줄바꿈 지점</td><td><code>WordBreak.Phrase</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>세 앱은 <a href="https://mvgood21.github.io/apps/image-compress/">사진 용량 줄이기</a>, <a href="https://mvgood21.github.io/apps/image-flip/">사진 반전·회전</a>, 이미지 변환 JPG·PNG·WebP입니다. 모두 같은 <code>core/designsystem</code> 코드를 가져다 사용합니다. 커밋 633c3dd는 파일 57개를 고쳤지만, 줄바꿈 수정의 중심은 이 디자인 시스템의 파일 몇 개입니다.</p>
+    </section>
+    <section aria-labelledby="why-syllable">
+      <h2 id="why-syllable">Compose는 한글 음절 사이도 줄바꿈 지점으로 봅니다</h2>
+      <p>Compose 텍스트에서 단어를 어디서 나눌지는 <code>LineBreak.WordBreak</code>가 정합니다. Android Developers의 <a href="https://developer.android.com/reference/kotlin/androidx/compose/ui/text/style/LineBreak.WordBreak" rel="noopener">LineBreak.WordBreak 참조 문서</a>는 <code>Default</code>를 "로캘의 기본 단어 나누기 규칙"이라고 설명합니다. 라틴 문자는 단어 사이에서 줄을 바꾸고, 공백을 쓰지 않는 언어(문서의 예는 일본어)는 글자 사이에서도 바꿀 수 있다고 적었습니다. <code>Phrase</code>는 같은 구 단위에 속한 글자 사이에는 줄을 바꾸지 않는 규칙이고, 제목과 UI 라벨 같은 짧은 텍스트에 알맞다고 합니다. 두 값 모두 Compose 1.3.0에 들어왔습니다.</p>
+      <p>한국어는 띄어쓰기를 합니다. 그런데도 앱에서는 음절 사이가 갈라졌습니다. 저장소의 <code>WordWidth.kt</code> 주석은 원인을 이렇게 적어 두었습니다. Compose가 계산하는 최소 고유 폭(min intrinsic width)이 한글 음절 하나하나를 줄바꿈 지점으로 본다는 겁니다. 그래서 '오른쪽으로'가 음절 한 개 폭이면 들어간다고 계산됐고, 그리드는 두 열을 유지한 채 단어를 중간에서 잘랐습니다.</p>
+      <p>플랫폼 쪽 사정도 있습니다. <a href="https://developer.android.com/reference/android/graphics/text/LineBreakConfig" rel="noopener">LineBreakConfig 문서</a>를 보면 구 단위 줄바꿈 <code>LINE_BREAK_WORD_STYLE_PHRASE</code>는 API 33(Android 13)에 추가됐고, 지원 여부가 로캘에 따라 다르며 지원하지 않는 로캘에서는 효과가 없습니다. 이 앱들의 minSdk는 29입니다. Android 10~12 기기에서는 <code>Phrase</code>를 넣어도 아무 일도 일어나지 않죠. 줄바꿈 규칙 하나로 끝낼 수 없는 이유입니다.</p>
+    </section>
+    <section aria-labelledby="phrase">
+      <h2 id="phrase">WordBreak.Phrase는 공용 TextStyle 한 곳에 넣었습니다</h2>
+      <p>타이포그래피를 만드는 <code>SugarType.kt</code>의 <code>style()</code> 함수 하나가 모든 글꼴 단계에 같은 <code>lineBreak</code>를 붙입니다. 화면 코드는 한 줄도 바꾸지 않았습니다.</p>
+      <pre><code>private val WordAwareBreak =
+    LineBreak.Simple.copy(wordBreak = LineBreak.WordBreak.Phrase)
+private fun style(weight: FontWeight, size: Int, line: Int, spacing: Boolean = false) = TextStyle(
+    // fontFamily, fontSize, lineHeight, letterSpacing ...
+    lineBreak = WordAwareBreak,
+)</code></pre>
+      <p>한국어 화면이 있는 Compose 앱이라면 <code>Phrase</code>를 <code>Text</code>마다 붙이지 말고 공용 <code>TextStyle</code>에 한 번만 넣으십시오. 화면마다 붙이면 새 화면을 만들 때마다 빠뜨립니다. 다만 이 설정에도 한계가 있습니다. 같은 주석에 "줄보다 넓은 단어는 여전히 잘린다"고 적어 두었습니다. (한국어 첫 화면의 큰 제목은 따로 "·" 뒤에 폭이 0인 줄바꿈 지점을 넣었습니다.)</p>
+    </section>
+    <section aria-labelledby="longest-word">
+      <h2 id="longest-word">가장 긴 단어의 폭으로 칸 수를 정합니다</h2>
+      <p>옵션 타일 그리드는 타일이 보고하는 최소 고유 폭을 보고 열 수를 정합니다. 한글은 이 값이 음절 하나 폭으로 나오니, 디자인 시스템에 단어 폭을 직접 재는 함수를 새로 넣었습니다. 공백으로 나눈 단어를 한 줄로 재고, 가장 넓은 값을 돌려줍니다.</p>
+      <pre><code>text.split(Regex("\\s+")).filter { it.isNotEmpty() }.maxOfOrNull { word -&gt;
+    measurer.measure(word, style, softWrap = false, maxLines = 1).size.width
+} ?: 0</code></pre>
+      <p>타일의 제목과 부제는 이 값을 최소 고유 폭으로 보고합니다(<code>minIntrinsicWidthAtLeast</code>, <code>LayoutModifier</code>로 구현). 그리드는 그 값을 칸 폭과 비교합니다.</p>
+      <pre><code>val cols = when {
+    requested == 1 -&gt; 1
+    largeFont -&gt; 1
+    measurables.any { it.minIntrinsicWidth(Constraints.Infinity) &gt; cellWidthFor(requested) } -&gt; 1
+    else -&gt; requested
+}</code></pre>
+      <p>앱 코드 중에서는 사진 반전·회전의 동작 버튼 네 개가 같은 함수를 씁니다. 라벨의 가장 긴 단어가 화면 절반에서 버튼 좌우 여백과 아이콘을 제외한 폭보다 넓으면, 한 줄에 버튼 두 개 대신 하나만 놓습니다.</p>
+    </section>
+    <section aria-labelledby="large-font">
+      <h2 id="large-font">150% 글꼴부터는 세로로, 칩 줄은 FlowRow로</h2>
+      <p>큰 글꼴 기준은 상수 하나입니다. <code>Chips.kt</code>의 <code>LARGE_FONT_SCALE = 1.5f</code> 이상이면 세 군데가 세로 배치로 전환됩니다.</p>
+      <ul>
+        <li>세그먼트 컨트롤: 한 줄 세그먼트 대신 옵션 타일을 위아래로 쌓습니다. 체크 아이콘도 지웠습니다. 아이콘이 세그먼트 폭의 3분의 1을 먹고 있었기 때문입니다.</li>
+        <li>옵션 타일 그리드: 요청한 열 수와 상관없이 1열입니다.</li>
+        <li>사진 반전·회전의 동작 버튼: 한 줄에 하나씩 놓습니다.</li>
+      </ul>
+      <p>선택 칩 줄은 원래 <code>Row</code>에 <code>horizontalScroll</code>을 건 구조였습니다. 화면을 넘는 칩은 오른쪽 밖에 숨었고, 사용자는 'Web'이나 'Custom'이 있는지 알 수 없었죠. <code>FlowRow</code>로 바꾸자 칩이 다음 줄로 내려옵니다.</p>
+      <pre><code>// 전: Row(modifier = modifier.horizontalScroll(rememberScrollState()), ...)
+FlowRow(
+    modifier = modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.spacedBy(SugarSpacing.sm),
+) { /* FilterChip ... */ }</code></pre>
+    </section>
+    <section aria-labelledby="ai-miss">
+      <h2 id="ai-miss">4일 전 커밋의 Row와 2px 차이로 빗나간 버튼 폭</h2>
+      <p>'R/u/l/e'는 한글 문제가 아니었습니다. 라벨·값 행은 2026-09-21 디자인 v2 커밋(33e6cc0)에서 AI 코딩 에이전트와 함께 만든 코드입니다. 라벨에는 <code>Modifier.weight(1f, fill = false)</code>를 주고 값에는 가중치를 주지 않은 <code>Row</code>였습니다. <code>Row</code>는 가중치 없는 자식을 먼저 측정합니다. 긴 값이 폭을 다 가져가고, 라벨은 남은 몇 픽셀에 한 글자씩 접혔습니다.</p>
+      <p>이 구조는 4일 뒤 실기기 QA에서 교차 검증 에이전트가 원인 코드를 읽으며 찾아냈습니다. 새 <code>PairLayout</code>은 두 칸의 자연 폭(<code>maxIntrinsicWidth</code>)을 먼저 재고, 합이 줄 폭 안이면 나란히, 넘으면 값을 라벨 아래로 내립니다.</p>
+      <p>두 번째 실수는 숫자였습니다. 동작 버튼에서 글자 외의 폭은 OutlinedButton 좌우 여백 24dp씩, 아이콘 20dp, 아이콘 간격 8dp를 더하면 정확히 76dp입니다. 코드 주석에 따르면 이 정확한 폭으로 계산했을 때 130% 글꼴의 '오른쪽으로'는 남는 공간보다 2px 작았는데도 줄이 바뀌었습니다. 결국 여유 8dp를 더해 <code>BUTTON_CHROME = 84.dp</code>로 고정했습니다. 덧셈은 맞았습니다. 기기에서 몇 픽셀이 어긋났을 뿐입니다.</p>
+      <p>같은 결함은 다른 경로로도 나왔습니다. 2026-10-06 <a href="https://mvgood21.github.io/apps/doc-viewer/">한글뷰어 슈가독</a> 기기 테스트에서 200% 글꼴의 형식 자리 표시가 'HW/PX'(S21), 'HW/P'(S20)로 갈라졌습니다. 이 앱도 같은 디자인 시스템을 사용하니 <code>Phrase</code>는 이미 켜져 있었습니다. 'HWPX'는 단어 하나라서 칸보다 넓으면 잘립니다. 자리 표시를 한 줄로 고정하고 칸에 맞춰 글자를 줄이게 하자 이번에는 'HWP 3.0'이 가장 작은 크기로도 들어가지 않아 'HWP 3.('으로 잘렸습니다. 최종 수정은 자리 표시 이름을 4자 이하('HWP3')로 줄이는 것이었습니다. 배지와 TalkBack 설명은 'HWP 3.0' 그대로입니다.</p>
+    </section>
+    <section aria-labelledby="checklist">
+      <h2 id="checklist">점검 목록</h2>
+      <p>9월 25일 수정 뒤에는 별도 에이전트가 한 번, 사람이 손으로 한 번 더 확인했습니다. 조합은 글꼴 1.0/1.3/2.0배, ko/en, 라이트/다크, 가로 화면이었고 회귀는 없었습니다. 아래 목록은 이번 수정에서 뽑은 확인 항목입니다.</p>
+      <ul>
+        <li>공용 <code>TextStyle</code>에 <code>lineBreak = LineBreak.Simple.copy(wordBreak = LineBreak.WordBreak.Phrase)</code>가 있는가. Android 12 이하는 무시하므로 아래 항목이 여전히 필요합니다.</li>
+        <li>칸 수를 정하는 레이아웃이 Compose의 최소 고유 폭 대신 가장 긴 단어 폭을 보는가.</li>
+        <li><code>fontScale</code> 1.5 이상에서 세그먼트, 그리드, 버튼 줄이 세로 배치로 바뀌는가.</li>
+        <li>선택지가 가로 스크롤 뒤에 숨지 않는가(<code>FlowRow</code>).</li>
+        <li>라벨·값 행을 <code>Row</code>의 가중치에 맡기지 않았는가.</li>
+        <li>계산으로 정한 여백에 기기에서 본 오차를 더했는가(이번에는 8dp).</li>
+        <li>단어 하나짜리 짧은 라벨('HWPX' 같은 형식 이름)이 200% 글꼴에서 칸에 들어가는가.</li>
+      </ul>
+      <p>아직 남은 것도 있습니다. 이미지 변환 JPG·PNG·WebP의 입력 화면에서 크기 배지가 "JPEG · 1.3 / MB"로 두 줄이 됩니다. CHANGELOG 2026-09-25 항목에 사소한 미해결로 적혀 있습니다. 출시 전에 거치는 검사 전체는 <a href="https://mvgood21.github.io/ax/release-gate/">AI가 만든 Android 앱, 출시 전에 무엇을 검사하나: 릴리스 게이트와 R8 크래시</a>에 정리했습니다.</p>
+    </section>
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>Jetpack Compose에서 한글을 단어 단위로 줄바꿈하려면 어떻게 하나요?</summary><div><p>TextStyle의 lineBreak에 LineBreak.Simple.copy(wordBreak = LineBreak.WordBreak.Phrase)를 넣습니다. 공용 타이포그래피에 한 번 넣으면 모든 Text가 따릅니다. Android 13 미만에서는 무시되므로 가장 긴 단어 폭을 재는 레이아웃 판단을 함께 넣습니다.</p></div></details>
+        <details><summary>WordBreak.Phrase를 넣었는데도 단어가 중간에서 잘리는 이유는 뭔가요?</summary><div><p>줄이나 칸보다 넓은 단어는 Phrase도 자르기 때문입니다. 칸을 넓히거나 열 수를 줄이거나 글자를 줄여야 합니다. 한글뷰어 슈가독은 200% 글꼴에서 'HWPX' 자리 표시가 'HW/PX'로 갈라져 한 줄 고정과 자동 축소를 넣었고, 그래도 잘린 'HWP 3.0'은 'HWP3'로 줄였습니다.</p></div></details>
+        <details><summary>Compose 레이아웃은 글꼴 크기 몇 배까지 확인해야 하나요?</summary><div><p>이 앱들은 1.0, 1.3, 2.0배를 ko/en, 라이트/다크, 가로 화면과 조합해 확인했습니다. 레이아웃은 1.5배부터 세로 배치로 바뀌므로, 그 앞뒤 값을 모두 봐야 전환이 맞는지 알 수 있습니다.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li>
+        <li><a href="https://mvgood21.github.io/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a></li>
+        <li><a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다: 가드 지워 보기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 21 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>AI 에이전트 병렬 개발: 동시 실행은 3개였다 – SugarMount</title>
+    <link>https://mvgood21.github.io/ax/parallel-agent-workstreams/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/ax/parallel-agent-workstreams/</guid>
+    <description><![CDATA[<section class="hero">
+      <span class="eyebrow">AX 노트 · 측정</span>
+      <h1>'에이전트 수백 개 써도 돼'의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</h1>
+      <p class="lead">코드를 고치는 에이전트는 한 번에 3개까지만 돌았습니다. 그 상한을 정한 것은 모델이 아니라 여유 RAM 4GB와 공용 기기 2대였습니다.</p>
+      <p>"에이전트 수백 개 써도 되고 시간 오래 걸려도 되니까 심층분석해서 진행해." 10월 3일 오후 4시 8분, 운영자가 <a href="https://mvgood21.github.io/apps/arrow-knots/">화살표 매듭풀기</a>를 300판에서 1,000판으로 늘리자며 남긴 요청입니다. 그날 저장소에는 커밋 59개가 쌓였고, 워크스트림 10개(ws0~ws9)가 각자 브랜치에서 통합 브랜치로 머지됐습니다. 그런데 코드를 쓰는 에이전트가 동시에 돈 것은 최대 3개였습니다. 메모리 13GB 가운데 여유가 4GB뿐이었거든요.</p>
+      <p class="note">숫자는 SugarMount 게임 저장소(sugar-game)의 git 기록(한국 시간 기준 일별 집계, 머지 커밋 206881a~427cb92), 사양서 docs/09-parts-1000-spec.md와 구현 메모 docs/09b-impl-notes.md, 그리고 이 저장소에서 연 Claude Code 세션 기록의 도구 호출을 스크립트로 센 값입니다. 기준일은 2026년 10월 21일입니다.</p>
+    </section>
+    <section aria-labelledby="request-vs-run">
+      <h2 id="request-vs-run">요청은 '수백 개', 동시에 코드를 쓴 에이전트는 3개였습니다</h2>
+      <p>요청 1분 뒤 에이전트는 설계용 Workflow를 띄웠습니다. Workflow는 Claude Code에서 서브에이전트 여러 개를 스크립트 하나로 묶어 돌리는 도구입니다. 난이도 곡선, 확대 화면, 게임 경제, 디자인, 스토어 문구, 다국어를 주제별로 나눠 에이전트 24개가 16:09부터 17:01까지 일했고, 첫 단계에서는 11개가 동시에 돌았습니다. 코드를 건드리지 않는 일이라 막을 것이 없었죠.</p>
+      <p>그 결과를 합친 사양서가 17:18에 커밋됐습니다(지금은 부록까지 1,327줄). 3분 뒤 시작한 구현 Workflow는 사정이 달랐습니다. 에이전트 41개가 구현, 적대적 리뷰, 수정, 머지를 나눠 맡아 22:27까지 5시간 6분을 돌았는데, 동시에 실행된 수는 1단계의 3개가 최대였습니다. 엔진 규칙(ws0), 레벨 생성기(ws1), 문자열과 빌드 설정(ws6)이었죠. 2·3단계는 2개씩이었고, 화면 통합(ws7)과 테스트 도구(ws8)는 혼자 돌았습니다. 스토어 문안(ws9)은 Workflow 밖에서 서브에이전트 하나가 22:36에 시작해 11분 만에 끝냈습니다.</p>
+      <p>3이라는 숫자는 에이전트가 스스로 골랐습니다. 구현 직전 세션에 남긴 판단의 요지는 16코어에 RAM 13GB(여유 4GB)라 Android 빌드를 한 번에 2~3개로 묶겠다는 것이었습니다. 17:28에 한 워크스트림 에이전트가 찍은 메모리 상태도 같았습니다.</p>
+<pre><code>$ free -g
+               total        used        free      shared  buff/cache   available
+Mem:              13           8           2           0           2           4</code></pre>
+    </section>
+    <section aria-labelledby="two-days">
+      <h2 id="two-days">10월 3~4일의 커밋, 머지, 에이전트 수</h2>
+      <p>이틀 동안 이 저장소에서 움직인 세션은 3개(화살표 게임, 광고·출시, 한판블록)였습니다. Agent·Workflow 칸은 이 세 세션이 직접 부른 횟수이고, 마지막 칸은 Workflow 안에서 뜬 에이전트 수입니다. 동시 최대는 에이전트마다 기록의 첫 시각과 마지막 시각을 잡아 겹친 수를 셌습니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">날짜 (KST)</th><th scope="col">커밋</th><th scope="col">머지 커밋</th><th scope="col">Agent 호출</th><th scope="col">Workflow 실행</th><th scope="col">Workflow 안 에이전트 (동시 최대)</th></tr></thead>
+          <tbody>
+            <tr><td>10-03</td><td>59</td><td>11</td><td>11</td><td>2</td><td>설계 24 (11), 구현 41 (3)</td></tr>
+            <tr><td>10-04</td><td>52</td><td>6</td><td>14</td><td>3</td><td>E2E 수정 10 (3), 출시 준비 조사 150 (14)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>10-03의 머지 11개는 모두 ws 브랜치입니다. 시뮬레이션 담당 ws2가 생성기 재조정 때문에 두 번 들어가서 10개가 아니라 11개가 됐습니다. 10-04의 6개는 E2E 수정 브랜치 3개와 main을 받아 온 머지 3개입니다. 10-04 Workflow 3번 가운데 1번은 한판블록 조사 실행을 이어 붙인 재개 호출이고, 150은 그 실행의 기록 파일 수라 재시도분이 섞여 있습니다.</p>
+      <p>기간을 넓혀도 같습니다. 이 저장소의 세션 6개(09-30~10-17)에서 운영자는 '수십 개', '수백 개', '마음껏' 같은 말로 에이전트를 많이 띄우라고 5번 요청했습니다. 메인 세션의 Agent 호출은 다 합쳐 53번이었고, 한 세션에서 가장 많이 부른 것이 20번이었습니다. Workflow 실행은 10번이었습니다.</p>
+    </section>
+    <section aria-labelledby="bottlenecks">
+      <h2 id="bottlenecks">병렬도를 정한 것은 RAM, 기기 2대, 파일 주인 표였습니다</h2>
+      <p>먼저 막힌 곳은 빌드 메모리였습니다. 구현 메모는 <code>./gradlew --max-workers=4</code>를 쓰고 작업 공간 하나에서 Gradle 빌드는 한 번에 하나만 돌리라고 적었습니다. 워크스트림마다 커밋 전에 엔진·앱 단위 테스트와 디버그 빌드를 통과해야 했으니, 동시 워크스트림 수가 곧 동시 Gradle 수였습니다. 빌드를 하지 않는 조사·설계 Workflow는 사정이 다릅니다. 이 저장소에서 6번 돌았고, 동시 실행이 11~14개까지 올라갔습니다.</p>
+      <p>기기는 Galaxy S21과 S20 두 대였습니다. 이 둘을 세션 5개가 나눠 썼습니다. 화살표 게임, 광고·출시, 한판블록 세션에 다른 앱 저장소의 유틸리티 세션 2개가 더해졌죠. 그래서 구현 메모에는 "어떤 워크스트림도 기기를 만지지 않는다, E2E는 나중에 S21에서만"이라고 적혀 있습니다. 10월 3~4일에 이 저장소 세션 세 개가 받은 세션 간 메시지는 148건이었고, 그중 114건이 S20이나 S21을 언급했습니다. 상당수가 "10분만 쓰겠다", "다 썼으니 이제 쓰셔도 된다" 같은 순서 조율이었습니다. (그날 S21은 16:14부터 17:17까지 다른 앱 세션의 한글 문서 뷰어 벤치마크에 가 있었습니다. 화살표 세션은 자기 앱 데이터와 글자 크기 같은 전역 설정을 건드리지 말라는 조건을 붙여 기기를 내줬죠.)</p>
+      <p>파일도 주인을 정했습니다. 사양서 11장의 워크스트림 표에는 "독점 소유" 열이 있습니다. 카메라 담당 ws3는 Camera.kt, BoardView.kt, CameraMathTest.kt만 고칩니다. 광고 코드와 공용 플랫폼 모듈은 다른 세션 몫이라 워크스트림은 읽기만 했습니다. 각 워크스트림은 자기 git worktree에서 커밋만 하고, 통합 브랜치에 머지하는 것은 통합 에이전트 하나뿐입니다. 워크트리로 에이전트를 나누는 방식은 <a href="https://mvgood21.github.io/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a>에서 처음 썼고, 이번에는 여기에 주인 표를 더했습니다.</p>
+    </section>
+    <section aria-labelledby="ai-errors">
+      <h2 id="ai-errors">에이전트 41개가 '실패 0'으로 끝낸 앱이 첫 실행에서 죽었습니다</h2>
+      <p>22:27 구현 Workflow는 "41개 모두 완료, 실패 없음"으로 끝났습니다. Workflow 안의 워크스트림은 시뮬레이션(ws2)만 빼고 모두 적대적 리뷰를 한 번 이상 거쳤고, 마지막 머지 에이전트가 전체 JVM 테스트와 디버그 빌드를 통과시킨 상태였습니다. 1분 뒤 S21에 설치하자 앱이 실행 직후 죽었습니다. 원인은 레벨 파일 이름이었습니다. Android 빌드 도구(aapt)가 에셋 이름 끝의 <code>.gz</code>를 떼어 내는 바람에, 코드가 찾는 파일이 APK 안에 없었죠. 22:31 커밋 4d46413이 레벨 파일을 압축하지 않은 채로 넣고, 에셋 이름이 .gz로 끝나면 실패하는 회귀 테스트를 붙였습니다.</p>
+      <p>33개 항목짜리 세부 E2E는 00:36부터 01:41까지 S21 한 대를 혼자 썼습니다. 31개가 통과하고 1개(큰 판 패닝 끊김)가 실패했으며, 1개는 디버그 빌드에서 확인할 수 없어 건너뛰었습니다. 버그와 디자인 문제는 10건이 나왔습니다. 이를 고친 Workflow도 에이전트 10개에 동시 3개였고, 02:23에 수정 브랜치 3개가 머지됐습니다.</p>
+      <p>에이전트가 틀린 것은 '완료'의 정의였습니다. 기기를 못 쓰게 한 규칙 자체는 맞았습니다. 그 대가로 41개의 '완료'는 JVM 테스트와 컴파일 통과만 뜻하게 됐고, 기기에서만 드러나는 결함은 전부 맨 끝의 한 줄짜리 대기열로 밀렸습니다. 이걸 잡은 것은 운영자가 첫 요청에 넣은 한 구절 "S21에 설치해서 E2E 테스트까지"였습니다. 01:43에는 운영자가 "S20에서 E2E 진행해도 괜찮다"며 기기 한 대를 더 내줬습니다. 그 덕에 출시 빌드 무작위 입력 3,000회×3 검사가 S20에서 수정 Workflow와 나란히 돌았습니다(크래시 0건). 에이전트를 더 띄우라는 말보다 기기를 하나 내주는 말이 병렬도를 더 올렸습니다.</p>
+      <p>에이전트를 몇 개 띄울지 정하기 전에, 동시에 돌릴 수 있는 빌드 수와 기기 수부터 세십시오. 그 숫자가 실제 병렬도입니다.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">다음 실험</h2>
+      <ul>
+        <li>동시 4개가 들어가는지. 이번에는 가용 메모리를 에이전트들이 띄엄띄엄 몇 번 찍어 본 것이 전부였습니다. 다음 병렬 구현에서는 1분마다 가용 메모리와 Gradle 데몬 수를 기록해, 3이 안전 여유였는지 낭비였는지 숫자로 보겠습니다.</li>
+        <li>메시지 대신 기기 잠금. 이틀 동안 114건이던 기기 언급 메시지를 잠금 파일 하나(누가, 언제까지)로 바꾸고, 기기 대기 시간이 얼마나 줄어드는지 측정합니다.</li>
+        <li>14의 정체. 조사용 Workflow 5번 모두 동시 실행이 정확히 14개에서 더 오르지 않았습니다. 이것이 도구 설정의 상한인지 아직 확인하지 않았습니다.</li>
+      </ul>
+    </section>
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>Claude Code 서브에이전트는 몇 개까지 병렬로 돌릴 수 있나요?</summary><div><p>이 저장소 기록에서는 빌드를 하지 않는 조사용 Workflow가 동시 14개까지 돌았습니다. Gradle 빌드를 하는 구현 에이전트는 여유 RAM 4GB에 맞춰 3개로 묶었습니다. 실제 상한은 도구보다 빌드 메모리와 기기 수가 먼저 정합니다.</p></div></details>
+        <details><summary>에이전트마다 git worktree를 따로 주면 충돌이 사라지나요?</summary><div><p>git 충돌은 줄지만 기기와 메모리를 두고 벌어지는 다툼은 남습니다. 이번에는 워크스트림별 독점 파일 표와 통합 에이전트 한 명만 머지하는 규칙으로 git 쪽을 막았고, 기기 두 대의 순서는 세션 간 메시지로 맞췄습니다.</p></div></details>
+        <details><summary>워크스트림 10개를 하루에 어떻게 합쳤나요?</summary><div><p>의존 순서대로 단계를 나누고, 단계가 끝날 때마다 통합 에이전트가 브랜치를 --no-ff로 차례로 머지한 뒤 단위 테스트와 디버그 빌드를 돌렸습니다. 10월 3일 19:10부터 22:47까지 머지 커밋 11개가 이렇게 생겼습니다.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/ax/agents-md/">AGENTS.md 작성법: AI 코딩 에이전트가 틀리기 쉬운 규칙만 적는다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다: 가드 지워 보기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li>
+        <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 21 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Play 단계적 출시 20%가 100%로 나갔다 – SugarMount</title>
+    <link>https://mvgood21.github.io/ax/play-staged-rollout-completed/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/ax/play-staged-rollout-completed/</guid>
+    <description><![CDATA[<section class="hero">
+      <span class="eyebrow">AX 노트 · 사고 기록</span>
+      <h1>20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</h1>
+      <p class="lead">completed로 커밋된 릴리스는 20%로 돌아가지 않습니다. 단계적 출시는 commit 전에 status와 userFraction을 확인하십시오.</p>
+      <p>에이전트의 터미널에 찍힌 줄은 <code>track production [('97 (1.6.029)', 'completed')]</code>였고, 바로 아래에 commit 결과가 붙어 있었습니다. 2026년 10월 11일 15시 50분, 한글 띄어쓰기 1.6.029(versionCode 97)를 Google Play production 트랙에 20%만 내보내려던 명령이 전체 사용자 대상 출시로 커밋된 순간입니다. 35초 뒤 20%로 고치려는 요청은 HTTP 403으로 거부됐습니다. 원인은 에이전트가 만든 업로드 스크립트의 인자 개수 조건 하나였죠. 다음 1.6.030과 1.6.031은 내부 테스트 트랙을 거쳐 production 20%로 나갔고, 하루 지켜본 뒤 10월 18일과 19일에 100%로 올렸습니다.</p>
+      <p class="note">근거는 한글 띄어쓰기 저장소의 1.6.029·1.6.030·1.6.031 출시 기록과 커밋 <code>e64cd83</code>, 그날 배포 세션의 명령 출력, Google Play Developer API 문서(edits.tracks 2026-09-28 갱신, APKs and Tracks 2025-12-18 갱신)입니다. 2026년 10월 21일에 다시 확인했습니다.</p>
+    </section>
+    <section aria-labelledby="off-by-one">
+      <h2 id="off-by-one">20%를 받은 명령이 completed를 보냈다</h2>
+      <p>에이전트가 실행한 명령은 <code>play3.py promote 97 "97 (1.6.029)" notes29.json production 0.2</code>였습니다. 마지막 <code>0.2</code>가 단계적 출시 비율입니다. 스크립트는 그 비율을 이렇게 읽었습니다.</p>
+      <pre><code>a=sys.argv; FR=None
+if a[1] in ("upload","promote") and len(a)&gt;(8 if a[1]=="upload" else 7): FR=a.pop()
+...
+**({"status":"inProgress","userFraction":float(FR)} if FR else {"status":"completed"})</code></pre>
+      <p>위 명령의 <code>sys.argv</code>는 스크립트 이름까지 7개입니다. 조건은 7보다 커야 비율을 꺼내도록 되어 있었습니다. 하나 차이로 <code>FR</code>이 비었고, 비율이 없을 때의 기본값인 <code>completed</code>가 production 트랙에 들어갔습니다. 업로드 쪽 조건도 같은 방식으로 하나가 어긋나 있었습니다.</p>
+      <p>이 스크립트는 저장소 밖의 임시 파일이었습니다. 같은 세션에서 에이전트가 이전 스크립트를 sed로 고쳐 만들었고, 내부 테스트 업로드에는 비율을 넘기지 않아 그때까지 문제가 드러나지 않았습니다. (vc97은 그날 다시 만든 빌드였습니다. 오후 Galaxy S21 심층 확인에서 화면이 꺼진 채 앱을 띄우면 검은 스플래시에 멈추는 기존 버그가 나와, vc96을 버리고 고쳐서 다시 빌드했습니다.)</p>
+    </section>
+    <section aria-labelledby="refused">
+      <h2 id="refused">20%로 되돌리는 PUT은 403 PERMISSION_DENIED였다</h2>
+      <p>에이전트는 곧바로 새 edit을 열어 production 트랙을 "vc97 inProgress 0.2, 이전 버전 vc94 completed"로 바꾸려 했습니다. Play의 응답은 이랬습니다.</p>
+      <pre><code>before [('97 (1.6.029)', 'completed', ['97'], None)]
+put [('97 (1.6.029)', 'inProgress', 0.2), ('94 (1.6.027)', 'completed', None)]
+HTTP 403 {
+  "error": {
+    "code": 403,
+    "message": "You cannot rollout this release because it does not allow any existing users to upgrade to the newly added APKs.",
+    "status": "PERMISSION_DENIED"
+  }
+}</code></pre>
+      <p>Google의 edits.tracks 문서는 <code>completed</code>를 "더 이상 바뀌지 않는 릴리스이며 모든 사용자에게 제공된다"고 정의합니다. <code>userFraction</code>은 status가 <code>inProgress</code>나 <code>halted</code>일 때만 설정할 수 있고 값은 0과 1 사이입니다. 이미 전체에 나간 릴리스에 비율을 다시 붙이는 방법도, 위 403 메시지를 설명하는 문단도 문서에서 찾지 못했습니다. 확인한 것은 결과뿐입니다. completed는 단계 출시로 돌아가지 않았습니다.</p>
+    </section>
+    <section aria-labelledby="ai-wrong">
+      <h2 id="ai-wrong">에이전트는 completed를 출력하고도 commit했다</h2>
+      <p>실수는 둘이었습니다. 첫째는 위의 하나 차이 조건입니다. 둘째가 더 큰 문제였죠. 스크립트는 PUT 응답의 트랙 상태를 <code>track production [('97 (1.6.029)', 'completed')]</code>로 출력한 뒤, 그 값을 검사하지 않고 같은 실행 안에서 commit까지 갔습니다. 잘못된 값은 commit 전에 이미 출력돼 있었습니다. 멈추는 코드가 없었을 뿐입니다.</p>
+      <p>사고 뒤 에이전트가 스크립트 조건을 고치려 한 sed 명령은 Claude Code의 자동 권한 검사에 막혔습니다. 에이전트는 그 스크립트를 더 쓰지 않겠다고 운영자에게 알리고, 사고를 출시 기록에 적었습니다(커밋 <code>e64cd83</code>, 15시 52분).</p>
+      <p>출시 기록에는 "멈출 수단은 핫픽스뿐"이라고 적혔습니다. 문서에는 길이 하나 더 있습니다. Google의 APKs and Tracks 문서 "Halt a completed rollout" 절에 따르면, 트랙에 먼저 게시된 completed 릴리스가 있을 때는 completed 릴리스도 <code>halted</code>로 바꿀 수 있고, 그러면 새 사용자와 업데이트하려는 기존 사용자에게 그 이전 릴리스가 나갑니다. 1.6.029 직전 completed 릴리스는 vc94였습니다. 저희는 이 경로를 시도하지 않았으니, Play가 받아들였을지는 모릅니다. 대신 +1일·+3일 안정성 점검 행을 모니터링 문서에 넣었습니다. 10월 15일에 한 늦은 판정은 "회귀 신호 없음"이었습니다. 다만 Play 크래시 지표는 보고 API 권한이 모자라 보지 못했습니다.</p>
+    </section>
+    <section aria-labelledby="internal-first">
+      <h2 id="internal-first">내부 테스트에 먼저 올리고, 같은 빌드를 승급한다</h2>
+      <p>이 사고 이틀 전에 규칙 하나가 이미 생겨 있었습니다. 10월 9일 1.6.026을 Publisher API로 production 100%에 바로 올리자, 운영자가 다음부터는 내부 테스트에 먼저 올리고 그것을 프로덕션으로 승급하자고 했습니다. 직접 설치한 APK로는 Play 서명, 결제, Play 자동 보호 경로를 끝까지 볼 수 없어서입니다. 업로드는 한 번만 하고, production에는 같은 versionCode를 새 edit으로 붙입니다.</p>
+      <p>1.6.029도 이 순서를 따르긴 했습니다. internal 커밋 뒤 production으로 승급하는 두 번째 단계에서 비율이 빠졌을 뿐이죠. 그다음 두 버전은 비율까지 지켰습니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">버전</th><th scope="col">production 첫 단계</th><th scope="col">100%</th><th scope="col">판정 근거</th></tr></thead>
+          <tbody>
+            <tr><td>1.6.029 (vc97)</td><td>10-11, completed(의도는 20%)</td><td>처음부터</td><td>10-15 늦은 판정: 회귀 신호 없음, 크래시 지표는 못 봄</td></tr>
+            <tr><td>1.6.030 (vc102 → vc103)</td><td>10-17, inProgress 0.2</td><td>10-18</td><td>+1일: 크래시 0, 광고 코드 변경 없음</td></tr>
+            <tr><td>1.6.031 (vc105)</td><td>10-18, inProgress 0.2</td><td>10-19</td><td>+1일: 크래시 0, 검사 실패 0</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>1.6.030의 20% 하루는 비교할 만큼 실사용자를 모으지 못했습니다. GA4에 잡힌 1.6.030 사용자 대부분이 Play 사전 출시 보고서의 테스트 기기와 저희 개발 기기였거든요. 그래서 100% 판단은 크래시 0과 광고 코드 diff가 없다는 확인에 기댔습니다. 20%가 안전장치 노릇을 하는 것은 표본이 모일 때까지 기다릴 때뿐입니다.</p>
+    </section>
+    <section aria-labelledby="guard">
+      <h2 id="guard">지금 쓰는 승급 스크립트는 인자 위치로 비율을 읽지 않는다</h2>
+      <p>1.6.031부터는 버전별 폴더에 <code>release_production.py</code>를 두고 그것으로 승급합니다. 핵심만 줄이면 이렇습니다.</p>
+      <pre><code>commit = '--commit' in sys.argv          # 없으면 드라이런
+fraction = float(sys.argv[sys.argv.index('--fraction') + 1]) if '--fraction' in sys.argv else 0.2
+edit = call('POST', f'{API}/edits', {})['id']
+done = False
+try:
+    internal = call('GET', f'{API}/edits/{edit}/tracks/internal')['releases']
+    new = [r for r in internal if r.get('versionCodes') == [NEW]]
+    if len(new) != 1:
+        sys.exit(f'internal 에 vc{NEW} 가 없다')
+    prod = call('GET', f'{API}/edits/{edit}/tracks/production')['releases']
+    old = [r for r in prod if r.get('versionCodes') == [OLD] and r['status'] == 'completed']
+    if len(old) != 1:
+        sys.exit(f'production 에 completed vc{OLD} 가 없다')
+    call('PUT', f'{API}/edits/{edit}/tracks/production', {'track': 'production', 'releases': [
+        {'versionCodes': [NEW], 'status': 'inProgress', 'userFraction': fraction, ...},
+        old[0]]})
+    call('POST', f'{API}/edits/{edit}:validate')
+    if commit:
+        call('POST', f'{API}/edits/{edit}:commit'); done = True
+finally:
+    if not done:
+        call('DELETE', f'{API}/edits/{edit}')   # 드라이런이나 실패면 edit을 버린다</code></pre>
+      <p>달라진 점은 네 가지입니다.</p>
+      <ul>
+        <li><code>status</code>는 코드에 <code>inProgress</code>로 박혀 있습니다. 비율이 빠져도 completed로 떨어질 길이 없고, 비율은 이름 붙은 <code>--fraction</code>으로만 바꿉니다.</li>
+        <li>내부 테스트 트랙에 그 versionCode가 정확히 하나 있어야 진행합니다. internal을 건너뛴 승급은 여기서 멈춥니다.</li>
+        <li>production에 이전 버전이 completed로 하나 있어야 합니다. 새 릴리스가 20%일 때 나머지 80%가 받을 릴리스입니다.</li>
+        <li>기본은 드라이런입니다. validate까지 돌리고 edit을 지우니, 실제 반영은 운영자가 확인한 뒤 <code>--commit</code>을 붙인 실행 한 번뿐입니다. 1.6.031은 10월 18일 운영자 확인 뒤 이렇게 나갔습니다.</li>
+      </ul>
+      <p>PUT 본문 모양은 10월 11일에 403을 받은 요청과 같습니다. 새 릴리스 inProgress, 이전 릴리스 completed. 1.6.031 때는 새 릴리스가 아직 아무에게도 나가지 않은 상태였고, 이 요청이 validate와 commit을 통과했습니다.</p>
+    </section>
+    <section aria-labelledby="prevention">
+      <h2 id="prevention">지금 규칙과 아직 코드에 없는 확인</h2>
+      <p>에이전트에게 production 출시 권한을 줄 거라면, 출시 비율을 위치 인자로 받는 스크립트는 쓰지 마십시오. 비율이 빠졌을 때 기본값이 completed인 코드는 실수 한 번을 전체 출시로 바꿉니다. 이제 업로드는 내부 테스트 트랙에만 하고, 운영자가 Play에서 설치해 확인한 뒤 같은 빌드를 승급합니다. 승급은 드라이런을 먼저 돌리고, production 20%에서 하루를 본 뒤 100%로 올립니다.</p>
+      <p>아직 코드에 없는 줄도 하나 있습니다. 프로젝트 메모에는 "commit 전에 PUT 응답의 status가 inProgress이고 userFraction이 맞는지 확인한다"고 적어 두었지만, 지금 스크립트는 PUT 본문을 직접 만들 뿐 응답을 읽지 않습니다. 다음 버전 스크립트에는 이 확인을 넣을 겁니다.</p>
+      <pre><code>tr = call('PUT', f'{API}/edits/{edit}/tracks/production', body)
+mine = [r for r in tr['releases'] if r.get('versionCodes') == [NEW]]
+if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFraction') != fraction:
+    sys.exit(f'PUT 응답이 의도와 다르다: {mine}')   # commit 전에 멈춘다</code></pre>
+      <p>halt 경로도 다음 단계 출시 때 문서대로 절차를 적어 둘 겁니다. completed가 실수로 나가도, 핫픽스 빌드를 기다리지 않고 새 설치를 이전 버전으로 돌릴 수 있는지 그때 확인합니다. 출시 전 검사 순서는 <a href="https://mvgood21.github.io/ax/release-gate/">AI가 만든 Android 앱, 출시 전에 무엇을 검사하나</a>에, 앱 소개는 <a href="https://mvgood21.github.io/apps/sugarspeller/">한글 띄어쓰기</a> 페이지에 있습니다.</p>
+    </section>
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>completed로 나간 Play 릴리스를 단계적 출시로 되돌릴 수 있나요?</summary><div><p>되돌리지 못했습니다. completed인 vc97을 inProgress 0.2로 바꾸는 PUT은 403 PERMISSION_DENIED로 거부됐습니다. 문서상 남은 길은 트랙에 이전 completed 릴리스가 있을 때 completed 릴리스 자체를 halted로 멈추는 것인데, 저희는 시도하지 않아 통하는지 모릅니다.</p></div></details>
+        <details><summary>Publisher API에서 userFraction은 어떻게 설정하나요?</summary><div><p>edits.tracks의 release에 status를 inProgress로 두고 userFraction에 0과 1 사이 값(20%면 0.2)을 넣은 뒤 edit을 commit합니다. userFraction은 status가 inProgress나 halted일 때만 설정할 수 있습니다. 나머지 사용자가 받을 이전 completed 릴리스도 같은 releases 배열에 함께 넣습니다.</p></div></details>
+        <details><summary>단계적 출시 비율은 나중에 어떻게 100%로 올리나요?</summary><div><p>새 edit에서 같은 릴리스의 status를 completed로 바꾸고 commit합니다. 한글 띄어쓰기는 production 20%에서 하루 동안 크래시와 검사 실패가 0인 것을 보고 올렸습니다(1.6.030은 10월 18일, 1.6.031은 10월 19일).</p></div></details>
+      </div>
+    </section>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다: 가드 지워 보기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li>
+        <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 21 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>가짜 테스트 찾기: 가드를 지워 보는 검사 – SugarMount</title>
     <link>https://mvgood21.github.io/ax/guard-removal-test/</link>
@@ -114,10 +436,10 @@ for mid, rel, edits, kind, target in MUT:
       <ul>
         <li><a href="https://mvgood21.github.io/ax/fresh-install-monkey-test/">AI가 &#x27;테스트 완료&#x27;라던 게임이 튜토리얼 첫 탭에서 죽었다: VIBRATE 권한과 신규 설치 몽키 테스트</a></li>
         <li><a href="https://mvgood21.github.io/ax/release-gate/">AI가 만든 Android 앱, 출시 전에 무엇을 검사하나: 릴리스 게이트와 R8 크래시</a></li>
+        <li><a href="https://mvgood21.github.io/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
         <li><a href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li>
-        <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
-        <li><a href="https://mvgood21.github.io/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -210,12 +532,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a></li>
+        <li><a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
         <li><a href="https://mvgood21.github.io/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다: 가드 지워 보기</a></li>
         <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
-        <li><a href="https://mvgood21.github.io/ax/fresh-install-monkey-test/">AI가 &#x27;테스트 완료&#x27;라던 게임이 튜토리얼 첫 탭에서 죽었다: VIBRATE 권한과 신규 설치 몽키 테스트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -271,12 +593,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
         <li><a href="https://mvgood21.github.io/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다: 가드 지워 보기</a></li>
         <li><a href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li>
         <li><a href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
-        <li><a href="https://mvgood21.github.io/ax/fresh-install-monkey-test/">AI가 &#x27;테스트 완료&#x27;라던 게임이 튜토리얼 첫 탭에서 죽었다: VIBRATE 권한과 신규 설치 몽키 테스트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a></li>
-        <li><a href="https://mvgood21.github.io/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -662,12 +984,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
         <li><a href="https://mvgood21.github.io/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다: 가드 지워 보기</a></li>
         <li><a href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li>
         <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/fresh-install-monkey-test/">AI가 &#x27;테스트 완료&#x27;라던 게임이 튜토리얼 첫 탭에서 죽었다: VIBRATE 권한과 신규 설치 몽키 테스트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a></li>
-        <li><a href="https://mvgood21.github.io/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -771,10 +1093,10 @@ done</code></pre>
       <ul>
         <li><a href="https://mvgood21.github.io/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다: 가드 지워 보기</a></li>
         <li><a href="https://mvgood21.github.io/ax/release-gate/">AI가 만든 Android 앱, 출시 전에 무엇을 검사하나: 릴리스 게이트와 R8 크래시</a></li>
+        <li><a href="https://mvgood21.github.io/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
         <li><a href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li>
-        <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
-        <li><a href="https://mvgood21.github.io/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -870,12 +1192,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
         <li><a href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li>
+        <li><a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
         <li><a href="https://mvgood21.github.io/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다: 가드 지워 보기</a></li>
         <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
-        <li><a href="https://mvgood21.github.io/ax/fresh-install-monkey-test/">AI가 &#x27;테스트 완료&#x27;라던 게임이 튜토리얼 첫 탭에서 죽었다: VIBRATE 권한과 신규 설치 몽키 테스트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2212,12 +2534,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
         <li><a href="https://mvgood21.github.io/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다: 가드 지워 보기</a></li>
         <li><a href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li>
         <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
-        <li><a href="https://mvgood21.github.io/ax/fresh-install-monkey-test/">AI가 &#x27;테스트 완료&#x27;라던 게임이 튜토리얼 첫 탭에서 죽었다: VIBRATE 권한과 신규 설치 몽키 테스트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2311,14 +2633,14 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
         <li><a href="https://mvgood21.github.io/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다: 가드 지워 보기</a></li>
         <li><a href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li>
         <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
-        <li><a href="https://mvgood21.github.io/ax/fresh-install-monkey-test/">AI가 &#x27;테스트 완료&#x27;라던 게임이 튜토리얼 첫 탭에서 죽었다: VIBRATE 권한과 신규 설치 몽키 테스트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a></li>
       </ul>
-      <p><a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
+      <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
     <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
   </item>
@@ -2350,6 +2672,9 @@ done</code></pre>
     <section aria-labelledby="notes">
       <h2 id="notes">최신 글</h2>
       <ul class="card-list">
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></h3><p class="sub">Compose는 한글을 음절 사이에서도 줄바꿈합니다. S21 QA의 &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이라 PairLayout으로 한글은 Phrase와 단어 폭 측정으로 고쳤습니다.</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></h3><p class="sub">운영자는 에이전트 수백 개를 허락했지만 코드를 쓰는 에이전트는 동시에 3개만 돌았습니다. 하루 59커밋을 만든 병렬도는 여유 RAM 4GB와 공용 기기 2대가 정했습니다.</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></h3><p class="sub">한글 띄어쓰기 1.6.029를 Play Publisher API로 20% 단계적 출시하려다 completed(100%)로 커밋했고, 되돌리는 요청은 403이었습니다. 원인과 지금 쓰는 가드입니다.</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다: 가드 지워 보기</a></h3><p class="sub">테스트 3,066개가 통과한 P2P 채팅 앱에서 SQLite 설정 한 줄이 기기의 DB 열기를 막고 있었습니다(소스 추적). 가드를 지워 테스트를 검사하는 Python 하네스와 적발 2건입니다.</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></h3><p class="sub">-dontoptimize를 빼도 Play Console DEX 지표는 36~39%였습니다. 안 쓰는 Kakao SDK keep 규칙을 지우자 r8.json 85%, AAB는 11.6MB가 됐습니다.</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></h3><p class="sub">사이트맵 URL 51개의 lastmod가 모두 같은 날이었습니다. 커밋 날짜 대신 본문 해시가 달라진 날만 수정일로 쓰자, HTML 99개를 고친 날에도 수정일은 기존 페이지 6개만 움직였습니다.</p></li>
@@ -2364,10 +2689,11 @@ done</code></pre>
     <section aria-labelledby="topics">
       <h2 id="topics">주제별로 보기</h2>
       <ul class="card-list">
-        <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법</a></h3><p class="sub">AI 코딩 에이전트에게 일을 나누고 규칙을 전하는 방법, 여러 세션을 한 저장소에서 함께 돌리며 겪은 충돌과 그 뒤에 정한 작업 방식입니다. 글 1개</p><ul class="related-links"><li><a href="https://mvgood21.github.io/ax/agents-md/">AGENTS.md 작성법: AI 코딩 에이전트가 틀리기 쉬운 규칙만 적는다</a></li></ul></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법</a></h3><p class="sub">AI 코딩 에이전트에게 일을 나누고 규칙을 전하는 방법, 여러 세션을 한 저장소에서 함께 돌리며 겪은 충돌과 그 뒤에 정한 작업 방식입니다. 글 2개</p><ul class="related-links"><li><a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li><li><a href="https://mvgood21.github.io/ax/agents-md/">AGENTS.md 작성법: AI 코딩 에이전트가 틀리기 쉬운 규칙만 적는다</a></li></ul></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시</a></h3><p class="sub">AI가 만든 코드를 출시하기 전에 거치는 단위 테스트, 릴리스 게이트, 실기기 확인과, 그 과정에서 실제로 잡힌 결함을 정리했습니다. 글 3개</p><ul class="related-links"><li><a href="https://mvgood21.github.io/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다: 가드 지워 보기</a></li><li><a href="https://mvgood21.github.io/ax/fresh-install-monkey-test/">AI가 &#x27;테스트 완료&#x27;라던 게임이 튜토리얼 첫 탭에서 죽었다: VIBRATE 권한과 신규 설치 몽키 테스트</a></li><li><a href="https://mvgood21.github.io/ax/release-gate/">AI가 만든 Android 앱, 출시 전에 무엇을 검사하나: 릴리스 게이트와 R8 크래시</a></li></ul></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발</a></h3><p class="sub">에이전트와 Android 앱을 만들며 부딪힌 Gradle 빌드, 라이브러리 업그레이드, 화면 구성, 성능 문제와 각각을 어떻게 풀었는지 적은 기록입니다. 글 2개</p><ul class="related-links"><li><a href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li><li><a href="https://mvgood21.github.io/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a></li></ul></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발</a></h3><p class="sub">에이전트와 Android 앱을 만들며 부딪힌 Gradle 빌드, 라이브러리 업그레이드, 화면 구성, 성능 문제와 각각을 어떻게 풀었는지 적은 기록입니다. 글 3개</p><ul class="related-links"><li><a href="https://mvgood21.github.io/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li><li><a href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li><li><a href="https://mvgood21.github.io/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a></li></ul></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/games/">게임 개발</a></h3><p class="sub">퍼즐 게임의 레벨을 에이전트와 함께 만들고, 풀 수 있는지 검증하고, 난이도를 맞추면서 정한 규칙과 측정한 숫자를 모았습니다. 글 1개</p><ul class="related-links"><li><a href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li></ul></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/store/">스토어와 수익화</a></h3><p class="sub">Google Play 등록과 심사, 스토어 스크린샷과 설명, 광고 설정처럼 앱을 내놓은 뒤 운영하는 일을 에이전트와 나눠 한 기록입니다. 글 1개</p><ul class="related-links"><li><a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li></ul></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/web/">웹사이트와 검색</a></h3><p class="sub">이 사이트를 에이전트와 만들며 정한 페이지 구조, 구글·네이버 검색 최적화, 구조화 데이터, 디자인 시스템을 실제 코드 기준으로 설명합니다. 글 1개</p><ul class="related-links"><li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li></ul></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/retro/">회고와 숫자</a></h3><p class="sub">기간을 끊어 돌아본 결과입니다. 무엇이 빨랐고 무엇이 틀렸는지를 git 기록과 QA 보고서에서 직접 센 숫자와 함께 적습니다. 글 1개</p><ul class="related-links"><li><a href="https://mvgood21.github.io/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li></ul></li>
       </ul>
@@ -2480,10 +2806,10 @@ done</code></pre>
       <ul>
         <li><a href="https://mvgood21.github.io/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다: 가드 지워 보기</a></li>
         <li><a href="https://mvgood21.github.io/ax/fresh-install-monkey-test/">AI가 &#x27;테스트 완료&#x27;라던 게임이 튜토리얼 첫 탭에서 죽었다: VIBRATE 권한과 신규 설치 몽키 테스트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
         <li><a href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li>
-        <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
-        <li><a href="https://mvgood21.github.io/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>

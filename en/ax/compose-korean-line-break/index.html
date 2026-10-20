@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Korean line breaks in Compose and stacked labels – SugarMount</title>
+  <meta name="description" content="Compose can break Korean between syllables, but the label stacked as &#x27;R/u/l/e&#x27; on a Galaxy S21 came from Row measurement order. Each cause got its own fix.">
+  <link rel="canonical" href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/compose-korean-line-break/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/compose-korean-line-break/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Korean line breaks in Compose and stacked labels – SugarMount">
+  <meta property="og:description" content="Compose can break Korean between syllables, but the label stacked as &#x27;R/u/l/e&#x27; on a Galaxy S21 came from Row measurement order. Each cause got its own fix.">
+  <meta property="og:url" content="https://mvgood21.github.io/en/ax/compose-korean-line-break/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-compose-korean-line-break-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/en/rss.xml">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=aae9be9a">
+  <link rel="stylesheet" href="/assets/site.css?v=aae9be9a">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=aae9be9a">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/en/ax/compose-korean-line-break/#article","headline":"Jetpack Compose splits Korean between syllables, but the stacked 'R/u/l/e' label came from how a Row measures","description":"Compose can break Korean between syllables, but the label stacked as 'R/u/l/e' on a Galaxy S21 came from Row measurement order. Each cause got its own fix.","url":"https://mvgood21.github.io/en/ax/compose-korean-line-break/","mainEntityOfPage":"https://mvgood21.github.io/en/ax/compose-korean-line-break/","inLanguage":"en","articleSection":"Android development","datePublished":"2026-10-21T09:00:00+09:00","dateModified":"2026-10-21T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-compose-korean-line-break-en.png"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I make Jetpack Compose wrap Korean by word instead of by syllable?","acceptedAnswer":{"@type":"Answer","text":"Set lineBreak = LineBreak.Simple.copy(wordBreak = LineBreak.WordBreak.Phrase) in your TextStyle. Put it in the shared typography once and every Text picks it up. Android 12 and lower ignore it, so keep a layout check based on the longest word as well."}},{"@type":"Question","name":"Why does a word still split in the middle with WordBreak.Phrase?","acceptedAnswer":{"@type":"Answer","text":"Phrase still breaks a word that is wider than its line or cell. Widen the cell, use fewer columns or shorten the text. HWP Viewer SugarDoc saw the 'HWPX' placeholder split into 'HW/PX' at 200% font, pinned it to one line with auto-shrink, and shortened 'HWP 3.0', which still did not fit, to 'HWP3'."}},{"@type":"Question","name":"Which font scales should a Compose layout be tested at?","acceptedAnswer":{"@type":"Answer","text":"These apps were checked at 1.0, 1.3 and 2.0 font scale, combined with Korean and English, light and dark, and landscape. Their layouts switch to vertical at 1.5, so test on both sides of that switch."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://mvgood21.github.io/en/ax/"},{"@type":"ListItem","position":3,"name":"Android development","item":"https://mvgood21.github.io/en/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"Jetpack Compose splits Korean between syllables, but the stacked 'R/u/l/e' label came from how a Row measures"}]}</script>
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/compose-korean-line-break/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/android/">Android development</a></li><li><span aria-current="page">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</span></li></ol></nav>
+    <section class="hero">
+      <span class="eyebrow">AX note · How-to</span>
+      <h1>Jetpack Compose splits Korean between syllables, but the stacked 'R/u/l/e' label came from how a Row measures</h1>
+      <p class="lead">The stacked "R/u/l/e" came from a Row that measured the value first; the Korean syllable splits came from Compose's break rules. Each got a separate fix in one design-system module that three apps share.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Android development</span> <span aria-hidden="true">·</span> <span>8 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-10-21">October 21, 2026</time></p><!-- /build:meta -->
+      <p>In a row that puts a label next to its value, the word "Rule" was standing on its end: R, u, l, e, one letter per line. We saw it on September 25, 2026, during a real-device pass of three photo apps on a Galaxy S21 (Android 15), and the same shape turned up in "Versio/n", "1.0.1-debu/g" and the Korean "오른쪽으/로" ("to the right", split before its last syllable). They looked alike but had two causes. The first three came from a Row that measured the value first and left the label almost no width. The Korean one came from Compose treating every Hangul syllable boundary as a break point. Both were fixed, separately, in one design-system module the three apps share (commit 633c3dd).</p>
+      <p class="note">Sources: commit 633c3dd in SugarMount's app repository (sugar-utils), the CHANGELOG and backlog entries from the same day, the HWP Viewer SugarDoc device test report (2026-10-06) and the Android Developers reference. Checked on October 21, 2026.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (8)</summary><ol><li><a href="#symptoms">Five broken spots, all inside shared components</a></li><li><a href="#why-syllable">Compose treats Hangul syllable boundaries as break points</a></li><li><a href="#phrase">WordBreak.Phrase lives in one shared TextStyle</a></li><li><a href="#longest-word">The longest word decides how many columns fit</a></li><li><a href="#large-font">From 150% font scale, stack; for chips, use FlowRow</a></li><li><a href="#ai-miss">A Row from four days earlier, and a button width that missed by 2 px</a></li><li><a href="#checklist">Checklist</a></li><li><a href="#faq">FAQ</a></li></ol></details><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#symptoms">Five broken spots, all inside shared components</a></li><li><a href="#why-syllable">Compose treats Hangul syllable boundaries as break points</a></li><li><a href="#phrase">WordBreak.Phrase lives in one shared TextStyle</a></li><li><a href="#longest-word">The longest word decides how many columns fit</a></li><li><a href="#large-font">From 150% font scale, stack; for chips, use FlowRow</a></li><li><a href="#ai-miss">A Row from four days earlier, and a button width that missed by 2 px</a></li><li><a href="#checklist">Checklist</a></li><li><a href="#faq">FAQ</a></li></ol></nav><!-- /build:toc -->
+
+    <section aria-labelledby="symptoms">
+      <h2 id="symptoms">Five broken spots, all inside shared components</h2>
+      <p>Every defect sat in a shared component. The September 25 QA was run by four AI coding agents in turn: one per app, then a fourth that reproduced every finding with its own screenshots and read the code behind each root cause. The table copies the symptoms recorded that day in the CHANGELOG and in code comments.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Symptom</th><th scope="col">Component</th><th scope="col">Cause</th><th scope="col">Fix</th></tr></thead>
+          <tbody>
+            <tr><td>"R/u/l/e", "Versio/n", "1.0.1-debu/g"</td><td>Label/value rows, settings rows</td><td>Row measured the value first and gave the label what was left</td><td><code>PairLayout</code>: side by side if both fit, otherwise the value drops below</td></tr>
+            <tr><td>"오른쪽으/로", "Transparen/t PNG"</td><td>Option tile grid, action buttons</td><td>A word wider than its cell; Compose reported one Hangul syllable as the minimum width</td><td>Measure the longest word and fall back to one column</td></tr>
+            <tr><td>"Quick compress" did not fit a third of the width</td><td>Segmented control</td><td>Large font</td><td>Stacked tiles from 150% font scale</td></tr>
+            <tr><td>"Web" and "Custom" hidden off-screen</td><td>Choice chip row</td><td>Horizontal scrolling</td><td><code>FlowRow</code> wrapping</td></tr>
+            <tr><td>Korean words such as "메일" (mail) could split at 200% font</td><td>Every text style</td><td>Syllable boundaries counted as break points</td><td><code>WordBreak.Phrase</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The three apps are <a href="/en/apps/image-compress/">Compress Image</a>, <a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a> and Convert Image JPG PNG WEBP, and all of them depend on the same <code>core/designsystem</code> module. Commit 633c3dd touched 57 files, but the line-breaking work is concentrated in a handful of files in that module.</p>
+    </section>
+
+    <section aria-labelledby="why-syllable">
+      <h2 id="why-syllable">Compose treats Hangul syllable boundaries as break points</h2>
+      <p><code>LineBreak.WordBreak</code> decides where Compose may split a word. The <a href="https://developer.android.com/reference/kotlin/androidx/compose/ui/text/style/LineBreak.WordBreak" rel="noopener">LineBreak.WordBreak reference</a> describes <code>Default</code> as the locale's default word-breaking rules: Latin scripts break between words, while languages that don't use whitespace (the page's example is Japanese) can break between characters. <code>Phrase</code> does not insert breaks between characters of the same phrase unit and is "ideal for short text such as titles and UI labels". Both values were added in Compose 1.3.0.</p>
+      <p>Korean does put spaces between words, yet the apps still split inside them. A comment in the repository's <code>WordWidth.kt</code> records why: Compose's own minimum intrinsic width treats every Hangul syllable as a break point. So the grid believed "오른쪽으로" fitted in the width of a single syllable, kept two columns and cut the word in the middle.</p>
+      <p>The platform adds its own limit. Per the <a href="https://developer.android.com/reference/android/graphics/text/LineBreakConfig" rel="noopener">LineBreakConfig reference</a>, phrase-based breaking (<code>LINE_BREAK_WORD_STYLE_PHRASE</code>) arrived in API level 33 (Android 13), its support depends on the locale, and it has no effect where the locale is unsupported. These apps have minSdk 29, which means <code>Phrase</code> does nothing on Android 10 to 12. A line-break setting alone cannot be the whole fix.</p>
+    </section>
+
+    <section aria-labelledby="phrase">
+      <h2 id="phrase">WordBreak.Phrase lives in one shared TextStyle</h2>
+      <p>A single <code>style()</code> function in <code>SugarType.kt</code> builds every step of the type scale, so it is the only place that sets <code>lineBreak</code>. No screen code changed.</p>
+      <pre><code>private val WordAwareBreak =
+    LineBreak.Simple.copy(wordBreak = LineBreak.WordBreak.Phrase)
+
+private fun style(weight: FontWeight, size: Int, line: Int, spacing: Boolean = false) = TextStyle(
+    // fontFamily, fontSize, lineHeight, letterSpacing ...
+    lineBreak = WordAwareBreak,
+)</code></pre>
+      <p>If your Compose app has Korean screens, set <code>Phrase</code> once in the shared <code>TextStyle</code> and do not add it to individual <code>Text</code> calls. Per-screen settings get forgotten the next time someone adds a screen. The setting has a limit, and the same comment says so: a word wider than the line still breaks. (The Korean hero titles also got zero-width break points after the "·" separator.)</p>
+    </section>
+
+    <section aria-labelledby="longest-word">
+      <h2 id="longest-word">The longest word decides how many columns fit</h2>
+      <p>The option tile grid picks its column count from the minimum intrinsic width each tile reports. For Korean that number is one syllable wide, so the module gained a function that measures whole words: split on whitespace, measure each word on one line, return the widest.</p>
+      <pre><code>text.split(Regex("\\s+")).filter { it.isNotEmpty() }.maxOfOrNull { word -&gt;
+    measurer.measure(word, style, softWrap = false, maxLines = 1).size.width
+} ?: 0</code></pre>
+      <p>Tile titles and subtitles report that value as their minimum intrinsic width (<code>minIntrinsicWidthAtLeast</code>, a small <code>LayoutModifier</code>), and the grid compares it with the cell width.</p>
+      <pre><code>val cols = when {
+    requested == 1 -&gt; 1
+    largeFont -&gt; 1
+    measurables.any { it.minIntrinsicWidth(Constraints.Infinity) &gt; cellWidthFor(requested) } -&gt; 1
+    else -&gt; requested
+}</code></pre>
+      <p>In app code, Flip &amp; Rotate Image's four action buttons use the same function. When the longest word of any label is wider than half the screen minus the button chrome, the buttons go one per row instead of two.</p>
+    </section>
+
+    <section aria-labelledby="large-font">
+      <h2 id="large-font">From 150% font scale, stack; for chips, use FlowRow</h2>
+      <p>One constant defines "large font": <code>LARGE_FONT_SCALE = 1.5f</code> in <code>Chips.kt</code>. At or above it, three components switch to a vertical layout.</p>
+      <ul>
+        <li>Segmented control: the segments become option tiles stacked top to bottom. The check icon went too; it was taking a third of a segment's width.</li>
+        <li>Option tile grid: one column, whatever was requested.</li>
+        <li>Flip &amp; Rotate Image's action buttons: one per row.</li>
+      </ul>
+      <p>The choice chip row used to be a <code>Row</code> with <code>horizontalScroll</code>. Chips past the edge simply hid there, and nothing told the user that "Web" or "Custom" existed. With <code>FlowRow</code> they wrap onto the next line.</p>
+      <pre><code>// before: Row(modifier = modifier.horizontalScroll(rememberScrollState()), ...)
+FlowRow(
+    modifier = modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.spacedBy(SugarSpacing.sm),
+) { /* FilterChip ... */ }</code></pre>
+    </section>
+
+    <section aria-labelledby="ai-miss">
+      <h2 id="ai-miss">A Row from four days earlier, and a button width that missed by 2 px</h2>
+      <p>"R/u/l/e" had nothing to do with Korean. The label/value row came from the design v2 commit (33e6cc0, 2026-09-21), written together with an AI coding agent. It was a <code>Row</code> with <code>Modifier.weight(1f, fill = false)</code> on the label and no weight on the value. A <code>Row</code> measures unweighted children first, so a long value took the whole width and the label folded into the few pixels left, one letter per line.</p>
+      <p>Four days later, the cross-check agent in the device QA flagged this structure while reading the code behind the finding. The new <code>PairLayout</code> measures each slot's natural width (<code>maxIntrinsicWidth</code>) first. If the sum fits the line, they sit side by side; if not, the value moves under the label.</p>
+      <p>The second mistake was a number. The action-button chrome adds up to exactly 76 dp: 24 dp of OutlinedButton padding on each side, a 20 dp icon and an 8 dp gap. According to the code comment, at 130% font "오른쪽으로" measured 2 px under the space that exact figure left, and it still wrapped. The value was fixed at <code>BUTTON_CHROME = 84.dp</code>, the exact chrome plus 8 dp of slack. The sum was right; the device was a few pixels off.</p>
+      <p>The same defect came back by another route. In the <a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a> device test on 2026-10-06, the format placeholder split into "HW/PX" (S21) and "HW/P" (S20) at 200% font. That app uses the same design-system module, so <code>Phrase</code> was already on, but "HWPX" is a single word and a word wider than its box still breaks. Pinning the placeholder to one line and letting it shrink to fit fixed that, but "HWP 3.0" did not fit even at the smallest step and got clipped to "HWP 3.(" instead. The final fix shortened placeholder names to four characters or fewer ("HWP3"), while the badge and the TalkBack label keep "HWP 3.0".</p>
+    </section>
+
+    <section aria-labelledby="checklist">
+      <h2 id="checklist">Checklist</h2>
+      <p>After the September 25 fixes, a separate agent checked every fix on the device and a person checked again by hand, across 1.0/1.3/2.0 font scale, Korean and English, light and dark, and landscape, with no regressions. The list below is drawn from these fixes.</p>
+      <ul>
+        <li>The shared <code>TextStyle</code> sets <code>lineBreak = LineBreak.Simple.copy(wordBreak = LineBreak.WordBreak.Phrase)</code>. Android 12 and lower ignore it, so the items below still matter.</li>
+        <li>Layouts that choose a column count look at the longest word, not Compose's minimum intrinsic width.</li>
+        <li>At <code>fontScale</code> 1.5 and above, segmented controls, grids and button rows switch to a vertical layout.</li>
+        <li>No option hides behind horizontal scrolling (<code>FlowRow</code>).</li>
+        <li>Label/value rows are not left to <code>Row</code> weights.</li>
+        <li>Computed padding includes the error seen on a device (8 dp this time).</li>
+        <li>Single-word short labels, such as format names like "HWPX", fit their box at 200% font.</li>
+      </ul>
+      <p>One item is still open: on the input screen of Convert Image JPG PNG WEBP, the size badge wraps as "JPEG · 1.3 / MB", recorded as a cosmetic leftover in the 2026-09-25 CHANGELOG entry. The full pre-release check list is in <a href="/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>.</p>
+    </section>
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>How do I make Jetpack Compose wrap Korean by word instead of by syllable?</summary><div><p>Set lineBreak = LineBreak.Simple.copy(wordBreak = LineBreak.WordBreak.Phrase) in your TextStyle. Put it in the shared typography once and every Text picks it up. Android 12 and lower ignore it, so keep a layout check based on the longest word as well.</p></div></details>
+        <details><summary>Why does a word still split in the middle with WordBreak.Phrase?</summary><div><p>Phrase still breaks a word that is wider than its line or cell. Widen the cell, use fewer columns or shorten the text. HWP Viewer SugarDoc saw the 'HWPX' placeholder split into 'HW/PX' at 200% font, pinned it to one line with auto-shrink, and shortened 'HWP 3.0', which still did not fit, to 'HWP3'.</p></div></details>
+        <details><summary>Which font scales should a Compose layout be tested at?</summary><div><p>These apps were checked at 1.0, 1.3 and 2.0 font scale, combined with Korean and English, light and dark, and landscape. Their layouts switch to vertical at 1.5, so test on both sides of that switch.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
+        <li><a href="/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
+        <li><a href="/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
+        <li><a href="/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
+        <li><a href="/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
+      </ul>
+      <p><a href="/en/ax/topic/android/">All notes on Android development</a> · <a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>

@@ -6,7 +6,329 @@
   <description>Small Android apps that each do one thing simply, from shrinking photos and opening Korean HWP documents to checking Korean spelling and playing puzzle games.</description>
   <language>en</language>
   <atom:link href="https://mvgood21.github.io/en/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Tue, 20 Oct 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Wed, 21 Oct 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Korean line breaks in Compose and stacked labels – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/compose-korean-line-break/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/compose-korean-line-break/</guid>
+    <description><![CDATA[<section class="hero">
+      <span class="eyebrow">AX note · How-to</span>
+      <h1>Jetpack Compose splits Korean between syllables, but the stacked 'R/u/l/e' label came from how a Row measures</h1>
+      <p class="lead">The stacked "R/u/l/e" came from a Row that measured the value first; the Korean syllable splits came from Compose's break rules. Each got a separate fix in one design-system module that three apps share.</p>
+      <p>In a row that puts a label next to its value, the word "Rule" was standing on its end: R, u, l, e, one letter per line. We saw it on September 25, 2026, during a real-device pass of three photo apps on a Galaxy S21 (Android 15), and the same shape turned up in "Versio/n", "1.0.1-debu/g" and the Korean "오른쪽으/로" ("to the right", split before its last syllable). They looked alike but had two causes. The first three came from a Row that measured the value first and left the label almost no width. The Korean one came from Compose treating every Hangul syllable boundary as a break point. Both were fixed, separately, in one design-system module the three apps share (commit 633c3dd).</p>
+      <p class="note">Sources: commit 633c3dd in SugarMount's app repository (sugar-utils), the CHANGELOG and backlog entries from the same day, the HWP Viewer SugarDoc device test report (2026-10-06) and the Android Developers reference. Checked on October 21, 2026.</p>
+    </section>
+    <section aria-labelledby="symptoms">
+      <h2 id="symptoms">Five broken spots, all inside shared components</h2>
+      <p>Every defect sat in a shared component. The September 25 QA was run by four AI coding agents in turn: one per app, then a fourth that reproduced every finding with its own screenshots and read the code behind each root cause. The table copies the symptoms recorded that day in the CHANGELOG and in code comments.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Symptom</th><th scope="col">Component</th><th scope="col">Cause</th><th scope="col">Fix</th></tr></thead>
+          <tbody>
+            <tr><td>"R/u/l/e", "Versio/n", "1.0.1-debu/g"</td><td>Label/value rows, settings rows</td><td>Row measured the value first and gave the label what was left</td><td><code>PairLayout</code>: side by side if both fit, otherwise the value drops below</td></tr>
+            <tr><td>"오른쪽으/로", "Transparen/t PNG"</td><td>Option tile grid, action buttons</td><td>A word wider than its cell; Compose reported one Hangul syllable as the minimum width</td><td>Measure the longest word and fall back to one column</td></tr>
+            <tr><td>"Quick compress" did not fit a third of the width</td><td>Segmented control</td><td>Large font</td><td>Stacked tiles from 150% font scale</td></tr>
+            <tr><td>"Web" and "Custom" hidden off-screen</td><td>Choice chip row</td><td>Horizontal scrolling</td><td><code>FlowRow</code> wrapping</td></tr>
+            <tr><td>Korean words such as "메일" (mail) could split at 200% font</td><td>Every text style</td><td>Syllable boundaries counted as break points</td><td><code>WordBreak.Phrase</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The three apps are <a href="https://mvgood21.github.io/en/apps/image-compress/">Compress Image</a>, <a href="https://mvgood21.github.io/en/apps/image-flip/">Flip &amp; Rotate Image</a> and Convert Image JPG PNG WEBP, and all of them depend on the same <code>core/designsystem</code> module. Commit 633c3dd touched 57 files, but the line-breaking work is concentrated in a handful of files in that module.</p>
+    </section>
+    <section aria-labelledby="why-syllable">
+      <h2 id="why-syllable">Compose treats Hangul syllable boundaries as break points</h2>
+      <p><code>LineBreak.WordBreak</code> decides where Compose may split a word. The <a href="https://developer.android.com/reference/kotlin/androidx/compose/ui/text/style/LineBreak.WordBreak" rel="noopener">LineBreak.WordBreak reference</a> describes <code>Default</code> as the locale's default word-breaking rules: Latin scripts break between words, while languages that don't use whitespace (the page's example is Japanese) can break between characters. <code>Phrase</code> does not insert breaks between characters of the same phrase unit and is "ideal for short text such as titles and UI labels". Both values were added in Compose 1.3.0.</p>
+      <p>Korean does put spaces between words, yet the apps still split inside them. A comment in the repository's <code>WordWidth.kt</code> records why: Compose's own minimum intrinsic width treats every Hangul syllable as a break point. So the grid believed "오른쪽으로" fitted in the width of a single syllable, kept two columns and cut the word in the middle.</p>
+      <p>The platform adds its own limit. Per the <a href="https://developer.android.com/reference/android/graphics/text/LineBreakConfig" rel="noopener">LineBreakConfig reference</a>, phrase-based breaking (<code>LINE_BREAK_WORD_STYLE_PHRASE</code>) arrived in API level 33 (Android 13), its support depends on the locale, and it has no effect where the locale is unsupported. These apps have minSdk 29, which means <code>Phrase</code> does nothing on Android 10 to 12. A line-break setting alone cannot be the whole fix.</p>
+    </section>
+    <section aria-labelledby="phrase">
+      <h2 id="phrase">WordBreak.Phrase lives in one shared TextStyle</h2>
+      <p>A single <code>style()</code> function in <code>SugarType.kt</code> builds every step of the type scale, so it is the only place that sets <code>lineBreak</code>. No screen code changed.</p>
+      <pre><code>private val WordAwareBreak =
+    LineBreak.Simple.copy(wordBreak = LineBreak.WordBreak.Phrase)
+private fun style(weight: FontWeight, size: Int, line: Int, spacing: Boolean = false) = TextStyle(
+    // fontFamily, fontSize, lineHeight, letterSpacing ...
+    lineBreak = WordAwareBreak,
+)</code></pre>
+      <p>If your Compose app has Korean screens, set <code>Phrase</code> once in the shared <code>TextStyle</code> and do not add it to individual <code>Text</code> calls. Per-screen settings get forgotten the next time someone adds a screen. The setting has a limit, and the same comment says so: a word wider than the line still breaks. (The Korean hero titles also got zero-width break points after the "·" separator.)</p>
+    </section>
+    <section aria-labelledby="longest-word">
+      <h2 id="longest-word">The longest word decides how many columns fit</h2>
+      <p>The option tile grid picks its column count from the minimum intrinsic width each tile reports. For Korean that number is one syllable wide, so the module gained a function that measures whole words: split on whitespace, measure each word on one line, return the widest.</p>
+      <pre><code>text.split(Regex("\\s+")).filter { it.isNotEmpty() }.maxOfOrNull { word -&gt;
+    measurer.measure(word, style, softWrap = false, maxLines = 1).size.width
+} ?: 0</code></pre>
+      <p>Tile titles and subtitles report that value as their minimum intrinsic width (<code>minIntrinsicWidthAtLeast</code>, a small <code>LayoutModifier</code>), and the grid compares it with the cell width.</p>
+      <pre><code>val cols = when {
+    requested == 1 -&gt; 1
+    largeFont -&gt; 1
+    measurables.any { it.minIntrinsicWidth(Constraints.Infinity) &gt; cellWidthFor(requested) } -&gt; 1
+    else -&gt; requested
+}</code></pre>
+      <p>In app code, Flip &amp; Rotate Image's four action buttons use the same function. When the longest word of any label is wider than half the screen minus the button chrome, the buttons go one per row instead of two.</p>
+    </section>
+    <section aria-labelledby="large-font">
+      <h2 id="large-font">From 150% font scale, stack; for chips, use FlowRow</h2>
+      <p>One constant defines "large font": <code>LARGE_FONT_SCALE = 1.5f</code> in <code>Chips.kt</code>. At or above it, three components switch to a vertical layout.</p>
+      <ul>
+        <li>Segmented control: the segments become option tiles stacked top to bottom. The check icon went too; it was taking a third of a segment's width.</li>
+        <li>Option tile grid: one column, whatever was requested.</li>
+        <li>Flip &amp; Rotate Image's action buttons: one per row.</li>
+      </ul>
+      <p>The choice chip row used to be a <code>Row</code> with <code>horizontalScroll</code>. Chips past the edge simply hid there, and nothing told the user that "Web" or "Custom" existed. With <code>FlowRow</code> they wrap onto the next line.</p>
+      <pre><code>// before: Row(modifier = modifier.horizontalScroll(rememberScrollState()), ...)
+FlowRow(
+    modifier = modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.spacedBy(SugarSpacing.sm),
+) { /* FilterChip ... */ }</code></pre>
+    </section>
+    <section aria-labelledby="ai-miss">
+      <h2 id="ai-miss">A Row from four days earlier, and a button width that missed by 2 px</h2>
+      <p>"R/u/l/e" had nothing to do with Korean. The label/value row came from the design v2 commit (33e6cc0, 2026-09-21), written together with an AI coding agent. It was a <code>Row</code> with <code>Modifier.weight(1f, fill = false)</code> on the label and no weight on the value. A <code>Row</code> measures unweighted children first, so a long value took the whole width and the label folded into the few pixels left, one letter per line.</p>
+      <p>Four days later, the cross-check agent in the device QA flagged this structure while reading the code behind the finding. The new <code>PairLayout</code> measures each slot's natural width (<code>maxIntrinsicWidth</code>) first. If the sum fits the line, they sit side by side; if not, the value moves under the label.</p>
+      <p>The second mistake was a number. The action-button chrome adds up to exactly 76 dp: 24 dp of OutlinedButton padding on each side, a 20 dp icon and an 8 dp gap. According to the code comment, at 130% font "오른쪽으로" measured 2 px under the space that exact figure left, and it still wrapped. The value was fixed at <code>BUTTON_CHROME = 84.dp</code>, the exact chrome plus 8 dp of slack. The sum was right; the device was a few pixels off.</p>
+      <p>The same defect came back by another route. In the <a href="https://mvgood21.github.io/en/apps/doc-viewer/">HWP Viewer SugarDoc</a> device test on 2026-10-06, the format placeholder split into "HW/PX" (S21) and "HW/P" (S20) at 200% font. That app uses the same design-system module, so <code>Phrase</code> was already on, but "HWPX" is a single word and a word wider than its box still breaks. Pinning the placeholder to one line and letting it shrink to fit fixed that, but "HWP 3.0" did not fit even at the smallest step and got clipped to "HWP 3.(" instead. The final fix shortened placeholder names to four characters or fewer ("HWP3"), while the badge and the TalkBack label keep "HWP 3.0".</p>
+    </section>
+    <section aria-labelledby="checklist">
+      <h2 id="checklist">Checklist</h2>
+      <p>After the September 25 fixes, a separate agent checked every fix on the device and a person checked again by hand, across 1.0/1.3/2.0 font scale, Korean and English, light and dark, and landscape, with no regressions. The list below is drawn from these fixes.</p>
+      <ul>
+        <li>The shared <code>TextStyle</code> sets <code>lineBreak = LineBreak.Simple.copy(wordBreak = LineBreak.WordBreak.Phrase)</code>. Android 12 and lower ignore it, so the items below still matter.</li>
+        <li>Layouts that choose a column count look at the longest word, not Compose's minimum intrinsic width.</li>
+        <li>At <code>fontScale</code> 1.5 and above, segmented controls, grids and button rows switch to a vertical layout.</li>
+        <li>No option hides behind horizontal scrolling (<code>FlowRow</code>).</li>
+        <li>Label/value rows are not left to <code>Row</code> weights.</li>
+        <li>Computed padding includes the error seen on a device (8 dp this time).</li>
+        <li>Single-word short labels, such as format names like "HWPX", fit their box at 200% font.</li>
+      </ul>
+      <p>One item is still open: on the input screen of Convert Image JPG PNG WEBP, the size badge wraps as "JPEG · 1.3 / MB", recorded as a cosmetic leftover in the 2026-09-25 CHANGELOG entry. The full pre-release check list is in <a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>.</p>
+    </section>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>How do I make Jetpack Compose wrap Korean by word instead of by syllable?</summary><div><p>Set lineBreak = LineBreak.Simple.copy(wordBreak = LineBreak.WordBreak.Phrase) in your TextStyle. Put it in the shared typography once and every Text picks it up. Android 12 and lower ignore it, so keep a layout check based on the longest word as well.</p></div></details>
+        <details><summary>Why does a word still split in the middle with WordBreak.Phrase?</summary><div><p>Phrase still breaks a word that is wider than its line or cell. Widen the cell, use fewer columns or shorten the text. HWP Viewer SugarDoc saw the 'HWPX' placeholder split into 'HW/PX' at 200% font, pinned it to one line with auto-shrink, and shortened 'HWP 3.0', which still did not fit, to 'HWP3'.</p></div></details>
+        <details><summary>Which font scales should a Compose layout be tested at?</summary><div><p>These apps were checked at 1.0, 1.3 and 2.0 font scale, combined with Korean and English, light and dark, and landscape. Their layouts switch to vertical at 1.5, so test on both sides of that switch.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 21 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Parallel AI agents: 10 workstreams, 3 at a time – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/parallel-agent-workstreams/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/parallel-agent-workstreams/</guid>
+    <description><![CDATA[<section class="hero">
+      <span class="eyebrow">AX notes · Measurement</span>
+      <h1>"Use hundreds of agents" in practice: 10 workstreams, 59 commits in a day, three running at once</h1>
+      <p class="lead">Only three code-writing agents ever ran at the same time. The limit came from 4 GB of free RAM and two shared phones, not from the model or from how many agents the operator allowed.</p>
+      <p>"Use hundreds of agents if you like, take as long as it needs, and analyze it properly." The operator wrote that at 4:08 pm on October 3 (Korea time), after deciding that <a href="https://mvgood21.github.io/en/apps/arrow-knots/">Arrow Knots</a> had to grow from 300 levels to 1,000. That day the repository logged 59 commits, and ten workstreams (ws0 to ws9) had been merged from their own branches into one integration branch. Yet no more than three code-writing agents ever ran at once. The machine had 13 GB of RAM and only 4 GB of it free.</p>
+      <p class="note">Numbers come from the git history of SugarMount's game repository (sugar-game), counted per day in Korea time, including merge commits 206881a through 427cb92; the spec docs/09-parts-1000-spec.md and the implementation notes docs/09b-impl-notes.md; and a script that counted tool calls in the Claude Code session logs for this repository. Checked on October 21, 2026.</p>
+    </section>
+    <section aria-labelledby="request-vs-run">
+      <h2 id="request-vs-run">Hundreds were allowed; three wrote code at the same time</h2>
+      <p>A minute after the request, the agent started a design Workflow. Workflow is the Claude Code tool that runs many subagents from a single script. This run split the problem by topic (difficulty curve, zoom camera, in-game economy, visual design, store copy, localization) and used 24 agents between 16:09 and 17:01. Eleven of them ran in parallel in the first phase. Nothing in that phase touched code, so nothing held it back.</p>
+      <p>The merged spec was committed at 17:18; with a later addendum it is now 1,327 lines. The implementation Workflow, started three minutes later, looked very different. Forty-one agents handled implementation, adversarial review, fixes and merges for 5 hours 6 minutes, until 22:27. Peak concurrency was three, in stage one: engine rules (ws0), the level generator (ws1), and strings plus build config (ws6). Stages two and three ran two at a time. Screen integration (ws7) and the test harness (ws8) ran alone. Store copy (ws9) went to a single subagent outside the Workflow, which started at 22:36 and finished in 11 minutes.</p>
+      <p>The agent picked the number three itself. Just before starting, it noted that the machine had 16 cores and 13 GB of RAM with 4 GB free, so it would cap Android builds at two or three at a time. One workstream agent checked memory at 17:28 and saw the same thing:</p>
+<pre><code>$ free -g
+               total        used        free      shared  buff/cache   available
+Mem:              13           8           2           0           2           4</code></pre>
+    </section>
+    <section aria-labelledby="two-days">
+      <h2 id="two-days">Commits, merges and agents on October 3 and 4</h2>
+      <p>Three sessions worked in this repository over those two days: the Arrow Knots session, an ads-and-release session, and the Block Turn session. The Agent and Workflow columns count calls those three sessions made directly; the last column counts agents launched inside each Workflow. Peak concurrency is the largest number of agents whose first and last log timestamps overlapped.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Date (KST)</th><th scope="col">Commits</th><th scope="col">Merge commits</th><th scope="col">Agent calls</th><th scope="col">Workflow runs</th><th scope="col">Agents inside Workflows (peak concurrent)</th></tr></thead>
+          <tbody>
+            <tr><td>Oct 3</td><td>59</td><td>11</td><td>11</td><td>2</td><td>design 24 (11), implementation 41 (3)</td></tr>
+            <tr><td>Oct 4</td><td>52</td><td>6</td><td>14</td><td>3</td><td>E2E fixes 10 (3), launch-prep research 150 (14)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>All 11 merges on October 3 were workstream branches. The simulation workstream (ws2) went in twice because the generator was retuned, which is why there are 11 and not 10. On October 4, three merges were E2E fix branches and three brought in main. One of that day's three Workflow calls resumed the Block Turn research run, and its 150 is a count of log files, so retries are included.</p>
+      <p>A wider window tells the same story. Across this repository's six sessions (September 30 to October 17), the operator asked five times for lots of agents, with phrases like "dozens", "hundreds" and "as many as you like". The main sessions made 53 Agent calls in total, never more than 20 in one session, plus 10 Workflow runs.</p>
+    </section>
+    <section aria-labelledby="bottlenecks">
+      <h2 id="bottlenecks">RAM, two phones and a file-ownership table set the pace</h2>
+      <p>Build memory was the first wall. The implementation notes say to run <code>./gradlew --max-workers=4</code> and to keep one Gradle build at a time per worktree. Every workstream had to pass the engine and app unit tests plus a debug build before each commit, so the number of parallel workstreams was the number of parallel Gradle builds. Research and design Workflows that never build are another matter: this repository ran six of them, and they reached 11 to 14 agents at once.</p>
+      <p>The phones were a Galaxy S21 and a Galaxy S20, shared by five sessions: the three game-repository sessions plus two sessions from the utility-app repository. So the implementation notes said no workstream touches a device, and E2E happens later on the S21 only. On October 3 and 4 the three game sessions received 148 messages from other sessions, and 114 of them mentioned the S20 or S21. Many were plain turn-taking: "I need it for 10 minutes", "I'm done, it's yours". (From 16:14 to 17:17 that afternoon the S21 belonged to another app's session, running an HWP document-viewer benchmark. The Arrow Knots session lent it on condition that its app data and global settings such as font scale stayed untouched.)</p>
+      <p>Files got owners too. The workstream table in section 11 of the spec has an "Owns (exclusive)" column. The camera workstream (ws3) edits only Camera.kt, BoardView.kt and CameraMathTest.kt. The ads code and the shared platform module belonged to another session, so workstreams could only read them. Each workstream commits in its own git worktree, and only one integrator agent merges into the integration branch. Splitting agents across worktrees started with <a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a>; this time we added the ownership table.</p>
+    </section>
+    <section aria-labelledby="ai-errors">
+      <h2 id="ai-errors">Forty-one agents reported zero failures, and the app crashed on launch</h2>
+      <p>The implementation Workflow ended at 22:27 with "41 agents completed, none failed". Every workstream inside the Workflow except the simulation (ws2) had been through at least one adversarial review, and the final merge agent had passed the full JVM suite and a debug build. A minute later the app went onto the S21 and crashed right after launch. The level files were the cause: the Android build tool (aapt) strips a trailing <code>.gz</code> from asset names, so the file the code asked for wasn't in the APK. Commit 4d46413 at 22:31 shipped the level packs uncompressed and added a regression test that fails on any asset name ending in .gz.</p>
+      <p>The detailed E2E pass had 33 items and kept the S21 to itself from 00:36 to 01:41. Thirty-one passed. One failed (stutter while panning large boards), and one was skipped because a debug build can't show it. It turned up 10 bugs and design problems. The Workflow that fixed them used 10 agents, again three at a time, and its three fix branches were merged at 02:23.</p>
+      <p>What the agent got wrong was the meaning of "done". Keeping workstreams off the phones was the right call. The cost was that 41 "done" reports meant only "JVM tests and compile pass", and every defect that shows up only on a device was pushed into a single queue at the very end. What caught it was one phrase in the operator's original request: install it on the S21 and run E2E. At 01:43 the operator also freed up the S20 for testing. That let a release-build random-input check (3,000 events × 3 seeds, zero crashes) run on the S20 alongside the fix Workflow. Handing over one more phone raised parallelism more than any request for more agents did.</p>
+      <p>Before deciding how many agents to launch, count how many builds and devices you can run at the same time. That count is your real parallelism.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Next experiment</h2>
+      <ul>
+        <li>Would four fit? This time free memory was only sampled a few times, whenever an agent happened to check. On the next parallel implementation run we will log available memory and the number of Gradle daemons every minute, to see whether three was a safety margin or wasted capacity.</li>
+        <li>A device lock instead of messages. Replace the 114 device-related messages with a single lock file (who, until when) and measure how much device waiting time drops.</li>
+        <li>Where 14 comes from. Five research Workflows all stopped at exactly 14 concurrent agents. We have not yet checked whether that is a tool setting.</li>
+      </ul>
+    </section>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>How many Claude Code subagents can run in parallel?</summary><div><p>In this repository's logs, research Workflows that never build reached 14 agents at once. Implementation agents that run Gradle were capped at three to fit 4 GB of free RAM. In practice build memory and device count set the limit before the tool does.</p></div></details>
+        <details><summary>Does a separate git worktree per agent remove conflicts?</summary><div><p>It reduces git conflicts, but contention for phones and memory remains. This run handled git with a per-workstream file-ownership table and a single integrator doing all merges; turns on the two phones were still negotiated in messages between sessions.</p></div></details>
+        <details><summary>How were ten workstreams merged in one day?</summary><div><p>The work was split into stages in dependency order. After each stage an integrator agent merged the branches one by one with --no-ff, then ran the unit tests and a debug build. That produced 11 merge commits between 19:10 and 22:47 on October 3.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 21 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Play staged rollout API: 20% went out as 100% – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/play-staged-rollout-completed/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/play-staged-rollout-completed/</guid>
+    <description><![CDATA[<section class="hero">
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</h1>
+      <p class="lead">Once a production release is committed as completed, Play will not turn it back into a 20% rollout. Before you commit a staged rollout, read back its status and userFraction.</p>
+      <p>The line in the agent's terminal read <code>track production [('97 (1.6.029)', 'completed')]</code>, and the commit result was printed right under it. At 15:50 KST on October 11, 2026, a command meant to ship SugarSpeller 1.6.029 (versionCode 97) to 20% of the Google Play production track had just shipped it to everyone. Thirty-five seconds later, a request to set it back to 20% came back HTTP 403. The cause was one argument-count check in an upload script the agent had written. The next two versions, 1.6.030 and 1.6.031, went through the internal testing track, out to 20% of production, and up to 100% after a day of watching, on October 18 and 19.</p>
+      <p class="note">Sources: SugarSpeller's release records for 1.6.029, 1.6.030 and 1.6.031, commit <code>e64cd83</code>, the command output from that day's release session, and the Google Play Developer API docs (edits.tracks updated 2026-09-28, APKs and Tracks updated 2025-12-18). Rechecked on October 21, 2026.</p>
+    </section>
+    <section aria-labelledby="off-by-one">
+      <h2 id="off-by-one">The command got 0.2 and sent completed</h2>
+      <p>The agent ran <code>play3.py promote 97 "97 (1.6.029)" notes29.json production 0.2</code>. The trailing <code>0.2</code> was the rollout fraction. This is how the script picked it up:</p>
+      <pre><code>a=sys.argv; FR=None
+if a[1] in ("upload","promote") and len(a)&gt;(8 if a[1]=="upload" else 7): FR=a.pop()
+...
+**({"status":"inProgress","userFraction":float(FR)} if FR else {"status":"completed"})</code></pre>
+      <p>That command produces seven entries in <code>sys.argv</code>, counting the script name. The check wanted more than seven before it would take the fraction. Off by one, <code>FR</code> stayed empty, and the default for "no fraction" was <code>completed</code>. The upload branch was off by one the same way.</p>
+      <p>The script was never in the repository. The agent had made it earlier in the same session by patching an older script with sed, and since the internal-track upload passed no fraction, nothing had exposed the bug. (vc97 was itself a same-day rebuild. A deep check on a Galaxy S21 that afternoon found an old bug where launching with the screen off left the app stuck on a black splash, so vc96 was dropped and the fix went into a new build.)</p>
+    </section>
+    <section aria-labelledby="refused">
+      <h2 id="refused">The PUT back to 20% got 403 PERMISSION_DENIED</h2>
+      <p>The agent opened a new edit straight away and tried to set the production track to "vc97 inProgress 0.2, previous vc94 completed". Play answered:</p>
+      <pre><code>before [('97 (1.6.029)', 'completed', ['97'], None)]
+put [('97 (1.6.029)', 'inProgress', 0.2), ('94 (1.6.027)', 'completed', None)]
+HTTP 403 {
+  "error": {
+    "code": 403,
+    "message": "You cannot rollout this release because it does not allow any existing users to upgrade to the newly added APKs.",
+    "status": "PERMISSION_DENIED"
+  }
+}</code></pre>
+      <p>The edits.tracks reference defines <code>completed</code> as a release that "will have no further changes" and is served to all users. <code>userFraction</code> can only be set when the status is <code>inProgress</code> or <code>halted</code>, and must sit between 0 and 1. Nothing in the docs describes putting a fraction back on a release that has already gone to everyone, and we found no paragraph explaining this particular 403 message. All we can report is the outcome: completed did not go back to staged.</p>
+    </section>
+    <section aria-labelledby="ai-wrong">
+      <h2 id="ai-wrong">The agent printed completed and committed anyway</h2>
+      <p>There were two mistakes. The first is the off-by-one above. The second was bigger. The script printed the track from the PUT response as <code>track production [('97 (1.6.029)', 'completed')]</code> and went on to commit in the same run without checking it. The wrong value was in the output before the commit. Nothing in the code stopped on it.</p>
+      <p>Afterwards the agent tried to fix the check with sed, and Claude Code's automatic permission check blocked the edit. The agent told the operator it would stop using that script and wrote the incident into the release record, which is commit <code>e64cd83</code> at 15:52.</p>
+      <p>That record says a hotfix was the only way to stop the rollout. The docs describe one more route. Per the "Halt a completed rollout" section of Google's APKs and Tracks guide, a completed release can be set to <code>halted</code> if the track already has an earlier published completed release; new users and existing users who update then get that earlier release. The completed release before 1.6.029 was vc94. We never tried this, so we do not know whether Play would have accepted it. What we did instead was add +1 day and +3 day stability rows to the monitoring doc. The late check on October 15 found no regression signal, though Play's crash numbers were out of reach because the reporting API lacked permissions.</p>
+    </section>
+    <section aria-labelledby="internal-first">
+      <h2 id="internal-first">Internal track first, then promote the same build</h2>
+      <p>One rule was already two days old when this happened. On October 9, 1.6.026 went straight to 100% of production through the Publisher API, and the operator asked that next time the build go to internal testing first and be promoted from there. A sideloaded APK cannot show the Play path end to end: Play signing, billing, Play's automatic protection. The bundle is uploaded once, and production gets the same versionCode in a new edit.</p>
+      <p>1.6.029 did follow that order. The fraction was lost in the second step, the promotion from internal to production. The two versions after it kept the fraction too.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Version</th><th scope="col">First production step</th><th scope="col">100%</th><th scope="col">Basis for the call</th></tr></thead>
+          <tbody>
+            <tr><td>1.6.029 (vc97)</td><td>Oct 11, completed (meant to be 20%)</td><td>from the start</td><td>late check Oct 15: no regression signal, crash numbers not seen</td></tr>
+            <tr><td>1.6.030 (vc102 → vc103)</td><td>Oct 17, inProgress 0.2</td><td>Oct 18</td><td>+1 day: zero crashes, no change to ad code</td></tr>
+            <tr><td>1.6.031 (vc105)</td><td>Oct 18, inProgress 0.2</td><td>Oct 19</td><td>+1 day: zero crashes, zero failed checks</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The 20% day for 1.6.030 did not collect enough real users to compare anything. Most of the 1.6.030 users in GA4 were Play pre-launch report test devices and our own development phones. So the 100% call rested on zero crashes and a diff showing no ad code had changed. A 20% stage only protects you if you wait until it has a sample.</p>
+    </section>
+    <section aria-labelledby="guard">
+      <h2 id="guard">The promotion script now never reads the fraction by position</h2>
+      <p>From 1.6.031 on, each version folder has its own <code>release_production.py</code>, and promotion goes through it. Trimmed to the core:</p>
+      <pre><code>commit = '--commit' in sys.argv          # dry run unless given
+fraction = float(sys.argv[sys.argv.index('--fraction') + 1]) if '--fraction' in sys.argv else 0.2
+edit = call('POST', f'{API}/edits', {})['id']
+done = False
+try:
+    internal = call('GET', f'{API}/edits/{edit}/tracks/internal')['releases']
+    new = [r for r in internal if r.get('versionCodes') == [NEW]]
+    if len(new) != 1:
+        sys.exit(f'vc{NEW} is not on internal')
+    prod = call('GET', f'{API}/edits/{edit}/tracks/production')['releases']
+    old = [r for r in prod if r.get('versionCodes') == [OLD] and r['status'] == 'completed']
+    if len(old) != 1:
+        sys.exit(f'no completed vc{OLD} on production')
+    call('PUT', f'{API}/edits/{edit}/tracks/production', {'track': 'production', 'releases': [
+        {'versionCodes': [NEW], 'status': 'inProgress', 'userFraction': fraction, ...},
+        old[0]]})
+    call('POST', f'{API}/edits/{edit}:validate')
+    if commit:
+        call('POST', f'{API}/edits/{edit}:commit'); done = True
+finally:
+    if not done:
+        call('DELETE', f'{API}/edits/{edit}')   # dry run or failure: throw the edit away</code></pre>
+      <p>(The real script's messages are in Korean; they are translated here.) Four things changed:</p>
+      <ul>
+        <li><code>status</code> is hard-coded as <code>inProgress</code>. A missing fraction cannot fall through to completed, and the fraction only changes through the named <code>--fraction</code> flag.</li>
+        <li>The internal testing track must hold exactly one release with that versionCode. A promotion that skipped internal stops here.</li>
+        <li>Production must hold exactly one completed release of the previous version. That is what the other 80% keep getting while the new release sits at 20%.</li>
+        <li>The default is a dry run: it validates and then deletes the edit. The only run that changes anything is the one with <code>--commit</code>, after the operator has checked. 1.6.031 shipped that way on October 18, after the operator confirmed.</li>
+      </ul>
+      <p>The PUT body has the same shape as the request that got the 403 on October 11: new release inProgress, previous release completed. For 1.6.031 the new release had not been served to anyone yet, and this request passed validate and commit.</p>
+    </section>
+    <section aria-labelledby="prevention">
+      <h2 id="prevention">The rule now, and a check not yet in code</h2>
+      <p>If you give an agent permission to ship to production, do not let it use a script that takes the rollout fraction as a positional argument. Code that defaults to completed when the fraction is missing turns one slip into a full release. The rule now: uploads go to the internal testing track only, the operator installs from Play and checks, and then the same build is promoted. Promotion runs as a dry run first, sits at 20% of production for a day, and only then goes to 100%.</p>
+      <p>One line is still missing from the code. The project notes say to confirm, before commit, that the PUT response shows status inProgress and the right userFraction. The current script builds the PUT body itself and never reads the response. The next version of the script gets this check:</p>
+      <pre><code>tr = call('PUT', f'{API}/edits/{edit}/tracks/production', body)
+mine = [r for r in tr['releases'] if r.get('versionCodes') == [NEW]]
+if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFraction') != fraction:
+    sys.exit(f'PUT response does not match: {mine}')   # stop before commit</code></pre>
+      <p>We will also write down the halt procedure from the docs at the next staged release, and check then whether a stray completed could send new installs back to the previous version without waiting for a hotfix build. Our release checks, in order, are in <a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>, and the app itself is on the <a href="https://mvgood21.github.io/en/apps/sugarspeller/">SugarSpeller</a> page.</p>
+    </section>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Can a completed Play release be turned back into a staged rollout?</summary><div><p>We could not do it. The PUT that set the completed vc97 to inProgress 0.2 was refused with 403 PERMISSION_DENIED. The documented option left is to halt the completed release when the track has an earlier completed release, which we did not try, so we do not know if it works.</p></div></details>
+        <details><summary>How do you set userFraction in the Publisher API?</summary><div><p>In edits.tracks, give the release status inProgress and a userFraction between 0 and 1 (0.2 for 20%), then commit the edit. userFraction can only be set while the status is inProgress or halted. Put the previous completed release in the same releases array so the remaining users keep getting it.</p></div></details>
+        <details><summary>How do you take a staged rollout to 100%?</summary><div><p>In a new edit, change the same release's status to completed and commit. SugarSpeller does this after one day at 20% of production with zero crashes and zero failed checks: October 18 for 1.6.030 and October 19 for 1.6.031.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 21 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>Finding fake tests by deleting their guards – SugarMount</title>
     <link>https://mvgood21.github.io/en/ax/guard-removal-test/</link>
@@ -118,10 +440,10 @@ for mid, rel, edits, kind, target in MUT:
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -214,12 +536,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -275,12 +597,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -665,12 +987,12 @@ room  = is there space for a 3×3 square, a 1×4 bar, a 4×1 bar (0–3)</code><
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -773,10 +1095,10 @@ done</code></pre>
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -877,12 +1199,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2219,12 +2541,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2318,14 +2640,14 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
       </ul>
-      <p><a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
     <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
   </item>
@@ -2357,6 +2679,9 @@ done</code></pre>
     <section aria-labelledby="notes">
       <h2 id="notes">Latest notes</h2>
       <ul class="card-list">
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></h3><p class="sub">Compose can break Korean between syllables, but the label stacked as &#x27;R/u/l/e&#x27; on a Galaxy S21 came from Row measurement order. Each cause got its own fix.</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></h3><p class="sub">The operator allowed hundreds of agents, but only three code-writing agents ran at once. 4 GB of free RAM and two shared phones set the pace of a 59-commit day.</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></h3><p class="sub">SugarSpeller 1.6.029 was meant for 20% via the Play Publisher API but was committed as completed; Play refused the move back to 20% with a 403. Cause and guard.</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></h3><p class="sub">A P2P chat app passed 3,066 tests while one SQLite pragma, traced through plugin source, kept its database from opening. Now we judge tests by deleting guards.</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></h3><p class="sub">Removing -dontoptimize left Play Console&#x27;s DEX metrics at 36-39%. Deleting an unused Kakao SDK keep rule took r8.json to 85% and the AAB to 11.6 MB.</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></h3><p class="sub">All 51 sitemap URLs once shared one lastmod. Now dates follow a hash of each page&#x27;s main content, not commit dates, and a 99-file commit moved only 6 of them.</p></li>
@@ -2371,10 +2696,11 @@ done</code></pre>
     <section aria-labelledby="topics">
       <h2 id="topics">Browse by topic</h2>
       <ul class="card-list">
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/workflow/">Working with agents</a></h3><p class="sub">How work is split between an AI coding agent and a person, how rules reach the agent, and what we changed after several sessions collided in one repository. 1 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li></ul></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/workflow/">Working with agents</a></h3><p class="sub">How work is split between an AI coding agent and a person, how rules reach the agent, and what we changed after several sessions collided in one repository. 2 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li><li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li></ul></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/quality/">Testing and release</a></h3><p class="sub">Unit tests, release gates and on-device checks that AI-written code goes through before each release, with the real defects those checks caught along the way. 3 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li><li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li><li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li></ul></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/android/">Android development</a></h3><p class="sub">Gradle builds, library upgrades, UI and performance problems we ran into while building Android apps with a coding agent, and how each one was solved. 2 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li><li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li></ul></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/android/">Android development</a></h3><p class="sub">Gradle builds, library upgrades, UI and performance problems we ran into while building Android apps with a coding agent, and how each one was solved. 3 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li><li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li><li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li></ul></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/games/">Game development</a></h3><p class="sub">Generating puzzle game levels with an agent, proving every level can be solved, and tuning difficulty: the rules we settled on and the numbers we measured. 1 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li></ul></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/store/">Play Store and monetization</a></h3><p class="sub">Google Play listings and review, store screenshots and descriptions, and ad setup: the work of shipping and running apps, shared with an AI coding agent. 1 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li></ul></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/web/">Website and search</a></h3><p class="sub">The page structure, Google and Naver search optimization, structured data and design system of this site, built with an agent and explained from the actual code. 1 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li></ul></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/retro/">Retrospectives and numbers</a></h3><p class="sub">Looking back over a period of work: what went fast and what went wrong, with numbers we counted ourselves from the git history and QA reports. 1 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li></ul></li>
       </ul>
@@ -2487,10 +2813,10 @@ done</code></pre>
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
