@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>androidx.pdf&#x27;s isolated process runs onCreate – SugarMount</title>
+  <meta name="description" content="androidx.pdf beta01 parses PDFs in an isolated process that also runs your Application.onCreate. Without a guard, the PDF never opened and no error came back.">
+  <link rel="canonical" href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/androidx-pdf-isolated-process/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/androidx-pdf-isolated-process/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="androidx.pdf&#x27;s isolated process runs onCreate – SugarMount">
+  <meta property="og:description" content="androidx.pdf beta01 parses PDFs in an isolated process that also runs your Application.onCreate. Without a guard, the PDF never opened and no error came back.">
+  <meta property="og:url" content="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-androidx-pdf-isolated-process-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/en/rss.xml">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=aae9be9a">
+  <link rel="stylesheet" href="/assets/site.css?v=aae9be9a">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=aae9be9a">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/#article","headline":"androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens","description":"androidx.pdf beta01 parses PDFs in an isolated process that also runs your Application.onCreate. Without a guard, the PDF never opened and no error came back.","url":"https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/","mainEntityOfPage":"https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/","inLanguage":"en","articleSection":"Android development","datePublished":"2026-10-22T09:00:00+09:00","dateModified":"2026-10-22T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-androidx-pdf-isolated-process-en.png"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why does androidx.pdf fail to open a PDF without any error?","acceptedAnswer":{"@type":"Answer","text":"Usually because its isolated service process died. Filter logcat by the process name :androidx.pdf.service.PdfDocumentServiceImpl and look for FATAL EXCEPTION. If Application.onCreate touches storage, only that process dies, and the app gets no callback."}},{"@type":"Question","name":"Why does SharedPreferences throw IllegalStateException in an isolated process?","acceptedAnswer":{"@type":"Answer","text":"An isolated process cannot use UserManager, so SharedPreferences cannot open. The message we saw was \"SharedPreferences cannot be accessed if UserManager is not available. (e.g. from inside an isolated process)\". Return early from Application.onCreate when Process.isIsolated() is true."}},{"@type":"Question","name":"Does androidx.pdf beta01 need extra R8 keep rules?","acceptedAnswer":{"@type":"Answer","text":"Not in our app. On 2026-10-05 an R8 release build with no added keep rules opened, searched and selected text on a Galaxy S21. We also confirmed that four of its AARs ship no consumer rules file."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://mvgood21.github.io/en/ax/"},{"@type":"ListItem","position":3,"name":"Android development","item":"https://mvgood21.github.io/en/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens"}]}</script>
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/androidx-pdf-isolated-process/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/android/">Android development</a></li><li><span aria-current="page">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</span></li></ol></nav>
+    <section class="hero">
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</h1>
+      <p class="lead">androidx.pdf's isolated PDF service runs Application.onCreate too. Make Process.isIsolated() the first statement of onCreate, return early, and pin that position with a test so nobody moves it.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Android development</span> <span aria-hidden="true">·</span> <span>7 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-10-22">October 22, 2026</time></p><!-- /build:meta -->
+      <p><code>if (Process.isIsolated()) return</code> is the first line of <code>Application.onCreate</code> in <a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a>, our Android viewer for Korean word-processor files and PDFs. On October 5, 2026, a release build without that line could not open a PDF on a Galaxy S21 running Android 15. The PDF service's isolated process ran our <code>onCreate</code>, crashed on SharedPreferences, and the app got no error callback for the roughly 6.5 seconds of log we saved. With the guard, the same phone opened a 5-page PDF in 81 ms.</p>
+      <p class="note">Sources: the V8 section of the M0 spike report in SugarMount's app repository (sugar-utils, dated 2026-10-05), the two S21 logcat files saved during that spike, and <code>SugarDocApp.kt</code> and <code>ViewerArchitectureTest.kt</code> as of commit ca1ade4 (2026-10-08). Checked on October 21, 2026.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (7)</summary><ol><li><a href="#isolated-oncreate">The isolated process creates your Application too</a></li><li><a href="#timeline">How it was found, October 4 to October 8</a></li><li><a href="#architecture-test">A unit test keeps the guard as the first statement</a></li><li><a href="#ai-miss">The measuring agent said 8 seconds; the log said 6.5</a></li><li><a href="#other-paths">The isolated service had other ways to die</a></li><li><a href="#if-again">If I did it again</a></li><li><a href="#faq">FAQ</a></li></ol></details><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#isolated-oncreate">The isolated process creates your Application too</a></li><li><a href="#timeline">How it was found, October 4 to October 8</a></li><li><a href="#architecture-test">A unit test keeps the guard as the first statement</a></li><li><a href="#ai-miss">The measuring agent said 8 seconds; the log said 6.5</a></li><li><a href="#other-paths">The isolated service had other ways to die</a></li><li><a href="#if-again">If I did it again</a></li><li><a href="#faq">FAQ</a></li></ol></nav><!-- /build:toc -->
+
+    <section aria-labelledby="isolated-oncreate">
+      <h2 id="isolated-oncreate">The isolated process creates your Application too</h2>
+      <p>androidx.pdf 1.0.0-beta01 does its PDF parsing in a service called <code>PdfDocumentServiceImpl</code>, declared with <code>isolatedProcess</code>. Android starts that process with your <code>Application</code> class and calls its <code>onCreate</code>. An isolated process has no access to your app's storage, so storage work in <code>onCreate</code> kills it. We measured SharedPreferences; the code comment in our app also names DataStore and Firebase.</p>
+      <p>Our spike app (Compose <code>PdfViewer</code> plus <code>SandboxedPdfLoader</code>, an R8-minified release build) wrote a SharedPreferences value in <code>onCreate</code> on purpose. This is the unguarded run:</p>
+      <pre><code>02:35:47.092 I M0V8: APP_ONCREATE pid=1678 isolated=true guard=false proc=kr.sugar.m0v8:androidx.pdf.service.PdfDocumentServiceImpl
+02:35:47.093 E M0V8: APP_INIT failed isolated=true: java.lang.IllegalStateException: SharedPreferences cannot be accessed if UserManager is not available. (e.g. from inside an isolated process)
+02:35:47.093 E AndroidRuntime: FATAL EXCEPTION: main
+02:35:47.110 I ActivityManager: Process kr.sugar.m0v8:androidx.pdf.service.PdfDocumentServiceImpl (pid 1678) has died</code></pre>
+      <p>The app process stayed alive, so no crash dialog appeared. Between the service dying and the last log line at 02:35:53.689, the "document opened" line (<code>V8_OPEN</code>) never showed up, and nothing told the app the open had failed. The guarded build, run on the same phone about two minutes earlier, let the isolated process return from <code>onCreate</code> at once and opened a 466,529-byte, 5-page PDF in 81 ms.</p>
+    </section>
+
+    <section aria-labelledby="timeline">
+      <h2 id="timeline">How it was found, October 4 to October 8</h2>
+      <p>This order comes only from the docs and git. There are no intermediate commits: everything below landed in one commit on October 8.</p>
+      <ol>
+        <li><strong>Oct 4</strong>: the design cross-check document noted that the PDF sandbox service is an isolated process and that Application.onCreate runs there too, tagged "verified/estimated". The implementation plan written the same day added spike V8 to test it.</li>
+        <li><strong>Oct 5, 02:33</strong>: guarded release build on the S21. The isolated process logged <code>isolated=true guard=true</code>, and the PDF opened.</li>
+        <li><strong>Oct 5, 02:35</strong>: unguarded build. The isolated process died as shown above, and the PDF never opened.</li>
+        <li><strong>Oct 5 (spike report)</strong>: a verification agent recomputed the measuring agent's numbers. This is where "8 seconds" became "about 6.5 seconds".</li>
+        <li><strong>Oct 5 (M1 results)</strong>: the guard went into the real app, with a record that deleting it makes the test fail.</li>
+        <li><strong>Oct 8, 08:56</strong>: commit ca1ade4 shipped the guard and the architecture test together with the app's milestones M1 to M5.</li>
+      </ol>
+      <p>Nobody hit this as a bug on a user's phone. The design cross-check flagged it first, and the spike then reproduced the failure on purpose. (The plan was to install the spike on a Galaxy S20 as well, but another session's app was using that phone, so it only read system properties there.)</p>
+    </section>
+
+    <section aria-labelledby="architecture-test">
+      <h2 id="architecture-test">A unit test keeps the guard as the first statement</h2>
+      <p>In <code>SugarDocApp.kt</code> the guard is line 17, the first statement of <code>onCreate</code>. The comment above it says it must stay first and names <code>ViewerArchitectureTest</code> as the rule that enforces it.</p>
+      <pre><code>override fun onCreate() {
+    if (Process.isIsolated()) return
+    super.onCreate()
+    container = AppContainer(this)
+}</code></pre>
+      <p>The test reads the source file and checks that the first statement after <code>override fun onCreate()</code> is exactly that string. It also rejects code that runs before <code>onCreate</code>, because that runs in the isolated process as well: member properties with initializers, <code>init</code> blocks, a companion object and <code>attachBaseContext</code>. Only <code>lateinit</code> and <code>by lazy</code> members are allowed. A second test feeds the detector a sample with five such lines and requires exactly five hits, so the detector itself cannot go quiet.</p>
+      <p>If your app uses androidx.pdf, put this guard first in <code>onCreate</code> and pin it with a test. Code review will not hold it there. Initialization code piles up in <code>onCreate</code> over time, and most of it touches storage. We checked the test by deleting the guard and watching it fail; the method is in <a href="/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a>.</p>
+    </section>
+
+    <section aria-labelledby="ai-miss">
+      <h2 id="ai-miss">The measuring agent said 8 seconds; the log said 6.5</h2>
+      <p>Two AI coding agents split spike V8. A measuring agent ran the phone and reported. A separate verification agent reopened the saved evidence files and recomputed every number. The spike report's header says it plainly: the numbers in it are the verification agent's corrected values.</p>
+      <p>The measuring agent reported that the unguarded build sat unresponsive for "8 seconds". The verification agent went back to the logcat and changed it to "about 6.5 seconds". That 6.5 is not an open time. It is how long the saved log runs, and the PDF never opened inside it. Recounting while writing this note: from the process death at 02:35:47.110 to the last line is 6.6 seconds.</p>
+      <p>The same section lists seven corrections. Open times went from 183/99 ms to 81/59 ms, and search times from 95 to 211 ms to 286/64 ms. The scroll evidence was thrown out because the first-page and last-page screenshots had the same md5. The agent that was wrong and the agent that fixed it were both AI; there is no record of a person correcting these numbers. What stays is the rule: measurement and verification go to different agents, and only corrected values reach the document.</p>
+    </section>
+
+    <section aria-labelledby="other-paths">
+      <h2 id="other-paths">The isolated service had other ways to die</h2>
+      <p>The guard covers one route: dying inside <code>onCreate</code>. The isolated service can die for other reasons, so the reader's <code>ReaderController</code> puts an 8-second timeout on openDocument (<code>PDF_OPEN_TIMEOUT_MS = 8_000L</code>, counted only while the reader is on screen) and ends on an error screen. In the M4 checks we killed the service with <code>am crash</code> during openDocument, 3 runs on each of 2 devices. Each run either showed E14 (try again) or reconnected and drew the first page, all within 0.5 to 2.4 seconds.</p>
+      <p>The nastier route came after a document had opened. When the service died, androidx.pdf showed a Material error Snackbar styled with <code>ThemeOverlay.AppCompat.Dark</code>. It read attributes such as <code>?attr/colorAccent</code> that our platform theme does not define, threw InflateException, and this time took down the app process itself. Adding 7 AppCompat color attributes to the reader theme fixed it, with the parent theme still a platform theme. After the fix, 9 runs on the S21 had zero app crashes.</p>
+      <p>For the record: we added no R8 keep rules and the release build still worked. The APK grew from 1,263,741 to 2,640,995 bytes, +1,377,254 bytes (dex +666,472, arsc +532,888, res +134,546). Measurements for the same app's HWP engine are in <a href="/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a>.</p>
+    </section>
+
+    <section aria-labelledby="if-again">
+      <h2 id="if-again">If I did it again</h2>
+      <p>I would not measure "no response" by the length of a log file. Two log lines in the spike app, one when openDocument is called and one when the timeout fires, would have left nothing to argue about between 8 and 6.5 seconds. The 6.5 came from where the logcat capture stopped, not from anything the app did.</p>
+      <p>I would also build a way to reproduce the no-callback 8-second timeout on a phone first. Today that path is covered only by JVM tests, because a release build gave us no way to freeze the isolated process (SIGSTOP). I would check transitive dependencies in the spike, too. The V8 evidence had no dependency tree, so that item stayed unconfirmed; we only learned that androidx.pdf brings in appcompat 1.7.0, fragment 1.5.4 and material 1.13.0 later that day, while building the real app in M1. Next spike, the output of <code>./gradlew :app:dependencies</code> goes into the evidence folder from the start.</p>
+    </section>
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Why does androidx.pdf fail to open a PDF without any error?</summary><div><p>Usually because its isolated service process died. Filter logcat by the process name <code>:androidx.pdf.service.PdfDocumentServiceImpl</code> and look for FATAL EXCEPTION. If Application.onCreate touches storage, only that process dies, and the app gets no callback.</p></div></details>
+        <details><summary>Why does SharedPreferences throw IllegalStateException in an isolated process?</summary><div><p>An isolated process cannot use UserManager, so SharedPreferences cannot open. The message we saw was "SharedPreferences cannot be accessed if UserManager is not available. (e.g. from inside an isolated process)". Return early from Application.onCreate when Process.isIsolated() is true.</p></div></details>
+        <details><summary>Does androidx.pdf beta01 need extra R8 keep rules?</summary><div><p>Not in our app. On 2026-10-05 an R8 release build with no added keep rules opened, searched and selected text on a Galaxy S21. We also confirmed that four of its AARs ship no consumer rules file.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
+        <li><a href="/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
+        <li><a href="/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
+        <li><a href="/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
+        <li><a href="/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
+      </ul>
+      <p><a href="/en/ax/topic/android/">All notes on Android development</a> · <a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>

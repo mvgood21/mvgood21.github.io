@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>androidx.pdf 격리 프로세스의 함정 – SugarMount</title>
+  <meta name="description" content="androidx.pdf beta01의 격리 프로세스에서도 Application.onCreate가 돕니다. 가드가 없으면 오류 콜백 없이 PDF가 안 열렸고, 첫 줄 가드와 테스트로 막았습니다.">
+  <link rel="canonical" href="https://mvgood21.github.io/ax/androidx-pdf-isolated-process/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/androidx-pdf-isolated-process/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/androidx-pdf-isolated-process/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="androidx.pdf 격리 프로세스의 함정 – SugarMount">
+  <meta property="og:description" content="androidx.pdf beta01의 격리 프로세스에서도 Application.onCreate가 돕니다. 가드가 없으면 오류 콜백 없이 PDF가 안 열렸고, 첫 줄 가드와 테스트로 막았습니다.">
+  <meta property="og:url" content="https://mvgood21.github.io/ax/androidx-pdf-isolated-process/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-androidx-pdf-isolated-process-ko.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/rss.xml">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=aae9be9a">
+  <link rel="stylesheet" href="/assets/site.css?v=aae9be9a">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=aae9be9a">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/ax/androidx-pdf-isolated-process/#article","headline":"androidx.pdf beta01: 격리 프로세스에서 Application.onCreate가 한 번 더 돌아 PDF가 조용히 안 열렸다","description":"androidx.pdf beta01의 격리 프로세스에서도 Application.onCreate가 돕니다. 가드가 없으면 오류 콜백 없이 PDF가 안 열렸고, 첫 줄 가드와 테스트로 막았습니다.","url":"https://mvgood21.github.io/ax/androidx-pdf-isolated-process/","mainEntityOfPage":"https://mvgood21.github.io/ax/androidx-pdf-isolated-process/","inLanguage":"ko","articleSection":"Android 개발","datePublished":"2026-10-22T09:00:00+09:00","dateModified":"2026-10-22T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-androidx-pdf-isolated-process-ko.png"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"androidx.pdf에서 PDF가 오류 없이 안 열리면 무엇부터 보나요?","acceptedAnswer":{"@type":"Answer","text":"격리 프로세스 이름( :androidx.pdf.service.PdfDocumentServiceImpl )으로 logcat을 걸러 FATAL EXCEPTION이 있는지 봅니다. Application.onCreate의 저장소 초기화가 그 프로세스만 죽이면 앱에는 콜백이 오지 않습니다."}},{"@type":"Question","name":"격리 프로세스에서 SharedPreferences를 쓰면 왜 IllegalStateException이 나나요?","acceptedAnswer":{"@type":"Answer","text":"격리 프로세스는 UserManager를 쓸 수 없어 SharedPreferences를 열지 못합니다. 실제 메시지는 \"SharedPreferences cannot be accessed if UserManager is not available. (e.g. from inside an isolated process)\"였습니다. Application.onCreate 첫 줄에서 Process.isIsolated()이면 바로 return하면 됩니다."}},{"@type":"Question","name":"androidx.pdf beta01에 R8 keep 규칙을 따로 넣어야 하나요?","acceptedAnswer":{"@type":"Answer","text":"이 앱에서는 넣지 않았습니다. 2026-10-05 S21에서 keep 규칙을 더하지 않은 R8 릴리스 빌드가 PDF 열기, 검색, 텍스트 선택까지 동작했습니다. AAR 4개에 consumer 규칙 파일이 없다는 것도 확인했습니다."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/"},{"@type":"ListItem","position":2,"name":"AX 노트","item":"https://mvgood21.github.io/ax/"},{"@type":"ListItem","position":3,"name":"Android 개발","item":"https://mvgood21.github.io/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"androidx.pdf beta01: 격리 프로세스에서 Application.onCreate가 한 번 더 돌아 PDF가 조용히 안 열렸다"}]}</script>
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a class="nav-apps" href="/apps/">앱</a>
+        <a class="nav-ax" href="/ax/" aria-current="page">AX 노트</a>
+        <a class="nav-about" href="/about/">소개</a>
+        <a class="nav-privacy" href="/privacy/">개인정보처리방침</a>
+      </nav>
+      <a class="lang" href="/en/ax/androidx-pdf-isolated-process/" lang="en" hreflang="en">English</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>메뉴</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="전체 메뉴">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">닫기</button>
+      <p class="menu-title" id="m-photo">사진·영상</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>슈가앨범</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 용량 줄이기</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 반전·회전</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>이미지 변환 JPG·PNG·WebP</span></a></li></ul>
+      <p class="menu-title" id="m-document">문서·글</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글 띄어쓰기</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글뷰어 슈가독</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">생활</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>생생카드</span></a></li></ul>
+      <p class="menu-title" id="m-games">게임</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>화살표 매듭풀기</span></a></li><li><a class="app-tile" data-app="blocks" href="/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한판블록</span></a></li></ul>
+      <p><a href="/apps/">모든 앱 보기</a></p>
+      <ul class="menu-links"><li><a href="/ax/" aria-current="page">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container">
+    <nav class="crumbs" aria-label="이동 경로"><ol><li><a href="/">SugarMount</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/ax/topic/android/">Android 개발</a></li><li><span aria-current="page">androidx.pdf beta01: 격리 프로세스에서 Application.onCreate가 한 번 더 돌아 PDF가 조용히 안 열렸다</span></li></ol></nav>
+    <section class="hero">
+      <span class="eyebrow">AX 노트 · 사고 기록</span>
+      <h1>androidx.pdf beta01: 격리 프로세스에서 Application.onCreate가 한 번 더 돌아 PDF가 조용히 안 열렸다</h1>
+      <p class="lead">androidx.pdf의 격리 프로세스에서도 Application.onCreate가 돕니다. 첫 줄에 isIsolated 가드를 두고 테스트로 고정하십시오.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/about/">작성 SugarMount</a> <span aria-hidden="true">·</span> <span>Android 개발</span> <span aria-hidden="true">·</span> <span>읽는 시간 10분</span> <span aria-hidden="true">·</span> 최종 업데이트 <time datetime="2026-10-22">2026년 10월 22일</time></p><!-- /build:meta -->
+      <p><code>if (Process.isIsolated()) return</code>은 <a href="/apps/doc-viewer/">한글뷰어 슈가독</a>의 <code>Application.onCreate</code> 첫 줄입니다. 2026년 10월 5일 Galaxy S21(Android 15)에서 이 줄이 없는 릴리스 빌드는 PDF를 열지 못했습니다. PDF를 여는 격리 프로세스가 앱의 <code>onCreate</code>를 그대로 실행하다 SharedPreferences에서 죽었고, 저장된 로그 약 6.5초 동안 오류 콜백은 하나도 오지 않았습니다. 가드를 넣은 빌드는 같은 기기에서 5쪽 PDF를 81ms에 열었습니다.</p>
+      <p class="note">근거는 SugarMount 앱 저장소(sugar-utils)의 M0 스파이크 문서 V8 절(2026-10-05), 그때 저장한 S21 logcat 두 개, 커밋 ca1ade4(2026-10-08)의 <code>SugarDocApp.kt</code>와 <code>ViewerArchitectureTest.kt</code>입니다. 기준일은 2026년 10월 21일입니다.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>목차 (7)</summary><ol><li><a href="#isolated-oncreate">격리 프로세스에서도 Application.onCreate가 돕니다</a></li><li><a href="#timeline">10월 4일 분석 문서에서 10월 8일 커밋까지</a></li><li><a href="#architecture-test">첫 줄 가드는 아키텍처 테스트가 고정합니다</a></li><li><a href="#ai-miss">측정 에이전트는 8초라고 보고했고, 로그는 6.5초였습니다</a></li><li><a href="#other-paths">격리 서비스가 죽는 경로는 하나가 아니었습니다</a></li><li><a href="#if-again">다시 한다면</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></details><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">목차</p><ol><li><a href="#isolated-oncreate">격리 프로세스에서도 Application.onCreate가 돕니다</a></li><li><a href="#timeline">10월 4일 분석 문서에서 10월 8일 커밋까지</a></li><li><a href="#architecture-test">첫 줄 가드는 아키텍처 테스트가 고정합니다</a></li><li><a href="#ai-miss">측정 에이전트는 8초라고 보고했고, 로그는 6.5초였습니다</a></li><li><a href="#other-paths">격리 서비스가 죽는 경로는 하나가 아니었습니다</a></li><li><a href="#if-again">다시 한다면</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></nav><!-- /build:toc -->
+
+    <section aria-labelledby="isolated-oncreate">
+      <h2 id="isolated-oncreate">격리 프로세스에서도 Application.onCreate가 돕니다</h2>
+      <p>androidx.pdf 1.0.0-beta01은 PDF 파싱을 <code>PdfDocumentServiceImpl</code>이라는 서비스에서 합니다. 이 서비스는 <code>isolatedProcess</code>로 선언돼 있어 앱과 다른 프로세스에서 실행됩니다. 그런데 안드로이드는 그 프로세스에서도 앱의 <code>Application</code> 클래스를 만들고 <code>onCreate</code>를 부릅니다. 격리 프로세스는 앱 저장소에 접근하지 못하죠.</p>
+      <p>스파이크 앱(Compose <code>PdfViewer</code> + <code>SandboxedPdfLoader</code>, R8로 줄인 릴리스)은 <code>onCreate</code>에서 일부러 SharedPreferences에 값을 썼습니다. 가드가 없는 빌드의 logcat은 이렇게 남았습니다.</p>
+      <pre><code>02:35:47.092 I M0V8: APP_ONCREATE pid=1678 isolated=true guard=false proc=kr.sugar.m0v8:androidx.pdf.service.PdfDocumentServiceImpl
+02:35:47.093 E M0V8: APP_INIT failed isolated=true: java.lang.IllegalStateException: SharedPreferences cannot be accessed if UserManager is not available. (e.g. from inside an isolated process)
+02:35:47.093 E AndroidRuntime: FATAL EXCEPTION: main
+02:35:47.110 I ActivityManager: Process kr.sugar.m0v8:androidx.pdf.service.PdfDocumentServiceImpl (pid 1678) has died</code></pre>
+      <p>앱 프로세스는 멀쩡했고, 크래시 창도 뜨지 않았습니다. 격리 프로세스가 죽은 뒤 로그가 끝나는 02:35:53.689까지 PDF가 열렸다는 줄(<code>V8_OPEN</code>)은 끝내 나오지 않았고, 앱 쪽에는 실패를 알리는 콜백도 없었습니다. 약 2분 전에 같은 기기에서 돌린 가드 빌드는 격리 프로세스의 <code>onCreate</code>가 바로 돌아간 뒤 5쪽, 466,529바이트 PDF를 81ms에 열었습니다.</p>
+    </section>
+
+    <section aria-labelledby="timeline">
+      <h2 id="timeline">10월 4일 분석 문서에서 10월 8일 커밋까지</h2>
+      <p>문서와 git 기록에 남은 순서만 옮깁니다. 중간 커밋은 없고, 아래 과정은 모두 2026-10-08 커밋 하나에 들어갔습니다.</p>
+      <ol>
+        <li><strong>10월 4일</strong>: 설계 교차 검증 문서가 PDF 샌드박스 서비스의 격리 프로세스에서도 Application.onCreate가 돈다고 적었습니다. 태그는 [검증/추정]이었습니다. 같은 날 쓴 구현 계획은 이를 확인할 스파이크 V8을 새로 만들었습니다.</li>
+        <li><strong>10월 5일 02:33</strong>: S21에서 가드를 넣은 릴리스 빌드를 실행했습니다. 격리 프로세스 로그에 <code>isolated=true guard=true</code>가 찍혔고 PDF는 열렸습니다.</li>
+        <li><strong>10월 5일 02:35</strong>: 가드가 없는 빌드를 실행했습니다. 위 로그처럼 격리 프로세스가 죽고 PDF는 열리지 않았습니다.</li>
+        <li><strong>10월 5일(스파이크 문서)</strong>: 측정 에이전트의 보고를 검증 에이전트가 다시 계산했습니다. 무응답 시간 "8초"를 "약 6.5초"로 고친 것이 이 단계입니다.</li>
+        <li><strong>10월 5일(M1 결과)</strong>: 본 앱 코드에 가드를 넣고, 가드를 지우면 테스트가 실패하는지 확인했다는 기록이 남았습니다.</li>
+        <li><strong>10월 8일 08:56</strong>: 커밋 ca1ade4가 앱의 M1~M5 작업 전체와 함께 가드와 아키텍처 테스트를 올렸습니다.</li>
+      </ol>
+      <p>사람이 기기에서 증상을 본 것이 출발점이 아니었습니다. 설계 분석 문서가 먼저 의심했고, 스파이크가 일부러 실패를 재현했습니다. (스파이크 앱은 S20에도 깔 예정이었지만, 다른 세션의 앱이 그 폰을 쓰고 있어 설치하지 않았습니다.)</p>
+    </section>
+
+    <section aria-labelledby="architecture-test">
+      <h2 id="architecture-test">첫 줄 가드는 아키텍처 테스트가 고정합니다</h2>
+      <p>앱 클래스 <code>SugarDocApp.kt</code>에서 가드는 17행, <code>onCreate</code>의 첫 문장입니다. 주석은 이 줄이 첫 문장으로 남아야 한다고 적고, 지키는 쪽으로 <code>ViewerArchitectureTest</code>를 가리킵니다. 누군가 <code>super.onCreate()</code> 아래로 옮기거나 그 위에 로그 한 줄을 넣는 순간을 막으려는 겁니다.</p>
+      <pre><code>override fun onCreate() {
+    if (Process.isIsolated()) return
+    super.onCreate()
+    container = AppContainer(this)
+}</code></pre>
+      <p><code>ViewerArchitectureTest</code>는 소스 파일을 직접 읽어 <code>onCreate</code> 다음의 첫 문장이 정확히 이 문자열인지 비교합니다. <code>onCreate</code>보다 먼저 도는 코드도 함께 봅니다. 초기값이 있는 멤버 프로퍼티, <code>init</code> 블록, companion object, <code>attachBaseContext</code>가 대상이고, <code>lateinit</code>과 <code>by lazy</code>만 허용합니다. 검출기도 따로 시험합니다. 위험한 줄 5개를 넣은 예제에서 정확히 5건을 찾아야 통과합니다.</p>
+      <p>androidx.pdf를 쓰는 앱이라면 이 가드를 <code>onCreate</code> 첫 줄에 두고, 그 위치를 테스트로 고정하십시오. 코드 리뷰로는 지키기 어렵습니다. DataStore, SharedPreferences, Firebase 초기화처럼 <code>onCreate</code>에 쌓이는 코드는 대부분 저장소를 건드리니까요. 테스트가 정말 가드를 지키는지는 가드를 지워 실패를 보는 방식으로 확인했습니다. 방법은 <a href="/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다: 가드 지워 보기</a>에 따로 정리했습니다.</p>
+    </section>
+
+    <section aria-labelledby="ai-miss">
+      <h2 id="ai-miss">측정 에이전트는 8초라고 보고했고, 로그는 6.5초였습니다</h2>
+      <p>V8 스파이크는 AI 코딩 에이전트 둘이 나눠 맡았습니다. 측정 에이전트가 보고하면 별도 검증 에이전트가 증거 파일을 다시 열어 숫자를 새로 계산했습니다. 스파이크 문서 머리말에는 "이 문서의 수치는 검증 에이전트가 정정한 값이다"라고 적혀 있습니다.</p>
+      <p>가드 없는 빌드의 무응답 시간을 측정 에이전트는 8초로 보고했습니다. 검증 에이전트는 logcat을 다시 열어 "약 6.5초"로 고쳤습니다. 이 6.5초는 PDF가 6.5초 뒤에 열린다는 뜻이 아닙니다. 저장된 로그의 길이일 뿐이고, 그 안에서 끝내 열리지 않았다는 뜻입니다. 글을 쓰며 다시 세어 보니 프로세스가 죽은 02:35:47.110부터 마지막 줄까지 6.6초였습니다.</p>
+      <p>같은 절에서 검증 에이전트가 고친 항목은 7개였습니다. 문서 열기 시간은 183/99ms가 81/59ms로, 검색 시간은 95~211ms가 286/64ms로 바뀌었습니다. 스크롤 확인 증거는 무효로 돌렸습니다. 1쪽과 마지막 쪽 캡처의 md5가 같았기 때문입니다. 틀린 쪽도, 고친 쪽도 AI 에이전트였습니다. 사람이 숫자를 고친 기록은 없습니다. 남은 규칙은 하나입니다. 측정과 검증을 다른 에이전트에 맡기고, 문서에는 정정한 값만 남깁니다.</p>
+    </section>
+
+    <section aria-labelledby="other-paths">
+      <h2 id="other-paths">격리 서비스가 죽는 경로는 하나가 아니었습니다</h2>
+      <p>가드는 프로세스가 <code>onCreate</code>에서 죽는 경로 하나만 막습니다. 격리 서비스는 다른 이유로도 죽습니다. 그래서 리더 쪽 <code>ReaderController</code>가 openDocument에 8초 타임아웃(<code>PDF_OPEN_TIMEOUT_MS = 8_000L</code>, 화면에 보인 시간만 셈)을 걸고, 시간이 지나면 오류 화면(E-코드)으로 끝냅니다. M4 점검에서 openDocument 도중 <code>am crash</code>로 서비스를 죽였더니(3회 × 2기기) 결과는 E14(다시 시도)이거나 서비스에 다시 붙어 첫 쪽을 그리는 것이었고, 모두 0.5~2.4초 안에 끝났습니다.</p>
+      <p>더 아픈 경로는 문서가 열린 뒤였습니다. 서비스가 죽으면 androidx.pdf의 PdfView가 Material 오류 Snackbar를 띄웁니다. 그 레이아웃의 <code>ThemeOverlay.AppCompat.Dark</code>가 플랫폼 테마에 없는 <code>?attr/colorAccent</code> 등을 읽다가 InflateException을 냈고, 이번에는 앱 프로세스가 죽었습니다. 리더 테마에 AppCompat 색 속성 7개를 넣어 고쳤고, 부모 테마는 플랫폼 테마 그대로 뒀습니다. 고친 뒤 S21에서 9회 돌려 앱 크래시는 0이었습니다.</p>
+      <p>R8 keep 규칙은 하나도 더하지 않았는데 릴리스에서 동작했습니다. APK는 1,263,741바이트에서 2,640,995바이트로, 1,377,254바이트 늘었습니다(dex +666,472, arsc +532,888, res +134,546). 같은 앱의 HWP 엔진 측정은 <a href="/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a>에 있습니다.</p>
+    </section>
+
+    <section aria-labelledby="if-again">
+      <h2 id="if-again">다시 한다면</h2>
+      <p>무응답 시간을 로그 길이로 재지 않을 겁니다. 스파이크 앱에 "openDocument 호출 시각"과 "타임아웃 발생 시각"을 직접 찍는 줄을 넣었다면 8초와 6.5초를 두고 다툴 일이 없었습니다. 6.5초는 앱이 아니라 logcat을 언제 끊었느냐로 정해진 숫자였으니까요.</p>
+      <p>콜백 없는 8초 타임아웃 경로도 기기에서 먼저 재현할 방법을 만들어 두겠습니다. 지금은 JVM 테스트로만 확인했습니다. 릴리스 빌드에서는 격리 프로세스를 멈춰 세울(SIGSTOP) 방법이 없었기 때문입니다. 전이 의존도 스파이크에서 미리 보겠습니다. V8 증거에는 의존성 트리가 없어 [미확인]으로 남았고, androidx.pdf가 appcompat 1.7.0·fragment 1.5.4·material 1.13.0을 끌고 온다는 사실은 같은 날 M1에서 본 앱을 만들며 알았습니다. 다음 스파이크에서는 <code>./gradlew :app:dependencies</code> 출력을 처음부터 증거 폴더에 넣겠습니다.</p>
+    </section>
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>androidx.pdf에서 PDF가 오류 없이 안 열리면 무엇부터 보나요?</summary><div><p>격리 프로세스 이름(<code>:androidx.pdf.service.PdfDocumentServiceImpl</code>)으로 logcat을 걸러 FATAL EXCEPTION이 있는지 봅니다. Application.onCreate의 저장소 초기화가 그 프로세스만 죽이면 앱에는 콜백이 오지 않습니다.</p></div></details>
+        <details><summary>격리 프로세스에서 SharedPreferences를 쓰면 왜 IllegalStateException이 나나요?</summary><div><p>격리 프로세스는 UserManager를 쓸 수 없어 SharedPreferences를 열지 못합니다. 실제 메시지는 "SharedPreferences cannot be accessed if UserManager is not available. (e.g. from inside an isolated process)"였습니다. Application.onCreate 첫 줄에서 Process.isIsolated()이면 바로 return하면 됩니다.</p></div></details>
+        <details><summary>androidx.pdf beta01에 R8 keep 규칙을 따로 넣어야 하나요?</summary><div><p>이 앱에서는 넣지 않았습니다. 2026-10-05 S21에서 keep 규칙을 더하지 않은 R8 릴리스 빌드가 PDF 열기, 검색, 텍스트 선택까지 동작했습니다. AAR 4개에 consumer 규칙 파일이 없다는 것도 확인했습니다.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
+        <li><a href="/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li>
+        <li><a href="/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a></li>
+        <li><a href="/ax/agent-review-refutation/">에이전트 84개가 돈 릴리스 전 검토: 발견마다 3명이 반박하고, 버틴 20건만 고쳤다</a></li>
+        <li><a href="/ax/contrast-checker-missed-40-percent/">대비 검사기는 텍스트 조각 40%를 재지 못하고도 통과를 냈다: &#x27;몇 개를 측정했나&#x27;를 출력하게 바꾸기</a></li>
+        <li><a href="/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li>
+      </ul>
+      <p><a href="/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="/ax/">AX 노트 전체 보기</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>한 가지 일을 간단하게 하는 Android 앱</p>
+        <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">앱</p>
+        <ul><li><a href="/apps/sugaralbum/">슈가앨범</a></li><li><a href="/apps/image-compress/">사진 용량 줄이기</a></li><li><a href="/apps/image-flip/">사진 반전·회전</a></li><li><a href="/apps/image-convert/">이미지 변환 JPG·PNG·WebP</a></li><li><a href="/apps/sugarspeller/">한글 띄어쓰기</a></li><li><a href="/apps/sugarclip/">SugarClip</a></li><li><a href="/apps/doc-viewer/">한글뷰어 슈가독</a></li><li><a href="/apps/sugarcard/">생생카드</a></li><li><a href="/apps/arrow-knots/">화살표 매듭풀기</a></li><li><a href="/apps/blocks/">한판블록</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">사이트</p>
+        <ul><li><a href="/apps/">모든 앱</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li><li><a href="/rss.xml">RSS 피드</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play 개발자 페이지</a></div>
+    </div>
+  </footer>
+</body>
+</html>
