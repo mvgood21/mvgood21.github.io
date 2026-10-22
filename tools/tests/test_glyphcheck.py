@@ -28,6 +28,11 @@ class GlyphCheck(unittest.TestCase):
         self.assertFalse(self.g.report())
         self.assertIn("밣", self.g._blank)
 
+    def test_unmapped_character_drawn_as_tofu_is_reported(self):
+        self.draw("1 − 2")  # U+2212 MINUS SIGN is not in NanumSquare: Pillow draws the .notdef box
+        self.assertFalse(self.g.report())
+        self.assertIn("−", self.g._blank)
+
     def test_common_text_and_spaces_pass(self):
         self.draw("한글 띄어쓰기 R8 1,200")
         self.assertTrue(self.g.report())
