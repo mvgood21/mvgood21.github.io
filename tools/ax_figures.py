@@ -22,6 +22,9 @@ import sys
 
 from PIL import Image, ImageDraw, ImageFont
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import glyphcheck  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FONT_EB = os.path.join(ROOT, "tools/fonts/nanumsquareeb.ttf")
 FONT_R = os.path.join(ROOT, "tools/fonts/nanumsquarer.ttf")
@@ -184,4 +187,7 @@ def figure_html(slug):
 
 if __name__ == "__main__":
     if "--html" in sys.argv: figure_html(sys.argv[sys.argv.index("--html") + 1])
-    else: render_all(sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None)
+    else:
+        glyphcheck.install()  # a rare syllable the font only pretends to have would print as a gap (tools/glyphcheck.py)
+        render_all(sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None)
+        if not glyphcheck.report(): sys.exit(1)
