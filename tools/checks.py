@@ -30,6 +30,7 @@ ORG_ID = SITE + "/#org"
 SITE_ID = SITE + "/#website"
 NOINDEX_PATHS = frozenset({"404.html", "design/index.html"})
 ACCENT_DEMO_PAGES = frozenset({"design/index.html"})  # SDS demo (noindex): data-app samples allowed inside <main>
+ADS_ORIGIN = "pagead2.googlesyndication.com"  # async AdSense loader, AX notes only (see the script check)
 ALLOWED_ORIGINS = frozenset()          # e.g. {"gc.zgo.at"} once the owner approves one analytics origin
 OWNERSHIP_FILES = ("google83e3e62aee87a145.html", "naverc6d2c9710a0b598bb0562751a0d005b7.html")
 LINK_FILE_EXCEPTIONS = frozenset({"/sitemap.xml", "/rss.xml", "/en/rss.xml", "/llms.txt", "/404.html"})
@@ -801,7 +802,10 @@ def check_page_budget(page, report, file_mode):
         if src:
             lk = resolve(src, p)
             if not lk.internal:
-                report.error("ORIGIN", p, f"external script {src}"); continue
+                # the one approved exception: AdSense on AX notes (data/ads.json, owner decision 2026-10-22)
+                if not (lk.host == ADS_ORIGIN and re.match(r"(en/)?ax/[^/]+/index\.html$", p) and "async" in s.attrs):
+                    report.error("ORIGIN", p, f"external script {src}")
+                continue
             js += site.size(lk.relpath) or 0
             if "defer" not in s.attrs and "async" not in s.attrs and (s.get("type") or "") != "module":
                 report.warn("JS-DEFER", p, f"script {src} without defer")

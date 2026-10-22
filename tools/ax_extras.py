@@ -98,3 +98,48 @@ def middle_h2(main):
     hs = [m.start() for m in re.finditer(r'<section aria-labelledby="(?!faq"|ax-related)[^"]*">\s*<h2\b', main)]
     if len(hs) < 3: return None
     return main.rfind("\n", 0, hs[len(hs) // 2])  # start of that line, so the box gets its own line
+
+
+# ---------- ads (AdSense display units on AX notes only) ----------
+# data/ads.json: {"client": "ca-pub-…", "slots": {"in_article": "…", "rail_left": "…", "rail_right": "…"}}.
+# No client → no ad markup at all (no empty boxes, no script). AX_ADS_PREVIEW=1 draws labelled placeholders instead
+# (for layout review in a scratch copy only; never build the real site with it).
+ADS_FILE = "data/ads.json"
+AD_LABEL = {"ko": "광고", "en": "Advertisement"}
+AD_PUSH = "<script>(adsbygoogle=window.adsbygoogle||[]).push({})</script>"
+
+
+def ads_config(root):
+    import os
+    path = os.path.join(root, ADS_FILE)
+    cfg = json.load(open(path, encoding="utf-8")) if os.path.exists(path) else {}
+    preview = os.environ.get("AX_ADS_PREVIEW") == "1"
+    on = bool(cfg.get("client")) and all(cfg.get("slots", {}).get(k) for k in ("in_article", "rail_left", "rail_right"))
+    return {"on": on, "preview": preview and not on, "client": cfg.get("client", ""), "slots": cfg.get("slots", {})}
+
+
+def ads_head(cfg):
+    if not cfg["on"]: return ""
+    return (f'<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={cfg["client"]}"'
+            ' crossorigin="anonymous"></script>')
+
+
+def ad_unit(cfg, kind, lang):
+    """kind: in_article (responsive, in the text column), rail_left (160 wide), rail_right (300 wide)."""
+    cls = {"in_article": "ad ad-in", "rail_left": "ad ad-rail", "rail_right": "ad ad-side"}[kind]
+    label = f'<p class="ad-label">{AD_LABEL[lang]}</p>'
+    if cfg["on"]:
+        fmt = ' data-ad-format="auto" data-full-width-responsive="true"' if kind == "in_article" else ""
+        ins = (f'<ins class="adsbygoogle" style="display:block" data-ad-client="{cfg["client"]}"'
+               f' data-ad-slot="{cfg["slots"][kind]}"{fmt}></ins>{AD_PUSH}')
+        return f'<aside class="{cls}" aria-label="{AD_LABEL[lang]}">{label}{ins}</aside>'
+    if cfg["preview"]:
+        return f'<aside class="{cls} ad-preview" aria-label="{AD_LABEL[lang]}">{label}<div class="ad-box">{kind}</div></aside>'
+    return ""
+
+
+def ads_txt(cfg):
+    """ads.txt line for the AdSense publisher (pub-… from ca-pub-…), or None when ads are off."""
+    if not cfg["on"]: return None
+    pub = cfg["client"].replace("ca-", "", 1)
+    return f"google.com, {pub}, DIRECT, f08c47fec0942fa0\n"

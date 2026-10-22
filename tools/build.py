@@ -43,6 +43,7 @@ SUFFIX = " – SugarMount"
 # Keep this a plain set literal: tools/indexnow.py reads it with ast.literal_eval.
 NOINDEX_PATHS = {"404.html", "design/index.html"}
 AX_HUB_LATEST = 6    # newest AX notes on the hub; the rest through search and topic pages (each title costs hub font budget)
+ADS = ax_extras.ads_config(ROOT)  # data/ads.json; empty client → no ad markup anywhere
 AX_RELATED = 6       # "더 읽기" links under an AX note
 RSS_MAX = 60         # newest items per feed (Naver reads the newest; a full-<main> feed grows by 3 notes a day)
 TITLE_LEN = {"ko": (30, 44), "en": (50, 65)}  # (topic, whole title), IA spec 3.1
@@ -190,6 +191,8 @@ def css_version(generated):
     has CRLF and must not change every page) plus the generated CSS texts, computed in memory BEFORE any file is
     written (IA spec 9.1), so two builds in a row change nothing."""
     h = hashlib.sha1(open(rel("assets/site.css"), "rb").read().replace(b"\r\n", b"\n"))
+    if exists("assets/ax.css"):  # AX notes' own stylesheet shares the version
+        h.update(open(rel("assets/ax.css"), "rb").read().replace(b"\r\n", b"\n"))
     for text in generated:
         h.update(text.encode("utf-8"))
     return h.hexdigest()[:8]
@@ -1151,6 +1154,7 @@ def wrap_hand(relpath):
     parts = bare.strip("/").split("/")
     noindex = relpath in NOINDEX_PATHS
     a, items, lds, current, og, og_type, app_scope = None, [], [], None, None, "website", None
+    main_cls = ""
     isolated = False
     headline = h1_text(main) or title
     page_dm = dates.iso_datetime(modified(relpath)) if not noindex else None
@@ -1230,8 +1234,9 @@ def wrap_hand(relpath):
                     "url": SITE + path, "mainEntityOfPage": SITE + path, "inLanguage": lang,
                     "articleSection": tp[lang]["name"] if tp else t["ax"],
                     "datePublished": dates.iso_datetime(published(relpath)), "dateModified": page_dm,
-                    **({"image": imgs} if (imgs := [SITE + x for x in ([og] if exists(og.lstrip("/")) else [])
-                                                         + ax_extras.figures(main)]) else {}),
+                    **({"image": imgs} if (imgs := [SITE + x for x in dict.fromkeys(
+                        [x for x in (og, f"/assets/ax/cover/{parts[1]}-{lang}.webp") if exists(x.lstrip("/"))]
+                        + ax_extras.figures(main))]) else {}),
                     "author": ORG_REF, "publisher": ORG_REF, "isPartOf": SITE_REF})
         main = set_block(main, "meta", meta_line(lang, relpath, main, tp[lang]["name"] if tp else t["ax"]), after_lead(main))
         # inquiry boxes: one before the middle body h2, one before the FAQ (ax_extras)
@@ -1239,7 +1244,24 @@ def wrap_hand(relpath):
         main = set_block(main, "cta-mid", ax_extras.cta_mid(lang, EMAIL, headline), mid)
         faq = re.search(r'\n\s*<section aria-labelledby="faq">', main)
         main = set_block(main, "cta", ax_extras.cta_end(lang, EMAIL, headline), faq.start() if faq else None)
-        main = set_block(main, "toc", toc_inner(main, lang), after_hero(main))
+        # cover: the note's figures on the topic colour, first thing in the hero (tools/ax_cover.py); site.css turns
+        # the hero's eyebrow, h1, lead and meta into a band of that colour beside (desktop) or under (phone) the art
+        cover = f"/assets/ax/cover/{parts[1]}-{lang}.webp"
+        hero = re.search(r'<section class="hero"[^>]*>', main)
+        if hero and exists(cover.lstrip("/")):
+            main = set_block(main, "cover", f'<figure class="ax-cover-art"><img src="{cover}" width="1200" height="900" alt=""'
+                                            f' fetchpriority="high" decoding="async"></figure>', hero.end())
+            main_cls = f"ax-note ax-t-{tp['id'] if tp else 'workflow'}"
+        # ads: one unit after the intro, one before the closing inquiry box, a left rail and one under the side TOC
+        main = set_block(main, "ad-1", ax_extras.ad_unit(ADS, "in_article", lang), after_hero(main))
+        cta_end = BLOCK_RE("cta").search(main)
+        main = set_block(main, "ad-2", ax_extras.ad_unit(ADS, "in_article", lang), cta_end.start() if cta_end else None)
+        toc = toc_inner(main, lang)
+        if toc:
+            inline, nav = toc.split("</details>", 1)
+            toc = f'{inline}</details><div class="ax-side">{nav}{ax_extras.ad_unit(ADS, "rail_right", lang)}</div>'
+        main = set_block(main, "toc", toc, after_hero(main))
+        main = set_block(main, "ad-rail", ax_extras.ad_unit(ADS, "rail_left", lang), BLOCK_RE("toc").search(main).end())
         # related: newest notes of the same topic first, then the newest of other topics, AX_RELATED in all
         allx = [(u, n) for u, n, _ in ax_articles(lang) if u != path]
         same = [x for x in allx if tp and ax_topic_of(x[0]) is tp][:AX_RELATED - 2]
@@ -1276,7 +1298,11 @@ def wrap_hand(relpath):
         base = privacy_url(a, lang)
         return page(lang, h, ' class="page-read"', legal_chrome.header(t, a, lang, base, other_href, BRAND_MARK), main,
                     legal_chrome.footer(t, a, lang, base, EMAIL, here_href=path), app=app_scope)
-    return page(lang, h, ' class="page-read"', header(lang, current, other_href), nav + main, footer(lang), app=app_scope)
+    if main_cls.startswith("ax-note"):
+        h = h.replace("</head>", f'  <link rel="stylesheet" href="/assets/ax.css?v={CSSV}">\n'
+                                 + (f"  {ax_extras.ads_head(ADS)}\n" if ADS["on"] else "") + "</head>")
+    return page(lang, h, ' class="page-read"', header(lang, current, other_href), nav + main, footer(lang), app=app_scope,
+                main_cls=main_cls)
 
 def build_404():
     """noindex only: no canonical, og:url, hreflang, breadcrumbs or JSON-LD (IA spec 3.2(8)). Links: /, /apps/, /ax/, /privacy/, /en/."""
@@ -1361,7 +1387,7 @@ def feed_body(content, page_url):
     markers; every href/src/srcset absolute, "#x" made "{page URL}#x"; "]]>" split so the CDATA section stays whole."""
     body = main_html(content)
     body = re.sub(r'<nav class="crumbs".*?</nav>', "", body, flags=re.S)
-    for name in ("meta", "toc"):
+    for name in ("meta", "toc", "ad-1", "ad-2", "ad-rail"):  # ads stay on the site, never in feeds
         body = BLOCK_RE(name).sub("", body)
     body = re.sub(r"<script\b.*?</script>", "", body, flags=re.S)
     body = re.sub(r"<!-- /?build:[\w-]+ -->", "", body)
@@ -1650,6 +1676,7 @@ def main():
     outputs["rss.xml"] = build_rss(outputs, "ko")
     outputs["en/rss.xml"] = build_rss(outputs, "en")
     outputs["robots.txt"] = build_robots()
+    if (adstxt := ax_extras.ads_txt(ADS)): outputs["ads.txt"] = adstxt
     key = indexnow_key()
     if key: outputs[key + ".txt"] = key
     for gone in STORE.unused():  # pages that no longer exist (or became NOINDEX) leave content-dates
