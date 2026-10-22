@@ -44,8 +44,10 @@
         <li>Treat tests as review targets too. Five of the defects in the September 28 audit were in tests. How to catch a test that still passes with its guard deleted is in <a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database</a>.</li>
         <li>Recommendation: grade every number. The SugarDoc spike report tags each claim as [verified] (checked against an evidence file), [estimated] (reasoned but not measured) or [unconfirmed] (not measured). The SugarSpeller CHANGELOG never uses these tags.</li>
       </ol>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/agent-review-refutation-1-en.webp" width="1200" height="764" alt="Step diagram: split the search into areas, have two or three other agents refute each finding, confirm only the survivors, and stop when a cross-review confirms 0; the September 29 review ran 84 agents and confirmed 20." loading="lazy"><figcaption>No agent judges its own finding; only findings that survive refutation get fixed.</figcaption></figure>
       <p>When you hand a review to agents, do not ask for the number of findings. Ask for the number that survived refutation. The raw count grows with every extra agent you launch, so it says nothing about quality.</p>
     </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%2084%20agents%20reviewed%20a%20release%3A%20three%20refuters%20per%20finding%2C%20and%20only%20the%2020%20survivors%20got%20fixed">Email us</a></p></aside>
     <section aria-labelledby="survived">
       <h2 id="survived">One of the 20 survivors was a critical crash</h2>
       <p>The fixes listed in the CHANGELOG went in across several commits between 21:45 and 23:21 on September 29. Only one of them, 4c99287 at 22:07, grades its items critical, important or minor, and exactly one is critical. SugarSpeller has a mini window that opens over other apps from the text selection menu. Suppose that window is what started the app process. The user hits the daily explanation limit, goes to the subscription screen, taps Next, and the subscription detail screen crashes. Only the main screen ever created the billing manager, so on the mini window path <code>lateinit billingClientManager</code> was read before anything set it. The fix made <code>getBC()</code> create the manager on first use.</p>
@@ -68,9 +70,11 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="when-not">
       <h2 id="when-not">When this does not fit</h2>
       <p>A refuter that reads code cannot confirm or break a defect that only shows up on a device. On the afternoon of September 28, an S21 end-to-end run found button labels on the correction sheet at a contrast of 1.00 to 1.02:1, white on white. The CHANGELOG files them under things unit and emulator tests could not catch. The day after the second cross-review came back at 0, the S21 check still found several subscription bugs, all of them older than 1.6.024. If the payment sheet failed at once, a spinner ran forever. Subscribers on the Classic screen were dropped to the free tier. A review that has converged still needs its own device pass.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/agent-review-refutation-2-en.webp" width="1200" height="663" alt="Comparison: the code review ran 84 agents, confirmed 20 findings and converged at 0, yet the S21 device check still found 1.00 to 1.02:1 button contrast and subscription flow bugs." loading="lazy"><figcaption>A review that has converged still needs its own device pass.</figcaption></figure>
       <p>On a device, refutation means reproduction. In the October 4 S21 QA of three photo apps, all 20 defects handed to re-verification were reproduced. Several sessions shared that phone, so changing global settings was off limits, and system dark mode went untested. Some things need production data. Eight concurrent requests from one user were only tested on the emulator, never against production Firestore.</p>
       <p>The next thing to check is a missing number. The 1.6.025 record has no count of raw findings and none of findings rejected by refuters. At the next release review, the CHANGELOG will carry all three numbers (found, rejected, confirmed), so we can see how much the refuters actually filtered out.</p>
     </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%2084%20agents%20reviewed%20a%20release%3A%20three%20refuters%20per%20finding%2C%20and%20only%20the%2020%20survivors%20got%20fixed">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
     <section aria-labelledby="faq">
       <h2 id="faq">FAQ</h2>
       <div class="faq">
@@ -114,6 +118,7 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
 02:35:47.093 E AndroidRuntime: FATAL EXCEPTION: main
 02:35:47.110 I ActivityManager: Process kr.sugar.m0v8:androidx.pdf.service.PdfDocumentServiceImpl (pid 1678) has died</code></pre>
       <p>The app process stayed alive, so no crash dialog appeared. Between the service dying and the last log line at 02:35:53.689, the "document opened" line (<code>V8_OPEN</code>) never showed up, and nothing told the app the open had failed. The guarded build, run on the same phone about two minutes earlier, let the isolated process return from <code>onCreate</code> at once and opened a 466,529-byte, 5-page PDF in 81 ms.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/androidx-pdf-isolated-process-1-en.webp" width="1200" height="804" alt="Comparison: without the guard the isolated process died in onCreate and the PDF never opened during about 6.5 seconds of log; with the guard a 5-page PDF opened in 81 ms." loading="lazy"><figcaption>On the same S21, one guard line in onCreate decided between an 81 ms open and a silent failure with no callback.</figcaption></figure>
     </section>
     <section aria-labelledby="timeline">
       <h2 id="timeline">How it was found, October 4 to October 8</h2>
@@ -139,6 +144,7 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
       <p>The test reads the source file and checks that the first statement after <code>override fun onCreate()</code> is exactly that string. It also rejects code that runs before <code>onCreate</code>, because that runs in the isolated process as well: member properties with initializers, <code>init</code> blocks, a companion object and <code>attachBaseContext</code>. Only <code>lateinit</code> and <code>by lazy</code> members are allowed. A second test feeds the detector a sample with five such lines and requires exactly five hits, so the detector itself cannot go quiet.</p>
       <p>If your app uses androidx.pdf, put this guard first in <code>onCreate</code> and pin it with a test. Code review will not hold it there. Initialization code piles up in <code>onCreate</code> over time, and most of it touches storage. We checked the test by deleting the guard and watching it fail; the method is in <a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a>.</p>
     </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20androidx.pdf%20beta01%20runs%20your%20Application.onCreate%20a%20second%20time%2C%20in%20an%20isolated%20process%2C%20and%20the%20PDF%20silently%20never%20opens">Email us</a></p></aside>
     <section aria-labelledby="ai-miss">
       <h2 id="ai-miss">The measuring agent said 8 seconds; the log said 6.5</h2>
       <p>Two AI coding agents split spike V8. A measuring agent ran the phone and reported. A separate verification agent reopened the saved evidence files and recomputed every number. The spike report's header says it plainly: the numbers in it are the verification agent's corrected values.</p>
@@ -150,12 +156,14 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
       <p>The guard covers one route: dying inside <code>onCreate</code>. The isolated service can die for other reasons, so the reader's <code>ReaderController</code> puts an 8-second timeout on openDocument (<code>PDF_OPEN_TIMEOUT_MS = 8_000L</code>, counted only while the reader is on screen) and ends on an error screen. In the M4 checks we killed the service with <code>am crash</code> during openDocument, 3 runs on each of 2 devices. Each run either showed E14 (try again) or reconnected and drew the first page, all within 0.5 to 2.4 seconds.</p>
       <p>The nastier route came after a document had opened. When the service died, androidx.pdf showed a Material error Snackbar styled with <code>ThemeOverlay.AppCompat.Dark</code>. It read attributes such as <code>?attr/colorAccent</code> that our platform theme does not define, threw InflateException, and this time took down the app process itself. Adding 7 AppCompat color attributes to the reader theme fixed it, with the parent theme still a platform theme. After the fix, 9 runs on the S21 had zero app crashes.</p>
       <p>For the record: we added no R8 keep rules and the release build still worked. The APK grew from 1,263,741 to 2,640,995 bytes, +1,377,254 bytes (dex +666,472, arsc +532,888, res +134,546). Measurements for the same app's HWP engine are in <a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a>.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/androidx-pdf-isolated-process-2-en.webp" width="1200" height="498" alt="Bar chart: of the 1,377,254-byte APK growth, dex is 666,472 bytes, arsc 532,888 and res 134,546." loading="lazy"><figcaption>With no added keep rules, the release APK grew by 1,377,254 bytes.</figcaption></figure>
     </section>
     <section aria-labelledby="if-again">
       <h2 id="if-again">If I did it again</h2>
       <p>I would not measure "no response" by the length of a log file. Two log lines in the spike app, one when openDocument is called and one when the timeout fires, would have left nothing to argue about between 8 and 6.5 seconds. The 6.5 came from where the logcat capture stopped, not from anything the app did.</p>
       <p>I would also build a way to reproduce the no-callback 8-second timeout on a phone first. Today that path is covered only by JVM tests, because a release build gave us no way to freeze the isolated process (SIGSTOP). I would check transitive dependencies in the spike, too. The V8 evidence had no dependency tree, so that item stayed unconfirmed; we only learned that androidx.pdf brings in appcompat 1.7.0, fragment 1.5.4 and material 1.13.0 later that day, while building the real app in M1. Next spike, the output of <code>./gradlew :app:dependencies</code> goes into the evidence folder from the start.</p>
     </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20androidx.pdf%20beta01%20runs%20your%20Application.onCreate%20a%20second%20time%2C%20in%20an%20isolated%20process%2C%20and%20the%20PDF%20silently%20never%20opens">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
     <section aria-labelledby="faq">
       <h2 id="faq">FAQ</h2>
       <div class="faq">
@@ -209,6 +217,7 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
         </table>
       </div>
       <p>The commit message says 3,762 fragments (40%) were "silently discarded". Adding up the table gives a sharper picture: 3,318 vanished without a trace, and 444 were measured against the wrong pixels instead of being dropped. Neither group was measured correctly.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/contrast-checker-missed-40-percent-1-en.webp" width="1200" height="728" alt="Bar chart: of 9,318 text fragments only 5,556 got a contrast ratio; 1,575 behind barriers, 876 emoji and 867 outside the capture were dropped, 270 were mis-measured and 174 occluded ones were reported as failures." loading="lazy"><figcaption>Where the contrast checker's 9,318 text fragments went: 3,762 (40.4%) were never measured correctly.</figcaption></figure>
       <p>Fragments left by several doors. Paragraphs behind a barrier were never collected, emoji hit a <code>continue</code>, and off-screen fragments got <code>return null</code> from <code>_evaluate</code>. None of these paths kept a count. The last door was these two lines:</p>
       <pre><code>final finding = _evaluate(f, bitmapA, bitmapB);
 if (finding != null) findings.add(finding);</code></pre>
@@ -229,12 +238,14 @@ if (finding != null) findings.add(finding);</code></pre>
         </table>
       </div>
       <p>The fixed meta test compares per state and requires a written reason for every exclusion. Deleting dead surfaces brought the total to 239 states, and the catalog grew to 149 cases. (Three tests that rendered dead code had been padding the "passes in three themes" count; they went too.)</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/contrast-checker-missed-40-percent-2-en.webp" width="1200" height="734" alt="Comparison: the old checker dropped unmeasured fragments without a word and its catalog rendered 36 of 245 states; the fixed one reports what it measured and dropped, fails when it measures less than declared, and runs 149 cases." loading="lazy"><figcaption>The fixed checker reports how much it measured and why it dropped the rest, and fails when it measures less than it declares.</figcaption></figure>
     </section>
     <section aria-labelledby="defects">
       <h2 id="defects">Measuring again found a 3.28:1 snackbar and a 36.5 dp send button</h2>
       <p>The chat screen's error snackbar picked a red background and left the text color to Material's default, which in the light and sunset themes came out at 3.28:1, under the 4.5:1 WCAG AA minimum for body text. White on a darker red gave 6.54:1. The send button was a geometry bug. Its <code>InkWell</code> sat inside a <code>Transform.scale</code> animation, so the tap area shrank with the icon to 36.5 × 36.5 dp; with the <code>InkWell</code> moved outside, it measured 47.66 × 47.85 dp.</p>
       <p>Measurement also cut the other way. Three reported defects (the permission dialog's guidance, a message bubble's text and a native splash) turned out to be artifacts of how they were sampled, and were withdrawn instead of fixed.</p>
     </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Our%20contrast%20checker%20passed%20while%20skipping%2040%25%20of%20the%20text%3A%20make%20it%20print%20how%20much%20it%20measured">Email us</a></p></aside>
     <section aria-labelledby="ai-miss">
       <h2 id="ai-miss">What the AI-built harness missed, and the rule the operator works by</h2>
       <p>The checker and the catalog were built by an AI coding agent one commit earlier, in <code>67edc8d</code>. That commit promised contrast "from rendered pixels rather than from declared alpha values", and it did measure pixels. What it never counted was how much it measured.</p>
@@ -272,6 +283,7 @@ flutter test test/theme_matrix/ --dart-define=Y2_NO_SETTLE=true
 # turns off the shared 600 ms settle frame</code></pre>
       <p>In the harness report from <code>8dacf19</code>, the run with the settle frame and the checks on gave 903 passed and 3 failed (the disabled buttons above), and turning only the checks off gave the same 903 and 3. At that point no unmeasured case was hiding. The rest of what runs before a release is in <a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a>. Two things are still open. The 1,575 fragments behind barriers are all dropped even when a sheet covers only half the screen, and every number here comes from widget-test pixels that have not yet been compared with device screenshots.</p>
     </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Our%20contrast%20checker%20passed%20while%20skipping%2040%25%20of%20the%20text%3A%20make%20it%20print%20how%20much%20it%20measured">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
     <section aria-labelledby="faq">
       <h2 id="faq">FAQ</h2>
       <div class="faq">
@@ -322,6 +334,7 @@ flutter test test/theme_matrix/ --dart-define=Y2_NO_SETTLE=true
         </table>
       </div>
       <p>The three apps are <a href="https://mvgood21.github.io/en/apps/image-compress/">Compress Image</a>, <a href="https://mvgood21.github.io/en/apps/image-flip/">Flip &amp; Rotate Image</a> and Convert Image JPG PNG WEBP, and all of them depend on the same <code>core/designsystem</code> module. Commit 633c3dd touched 57 files, but the line-breaking work is concentrated in a handful of files in that module.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/compose-korean-line-break-1-en.webp" width="1200" height="795" alt="Comparison: &quot;R/u/l/e&quot; came from a Row measuring the value first and was fixed with PairLayout; the Korean split came from Compose breaking between Hangul syllables and was fixed with WordBreak.Phrase plus longest-word measurement." loading="lazy"><figcaption>The labels broke the same way, but the causes were different, so each got its own fix.</figcaption></figure>
     </section>
     <section aria-labelledby="why-syllable">
       <h2 id="why-syllable">Compose treats Hangul syllable boundaries as break points</h2>
@@ -340,6 +353,7 @@ private fun style(weight: FontWeight, size: Int, line: Int, spacing: Boolean = f
 )</code></pre>
       <p>If your Compose app has Korean screens, set <code>Phrase</code> once in the shared <code>TextStyle</code> and do not add it to individual <code>Text</code> calls. Per-screen settings get forgotten the next time someone adds a screen. The setting has a limit, and the same comment says so: a word wider than the line still breaks. (The Korean hero titles also got zero-width break points after the "·" separator.)</p>
     </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Jetpack%20Compose%20splits%20Korean%20between%20syllables%2C%20but%20the%20stacked%20%27R/u/l/e%27%20label%20came%20from%20how%20a%20Row%20measures">Email us</a></p></aside>
     <section aria-labelledby="longest-word">
       <h2 id="longest-word">The longest word decides how many columns fit</h2>
       <p>The option tile grid picks its column count from the minimum intrinsic width each tile reports. For Korean that number is one syllable wide, so the module gained a function that measures whole words: split on whitespace, measure each word on one line, return the widest.</p>
@@ -376,6 +390,7 @@ FlowRow(
       <p>Four days later, the cross-check agent in the device QA flagged this structure while reading the code behind the finding. The new <code>PairLayout</code> measures each slot's natural width (<code>maxIntrinsicWidth</code>) first. If the sum fits the line, they sit side by side; if not, the value moves under the label.</p>
       <p>The second mistake was a number. The action-button chrome adds up to exactly 76 dp: 24 dp of OutlinedButton padding on each side, a 20 dp icon and an 8 dp gap. According to the code comment, at 130% font "오른쪽으로" measured 2 px under the space that exact figure left, and it still wrapped. The value was fixed at <code>BUTTON_CHROME = 84.dp</code>, the exact chrome plus 8 dp of slack. The sum was right; the device was a few pixels off.</p>
       <p>The same defect came back by another route. In the <a href="https://mvgood21.github.io/en/apps/doc-viewer/">HWP Viewer SugarDoc</a> device test on 2026-10-06, the format placeholder split into "HW/PX" (S21) and "HW/P" (S20) at 200% font. That app uses the same design-system module, so <code>Phrase</code> was already on, but "HWPX" is a single word and a word wider than its box still breaks. Pinning the placeholder to one line and letting it shrink to fit fixed that, but "HWP 3.0" did not fit even at the smallest step and got clipped to "HWP 3.(" instead. The final fix shortened placeholder names to four characters or fewer ("HWP3"), while the badge and the TalkBack label keep "HWP 3.0".</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/compose-korean-line-break-2-en.webp" width="1200" height="682" alt="Step diagram: at 200% font &quot;HWPX&quot; split into &quot;HW/PX&quot;, pinning it to one line with auto-shrink clipped &quot;HWP 3.0&quot; to &quot;HWP 3.(&quot;, and the final fix shortened the placeholder to &quot;HWP3&quot;." loading="lazy"><figcaption>Phrase cannot save one word that is wider than its box, so in the end the name got shorter.</figcaption></figure>
     </section>
     <section aria-labelledby="checklist">
       <h2 id="checklist">Checklist</h2>
@@ -391,6 +406,7 @@ FlowRow(
       </ul>
       <p>One item is still open: on the input screen of Convert Image JPG PNG WEBP, the size badge wraps as "JPEG · 1.3 / MB", recorded as a cosmetic leftover in the 2026-09-25 CHANGELOG entry. The full pre-release check list is in <a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>.</p>
     </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Jetpack%20Compose%20splits%20Korean%20between%20syllables%2C%20but%20the%20stacked%20%27R/u/l/e%27%20label%20came%20from%20how%20a%20Row%20measures">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
     <section aria-labelledby="faq">
       <h2 id="faq">FAQ</h2>
       <div class="faq">
@@ -449,9 +465,11 @@ Mem:              13           8           2           0           2           4
       <p>All 11 merges on October 3 were workstream branches. The simulation workstream (ws2) went in twice because the generator was retuned, which is why there are 11 and not 10. On October 4, three merges were E2E fix branches and three brought in main. One of that day's three Workflow calls resumed the Block Turn research run, and its 150 is a count of log files, so retries are included.</p>
       <p>A wider window tells the same story. Across this repository's six sessions (September 30 to October 17), the operator asked five times for lots of agents, with phrases like "dozens", "hundreds" and "as many as you like". The main sessions made 53 Agent calls in total, never more than 20 in one session, plus 10 Workflow runs.</p>
     </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20%22Use%20hundreds%20of%20agents%22%20in%20practice%3A%2010%20workstreams%2C%2059%20commits%20in%20a%20day%2C%20three%20running%20at%20once">Email us</a></p></aside>
     <section aria-labelledby="bottlenecks">
       <h2 id="bottlenecks">RAM, two phones and a file-ownership table set the pace</h2>
       <p>Build memory was the first wall. The implementation notes say to run <code>./gradlew --max-workers=4</code> and to keep one Gradle build at a time per worktree. Every workstream had to pass the engine and app unit tests plus a debug build before each commit, so the number of parallel workstreams was the number of parallel Gradle builds. Research and design Workflows that never build are another matter: this repository ran six of them, and they reached 11 to 14 agents at once.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/parallel-agent-workstreams-1-en.webp" width="1200" height="624" alt="Bar chart: peak concurrent agents were 11 for design, 3 for implementation, 3 for E2E fixes and 14 for launch-prep research." loading="lazy"><figcaption>Workflows that changed code never ran more than three agents at once; design and research, which never build, reached 11 to 14.</figcaption></figure>
       <p>The phones were a Galaxy S21 and a Galaxy S20, shared by five sessions: the three game-repository sessions plus two sessions from the utility-app repository. So the implementation notes said no workstream touches a device, and E2E happens later on the S21 only. On October 3 and 4 the three game sessions received 148 messages from other sessions, and 114 of them mentioned the S20 or S21. Many were plain turn-taking: "I need it for 10 minutes", "I'm done, it's yours". (From 16:14 to 17:17 that afternoon the S21 belonged to another app's session, running an HWP document-viewer benchmark. The Arrow Knots session lent it on condition that its app data and global settings such as font scale stayed untouched.)</p>
       <p>Files got owners too. The workstream table in section 11 of the spec has an "Owns (exclusive)" column. The camera workstream (ws3) edits only Camera.kt, BoardView.kt and CameraMathTest.kt. The ads code and the shared platform module belonged to another session, so workstreams could only read them. Each workstream commits in its own git worktree, and only one integrator agent merges into the integration branch. Splitting agents across worktrees started with <a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a>; this time we added the ownership table.</p>
     </section>
@@ -459,6 +477,7 @@ Mem:              13           8           2           0           2           4
       <h2 id="ai-errors">Forty-one agents reported zero failures, and the app crashed on launch</h2>
       <p>The implementation Workflow ended at 22:27 with "41 agents completed, none failed". Every workstream inside the Workflow except the simulation (ws2) had been through at least one adversarial review, and the final merge agent had passed the full JVM suite and a debug build. A minute later the app went onto the S21 and crashed right after launch. The level files were the cause: the Android build tool (aapt) strips a trailing <code>.gz</code> from asset names, so the file the code asked for wasn't in the APK. Commit 4d46413 at 22:31 shipped the level packs uncompressed and added a regression test that fails on any asset name ending in .gz.</p>
       <p>The detailed E2E pass had 33 items and kept the S21 to itself from 00:36 to 01:41. Thirty-one passed. One failed (stutter while panning large boards), and one was skipped because a debug build can't show it. It turned up 10 bugs and design problems. The Workflow that fixed them used 10 agents, again three at a time, and its three fix branches were merged at 02:23.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/parallel-agent-workstreams-2-en.webp" width="1200" height="1296" alt="Timeline: request at 16:08 on October 3, 41 agents done with no failures at 22:27, crash on the S21 a minute later, fix commit 4d46413 at 22:31, E2E 00:36 to 01:41 with 31 of 33 items passing, three fix branches merged at 02:23." loading="lazy"><figcaption>A minute after 41 agents reported zero failures, the app crashed on the S21; device-only defects all landed in the E2E pass at the very end.</figcaption></figure>
       <p>What the agent got wrong was the meaning of "done". Keeping workstreams off the phones was the right call. The cost was that 41 "done" reports meant only "JVM tests and compile pass", and every defect that shows up only on a device was pushed into a single queue at the very end. What caught it was one phrase in the operator's original request: install it on the S21 and run E2E. At 01:43 the operator also freed up the S20 for testing. That let a release-build random-input check (3,000 events × 3 seeds, zero crashes) run on the S20 alongside the fix Workflow. Handing over one more phone raised parallelism more than any request for more agents did.</p>
       <p>Before deciding how many agents to launch, count how many builds and devices you can run at the same time. That count is your real parallelism.</p>
     </section>
@@ -470,6 +489,7 @@ Mem:              13           8           2           0           2           4
         <li>Where 14 comes from. Five research Workflows all stopped at exactly 14 concurrent agents. We have not yet checked whether that is a tool setting.</li>
       </ul>
     </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20%22Use%20hundreds%20of%20agents%22%20in%20practice%3A%2010%20workstreams%2C%2059%20commits%20in%20a%20day%2C%20three%20running%20at%20once">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
     <section aria-labelledby="faq">
       <h2 id="faq">FAQ</h2>
       <div class="faq">
@@ -533,7 +553,9 @@ HTTP 403 {
       <p>There were two mistakes. The first is the off-by-one above. The second was bigger. The script printed the track from the PUT response as <code>track production [('97 (1.6.029)', 'completed')]</code> and went on to commit in the same run without checking it. The wrong value was in the output before the commit. Nothing in the code stopped on it.</p>
       <p>Afterwards the agent tried to fix the check with sed, and Claude Code's automatic permission check blocked the edit. The agent told the operator it would stop using that script and wrote the incident into the release record, which is commit <code>e64cd83</code> at 15:52.</p>
       <p>That record says a hotfix was the only way to stop the rollout. The docs describe one more route. Per the "Halt a completed rollout" section of Google's APKs and Tracks guide, a completed release can be set to <code>halted</code> if the track already has an earlier published completed release; new users and existing users who update then get that earlier release. The completed release before 1.6.029 was vc94. We never tried this, so we do not know whether Play would have accepted it. What we did instead was add +1 day and +3 day stability rows to the monitoring doc. The late check on October 15 found no regression signal, though Play's crash numbers were out of reach because the reporting API lacked permissions.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/play-staged-rollout-completed-1-en.webp" width="1200" height="724" alt="Timeline: at 15:50 on October 11 vc97 was committed as completed, 35 seconds later the PUT back to 20% got HTTP 403, commit e64cd83 at 15:52, no regression signal on October 15." loading="lazy"><figcaption>1.6.029 was meant to reach 20% and was committed as completed; 35 seconds later Play refused to put it back with a 403.</figcaption></figure>
     </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%2020%25%20staged%20rollout%20went%20out%20at%20100%25%3A%20a%20completed%20release%20in%20the%20Play%20Publisher%20API%20cannot%20go%20back%20to%20staged">Email us</a></p></aside>
     <section aria-labelledby="internal-first">
       <h2 id="internal-first">Internal track first, then promote the same build</h2>
       <p>One rule was already two days old when this happened. On October 9, 1.6.026 went straight to 100% of production through the Publisher API, and the operator asked that next time the build go to internal testing first and be promoted from there. A sideloaded APK cannot show the Play path end to end: Play signing, billing, Play's automatic protection. The bundle is uploaded once, and production gets the same versionCode in a new edit.</p>
@@ -582,6 +604,7 @@ finally:
         <li>Production must hold exactly one completed release of the previous version. That is what the other 80% keep getting while the new release sits at 20%.</li>
         <li>The default is a dry run: it validates and then deletes the edit. The only run that changes anything is the one with <code>--commit</code>, after the operator has checked. 1.6.031 shipped that way on October 18, after the operator confirmed.</li>
       </ul>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/play-staged-rollout-completed-2-en.webp" width="1200" height="775" alt="Comparison: the old play3.py read the fraction by position and fell back to completed, while release_production.py hard-codes inProgress and runs dry unless given --commit." loading="lazy"><figcaption>With the current script a missing fraction cannot fall through to completed, and nothing ships without --commit.</figcaption></figure>
       <p>The PUT body has the same shape as the request that got the 403 on October 11: new release inProgress, previous release completed. For 1.6.031 the new release had not been served to anyone yet, and this request passed validate and commit.</p>
     </section>
     <section aria-labelledby="prevention">
@@ -594,6 +617,7 @@ if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFract
     sys.exit(f'PUT response does not match: {mine}')   # stop before commit</code></pre>
       <p>We will also write down the halt procedure from the docs at the next staged release, and check then whether a stray completed could send new installs back to the previous version without waiting for a hotfix build. Our release checks, in order, are in <a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>, and the app itself is on the <a href="https://mvgood21.github.io/en/apps/sugarspeller/">SugarSpeller</a> page.</p>
     </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%2020%25%20staged%20rollout%20went%20out%20at%20100%25%3A%20a%20completed%20release%20in%20the%20Play%20Publisher%20API%20cannot%20go%20back%20to%20staged">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
     <section aria-labelledby="faq">
       <h2 id="faq">FAQ</h2>
       <div class="faq">
@@ -663,7 +687,9 @@ if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFract
       </ul>
       <p>The review logged 26 findings, and 24 of them had been introduced by that round's own fixes. Its notes say the pattern of the previous fix creating new defects had now repeated four times. What the agent got wrong was the report more than the code. It really had added tests, and they really passed; nobody had checked what they measured.</p>
       <p>The reviewer was an agent too. It changed no code, and it restored the tree after every revert experiment. Its brief carried this rule: if a test still passes after you revert the fix, the test is wrong. After the fixes the suite stood at 3,099 passed, 13 skipped, 0 failed.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/guard-removal-test-1-en.webp" width="1200" height="966" alt="Timeline: notes from September 9 said every fix was pinned by a guard test, yet the review two days later found a blocker under 3,066 passing tests and two fixes whose guards guarded nothing; after the fixes 3,099 tests passed." loading="lazy"><figcaption>A written rule did not catch the fake tests; reverting each fix did.</figcaption></figure>
     </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%203%2C066%20green%20tests%20hid%20a%20line%20that%20breaks%20opening%20the%20database%3A%20checking%20tests%20by%20deleting%20the%20guard">Email us</a></p></aside>
     <section aria-labelledby="done-rule">
       <h2 id="done-rule">The rule had been written down two days earlier</h2>
       <p>When an agent says it added a test, delete the code that test is meant to protect and run it again. If it stays green, it does not count. The chat app's instruction file ties "done" to three conditions: zero analyzer errors, code reachable from <code>main.dart</code>, and code protected by a test. The release-readiness notes from September 9 already said every fix in that round was pinned by a test that fails when its guard is removed. Two days later the review still caught two that did not. Writing the rule down was not enough; it took a second agent actually reverting the fixes.</p>
@@ -698,6 +724,7 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="still-passes">
       <h2 id="still-passes">Two rows that stayed green in 1.3.0</h2>
       <p>The SugarDoc 1.3.0 release record from October 18 holds real catches. After confirming that all 147 rows of the editing script still matched once, the 37 rows added or changed that day were run. Two came back <code>STILL-PASSES</code> on the first run.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/guard-removal-test-2-en.webp" width="1200" height="596" alt="Bar chart: of the editing script&#x27;s 147 mutation rows, 37 were run for 1.3.0 and 110 were not rerun; 2 of the 37 came back STILL-PASSES on the first run." loading="lazy"><figcaption>Release 1.3.0 ran only the 37 changed rows, and 2 of them stayed green on the first run.</figcaption></figure>
       <div class="table-wrap">
         <table>
           <thead><tr><th scope="col">Row</th><th scope="col">Mutation</th><th scope="col">Cause</th><th scope="col">Fix</th></tr></thead>
@@ -713,6 +740,7 @@ for mid, rel, edits, kind, target in MUT:
       <h2 id="next">What is still open</h2>
       <p>The Android failure in the chat app has not been measured. The verification notes list it as open: build an APK from the commit before the fix, install it on an emulator and read logcat at the first database open. iOS needs a macOS machine we do not have. On the SugarDoc side, 1.3.0 reran only the 37 changed rows of the editing script; the 110 untouched rows were not rerun. Whether those older rows still go red will show at the next full run.</p>
     </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%203%2C066%20green%20tests%20hid%20a%20line%20that%20breaks%20opening%20the%20database%3A%20checking%20tests%20by%20deleting%20the%20guard">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
     <section aria-labelledby="faq">
       <h2 id="faq">FAQ</h2>
       <div class="faq">
@@ -779,6 +807,7 @@ for mid, rel, edits, kind, target in MUT:
       <p>Commit e05f8e3 deleted the file and both build references to it, release and debug. It also deleted <code>proguard-retrofit2.pro</code>, which no build had ever referenced. (The merged file from the October 9, 2026 release build is 1,369 lines. Short enough to read end to end.)</p>
       <p>Do not ship an unconditional keep rule on <code>class *</code> in an Android app. Libraries that need rules already ship them as consumer rules inside their AAR.</p>
     </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Play%20Console%20said%20our%20DEX%20was%2039%25%20optimized.%20The%20culprit%20was%20a%20keep%20rule%20for%20an%20SDK%20we%20never%20used">Email us</a></p></aside>
     <section aria-labelledby="before-after">
       <h2 id="before-after">Before and after: r8.json and sizes for both changes</h2>
       <p>Each pair of columns comes from a different day and a different commit, so compare within a pair. Even the same configuration drifts in the second decimal: 64.25% on September 20, 64.27% on September 25.</p>
@@ -795,7 +824,9 @@ for mid, rel, edits, kind, target in MUT:
           </tbody>
         </table>
       </div>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/r8-dex-optimization-keep-rule-1-en.webp" width="1200" height="728" alt="Bar chart: after the kakao file was removed, r8.json&#x27;s unoptimized share fell from 64.27% to 15.68%, unobfuscated from 61.48% to 15.14% and unshrunk from 61.47% to 15.18%." loading="lazy"><figcaption>Deleting one seven-line Kakao SDK file took the unshrunk share from 61.47% to 15.18%.</figcaption></figure>
       <p>Measured by DEX size, deleting one rule did about five times what removing <code>-dontoptimize</code> did. DEX shrank by 1.5 MB on September 20 and by 7.4 MB (47%) on September 25, and the AAB lost another 6.8 MB.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/r8-dex-optimization-keep-rule-2-en.webp" width="1200" height="596" alt="Bar chart: removing -dontoptimize took DEX from 16.31 MB to 14.84 MB; removing the kakao file took it from 15.6 MB to 8.2 MB." loading="lazy"><figcaption>By DEX saved, deleting one rule file did about five times what removing -dontoptimize did.</figcaption></figure>
       <p>Before release, a release APK signed with the debug key ran on an API 34 emulator. A spelling check against Naver (Korea's largest web portal) came back with the two corrections the server reported, and the post-check quiz bubble, the quiz screen and Remote Config content injection all worked. The five JSON key strings Gson reads were still present verbatim in the release DEX. (A headless emulator returns black screenshots, so we read screen text with <code>uiautomator dump</code> instead.)</p>
       <p>The post-release watch log closes the loop. From September 22 to October 3 it recorded zero crashes for 1.6.020, for 1.6.024 (the first release without the kakao rule) and for 1.6.025, and closed the item as "no regression".</p>
     </section>
@@ -812,6 +843,7 @@ for mid, rel, edits, kind, target in MUT:
         <li>The ratio creeping back. A new Firebase dependency in 1.6.025 pulled the build down about 5 points, to roughly 80%. The release AAB left on disk from October 9, 2026 reads 20.23% unoptimized with 9.30 MB of DEX (9,302,488 bytes). Next step: diff configuration.txt to see which consumer rule arrived.</li>
       </ul>
     </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Play%20Console%20said%20our%20DEX%20was%2039%25%20optimized.%20The%20culprit%20was%20a%20keep%20rule%20for%20an%20SDK%20we%20never%20used">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
     <section aria-labelledby="faq">
       <h2 id="faq">FAQ</h2>
       <div class="faq">
@@ -850,6 +882,7 @@ for mid, rel, edits, kind, target in MUT:
       <h2 id="why-same-date">Commit dates made every page look new</h2>
       <p>The old build set each URL's lastmod to the date of the last git commit that touched the file. That helper, <code>git_date</code>, arrived on October 5 in <code>bdbbe97</code>, a commit that carries an AI coding agent's co-author line. The agent's code measured when a file changed. A sitemap needs to know when the content did.</p>
       <p>It broke on <code>12ed443</code>, a site-wide pass. Fifty-two HTML files went into one commit, each gaining an RSS <code>&lt;link&gt;</code> in its head, and all 51 sitemap URLs ended up on that day. Re-running today's hash rule (the inside of <code>&lt;main&gt;</code>) over those 52 files, only 2 had real body changes: the SugarDoc app page in Korean and English. 42 had identical bodies. The other 8 differed by a single added line, a "last updated" date. (Counting structured data in the head as well, 11 pages changed their FAQ or feature list.)</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/sitemap-lastmod-content-hash-1-en.webp" width="1200" height="526" alt="Bar chart: of the 52 HTML files commit 12ed443 touched, 42 had identical bodies, 8 only gained a last-updated line, and just 2 had real body changes." loading="lazy"><figcaption>A commit that added one RSS line changed the body of only 2 pages.</figcaption></figure>
       <p>Google's sitemap documentation says it uses lastmod only if the value is "consistently and verifiably" accurate, and gives a copyright date update as an example of a change that isn't significant. Moving 51 dates for one RSS line is how you lose that.</p>
     </section>
     <section aria-labelledby="hash-rule">
@@ -865,15 +898,18 @@ for mid, rel, edits, kind, target in MUT:
       <p>The easy thing to miss is the date itself. In <code>12ed443</code> the "last updated" line sat inside <code>&lt;main&gt;</code> as plain HTML. Hash that line and every date change looks like a content change, so the next day's build moves the date again, forever. On hand-written pages the line now lives in a <code>build:meta</code> block. Those 8 app pages became generated pages built from <code>data/apps.json</code>, so their hash covers the input data, not the HTML. A unit test (<code>test_every_marker_block_is_removed</code>) asserts the phrase never reaches the hash input, and <code>test_idempotent_next_day</code> checks that a rerun the next day leaves the dates alone.</p>
       <p>Never derive lastmod from commit dates or build dates. Don't let people edit it either: the repository's AGENTS.md says "never edit dates by hand" (how we write that file is in <a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md</a>).</p>
     </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Every%20sitemap%20lastmod%20had%20the%20same%20date%3A%20deriving%20modified%20dates%20from%20a%20content%20hash">Email us</a></p></aside>
     <section aria-labelledby="after">
       <h2 id="after">99 files touched, 6 dates moved</h2>
       <p>Commit <code>b79f2d1</code> on October 19 touched 99 HTML files, mostly to bump a <code>?v=</code> cache-busting value on the stylesheet links. Apart from 14 new pages, the modified date moved on 6 existing ones: the home page, the apps hub and the privacy policy list, in Korean and English, each of which now lists the new pages.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/sitemap-lastmod-content-hash-2-en.webp" width="1200" height="530" alt="Bar chart: commit b79f2d1 touched 99 HTML files; apart from 14 new pages, only 6 existing pages got a new modified date." loading="lazy"><figcaption>Touching 99 HTML files moved the modified date on just 6 existing pages.</figcaption></figure>
       <p>IndexNow pings follow the same dates. <code>tools/indexnow.py</code> picks only pages whose modified date is today, and it is a dry run unless you pass <code>--send</code>.</p>
     </section>
     <section aria-labelledby="next-checks">
       <h2 id="next-checks">What we check next</h2>
       <p>The related-notes list (<code>build:extra</code>) is excluded from the hash. Google counts link changes as significant, yet when a new note joins that list, older notes keep their dates. We will decide after reading Search Console's crawl data in November 2026.</p>
     </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Every%20sitemap%20lastmod%20had%20the%20same%20date%3A%20deriving%20modified%20dates%20from%20a%20content%20hash">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
     <section aria-labelledby="faq">
       <h2 id="faq">FAQ</h2>
       <div class="faq">
@@ -1224,6 +1260,7 @@ room  = is there space for a 3×3 square, a 1×4 bar, a 4×1 bar (0–3)</code><
         <li>Tray generation time at p95, to see whether supply cost matters on a phone.</li>
       </ul>
     </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Block%20puzzle%20difficulty%3A%20how%20simulation%20bots%20caught%20a%20game%20you%20could%20never%20lose">Email us</a></p></aside>
     <section aria-labelledby="versions">
       <h2 id="versions">Supply rules v1 to v7, side by side</h2>
       <p>The awkward pieces are the 3×3 square, the 2×3 rectangle in both orientations and the four-cell bar in both orientations. "Pressure" means that every N moves those pieces gain one more multiple of their base weight, up to a cap.</p>
@@ -1243,6 +1280,7 @@ room  = is there space for a 3×3 square, a 1×4 bar, a 4×1 bar (0–3)</code><
       </div>
       <p>Under v1 the planner's median game lasted 1,001 trays and scored 26,772 points. Under v7 it was 41 trays and 998 points. In the four versions with full numbers (v1, v5, v6, v7), the greedy bot never reached the cap.</p>
       <p>We picked v7 for the skill gap: 122 moves against 47 is 2.6×. Adding pressure (v5, v6) cut that gap to 1.8 to 1.9×, mostly by cutting the strong player's runs short. Shorter runs mean more game-over screens, but they also mean a good player gets less for being good. So v7 shipped as the default, and v5 is parked as an A/B candidate.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/block-puzzle-bot-playtest-1-en.webp" width="1200" height="728" alt="Bar chart: under v1 the planning bot ran to the 3,000-move cap; under v7 the planner&#x27;s median is 122 moves and the greedy bot&#x27;s 47." loading="lazy"><figcaption>Under v7 the planner no longer reaches the cap, and its runs are still 2.6x as long as the greedy bot's.</figcaption></figure>
       <p>Supply cost turned out to be a non-issue. Tray generation stayed at or under 0.2 ms at p95 for every version with timings in the table, and the spec's last-resort fallback (deal three single cells) never fired in 2,710 trays of the earlier Python simulation.</p>
       <p>If a game spec says the player can "always" do something, run a bot that exploits that promise to the end before you build on it. Reading the sentence will not show you the problem.</p>
     </section>
@@ -1263,6 +1301,7 @@ room  = is there space for a 3×3 square, a 1×4 bar, a 4×1 bar (0–3)</code><
       </ul>
       <p>How the earlier apps came out of the same agent-driven workflow is in <a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a>.</p>
     </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Block%20puzzle%20difficulty%3A%20how%20simulation%20bots%20caught%20a%20game%20you%20could%20never%20lose">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
     <section aria-labelledby="faq">
       <h2 id="faq">FAQ</h2>
       <div class="faq">
@@ -1331,6 +1370,7 @@ runCatching { v.vibrate(VibrationEffect.startComposition().addPrimitive(primitiv
       <p>The agent's own explanation was that the scripts only tap a fixed path. That is half right. The bigger hole was a check that never looked at crashes. (The tutorial script did run to the end on the S21 at about 22:45. Whether that build already had the vibration change was not checked that night, and the log does not say.)</p>
       <p><code>device_check.py</code> also writes <code>tutorialDone=true</code> when it jumps to a level, so it skips the first screens a new player sees by design. The new-player path only exists when the app has no data.</p>
     </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20The%20agent%20said%20it%20was%20tested.%20The%20game%20crashed%20on%20the%20first%20tutorial%20tap%3A%20a%20missing%20VIBRATE%20permission%20and%20the%20fresh-install%20monkey%20test">Email us</a></p></aside>
     <section aria-labelledby="monkey-script">
       <h2 id="monkey-script">The fresh-install monkey script</h2>
       <p><code>tools/monkey_check.sh</code> loops over three fixed seeds (7, 21, 99). For each one it wipes the app's data, launches it, sends 800 random events, and counts <code>FATAL EXCEPTION</code> lines in logcat. Any non-zero count fails the run. Below is the core of the current version, without device selection, output cleanup and the exit code. The script defaults to the debug package; here it uses the release package published on Play.</p>
@@ -1353,6 +1393,7 @@ done</code></pre>
         <li><code>--throttle 120</code> waits 120 ms between events. The last argument, 800, is the event count, so a run takes at least 96 seconds.</li>
         <li><code>-s</code> fixes the seed, which replays the same event sequence. Before the fix, seed 7 printed <code>System appears to have crashed at event 15 of 800 using seed 7</code>. After it, the same seed injected all 800.</li>
       </ul>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/fresh-install-monkey-test-1-en.webp" width="1200" height="811" alt="Comparison: the scripted tests only tapped a fixed path and never looked for crashes, while the fresh-install monkey run wiped app data for each of three seeds, sent 800 events and caught the crash at event 15 with seed 7." loading="lazy"><figcaption>Only the run whose pass condition counted crashes caught the first-tap tutorial crash.</figcaption></figure>
       <p>"Fresh install" here means no app data at all. The first version deleted a single progress file through <code>run-as</code>, which only works on debuggable builds. When release signing went in on October 3 (commit <code>f421333</code>), it became <code>pm clear</code>, with the comment "works on release (non-debuggable) builds too". If you suspect the install itself, run <code>adb uninstall</code> and install again. The script does not reinstall per seed; it clears data.</p>
       <p>The pass condition changed too. The first version counted every <code>FATAL EXCEPTION</code> on the device, which also counts other apps' crashes, like the Samsung one on the S24. On October 4 the block puzzle game's <code>block_monkey.sh</code> (commit <code>575aaa1</code>) began counting only <code>Process: &lt;package&gt;,</code> lines plus <code>am_anr</code> entries from the events buffer. Its comment notes that uiautomator and the monkey tool can die on their own. On October 18 (<code>dca02f2</code>) both scripts gained a <code>setprop debug.firebase.analytics.app</code> call before the loop, so test runs land in Firebase DebugView instead of the GA4 reports.</p>
       <p>(During the post-fix check, the S21 briefly disconnected in the middle of seed 21. Any run that printed <code>- waiting for device -</code> was thrown out and repeated.)</p>
@@ -1361,6 +1402,7 @@ done</code></pre>
       <h2 id="done-rule">The rule: no "done" without a fresh-install monkey run</h2>
       <p>After that night the agent's memory gained one rule. Before calling an Android build tested, run <code>monkey_check.sh</code> on the connected device, on top of the fixed-path scripts, and name every device it ran on. Always run it when the manifest, a permission or a system-service call changes. The rule also says it plainly: installing is not verifying.</p>
       <p>Commit messages changed after that. As of October 19, 2026, 19 of the 144 commits since <code>f7beb3d</code> mention monkey in the message, and 16 of those report a result, in lines like "release (R8, test ads) monkey 3x1500 0 fatals" and "Android 7 launch and monkey pass on API 24". The other three are a tool list or a "still to run". Reported event counts range from 600 to 4,000.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/fresh-install-monkey-test-2-en.webp" width="1200" height="530" alt="Bar chart: of 144 commits since f7beb3d, 19 mention monkey in the message and 16 of those report a result." loading="lazy"><figcaption>After the incident, 16 of 144 commits recorded a monkey result in the message.</figcaption></figure>
       <p>When an agent says "done", ask which device and what ran on it. Without a monkey result from clean app data, we do not accept it as done. The wider pre-release routine is in <a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>, and how we pin rules like this one for the agent is in <a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md for an AI coding agent</a>.</p>
       <p>Monkey runs are not the whole answer. The next day (October 2) a new stress suite crashed the game 28 times on its first pass through 300 levels: a blocked arrow springing back from far away overshot and read <code>points[-1]</code>, an <code>IndexOutOfBoundsException</code> fixed in <code>69781a7</code>. A fresh-install monkey run starts at the tutorial and the first level, so deep levels need their own runs.</p>
     </section>
@@ -1368,6 +1410,7 @@ done</code></pre>
       <h2 id="next">What is still open</h2>
       <p>Arrow Knots' <code>monkey_check.sh</code> still counts every <code>FATAL EXCEPTION</code> on the device and ignores ANRs. It should match the block game's script and count only its own process's crashes plus ANRs. Several agent sessions share the same phones, so another app's crash failing our run is the first thing to fix.</p>
     </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20The%20agent%20said%20it%20was%20tested.%20The%20game%20crashed%20on%20the%20first%20tutorial%20tap%3A%20a%20missing%20VIBRATE%20permission%20and%20the%20fresh-install%20monkey%20test">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
     <section aria-labelledby="faq">
       <h2 id="faq">FAQ</h2>
       <div class="faq">
@@ -1438,9 +1481,11 @@ done</code></pre>
       <p>The one failure, <code>issue2063_huge_cellbreak_table.hwp</code>, is a stress test built around a giant table split across pages; it ran past the 120-second limit. The spike report made a fallback path a condition for adopting the engine, and the app now lets you keep waiting or hand the file to another app after 10 seconds.</p>
       <p>Fidelity held up. Against the reference PDFs, page counts matched for 195 of 197 samples (the other two were one page off), and the median first-page image similarity was 0.997. We also put seven files (two press releases, five samples) side by side with Hancom's output. The press-release tables, logos and bold text and the exam paper's equations and two columns looked nearly the same. The one visible miss was the first question number, "문1)", dropped from one exam paper.</p>
     </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Building%20an%20Android%20HWP%20viewer%3A%20rhwp%20in%20a%20WebView%2C%20measured%20on%20222%20documents">Email us</a></p></aside>
     <section aria-labelledby="virtual-scroll">
       <h2 id="virtual-scroll">A 384-page file only works if you draw the visible pages</h2>
       <p>One rhwp sample is a 384-page government administration handbook (10.7 MB). With every page's SVG in the DOM, the WebView renderer process grew to 2.8 GB. Drawing only the visible pages, the same file sat at 255 MB in one run and 366 MB in another run the same afternoon. Read it as an order of magnitude, not a precise figure.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/hwp-viewer-rhwp-webview-1-en.webp" width="1200" height="582" alt="Comparison: drawing all pages of a 384-page file took the WebView renderer to 2.8 GB; drawing only the visible pages kept it at 255 MB (366 MB in another run)." loading="lazy"><figcaption>Virtual scrolling cut renderer memory by an order of magnitude on the 384-page file.</figcaption></figure>
       <p>If you build an HWP viewer on a WebView, put virtual scrolling (only the visible pages and their neighbours in the DOM) in from day one. Do not plan to add it later.</p>
       <p>The shipped viewer gives every page an empty slot of the right size and keeps SVG only for the visible pages plus two on each side, or one on each side on low-memory devices. Rendered SVG strings live in a byte-capped LRU (least recently used) cache, so the pages viewed longest ago are dropped first.</p>
     </section>
@@ -1448,6 +1493,7 @@ done</code></pre>
       <h2 id="fonts">Fonts went from 144 MB to 9.2 MB</h2>
       <p>The font folder that comes with rhwp is 87 files and 144,327,972 bytes. The spike report called it "138 MB", which is the same number counted in mebibytes. The 222 documents actually used 17 of those files, about 37 MB.</p>
       <p>The app ships 10 files, 9,207,952 bytes, about 6% of the original. Two rules decided what went in: a clear license and a close look. Hancom's own Hamchorom fonts were left out because Hancom's license page does not spell out whether they may be bundled in an app; Hamchorom Batang is drawn with Noto Serif KR and Hamchorom Dotum with NanumGothic, both under the SIL Open Font License. rhwp's NanumGothic was a subset that kept the reserved font name, so we swapped in the original TTF from google/fonts.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/hwp-viewer-rhwp-webview-2-en.webp" width="1200" height="498" alt="Bar chart: rhwp&#x27;s 87 font files total 144 MB, the 17 the 222 documents used are about 37 MB, and the 10 bundled in the app are 9.2 MB." loading="lazy"><figcaption>The app bundles 10 fonts with clear licenses, about 6% of what rhwp ships.</figcaption></figure>
       <p>On 2026-10-05 we measured the cost on the same S21: how much first-page ink overlap (F1) against the reference drops with the substitute fonts. The pass mark, fixed in advance, was a median drop of 0.02 or less; the median came out at 0.0071. One file went over at 0.0336, a college entrance exam (Suneung) paper whose title is in Chinese characters (hanja). The difference sat in the hanja title and the circled numbers ① to ⑤, which the bundled fonts lack, so the system font draws them.</p>
     </section>
     <section aria-labelledby="ai-errors">
@@ -1475,6 +1521,7 @@ done</code></pre>
         <li>Upgrading rhwp. It is pre-1.0, so the app pins 0.8.6 and every build checks that the engine files match the pinned copy. An upgrade will be re-measured on the same 222 files. The other pre-release checks are in <a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>.</li>
       </ul>
     </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Building%20an%20Android%20HWP%20viewer%3A%20rhwp%20in%20a%20WebView%2C%20measured%20on%20222%20documents">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
     <section aria-labelledby="faq">
       <h2 id="faq">FAQ</h2>
       <div class="faq">
@@ -2764,6 +2811,7 @@ done</code></pre>
         </table>
       </div>
       <p class="muted">41 of the 59 commits (69%) were made between 9 p.m. and 2 a.m. This was not full-time work but a few hours each evening.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/20-days-4-apps-1-en.webp" width="1200" height="498" alt="Bar chart: of 59 commits, 52 (88%) are marked as co-authored with the agent and 41 (69%) were made between 9 p.m. and 2 a.m." loading="lazy"><figcaption>52 of the 59 commits in those 20 days were made with the agent, and 41 were made in the evening.</figcaption></figure>
     </section>
     <section aria-labelledby="who-did-what">
       <h2 id="who-did-what">How was the work split between the person and the AI?</h2>
@@ -2789,6 +2837,7 @@ done</code></pre>
       </div>
       <p>The co-author mark means the commit was made together with the agent. It is not a measure of who wrote how many lines.</p>
     </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20How%20we%20shipped%20four%20Android%20apps%20in%2020%20days%20with%20an%20AI%20coding%20agent">Email us</a></p></aside>
     <section aria-labelledby="four-rules">
       <h2 id="four-rules">Four rules that made it fast</h2>
       <ol class="steps">
@@ -2806,6 +2855,7 @@ done</code></pre>
         <li><strong>On-device tests ran after submitting for review.</strong> End-to-end tests on a Galaxy S21 and S20 on October 4 found nine major defects, five distinct causes. The biggest: if the system killed the app mid-job, the progress screen froze. No crashes and no damaged originals, but the order was backwards. End-to-end tests now come before submission.</li>
         <li><strong>The test scripts had bugs too.</strong> A script that waits for a screen exited with success (0) on timeout, so later checks kept running on the wrong screen. Tools the AI writes for testing need testing too.</li>
       </ul>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/20-days-4-apps-2-en.webp" width="1200" height="728" alt="Comparison: at first end-to-end tests ran after submitting for review and found nine major defects with five causes; now they run before submission, and the release build is launched twice on a device before every upload." loading="lazy"><figcaption>On-device end-to-end tests now come before submission; on October 4 the order was backwards.</figcaption></figure>
     </section>
     <section aria-labelledby="try-it-yourself">
       <h2 id="try-it-yourself">If you want to try it</h2>
@@ -2816,6 +2866,7 @@ done</code></pre>
         <li><strong>Record what was and wasn't verified</strong>: In the changelog, write which device checked what, and what was not checked.</li>
       </ol>
     </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20How%20we%20shipped%20four%20Android%20apps%20in%2020%20days%20with%20an%20AI%20coding%20agent">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
     <section aria-labelledby="faq">
       <h2 id="faq">Frequently asked questions</h2>
       <div class="faq">
@@ -2878,7 +2929,9 @@ done</code></pre>
         <li><strong>Secrets</strong>: Key files get a location and "never commit"; their contents never appear.</li>
         <li><strong>General advice</strong>: The agent already knows "keep the code clean". Keep only what is true of this repository.</li>
       </ul>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/agents-md-1-en.webp" width="1200" height="988" alt="Comparison: the six sections that go into a 96-line AGENTS.md, including 12 easy-to-get-wrong rules, against the three things kept out: history, secrets and general advice." loading="lazy"><figcaption>AGENTS.md keeps only what is true of this one repository.</figcaption></figure>
     </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20How%20to%20write%20AGENTS.md%3A%20only%20the%20rules%20an%20AI%20coding%20agent%20gets%20wrong">Email us</a></p></aside>
     <section aria-labelledby="writing-rules">
       <h2 id="writing-rules">How do you write a rule that is easy to get wrong?</h2>
       <p>Each rule says what not to do, why, and how far any exception reaches. A few of the actual rules:</p>
@@ -2916,6 +2969,7 @@ done</code></pre>
         <li><strong>Move long parts out</strong>: Ad policy, design rules and the document viewer design live in their own documents; AGENTS.md keeps only the paths.</li>
       </ol>
     </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20How%20to%20write%20AGENTS.md%3A%20only%20the%20rules%20an%20AI%20coding%20agent%20gets%20wrong">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
     <section aria-labelledby="faq">
       <h2 id="faq">Frequently asked questions</h2>
       <div class="faq">
@@ -2950,6 +3004,41 @@ done</code></pre>
       <p>This is AX (AI transformation) applied to one-person app development. In the 20 days from the first commit on September 20, 2026, four Android apps (<a href="https://mvgood21.github.io/en/apps/image-compress/">Compress Image</a>, <a href="https://mvgood21.github.io/en/apps/image-flip/">Flip &amp; Rotate Image</a>, <a href="https://mvgood21.github.io/en/apps/image-convert/">Convert Image</a> and <a href="https://mvgood21.github.io/en/apps/doc-viewer/">HWP Viewer SugarDoc</a>) went live on Google Play.</p>
       <p class="note">Every number comes from the git history, changelog and on-device QA reports of SugarMount's app repository. What we could not verify, we say so.</p>
     </section>
+    <section aria-labelledby="find">
+      <h2 id="find">Find a note</h2>
+      <div class="ax-search" role="search"><label for="ax-q">Search AX notes</label><input id="ax-q" type="search" autocomplete="off" placeholder="e.g. tests, R8, release, agents" data-src="https://mvgood21.github.io/en/ax/search.json"><p class="muted">Matches titles, summaries, topics and note types.</p><ul id="ax-r" class="ax-results" aria-live="polite" data-none="No notes match. Try another word."></ul></div>
+    </section>
+    <section aria-labelledby="topics">
+      <h2 id="topics">Browse by topic</h2>
+      <ul class="card-list">
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/workflow/">Working with agents</a></h3><p class="sub">How work is split between an AI coding agent and a person, how rules reach the agent, and what we changed after several sessions collided in one repository.</p><p class="meta">3 notes</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/quality/">Testing and release</a></h3><p class="sub">Unit tests, release gates and on-device checks that AI-written code goes through before each release, with the real defects those checks caught along the way.</p><p class="meta">4 notes</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/android/">Android development</a></h3><p class="sub">Gradle builds, library upgrades, UI and performance problems we ran into while building Android apps with a coding agent, and how each one was solved.</p><p class="meta">4 notes</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/games/">Game development</a></h3><p class="sub">Generating puzzle game levels with an agent, proving every level can be solved, and tuning difficulty: the rules we settled on and the numbers we measured.</p><p class="meta">1 notes</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/store/">Play Store and monetization</a></h3><p class="sub">Google Play listings and review, store screenshots and descriptions, and ad setup: the work of shipping and running apps, shared with an AI coding agent.</p><p class="meta">1 notes</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/web/">Website and search</a></h3><p class="sub">The page structure, Google and Naver search optimization, structured data and design system of this site, built with an agent and explained from the actual code.</p><p class="meta">1 notes</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/retro/">Retrospectives and numbers</a></h3><p class="sub">Looking back over a period of work: what went fast and what went wrong, with numbers we counted ourselves from the git history and QA reports.</p><p class="meta">1 notes</p></li>
+      </ul>
+    </section>
+    <section aria-labelledby="start">
+      <h2 id="start">Start here</h2>
+      <ol class="steps">
+        <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a><br>The whole run, with the numbers.</li>
+        <li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a><br>How rules reach the agent.</li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a><br>The checks AI-written code passes before it ships.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="notes">
+      <h2 id="notes">Latest notes</h2>
+      <ul class="card-list">
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></h3><p class="sub">SugarSpeller 1.6.025&#x27;s release review ran 84 agents with three refuters per finding. 20 findings survived, one of them a crash, and the second pass confirmed 0.</p><p class="meta">Working with agents · How-to · October 22, 2026</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></h3><p class="sub">androidx.pdf beta01 parses PDFs in an isolated process that also runs your Application.onCreate. Without a guard, the PDF never opened and no error came back.</p><p class="meta">Android development · Incident · October 22, 2026</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></h3><p class="sub">A contrast check that passed in three themes had silently dropped 3,762 of 9,318 text fragments (40%). Now it prints what it measured and fails on a shortfall.</p><p class="meta">Testing and release · Measurement · October 22, 2026</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></h3><p class="sub">Compose can break Korean between syllables, but the label stacked as &#x27;R/u/l/e&#x27; on a Galaxy S21 came from Row measurement order. Each cause got its own fix.</p><p class="meta">Android development · How-to · October 21, 2026</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></h3><p class="sub">The operator allowed hundreds of agents, but only three code-writing agents ran at once. 4 GB of free RAM and two shared phones set the pace of a 59-commit day.</p><p class="meta">Working with agents · Measurement · October 21, 2026</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></h3><p class="sub">SugarSpeller 1.6.029 was meant for 20% via the Play Publisher API but was committed as completed; Play refused the move back to 20% with a 403. Cause and guard.</p><p class="meta">Play Store and monetization · Incident · October 21, 2026</p></li>
+      </ul>
+    </section>
     <section aria-labelledby="by-the-numbers">
       <h2 id="by-the-numbers">By the numbers</h2>
       <div class="table-wrap">
@@ -2964,35 +3053,6 @@ done</code></pre>
         </table>
       </div>
     </section>
-    <section aria-labelledby="notes">
-      <h2 id="notes">Latest notes</h2>
-      <ul class="card-list">
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></h3><p class="sub">SugarSpeller 1.6.025&#x27;s release review ran 84 agents with three refuters per finding. 20 findings survived, one of them a crash, and the second pass confirmed 0.</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></h3><p class="sub">androidx.pdf beta01 parses PDFs in an isolated process that also runs your Application.onCreate. Without a guard, the PDF never opened and no error came back.</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></h3><p class="sub">A contrast check that passed in three themes had silently dropped 3,762 of 9,318 text fragments (40%). Now it prints what it measured and fails on a shortfall.</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></h3><p class="sub">Compose can break Korean between syllables, but the label stacked as &#x27;R/u/l/e&#x27; on a Galaxy S21 came from Row measurement order. Each cause got its own fix.</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></h3><p class="sub">The operator allowed hundreds of agents, but only three code-writing agents ran at once. 4 GB of free RAM and two shared phones set the pace of a 59-commit day.</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></h3><p class="sub">SugarSpeller 1.6.029 was meant for 20% via the Play Publisher API but was committed as completed; Play refused the move back to 20% with a 403. Cause and guard.</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></h3><p class="sub">A P2P chat app passed 3,066 tests while one SQLite pragma, traced through plugin source, kept its database from opening. Now we judge tests by deleting guards.</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></h3><p class="sub">Removing -dontoptimize left Play Console&#x27;s DEX metrics at 36-39%. Deleting an unused Kakao SDK keep rule took r8.json to 85% and the AAB to 11.6 MB.</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></h3><p class="sub">All 51 sitemap URLs once shared one lastmod. Now dates follow a hash of each page&#x27;s main content, not commit dates, and a 99-file commit moved only 6 of them.</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></h3><p class="sub">Our block puzzle spec promised every tray could always be placed. A planning bot then played 80 games; all 80 hit the 3,000-move cap. How two bots set the fix.</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></h3><p class="sub">Our AI agent called a puzzle game crash-free, then it died on the first tutorial tap: a missing VIBRATE permission. adb monkey on clean data hit it at event 15.</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></h3><p class="sub">The open-source rhwp engine in an Android WebView opened 221 of 222 Korean HWP/HWPX files on a Galaxy S21; a 384-page file needed virtual scrolling.</p></li>
-      </ul>
-    </section>
-    <section aria-labelledby="topics">
-      <h2 id="topics">Browse by topic</h2>
-      <ul class="card-list">
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/workflow/">Working with agents</a></h3><p class="sub">How work is split between an AI coding agent and a person, how rules reach the agent, and what we changed after several sessions collided in one repository. 3 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li><li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li><li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li></ul></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/quality/">Testing and release</a></h3><p class="sub">Unit tests, release gates and on-device checks that AI-written code goes through before each release, with the real defects those checks caught along the way. 4 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li><li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li><li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li></ul></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/android/">Android development</a></h3><p class="sub">Gradle builds, library upgrades, UI and performance problems we ran into while building Android apps with a coding agent, and how each one was solved. 4 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li><li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li><li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li></ul></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/games/">Game development</a></h3><p class="sub">Generating puzzle game levels with an agent, proving every level can be solved, and tuning difficulty: the rules we settled on and the numbers we measured. 1 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li></ul></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/store/">Play Store and monetization</a></h3><p class="sub">Google Play listings and review, store screenshots and descriptions, and ad setup: the work of shipping and running apps, shared with an AI coding agent. 1 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li></ul></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/web/">Website and search</a></h3><p class="sub">The page structure, Google and Naver search optimization, structured data and design system of this site, built with an agent and explained from the actual code. 1 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li></ul></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/retro/">Retrospectives and numbers</a></h3><p class="sub">Looking back over a period of work: what went fast and what went wrong, with numbers we counted ourselves from the git history and QA reports. 1 notes</p><ul class="related-links"><li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li></ul></li>
-      </ul>
-    </section>
     <section aria-labelledby="principles">
       <h2 id="principles">How these notes are written</h2>
       <ul>
@@ -3001,6 +3061,11 @@ done</code></pre>
         <li><strong>Failures are included.</strong> A defect found right after release, and its cause, is often more useful than a rule.</li>
       </ul>
     </section>
+    <aside class="ax-cta" aria-labelledby="hub-cta-h">
+      <p class="ax-cta-title" id="hub-cta-h">Questions or ideas?</p>
+      <p>Send us where you got stuck applying one of these notes, a question about the numbers, or a topic you would like covered.</p>
+      <p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Question">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p>
+    </aside>
     <section aria-labelledby="faq">
       <h2 id="faq">Frequently asked questions</h2>
       <div class="faq">
@@ -3010,7 +3075,7 @@ done</code></pre>
         <details><summary>Where do the numbers come from?</summary><div><p>From the git history, CHANGELOG and QA reports of SugarMount's app repository (sugar-utils, private). Each note gives the date its numbers were taken.</p></div></details>
       </div>
     </section>
-    <p class="meta updated">Last updated <time datetime="2026-10-19">October 19, 2026</time></p>]]></description>
+    <p class="meta updated">Last updated <time datetime="2026-10-22">October 22, 2026</time></p>]]></description>
     <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
   </item>
   <item>
@@ -3054,6 +3119,7 @@ done</code></pre>
       </div>
       <p class="muted"><a href="https://mvgood21.github.io/en/apps/doc-viewer/">HWP Viewer SugarDoc</a>, which has no ads, is checked the other way round: the build fails if an ads SDK enters the release dependencies or an advertising ID permission is merged into the manifest.</p>
     </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20What%20to%20check%20before%20shipping%20an%20AI-built%20Android%20app%3A%20the%20release%20gate%20and%20an%20R8%20crash">Email us</a></p></aside>
     <section aria-labelledby="launch-check">
       <h2 id="launch-check">Step 2: launch the minified release build twice</h2>
       <p><code>release_launch.sh &lt;app&gt; &lt;device&gt;</code> installs the R8-shrunk release APK, force-stops the app and cold-starts it twice. After each launch it counts <strong>only this package's lines</strong> in the crash log since that moment, and checks that the process is alive.</p>
@@ -3078,6 +3144,7 @@ done</code></pre>
       </div>
       <p>No crashes and no damaged originals; the minified release builds of all three launched cleanly both times. But there were nine major defects with five distinct causes. The biggest, shared by all three apps: if the system killed the app mid-job, the progress screen froze at 0 / 0. Neither the emulator nor the unit tests had shown it.</p>
       <p>These tests ran after the apps had been submitted for production review. Wrong order. Now end-to-end tests come before submission; after the fixes, 410 unit tests, lint and all three release gates passed again before release.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/release-gate-1-en.webp" width="1200" height="770" alt="Three-step diagram: release gate, two launches of the minified release build, and on-device E2E on a Galaxy S21 that found nine major defects." loading="lazy"><figcaption>The three checks every upload goes through; the last one, on a real device, found nine major defects.</figcaption></figure>
     </section>
     <section aria-labelledby="checks-by-ai">
       <h2 id="checks-by-ai">When you let AI run the checks</h2>
@@ -3087,6 +3154,7 @@ done</code></pre>
         <li><strong>Verify with a different agent.</strong> In on-device QA, three per-app agents found defects and a fourth reproduced each one with its own screenshots and traced the cause in the code. Whoever built it misses things when checking their own work.</li>
       </ul>
     </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20What%20to%20check%20before%20shipping%20an%20AI-built%20Android%20app%3A%20the%20release%20gate%20and%20an%20R8%20crash">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
     <section aria-labelledby="faq">
       <h2 id="faq">Frequently asked questions</h2>
       <div class="faq">

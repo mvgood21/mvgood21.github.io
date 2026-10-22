@@ -27,6 +27,7 @@ import dates  # noqa: E402
 import sds_apps  # noqa: E402  (generated CSS text: assets/sds-apps.css, assets/fonts/pretendard.css)
 import checks  # noqa: E402  (site gates run by --check)
 import legal_chrome  # noqa: E402  (isolated header/footer for legal pages an app opens; standalone pages)
+import ax_extras  # noqa: E402  (AX hub search, note types, inquiry boxes, figures)
 from html.parser import HTMLParser  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -41,7 +42,7 @@ SUFFIX = " – SugarMount"
 # pages that are noindex: no canonical/og:url/hreflang, and left out of sitemap, RSS and llms.txt (IA spec 2).
 # Keep this a plain set literal: tools/indexnow.py reads it with ast.literal_eval.
 NOINDEX_PATHS = {"404.html", "design/index.html"}
-AX_HUB_LATEST = 12   # newest AX notes listed on the hub; the rest are reached through the topic pages
+AX_HUB_LATEST = 6    # newest AX notes on the hub; the rest through search and topic pages (each title costs hub font budget)
 AX_RELATED = 6       # "더 읽기" links under an AX note
 RSS_MAX = 60         # newest items per feed (Naver reads the newest; a full-<main> feed grows by 3 notes a day)
 TITLE_LEN = {"ko": (30, 44), "en": (50, 65)}  # (topic, whole title), IA spec 3.1
@@ -965,6 +966,11 @@ def ax_articles(lang):
 def ax_slug(u): return u.rstrip("/").rsplit("/", 1)[-1]
 def ax_topic_of(u): return AX_TOPICS.get(AX_NOTE_TOPIC.get(ax_slug(u)))
 def ax_topic_url(tp, lang): return url(lang, f"/ax/topic/{tp['id']}/")
+def ax_type(u): return ax_extras.note_type(read(relpath_of(u)), "")
+def ax_label(u, lang):
+    """'Android 개발 · 사고 기록 · 2026년 10월 22일': topic, note type, published date (hub cards, search)."""
+    tp = ax_topic_of(u)
+    return " · ".join(x for x in (tp[lang]["name"] if tp else "", ax_type(u), fmt_date(lang, published(relpath_of(u)))) if x)
 
 def ax_by_topic(lang):
     """[(topic, [(url, h1, description)])] in data/ax.json order, newest first inside a topic; empty topics left out."""
@@ -1195,11 +1201,16 @@ def wrap_hand(relpath):
         items = [(t["ax"], None)]
         arts = ax_articles(lang)
         # the hub's lists are ours: the latest notes and one card per topic, rebuilt from ax/<slug>/ + data/ax.json on every build
-        main = set_block(main, "ax-list", f'\n      <ul class="card-list">{ax_cards(arts[:AX_HUB_LATEST])}\n      </ul>\n      ')
+        latest = "".join(
+            f'\n        <li class="card"><h3><a href="{u}">{esc(n)}</a></h3><p class="sub">{esc(d)}</p>'
+            f'<p class="meta">{esc(ax_label(u, lang))}</p></li>' for u, n, d in arts[:AX_HUB_LATEST])
+        main = set_block(main, "ax-list", f'\n      <ul class="card-list">{latest}\n      </ul>\n      ')
+        if BLOCK_RE("ax-search").search(main):
+            main = set_block(main, "ax-search", ax_extras.search_block(lang, url(lang, "/ax/search.json")))
+        # topic cards carry no note titles: every title on the hub costs font subsets (470 KB budget)
         tcards = "".join(
             f'\n        <li class="card"><h3><a href="{ax_topic_url(tp, lang)}">{esc(tp[lang]["name"])}</a></h3>'
-            f'<p class="sub">{esc(tp[lang]["desc"])} {AX_T[lang]["ax_n"].format(n=len(a))}</p>'
-            '<ul class="related-links">' + "".join(f'<li><a href="{u}">{esc(n)}</a></li>' for u, n, _ in a[:3]) + '</ul></li>'
+            f'<p class="sub">{esc(tp[lang]["desc"])}</p><p class="meta">{AX_T[lang]["ax_n"].format(n=len(a))}</p></li>'
             for tp, a in ax_by_topic(lang))
         if BLOCK_RE("ax-topics").search(main):
             main = set_block(main, "ax-topics", f'\n      <ul class="card-list">{tcards}\n      </ul>\n      ')
@@ -1219,9 +1230,15 @@ def wrap_hand(relpath):
                     "url": SITE + path, "mainEntityOfPage": SITE + path, "inLanguage": lang,
                     "articleSection": tp[lang]["name"] if tp else t["ax"],
                     "datePublished": dates.iso_datetime(published(relpath)), "dateModified": page_dm,
-                    **({"image": [SITE + og]} if exists(og.lstrip("/")) else {}),
+                    **({"image": imgs} if (imgs := [SITE + x for x in ([og] if exists(og.lstrip("/")) else [])
+                                                         + ax_extras.figures(main)]) else {}),
                     "author": ORG_REF, "publisher": ORG_REF, "isPartOf": SITE_REF})
         main = set_block(main, "meta", meta_line(lang, relpath, main, tp[lang]["name"] if tp else t["ax"]), after_lead(main))
+        # inquiry boxes: one before the middle body h2, one before the FAQ (ax_extras)
+        mid = ax_extras.middle_h2(main)
+        main = set_block(main, "cta-mid", ax_extras.cta_mid(lang, EMAIL, headline), mid)
+        faq = re.search(r'\n\s*<section aria-labelledby="faq">', main)
+        main = set_block(main, "cta", ax_extras.cta_end(lang, EMAIL, headline), faq.start() if faq else None)
         main = set_block(main, "toc", toc_inner(main, lang), after_hero(main))
         # related: newest notes of the same topic first, then the newest of other topics, AX_RELATED in all
         allx = [(u, n) for u, n, _ in ax_articles(lang) if u != path]
@@ -1288,6 +1305,8 @@ def page_images(relpath, outputs):
     """Image sitemap entries (IA spec 4.2): app pages and help articles list the images their <main> shows (screenshots,
     article captures; app icons left out), and app pages add their share image."""
     parts = bare_of(relpath)[:-len("index.html")].strip("/").split("/")
+    if parts[0] == "ax" and len(parts) == 2 and parts[1] != "topic":  # AX notes: their figures (ax_extras.figures)
+        return [x for x in ax_extras.figures(main_html(outputs.get(relpath, ""))) if exists(x.lstrip("/"))]
     if parts[0] != "apps" or len(parts) not in (2, 3) or parts[1] not in BY_APP_PATH: return []
     out = []
     for src in re.findall(r'<img\b[^>]*\bsrc="(/[^"]+)"', main_html(outputs.get(relpath, ""))):
@@ -1622,6 +1641,10 @@ def main():
     for p in outputs:
         outputs[p] = outputs[p].replace(CSSV, version)
     outputs.update(css_out)
+    for lang in ("ko", "en"):  # the hub's search index (ax_extras.search_block)
+        outputs[("en/" if lang == "en" else "") + "ax/search.json"] = ax_extras.search_json(
+            [(u, n, d, (ax_topic_of(u) or {}).get(lang, {}).get("name", ""), ax_type(u), fmt_date(lang, published(relpath_of(u))))
+             for u, n, d in ax_articles(lang)])
     outputs["llms.txt"] = build_llms(outputs)
     outputs["sitemap.xml"] = build_sitemap(pages, outputs)
     outputs["rss.xml"] = build_rss(outputs, "ko")
