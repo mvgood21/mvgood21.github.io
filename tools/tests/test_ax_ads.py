@@ -28,11 +28,16 @@ class Ads(unittest.TestCase):
         for kind in SLOTS: self.assertEqual(ax_extras.ad_unit(c, kind, "ko"), "")
         self.assertEqual(ax_extras.ads_head(c), "")
         self.assertIsNone(ax_extras.ads_txt(c))
+        self.assertEqual(ax_extras.ads_meta(c), "")
 
     def test_missing_slot_keeps_ads_off(self):
         c = cfg({"client": "ca-pub-1", "slots": {"in_article": "1"}})
         self.assertFalse(c["on"])
         self.assertEqual(ax_extras.ad_unit(c, "in_article", "ko"), "")
+        self.assertEqual(ax_extras.ads_head(c), "")
+        # ownership meta and ads.txt come with the client alone (AdSense site review happens before ad units exist)
+        self.assertEqual(ax_extras.ads_meta(c), '<meta name="google-adsense-account" content="ca-pub-1">')
+        self.assertEqual(ax_extras.ads_txt(c), "google.com, pub-1, DIRECT, f08c47fec0942fa0\n")
 
     def test_on_renders_labelled_unit_loader_and_ads_txt(self):
         c = cfg({"client": "ca-pub-123", "slots": SLOTS})

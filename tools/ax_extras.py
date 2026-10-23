@@ -138,8 +138,14 @@ def ad_unit(cfg, kind, lang):
     return ""
 
 
+def ads_meta(cfg):
+    """Site-ownership tag AdSense asks for on every page; present as soon as the client is set (before ad units exist)."""
+    if not cfg["client"]: return ""
+    return f'<meta name="google-adsense-account" content="{cfg["client"]}">'
+
+
 def ads_txt(cfg):
-    """ads.txt line for the AdSense publisher (pub-… from ca-pub-…), or None when ads are off."""
-    if not cfg["on"]: return None
+    """ads.txt line for the AdSense publisher (pub-… from ca-pub-…), or None until the client is set."""
+    if not cfg["client"]: return None
     pub = cfg["client"].replace("ca-", "", 1)
     return f"google.com, {pub}, DIRECT, f08c47fec0942fa0\n"

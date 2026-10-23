@@ -476,6 +476,7 @@ def head(lang, title, desc, path, alt_path, *, og_type="website", og_image=None,
               f'<link rel="icon" type="image/png" sizes="64x64" href="{SITE}/assets/favicon.png">',
               f'<link rel="apple-touch-icon" href="{SITE}/assets/apple-touch-icon.png">',  # absolute, like rel=icon (Naver favicon)
               f'<link rel="alternate" type="application/rss+xml" title="SugarMount" href="{SITE}{feed}">']
+    if (m := ax_extras.ads_meta(ADS)): lines.append(m)  # AdSense site ownership (data/ads.json client)
     lines += [f'<link rel="stylesheet" href="{c}?v={CSSV}">' for c in CSS_FILES]
     lines += [f'<script type="application/ld+json">{ld_json(x)}</script>' for x in lds]
     return "<head>\n" + "".join(f"  {x}\n" for x in lines) + "</head>"
