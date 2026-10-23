@@ -86,6 +86,7 @@ T = {
     "policy_of": "{name} 개인정보처리방침", "policy_view": "{name} 개인정보처리방침 보기", "play_of": "{name} Google Play에서 받기",
     "privacy_title": "개인정보처리방침 – SugarMount",
     "privacy_desc": "SugarMount가 배포하는 Android 앱의 개인정보처리방침 목록입니다. 앱마다 실제 구현을 기준으로 수집 항목, 처리 주체, 보존과 삭제 방법을 적습니다.",
+    "site_policy_h": "웹사이트(mvgood21.github.io)", "site_policy_sub": "광고·쿠키와 접속 기록", "site_policy_btn": "웹사이트 방침 보기",
     "privacy_lead": "SugarMount가 배포하는 모든 앱의 개인정보처리방침을 앱별로 안내합니다. 각 방침은 실제 구현을 기준으로 씁니다.",
     "privacy_contact": "개인정보 처리에 관한 문의는 이메일로 보내 주세요.",
     "package": "패키지 이름", "effective": "시행일",
@@ -143,6 +144,7 @@ T = {
     "policy_of": "{name} privacy policy", "policy_view": "Read the {name} privacy policy", "play_of": "Get {name} on Google Play",
     "privacy_title": "Privacy policies – SugarMount",
     "privacy_desc": "Privacy policies for every Android app SugarMount publishes, each written from the app's code: what is collected, who processes it, and how it is deleted.",
+    "site_policy_h": "Website (mvgood21.github.io)", "site_policy_sub": "Ads, cookies and access logs", "site_policy_btn": "View the website policy",
     "privacy_lead": "Privacy policies for every app SugarMount publishes, one per app, each written from the app's actual implementation.",
     "privacy_contact": "For questions about how your data is handled, email us.",
     "package": "Package name", "effective": "Effective",
@@ -766,6 +768,12 @@ def build_privacy_index(lang):
           {status_p(a, lang)}
           <p class="sub">{t["package"]} <code>{a["package"]}</code>{eff_s}</p>
           <div class="card-actions"><a class="button button--outline" href="{privacy_url(a, lang)}">{esc(t["policy_view"].format(name=name))}</a></div>{subdocs}
+        </li>''')
+    if exists(relpath_of(url(lang, "/privacy/site/"))):  # the website's own policy (ads and cookies), first
+        items.insert(0, f'''        <li class="card">
+          <h2>{t["site_policy_h"]}</h2>
+          <p class="sub">{t["site_policy_sub"]}</p>
+          <div class="card-actions"><a class="button button--outline" href="{url(lang, "/privacy/site/")}">{t["site_policy_btn"]}</a></div>
         </li>''')
     path, alt = url(lang, "/privacy/"), url(other(lang), "/privacy/")
     nav, bc = crumbs(lang, [(t["privacy"], None)])

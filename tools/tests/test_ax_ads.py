@@ -48,6 +48,14 @@ class Ads(unittest.TestCase):
         self.assertIn("async", ax_extras.ads_head(c))
         self.assertEqual(ax_extras.ads_txt(c), "google.com, pub-123, DIRECT, f08c47fec0942fa0\n")
 
+    def test_serve_false_keeps_units_off_but_keeps_ownership(self):
+        c = cfg({"client": "ca-pub-9", "serve": False, "slots": SLOTS})
+        self.assertFalse(c["on"])
+        self.assertEqual(ax_extras.ad_unit(c, "rail_right", "ko"), "")
+        self.assertEqual(ax_extras.ads_head(c), "")
+        self.assertIn("ca-pub-9", ax_extras.ads_meta(c))
+        self.assertTrue(cfg({"client": "ca-pub-9", "serve": True, "slots": SLOTS})["on"])
+
     def test_preview_only_when_off(self):
         self.assertIn("ad-preview", ax_extras.ad_unit(cfg({"client": "", "slots": SLOTS}, preview=True), "in_article", "ko"))
         on = cfg({"client": "ca-pub-1", "slots": SLOTS}, preview=True)

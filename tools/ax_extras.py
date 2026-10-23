@@ -101,7 +101,7 @@ def middle_h2(main):
 
 
 # ---------- ads (AdSense display units on AX notes only) ----------
-# data/ads.json: {"client": "ca-pub-…", "slots": {"in_article": "…", "rail_left": "…", "rail_right": "…"}}.
+# data/ads.json: {"client": "ca-pub-…", "serve": true|false, "slots": {"in_article": "…", "rail_left": "…", "rail_right": "…"}}.
 # No client → no ad markup at all (no empty boxes, no script). AX_ADS_PREVIEW=1 draws labelled placeholders instead
 # (for layout review in a scratch copy only; never build the real site with it).
 ADS_FILE = "data/ads.json"
@@ -114,7 +114,9 @@ def ads_config(root):
     path = os.path.join(root, ADS_FILE)
     cfg = json.load(open(path, encoding="utf-8")) if os.path.exists(path) else {}
     preview = os.environ.get("AX_ADS_PREVIEW") == "1"
-    on = bool(cfg.get("client")) and all(cfg.get("slots", {}).get(k) for k in ("in_article", "rail_left", "rail_right"))
+    # "serve": false keeps units off while AdSense reviews the site (empty boxes otherwise); flip to true once approved
+    on = (bool(cfg.get("client")) and all(cfg.get("slots", {}).get(k) for k in ("in_article", "rail_left", "rail_right"))
+          and cfg.get("serve", True) is True)
     return {"on": on, "preview": preview and not on, "client": cfg.get("client", ""), "slots": cfg.get("slots", {})}
 
 
