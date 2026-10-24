@@ -7,6 +7,8 @@ gap. Characters the font does not map at all print as its .notdef box (tofu). in
 record every non-space character that renders no ink or the .notdef box; report() prints them
 and returns False when any were found. Used by tools/ax_figures.py and tools/og.py.
 """
+import sys
+
 from PIL import ImageDraw
 
 _seen, _blank = {}, {}
@@ -42,9 +44,15 @@ def install():
     ImageDraw.ImageDraw.text = _text
 
 
+def _say(line):
+    # a cp949 console cannot encode every flagged character (U+2212 among them); escape those instead of crashing
+    enc = getattr(sys.stdout, "encoding", None) or "utf-8"
+    print(line.encode(enc, "backslashreplace").decode(enc))
+
+
 def report():
     if not _blank: return True
     for ch, where in sorted(_blank.items()):
-        print(f"BLANK GLYPH {ch!r} (U+{ord(ch):04X}) in: " + " | ".join(sorted(where)[:3]))
+        _say(f"BLANK GLYPH {ch!r} (U+{ord(ch):04X}) in: " + " | ".join(sorted(where)[:3]))
     print("Reword these (the font has no outline for them), then run again.")
     return False
