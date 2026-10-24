@@ -76,12 +76,12 @@
       <h1>Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</h1>
       <p class="lead">We lined up GA4 events per device and minute to find where players stopped, then played every board in that stretch out exactly with a clear-the-line player model. Four of the first ten boards were walls.</p>
 
-    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Game development</span> <span aria-hidden="true">·</span> <span>10 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-10-24">October 24, 2026</time></p><!-- /build:meta -->
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Game development</span> <span aria-hidden="true">·</span> <span>12 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-10-24">October 24, 2026</time></p><!-- /build:meta -->
       <p>Of 16 devices that installed the block puzzle Block Turn from a Korean ad, 7 finished the three tutorial boards, solved nothing on board 4 (R004), and went quiet; 5 of those show an uninstall. Only one device has a record past R013. Computing all 300 boards exactly with a "clear a line whenever you can" player model showed that in chapter one (R004 to R013), R006, R011 and R013 had a 0% win rate, and R012 had one winning sequence out of 198. Version 1.1.3, submitted on 2026-10-17, moved those four boards to positions 37 to 40. R004, where the largest group stopped, is not one of the four, and this data cannot say whether those 7 devices left because of its difficulty.</p>
       <p class="note">Sources: per-device event timelines pulled with the GA4 Data API for Korean paid installs (2026-10-11 to 10-16), the churn analysis document in the game repository (2026-10-17), commits <code>d1f6de1</code> and <code>cc4e860</code>, and the unit test <code>PlayOrderTest</code>. The per-board win rates were recomputed from the same pack file on 2026-10-23 and matched the record.</p>
     </section>
 
-    <!-- build:toc --><details class="toc-inline"><summary>Contents (10)</summary><ol><li><a href="#walls">Three of ten boards could not be won by a line-first player</a></li><li><a href="#per-person">We lined up 16 devices&#x27; events by minute</a></li><li><a href="#wrong-guesses">Both the ad theory and the first-move hint missed</a></li><li><a href="#cause-chain">Why a board tagged &quot;easy&quot; became a wall</a></li><li><a href="#fix">We changed only the order and kept progress keyed by puzzle id</a></li><li><a href="#alternatives">Why we reread players one by one instead of the funnel</a></li><li><a href="#limits">When this method does not hold</a></li><li><a href="#how-to">Steps to repeat this</a></li><li><a href="#next">What we check next</a></li><li><a href="#faq">FAQ</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#walls">Three of ten boards could not be won by a line-first player</a></li><li><a href="#per-person">We lined up 16 devices&#x27; events by minute</a></li><li><a href="#wrong-guesses">Both the ad theory and the first-move hint missed</a></li><li><a href="#cause-chain">Why a board tagged &quot;easy&quot; became a wall</a></li><li><a href="#fix">We changed only the order and kept progress keyed by puzzle id</a></li><li><a href="#alternatives">Why we reread players one by one instead of the funnel</a></li><li><a href="#limits">When this method does not hold</a></li><li><a href="#how-to">Steps to repeat this</a></li><li><a href="#next">What we check next</a></li><li><a href="#faq">FAQ</a></li></ol></nav></div><!-- /build:toc -->
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (11)</summary><ol><li><a href="#walls">Three of ten boards could not be won by a line-first player</a></li><li><a href="#per-person">We lined up 16 devices&#x27; events by minute</a></li><li><a href="#wrong-guesses">Both the ad theory and the first-move hint missed</a></li><li><a href="#cause-chain">Why a board tagged &quot;easy&quot; became a wall</a></li><li><a href="#fix">We changed only the order and kept progress keyed by puzzle id</a></li><li><a href="#alternatives">Why we reread players one by one instead of the funnel</a></li><li><a href="#limits">When this method does not hold</a></li><li><a href="#how-to">Steps to repeat this</a></li><li><a href="#retest-2026-10-24">Added 2026-10-24: the retest missed two of three bars</a></li><li><a href="#next">What we check next</a></li><li><a href="#faq">FAQ</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#walls">Three of ten boards could not be won by a line-first player</a></li><li><a href="#per-person">We lined up 16 devices&#x27; events by minute</a></li><li><a href="#wrong-guesses">Both the ad theory and the first-move hint missed</a></li><li><a href="#cause-chain">Why a board tagged &quot;easy&quot; became a wall</a></li><li><a href="#fix">We changed only the order and kept progress keyed by puzzle id</a></li><li><a href="#alternatives">Why we reread players one by one instead of the funnel</a></li><li><a href="#limits">When this method does not hold</a></li><li><a href="#how-to">Steps to repeat this</a></li><li><a href="#retest-2026-10-24">Added 2026-10-24: the retest missed two of three bars</a></li><li><a href="#next">What we check next</a></li><li><a href="#faq">FAQ</a></li></ol></nav></div><!-- /build:toc -->
 
     <!-- build:ad-rail --><!-- /build:ad-rail -->
 
@@ -194,9 +194,43 @@ after_hint = win(board after the correct first move, 2 pieces left, lines it cle
       </ol>
     </section>
 
+    <section aria-labelledby="retest-2026-10-24">
+      <h2 id="retest-2026-10-24">Added 2026-10-24: the retest missed two of three bars</h2>
+      <p>On 2026-10-24 we judged the first seven days after 1.1.3 (2026-10-17 to 10-23) of Korean paid installs: 25 installs, with test devices and emulators excluded. Only one of the three bars passed, same-day uninstalls.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Bar</th><th scope="col">Target</th><th scope="col">Baseline</th><th scope="col">7-day result</th><th scope="col">Verdict</th></tr></thead>
+          <tbody>
+            <tr><td>Solve rate at position 4</td><td>at least 80%</td><td>10 of 17</td><td>10 of 16, 62%</td><td>missed</td></tr>
+            <tr><td>Day-1 return</td><td>at least 30%</td><td>23%</td><td>20%</td><td>missed</td></tr>
+            <tr><td>Same-day uninstall</td><td>under 40%</td><td>58%</td><td>5 of 25, 20%</td><td>passed</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Same-day uninstalls fell, but counting everyone who uninstalled within seven days gives 10 of 25 (40%). The sample is small, too. Sixteen people started position 4, so one person moves that rate by about 6 points.</p>
+      <p>The bar was named "R004 solve rate", but we judged it at position 4. Since 1.1.3 that slot holds R294, and R004 sits at position 11 (<code>PLAY_ORDER</code> in <code>cc4e860</code>). So the 10-of-17 baseline belongs to R004 when it was the fourth board, and the 62% belongs to R294 in the same slot. Versions 1.1.4 and 1.1.5 shipped during the window, and neither touched the play order; 1.1.5 appended R301 to R600 and left R001 to R300 as they were.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Play position</th><th scope="col">Board (<code>pid</code>)</th><th scope="col">Started</th><th scope="col">Solved</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>R001</td><td>21</td><td>16</td></tr>
+            <tr><td>2</td><td>R002</td><td>16</td><td>16</td></tr>
+            <tr><td>3</td><td>R003</td><td>16</td><td>14</td></tr>
+            <tr><td>4</td><td>R294</td><td>16</td><td>10</td></tr>
+            <tr><td>5</td><td>R085</td><td>10</td><td>7</td></tr>
+            <tr><td>6</td><td>R065</td><td>7</td><td>7</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Players drop out in two places. The first is the opening tutorial R001: 21 started and only 16 solved it, a stretch we could not see in the baseline window (10-11 to 10-16) because there was no <code>level_start</code> event. The second is position 4.</p>
+      <p>The body said the four walls did not prove why those 7 devices left. This result settles that part. With the walls parked at positions 37 to 40, 6 of 16 players still failed to solve position 4, and swapping R004 for R294 left the solved count at the same 10 as the baseline. The churn happens before the walls, at R001 and position 4. The baseline grouped players by device model and inferred progress from <code>level_up</code> counts while this run counts users tagged with <code>pid</code>, so we do not read a one-person gap as better or worse.</p>
+      <p>The model missed here as well. Line-first computed R294 at 100%; people solved it 62% of the time. It found the 0% boards in chapter one, but it did not predict how people do on the first board after the tutorials. Judge the first plain board by the share of people who solve it, not by a model number.</p>
+      <p>The second number we promised is not in yet. The verdict funnel stops at position 6 (R065, 7 starts), and <code>level_fail</code> for R004, now at position 11, and for the four boards at 37 to 40 was not tallied per board. The analysis record for the same stretch (10-17 to 10-22) does show one Korean paid player who solved R001 to R282 by pack id, so at least one person got past R004 and all four walls.</p>
+    </section>
+
     <section aria-labelledby="next">
       <h2 id="next">What we check next</h2>
-      <p>A retest on installs after 1.1.3 is scheduled to be judged on 2026-10-24. The bars: R004 solve rate of at least 80% (recorded baseline 10 of 17), day-1 return of at least 30% (baseline 23%), and same-day uninstalls under 40% (baseline 58%). The result will be added as a dated section, and the <code>pid</code> on <code>level_fail</code> will show how many players actually stall on R004 and on the four boards at positions 37 to 40. The game itself is on the <a href="/en/apps/blocks/">Block Turn</a> page.</p>
+      <p>The 2026-10-24 retest verdict is in the dated section above: solve rate at position 4 (62%) and day-1 return (20%) missed, and same-day uninstalls (20%) passed. The next fix candidate is the board at position 4. How many players actually stall on R004 (now position 11) and on the four boards at positions 37 to 40, by the <code>pid</code> on <code>level_fail</code>, is not tallied yet. The game itself is on the <a href="/en/apps/blocks/">Block Turn</a> page.</p>
     </section>
 
     
