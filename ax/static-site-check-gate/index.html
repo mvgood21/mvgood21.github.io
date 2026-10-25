@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>여러 세션이 고치는 정적 사이트와 --check 게이트 – SugarMount</title>
+  <meta name="description" content="여러 에이전트 세션이 고치는 GitHub Pages 사이트에서 커밋 전 --check로 재빌드 변경 0개와 게이트 오류 0건을 확인합니다. 이 명령이 멈춘 네 번을 정리했습니다.">
+  <link rel="canonical" href="https://mvgood21.github.io/ax/static-site-check-gate/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/static-site-check-gate/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/static-site-check-gate/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/static-site-check-gate/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="여러 세션이 고치는 정적 사이트와 --check 게이트 – SugarMount">
+  <meta property="og:description" content="여러 에이전트 세션이 고치는 GitHub Pages 사이트에서 커밋 전 --check로 재빌드 변경 0개와 게이트 오류 0건을 확인합니다. 이 명령이 멈춘 네 번을 정리했습니다.">
+  <meta property="og:url" content="https://mvgood21.github.io/ax/static-site-check-gate/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-static-site-check-gate-ko.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=2227fbc3">
+  <link rel="stylesheet" href="/assets/site.css?v=2227fbc3">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=2227fbc3">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/ax/static-site-check-gate/#article","headline":"여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나","description":"여러 에이전트 세션이 고치는 GitHub Pages 사이트에서 커밋 전 --check로 재빌드 변경 0개와 게이트 오류 0건을 확인합니다. 이 명령이 멈춘 네 번을 정리했습니다.","url":"https://mvgood21.github.io/ax/static-site-check-gate/","mainEntityOfPage":"https://mvgood21.github.io/ax/static-site-check-gate/","inLanguage":"ko","articleSection":"웹사이트와 검색","datePublished":"2026-10-25T09:00:00+09:00","dateModified":"2026-10-25T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-static-site-check-gate-ko.png","https://mvgood21.github.io/assets/ax/cover/static-site-check-gate-ko.webp","https://mvgood21.github.io/assets/ax/static-site-check-gate-1-ko.webp","https://mvgood21.github.io/assets/ax/static-site-check-gate-2-ko.webp"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"빌드 결과 HTML도 git에 커밋하나요?","acceptedAnswer":{"@type":"Answer","text":"커밋합니다. GitHub Pages가 저장소 파일을 그대로 내보내므로(.nojekyll로 Jekyll 처리도 끔) 빌드 결과가 곧 배포본입니다. --check 는 커밋된 결과가 지금 입력으로 다시 만든 결과와 같은지 확인합니다."}},{"@type":"Question","name":"정적 사이트 빌드가 멱등인지 어떻게 확인하나요?","acceptedAnswer":{"@type":"Answer","text":"연속 두 번, 내일 날짜, 과거 날짜로 빌드해 바뀌는 파일이 0개인지 봅니다. 같은 날 두 번은 통과해도 다음 날 날짜가 움직이는 결함이 있어서, 날짜를 환경 변수로 바꿀 수 있게 만들어 두는 것이 먼저입니다."}},{"@type":"Question","name":"여러 AI 에이전트 세션이 같은 사이트 저장소를 고칠 때 충돌은 어떻게 푸나요?","acceptedAnswer":{"@type":"Answer","text":"본문과 데이터 같은 원본만 병합하고, 생성 파일은 한쪽을 고른 뒤 다시 빌드해 --check 를 통과해야 커밋합니다. 이 사이트의 홈 글꼴 초과도 이 단계에서 처음 드러났습니다."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/"},{"@type":"ListItem","position":2,"name":"AX 노트","item":"https://mvgood21.github.io/ax/"},{"@type":"ListItem","position":3,"name":"웹사이트와 검색","item":"https://mvgood21.github.io/ax/topic/web/"},{"@type":"ListItem","position":4,"name":"여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=2227fbc3">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a class="nav-apps" href="/apps/">앱</a>
+        <a class="nav-ax" href="/ax/" aria-current="page">AX 노트</a>
+        <a class="nav-about" href="/about/">소개</a>
+        <a class="nav-privacy" href="/privacy/">개인정보처리방침</a>
+      </nav>
+      <a class="lang" href="/en/ax/static-site-check-gate/" lang="en" hreflang="en">English</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>메뉴</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="전체 메뉴">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">닫기</button>
+      <p class="menu-title" id="m-photo">사진·영상</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>슈가앨범</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 용량 줄이기</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 반전·회전</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>이미지 변환 JPG·PNG·WebP</span></a></li></ul>
+      <p class="menu-title" id="m-document">문서·글</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글 띄어쓰기</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글뷰어 슈가독</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">생활</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>생생카드</span></a></li></ul>
+      <p class="menu-title" id="m-games">게임</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>화살표 매듭풀기</span></a></li><li><a class="app-tile" data-app="blocks" href="/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한판블록</span></a></li></ul>
+      <p><a href="/apps/">모든 앱 보기</a></p>
+      <ul class="menu-links"><li><a href="/ax/" aria-current="page">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-web">
+    <nav class="crumbs" aria-label="이동 경로"><ol><li><a href="/">SugarMount</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/ax/topic/web/">웹사이트와 검색</a></li><li><span aria-current="page">여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/static-site-check-gate-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX 노트 · 방법</span>
+      <h1>여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</h1>
+      <p class="lead">생성 파일은 손대지 않고 커밋 전 --check로 재빌드 변경 0개, 게이트 오류 0건을 보면 작업을 합친 뒤 생기는 예산 초과와 날짜 흔들림을 미리 잡습니다.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/about/">작성 SugarMount</a> <span aria-hidden="true">·</span> <span>웹사이트와 검색</span> <span aria-hidden="true">·</span> <span>읽는 시간 13분</span> <span aria-hidden="true">·</span> 최종 업데이트 <time datetime="2026-10-25">2026년 10월 25일</time></p><!-- /build:meta -->
+      <p><code>python tools/build.py --check</code>가 멈춘 것은 2026년 10월 19일 밤, 다른 세션의 커밋 위로 rebase한 직후였습니다. 오류는 한 줄이었습니다. <code>[BUDGET-FONT] index.html: font files this page needs 421 KB &gt; 400 KB</code>. rebase 전 빌드에서 홈에는 오류가 없었고, 두 작업을 합친 뒤에야 드러났습니다. 이 사이트는 프레임워크 없이 Python 표준 라이브러리만 쓰는 빌드 모듈 6개(3,616줄)로 만들고, 사람이든 에이전트든 커밋 전에 이 명령을 통과시키는 것이 규칙입니다. 10월 5일부터 22일까지 이 명령이 멈춘 일 가운데 네 번을 봅니다.</p>
+      <p class="note">근거는 이 사이트 저장소의 git 기록과 <code>tools/</code> 코드, 개편 명세 리뷰 문서, 작업 세션 기록, AX 노트 발행 기록입니다. 줄 수·테스트 수·파일 수는 2026년 10월 24일 커밋 1d5d432에서 다시 확인했습니다.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>목차 (10)</summary><ol><li><a href="#check-stops">--check가 커밋 전에 멈춘 네 번</a></li><li><a href="#ownership">손으로 쓰는 곳은 본문과 데이터 파일뿐입니다</a></li><li><a href="#idempotency">멱등성은 두 번 빌드가 아니라 내일 날짜 빌드로 확인합니다</a></li><li><a href="#gate-was-wrong">첫 통합에서 틀린 쪽은 게이트였습니다</a></li><li><a href="#font-budget">글꼴 예산은 다른 글의 제목으로도 깨집니다</a></li><li><a href="#og-images">공유 이미지는 실제 화면만 쓰고 글자를 넣지 않습니다</a></li><li><a href="#limits">브라우저 편집, 많은 페이지, CI 없는 저장소에는 맞지 않습니다</a></li><li><a href="#how-to">다른 사이트에 --check 게이트를 들이는 순서</a></li><li><a href="#next">다음에 확인할 것</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">목차</p><ol><li><a href="#check-stops">--check가 커밋 전에 멈춘 네 번</a></li><li><a href="#ownership">손으로 쓰는 곳은 본문과 데이터 파일뿐입니다</a></li><li><a href="#idempotency">멱등성은 두 번 빌드가 아니라 내일 날짜 빌드로 확인합니다</a></li><li><a href="#gate-was-wrong">첫 통합에서 틀린 쪽은 게이트였습니다</a></li><li><a href="#font-budget">글꼴 예산은 다른 글의 제목으로도 깨집니다</a></li><li><a href="#og-images">공유 이미지는 실제 화면만 쓰고 글자를 넣지 않습니다</a></li><li><a href="#limits">브라우저 편집, 많은 페이지, CI 없는 저장소에는 맞지 않습니다</a></li><li><a href="#how-to">다른 사이트에 --check 게이트를 들이는 순서</a></li><li><a href="#next">다음에 확인할 것</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="check-stops">
+      <h2 id="check-stops">--check가 커밋 전에 멈춘 네 번</h2>
+      <p><code>--check</code>는 메모리에서 사이트 전체를 다시 만든 뒤 두 가지를 봅니다. 디스크에 있는 파일과 한 바이트라도 다른 출력이 있는지, 그리고 검사 모듈 <code>tools/checks.py</code>가 오류를 냈는지입니다. 하나라도 걸리면 exit 1입니다. 핵심만 줄이면 아래와 같습니다.</p>
+      <pre><code>outputs = build_all()              # pages, feeds, sitemap, CSS: in memory
+changed = [p for p, text in outputs.items()
+           if read_file(p) != text]
+report = checks.run(ROOT, outputs)  # 106 issue codes
+if "--check" in argv:
+    if changed or report.errors:
+        exit(1)                     # nothing is written
+else:
+    write_files(changed)</code></pre>
+      <p>10월 24일 기준 출력 파일은 162개, 검사 코드(<code>SD-CRUMB-HOME</code> 같은 고정 이름)는 106개이고, 이 PC에서 한 번 도는 데 11.6초가 걸렸습니다.</p>
+      <p>멈춘 네 번은 10월 5일 첫 빌드 직후 out of date 2개, 10월 18일 통합 빌드의 게이트 오류 101건, 10월 19일 rebase 뒤 홈 글꼴 421KB(상한 400KB), 10월 22일 새 글 제목 때문에 다른 글 2편이 482KB와 473KB(상한 470KB)였습니다. 10월 23일에는 그림 도구가 글꼴이 빈칸으로 그리는 글자에서 멈추도록 검사를 더했습니다.</p>
+      <figure class="ax-fig"><img src="/assets/ax/static-site-check-gate-1-ko.webp" width="1200" height="826" alt="단계 그림: 10월 5일 빌드 직후 out of date 2개, 10월 18일 통합 빌드 게이트 오류 101건, 10월 19일 rebase 뒤 홈 글꼴 421KB, 10월 22일 새 제목 때문에 다른 글 2편이 482KB와 473KB, 10월 23일 그림 도구에 BLANK GLYPH 검사 추가." loading="lazy"><figcaption>네 번 모두 커밋 전에 걸렸고, 홈 초과는 다른 세션의 커밋 위로 rebase한 뒤에야 보였습니다.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="ownership">
+      <h2 id="ownership">손으로 쓰는 곳은 본문과 데이터 파일뿐입니다</h2>
+      <p>파일마다 쓰는 쪽은 하나뿐입니다. 저장소의 AGENTS.md에 있는 표를 줄이면 이렇습니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>누가 쓰나</th><th>무엇을</th></tr></thead>
+        <tbody>
+          <tr><td>글 쓰는 사람·에이전트</td><td>손 페이지의 <code>&lt;title&gt;</code>, description, <code>&lt;main&gt;</code>(빌드 블록 제외), <code>data/apps.json</code>, <code>data/ax.json</code></td></tr>
+          <tr><td>빌드 담당 세션 하나</td><td><code>tools/*.py</code>, 통합 빌드 실행</td></tr>
+          <tr><td>빌드만</td><td>head·헤더·푸터·이동 경로·JSON-LD, 홈·목록·주제 페이지, sitemap·RSS·robots·llms.txt, 날짜 파일, 생성 CSS</td></tr>
+        </tbody>
+      </table></div>
+      <p>손 페이지 안에서도 빌드가 채우는 자리는 <code>&lt;!-- build:meta --&gt;</code> 같은 표시로 구분합니다. 빌드는 매번 이 블록을 비우고 다시 넣으며, 그 밖의 <code>&lt;main&gt;</code>은 바이트 그대로 둡니다(앱 설치 링크의 추적 값 하나만 예외). 글을 쓰는 쪽은 빌드를 돌리지 않고 읽기 전용 검사 <code>python tools/checks.py --file &lt;파일&gt;</code>만 씁니다.</p>
+      <p>이 규칙은 처음부터 있지 않았습니다. 10월 18일 개편 명세는 에이전트가 썼고, 작업 묶음마다 "끝에 build와 --check를 돌려라"와 "생성 HTML은 건드리지 마라"를 함께 요구했습니다. 명세를 공격하는 역할을 맡은 리뷰 에이전트가 이 둘이 모순이라고 지적했습니다. 빌드는 모든 손 페이지의 머리와 꼬리를 다시 쓰므로, 한 세션이 검증하려고 빌드를 돌리면 다른 세션이 고치는 파일 60여 개가 달라집니다. 그 뒤로 통합 빌드는 한 번, 한 곳에서만 돌립니다.</p>
+      <p>rebase 충돌도 같은 원칙으로 해결합니다. 10월 19일 충돌 난 파일은 404.html, 소개·앱 페이지, rss.xml처럼 빌드가 다시 쓰는 파일이었고, 이 파일들은 다른 세션 쪽을 받고 AX 글만 내 쪽을 고른 뒤 다시 빌드했죠. 생성 파일은 손으로 고치지도 병합하지도 마십시오. 한쪽을 고르고 다시 빌드한 뒤 <code>--check</code>가 0을 낼 때만 커밋하십시오.</p>
+      <p>빌드 모듈 6개는 <code>hashlib</code>, <code>html.parser</code>, <code>xml.etree</code> 같은 표준 라이브러리만 씁니다. 설치할 패키지가 없습니다. 그림 도구 4개(775줄)는 Pillow가 필요하고 <code>--check</code> 밖에 있습니다.</p>
+    </section>
+
+    <section aria-labelledby="idempotency">
+      <h2 id="idempotency">멱등성은 두 번 빌드가 아니라 내일 날짜 빌드로 확인합니다</h2>
+      <p>10월 5일 에이전트가 첫 빌드 스크립트(커밋 시점 725줄)를 쓰고 바로 돌렸을 때 결과는 이랬습니다.</p>
+      <pre><code>45 files, 45 changed
+out of date:
+  apps/sugarcard/index.html
+  sitemap.xml</code></pre>
+      <p>한 번 더 빌드하자 2개가 바뀌었고, 그다음에는 up to date였습니다. 달라진 줄은 sitemap의 lastmod 날짜였습니다.</p>
+      <p>원인은 두 단계였습니다. 가까운 원인은 계산 순서입니다. 빌드가 lastmod를 <code>git status</code>와 <code>git log</code>에서 읽었는데, 파일을 쓰기 전에 읽었습니다. 빌드가 파일을 쓰면 git 상태가 바뀌고, 다음 빌드는 다른 입력을 봅니다. 그 밑의 원인은 날짜가 내용이 아니라 저장소 상태와 벽시계에서 나왔다는 점입니다. 빌드 입력에 빌드 자신의 흔적이 들어간 겁니다.</p>
+      <p>리뷰 에이전트가 짚은 것과 그날 고친 것은 가까운 원인뿐이었습니다. "이번 빌드가 쓰는 파일은 오늘 날짜"라는 집합을 하나 더하자 같은 날 두 번 빌드는 통과했습니다. 날짜를 git에서 읽는 구조는 남았죠. 두 번 돌려 수렴하면 멱등처럼 보이지만, 같은 입력으로 다음 날 빌드하면 날짜가 또 움직입니다. 그래서 같은 날 두 번 빌드로는 이 결함을 볼 수 없습니다.</p>
+      <p>13일 뒤 개편에서 이 구조를 걷어냈는데, 개편 명세(역시 에이전트 작성)에도 같은 종류의 순환이 둘 있었습니다. 앱 페이지의 "최종 업데이트" 줄이 해시 대상 안에 있어 날짜가 해시를, 해시가 다시 날짜를 바꿨고, 빌드가 <code>site.css</code>에 생성 블록을 쓰는데 CSS 버전 값은 그 파일의 해시였습니다. 리뷰 에이전트는 두 번째 것이 "<code>--check</code>가 영원히 한 번씩 실패한다"고 적었습니다. 둘 다 구현 전에 고쳤습니다.</p>
+      <p>CSS 쪽은 생성 CSS를 별도 파일로 메모리에서 먼저 만들고, 버전 값을 계산해 넣은 뒤에 디스크에 쓰게 했습니다. 날짜 쪽 규칙(본문 해시, <code>SOURCE_DATE</code> 환경 변수)은 <a href="/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a>에 적었습니다.</p>
+      <p>10월 18일 통합 때는 파일 445개의 sha256을 빌드 1회차, 2회차, <code>SOURCE_DATE</code> 실행 뒤에 떠서 비교했고 차이는 0이었습니다. 10월 24일 스크래치 사본에서 다시 돌린 결과입니다.</p>
+      <pre><code>$ SOURCE_DATE=2026-10-25 python tools/build.py
+162 files, 0 changed
+$ SOURCE_DATE=2026-12-31 python tools/build.py
+162 files, 0 changed</code></pre>
+    </section>
+
+    <section aria-labelledby="gate-was-wrong">
+      <h2 id="gate-was-wrong">첫 통합에서 틀린 쪽은 게이트였습니다</h2>
+      <p>10월 18일 개편은 에이전트 36명이 나눠 맡은 워크플로였고, 2시간 24분 걸렸습니다. 작업 묶음을 합친 첫 <code>--check</code>는 다시 쓸 파일 0개, 게이트 오류 101건으로 실패했습니다. 빌드는 멱등이었고, 걸린 것은 검사였습니다.</p>
+      <figure class="ax-fig"><img src="/assets/ax/static-site-check-gate-2-ko.webp" width="1200" height="662" alt="막대그림: 2026년 10월 18일 통합 빌드의 첫 --check 오류 101건 중 BUDGET-FONT 43건, ANCHOR-DUP 24건, DATA-APP 19건, BUDGET-OG 14건, LINK-BROKEN 1건." loading="lazy"><figcaption>가장 많은 오류는 글이 아니라 게이트의 집계 방식에서 나왔습니다.</figcaption></figure>
+      <p>가장 많은 BUDGET-FONT 43건은 대부분 검사 코드가 틀린 경우였습니다. 영어 페이지의 ©는 CSS에서 시스템 글꼴로 그리는데, 검사 코드는 이 글자까지 세어 글꼴 조각이 더 필요하다고 계산했습니다. 진짜 낭비도 하나 있었습니다. 이동 경로의 구분 기호 <code>›</code> 한 글자 때문에 이동 경로가 있는 페이지마다 25KB 조각 하나를 더 받고 있었죠. 검사 코드의 글자 집계를 CSS 규칙과 맞추고, 구분 기호는 시스템 글꼴로 돌렸습니다. 나머지는 같은 문구로 두 주소를 가리킨 링크, 디자인 예시의 앱 색 표시, 200KB를 넘은 공유 이미지, 깨진 링크였습니다.</p>
+      <p>게이트를 고칠 때는 테스트를 같이 고칩니다. 이때 테스트 6개를 더했고, 새로 넣은 가드 8개를 하나씩 지운 사본에서 테스트가 모두 실패하는 것을 확인했습니다. 10월 24일 기준 검사 코드 106개는 하나도 빠짐없이 <code>test_checks.py</code>에 이름이 나오고, 테스트는 전부 188개입니다.</p>
+      <p>통합 에이전트는 게이트 두 곳을 스스로 정했습니다. 명세에 상한이 없는 개별 방침과 디자인 예시 페이지는 글꼴 초과를 경고로만 냈고, 생성 글꼴 CSS 상한은 20KB에서 24KB로 올렸죠. 둘 다 "확인이 필요하다"고 보고서에 적었습니다. 운영자는 같은 보고서의 다른 결정 항목(방침의 책임자 표기를 사업자 이름으로)을 그날 저녁 정했습니다. 24KB 쪽 코드 주석은 10월 24일에도 "확인하거나 낮춰야 한다"는 문장 그대로입니다. 숫자 상한을 바꾸는 커밋은 게이트를 통과합니다. 그래서 상한 변경은 따로 사람이 봐야 합니다.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EC%97%AC%EB%9F%AC%20%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EC%84%B8%EC%85%98%EC%9D%B4%20%EA%B3%A0%EC%B9%98%EB%8A%94%20%EC%A0%95%EC%A0%81%20%EC%82%AC%EC%9D%B4%ED%8A%B8%3A%20%EC%BB%A4%EB%B0%8B%20%EC%A0%84%20--check%20%EA%B2%8C%EC%9D%B4%ED%8A%B8%20%ED%95%98%EB%82%98">메일로 문의하기</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="font-budget">
+      <h2 id="font-budget">글꼴 예산은 다른 글의 제목으로도 깨집니다</h2>
+      <p>이 사이트의 한글 글꼴은 92개 조각으로 나뉘어 있고, 페이지는 자기 글자가 들어 있는 조각만 받습니다. 상한은 글 페이지 470KB, 홈과 목록 페이지 400KB입니다. 드문 음절 하나가 17~40KB 조각 하나를 더 부르기 때문에, 첫날 AX 노트 세 편 중 두 편이 619KB와 533KB였습니다. 그날 드문 음절이 든 단어를 흔한 말로 고쳤습니다.</p>
+      <p>홈은 사정이 달랐습니다. 홈에는 최신 AX 노트 제목 3개가 들어갔고, 그 제목은 매일 달라집니다. rebase로 다른 세션의 변경과 합쳐지자 421KB가 됐습니다. 제목을 고치는 대신 홈 목록을 주제 페이지 링크로 바꿨습니다(663f04e). 주제 이름은 고정 문구라 비용이 움직이지 않습니다. 10월 22일 허브의 주제 카드에서 글 제목을 없앤 것도 같은 이유였고, 허브는 468KB에서 389KB로 줄었습니다(6b96643).</p>
+      <p>10월 22일에는 새 글 제목에 든 <code>쟀</code> 한 글자가 관련 글 목록을 타고 다른 글 두 편에 들어가, 그 두 편이 482KB와 473KB가 됐습니다. 새 글 파일 하나만 검사하면 통과합니다. 제목을 "측정했나"로 바꾸자 450KB와 441KB로 내려갔습니다. 다른 페이지의 글이 섞여 들어가는 예산은 사이트 전체 출력에서 검사해야 합니다.</p>
+    </section>
+
+    <section aria-labelledby="og-images">
+      <h2 id="og-images">공유 이미지는 실제 화면만 쓰고 글자를 넣지 않습니다</h2>
+      <p><code>tools/og.py</code>는 앱·도움말 글의 공유 이미지를 실제 Play 스크린샷과 중립 배경만으로 만들고, 글자와 로고를 넣지 않습니다. 글자 카드는 홈·허브·소개·방침·AX 노트에만 씁니다.</p>
+      <p>이 규칙에는 구멍이 있습니다. 이미지는 <code>--check</code>가 다시 만들어 비교하는 대상이 아닙니다. 10월 24일 스크래치 사본에서 og.py를 돌리자 155개 중 4개가 커밋본과 달랐습니다. 10월 19일 새 앱 페이지와 함께 og.py를 거치지 않고 커밋된 앱 카드 2장(제목과 문구가 들어 있음)과, 그 앱 아이콘이 들어가기 전의 홈 카드 2장이었습니다. og.py는 두 번 돌려도 바이트가 같았으니, 생성기 출력과 다른 쪽은 커밋본입니다. 발행 절차는 관련 없는 이미지 변경을 커밋하지 않으므로, 10월 20일부터 24일까지 다섯 번 og.py를 돌린 뒤 이 4개를 커밋본으로 되돌렸습니다. <code>--check</code>가 0이어도 이 차이는 남는 거죠.</p>
+      <p>10월 23일 그림 도구에 넣은 빈 글자 검사의 경위는 <a href="/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a>에 있습니다.</p>
+    </section>
+
+    <section aria-labelledby="limits">
+      <h2 id="limits">브라우저 편집, 많은 페이지, CI 없는 저장소에는 맞지 않습니다</h2>
+      <p>글을 브라우저에서 쓰고 미리 보는 팀에는 맞지 않습니다. 여기서는 작성자가 HTML의 본문을 직접 고치고 명령을 실행합니다. 정적 사이트 생성기와 견줘 고른 기록은 없습니다. 다만 이 글의 네 번 중 세 번(10월 18일, 19일, 22일)은 전체 출력에 대한 검사에서 나왔으니, 생성기를 써도 그 검사와 날짜 규칙은 따로 만들어야 합니다.</p>
+      <p>페이지가 아주 많으면 비용이 커집니다. <code>--check</code>는 매번 전부 다시 만들고 전부 비교합니다. 162개 파일에 11.6초는 괜찮지만 증분 빌드는 없습니다.</p>
+      <p>게이트는 강제되지 않습니다. 저장소에 CI 작업이 없어서, 커밋 전에 누군가 이 명령을 돌려야 작동합니다. 게이트가 틀릴 수 있다는 점도 남습니다. 10월 18일 오류 43건이 그랬고, 상한을 올리는 커밋은 게이트가 막지 못합니다.</p>
+    </section>
+
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">다른 사이트에 --check 게이트를 들이는 순서</h2>
+      <ol>
+        <li>누가 어떤 파일을 쓰는지 AGENTS.md 같은 지침 파일 첫머리에 표로 적고, 생성 파일은 손대지 않는다고 못박습니다.</li>
+        <li>손 페이지 안에서 빌드가 채우는 자리는 <code>&lt;!-- build:NAME --&gt;</code> 블록으로 표시하고, 빌드는 매번 비우고 다시 넣습니다.</li>
+        <li><code>--check</code>는 모든 출력을 메모리에 만든 뒤 디스크와 비교하고, 같은 출력에 검사를 돌려 둘 중 하나라도 걸리면 exit 1을 냅니다.</li>
+        <li>날짜와 버전 값은 내용 해시로 정하고, 해시 입력에서 날짜 줄과 자동 목록을 제외합니다.</li>
+        <li>멱등성은 세 번 확인합니다: 연속 두 번 빌드, 내일 날짜 빌드, 과거 날짜 빌드(날짜가 뒤로 가지 않는지).</li>
+        <li>검사마다 고정 코드를 붙이고, 그 코드가 실제로 나는지 확인하는 테스트를 둡니다. 가드를 지운 사본에서 테스트가 실패하는지도 봅니다.</li>
+        <li>글 쓰는 세션은 파일 단위 읽기 전용 검사만 하고, 통합 빌드는 한 세션이 한 번 돌립니다.</li>
+        <li>rebase에서 생성 파일이 충돌하면 한쪽을 고른 뒤 다시 빌드하고 <code>--check</code>를 돌립니다.</li>
+        <li>다른 페이지의 글이 섞여 들어가는 예산(글꼴, 크기)은 전체 출력에서 검사하고, 매일 바뀌는 목록은 공통 페이지에 넣지 않습니다.</li>
+        <li>상한 숫자를 바꾸는 커밋은 사람이 따로 봅니다.</li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">다음에 확인할 것</h2>
+      <p>이미지는 아직 게이트 밖입니다. 다음 확인은 og.py 출력과 커밋본을 비교하는 단계를 <code>--check</code>에 넣는 것이고, 그 전에 글자가 든 앱 카드를 og.py의 예외로 둘지 생성기 출력으로 바꿀지 정해야 합니다. 글꼴 CSS 상한 24KB와 경고로만 내는 두 페이지는 아직 사람이 확인하지 않았습니다.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EC%97%AC%EB%9F%AC%20%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EC%84%B8%EC%85%98%EC%9D%B4%20%EA%B3%A0%EC%B9%98%EB%8A%94%20%EC%A0%95%EC%A0%81%20%EC%82%AC%EC%9D%B4%ED%8A%B8%3A%20%EC%BB%A4%EB%B0%8B%20%EC%A0%84%20--check%20%EA%B2%8C%EC%9D%B4%ED%8A%B8%20%ED%95%98%EB%82%98">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>빌드 결과 HTML도 git에 커밋하나요?</summary><div><p>커밋합니다. GitHub Pages가 저장소 파일을 그대로 내보내므로(.nojekyll로 Jekyll 처리도 끔) 빌드 결과가 곧 배포본입니다. <code>--check</code>는 커밋된 결과가 지금 입력으로 다시 만든 결과와 같은지 확인합니다.</p></div></details>
+        <details><summary>정적 사이트 빌드가 멱등인지 어떻게 확인하나요?</summary><div><p>연속 두 번, 내일 날짜, 과거 날짜로 빌드해 바뀌는 파일이 0개인지 봅니다. 같은 날 두 번은 통과해도 다음 날 날짜가 움직이는 결함이 있어서, 날짜를 환경 변수로 바꿀 수 있게 만들어 두는 것이 먼저입니다.</p></div></details>
+        <details><summary>여러 AI 에이전트 세션이 같은 사이트 저장소를 고칠 때 충돌은 어떻게 푸나요?</summary><div><p>본문과 데이터 같은 원본만 병합하고, 생성 파일은 한쪽을 고른 뒤 다시 빌드해 <code>--check</code>를 통과해야 커밋합니다. 이 사이트의 홈 글꼴 초과도 이 단계에서 처음 드러났습니다.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="/ax/ai-region-privacy-policy/">개인정보처리방침 AI 처리 위치(국외 이전): 하루에 두 번 고친 고지를 코드에 묶기</a></li>
+        <li><a href="/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
+        <li><a href="/ax/market-check-before-app/">사진 앱 3개를 만든 뒤에야 시장 조사를 했다: 올해 나온 경쟁 앱 설치 중앙값 1,166</a></li>
+        <li><a href="/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
+        <li><a href="/ax/commit-messages-701/">커밋 701개로 본 AI 코딩 1년: &#x27;완성&#x27;에서 &#x27;원인·검증&#x27;으로</a></li>
+        <li><a href="/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
+      </ul>
+      <p><a href="/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="/ax/">AX 노트 전체 보기</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>한 가지 일을 간단하게 하는 Android 앱</p>
+        <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">앱</p>
+        <ul><li><a href="/apps/sugaralbum/">슈가앨범</a></li><li><a href="/apps/image-compress/">사진 용량 줄이기</a></li><li><a href="/apps/image-flip/">사진 반전·회전</a></li><li><a href="/apps/image-convert/">이미지 변환 JPG·PNG·WebP</a></li><li><a href="/apps/sugarspeller/">한글 띄어쓰기</a></li><li><a href="/apps/sugarclip/">SugarClip</a></li><li><a href="/apps/doc-viewer/">한글뷰어 슈가독</a></li><li><a href="/apps/sugarcard/">생생카드</a></li><li><a href="/apps/arrow-knots/">화살표 매듭풀기</a></li><li><a href="/apps/blocks/">한판블록</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">사이트</p>
+        <ul><li><a href="/apps/">모든 앱</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li><li><a href="/rss.xml">RSS 피드</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play 개발자 페이지</a></div>
+    </div>
+  </footer>
+</body>
+</html>
