@@ -1419,14 +1419,6 @@ def section_rank(relpath):
     bare = bare_of(relpath)
     return 0 if bare == "index.html" else 1 if bare.startswith("apps/") else 2 if bare.startswith("ax/") else 3
 
-def alternates(relpath, pages):
-    """(ko_path, en_path) when both language files exist, else None. Shared by sitemap and head()."""
-    bare = "/" + bare_of(relpath)[:-len("index.html")]
-    ko_p, en_p = bare, "/en" + bare
-    if relpath_of(ko_p) in pages and relpath_of(en_p) in pages:
-        return ko_p, en_p
-    return None
-
 SITEMAP_PARTS = (("sitemap-main.xml", (0, 3)), ("sitemap-apps.xml", (1,)), ("sitemap-ax.xml", (2,)))  # home+about+policies, apps, AX notes
 
 def sitemap_rank(relpath):
@@ -1566,7 +1558,7 @@ def build_llms(outputs):
              f"- [All apps]({SITE}/en/apps/) · [앱 전체 (Korean)]({SITE}/apps/)",
              f"- [About SugarMount]({SITE}/en/about/) · [소개 (Korean)]({SITE}/about/)",
              f"- [RSS feed (English)]({SITE}/en/rss.xml) · [RSS 피드 (Korean)]({SITE}/rss.xml)",
-             f"- [Sitemap]({SITE}/sitemap.xml)", "",
+             f"- [Site map: every page]({SITE}/en/sitemap/) · [사이트맵 (Korean)]({SITE}/sitemap/) · [XML sitemap]({SITE}/sitemap.xml)", "",
              "## Apps", ""]
     for a in APPS:
         d, k = a["en"], a["ko"]
