@@ -30,7 +30,7 @@
   <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=2227fbc3">
   <link rel="stylesheet" href="/assets/site.css?v=2227fbc3">
   <link rel="stylesheet" href="/assets/sds-apps.css?v=2227fbc3">
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/en/ax/release-gate/#article","headline":"What to check before shipping an AI-built Android app: the release gate and an R8 crash","description":"Our Android app ran fine in debug but crashed at launch in release after R8 removed a constructor. Now every upload passes three pre-release checks.","url":"https://mvgood21.github.io/en/ax/release-gate/","mainEntityOfPage":"https://mvgood21.github.io/en/ax/release-gate/","inLanguage":"en","articleSection":"Testing and release","datePublished":"2026-10-18T09:00:00+09:00","dateModified":"2026-10-22T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-release-gate-en.png","https://mvgood21.github.io/assets/ax/cover/release-gate-en.webp","https://mvgood21.github.io/assets/ax/release-gate-1-en.webp"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/en/ax/release-gate/#article","headline":"What to check before shipping an AI-built Android app: the release gate and an R8 crash","description":"Our Android app ran fine in debug but crashed at launch in release after R8 removed a constructor. Now every upload passes three pre-release checks.","url":"https://mvgood21.github.io/en/ax/release-gate/","mainEntityOfPage":"https://mvgood21.github.io/en/ax/release-gate/","inLanguage":"en","articleSection":"Testing and release","datePublished":"2026-10-18T09:00:00+09:00","dateModified":"2026-10-25T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-release-gate-en.png","https://mvgood21.github.io/assets/ax/cover/release-gate-en.webp","https://mvgood21.github.io/assets/ax/release-gate-1-en.webp"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Can you catch R8 problems in advance?","acceptedAnswer":{"@type":"Answer","text":"The surest way is to actually launch a build shrunk with the release settings on a device. Debug builds and unit tests never go through shrinking, so they cannot catch a missing keep rule."}},{"@type":"Question","name":"Is an emulator enough?","acceptedAnswer":{"@type":"Answer","text":"It was not. State loss after process death, and \"keep original name\" failing because of the file names the photo picker hands over, showed up only in on-device tests. Use the emulator for quick checks and a real device before release."}},{"@type":"Question","name":"Are the gate scripts public?","acceptedAnswer":{"@type":"Answer","text":"The repository is private. The table above lists every check shared by all apps, so you can build the same thing in the same order. The HWP viewer adds checks that compare its document engine files and fonts against pinned sources."}}]}</script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://mvgood21.github.io/en/ax/"},{"@type":"ListItem","position":3,"name":"Testing and release","item":"https://mvgood21.github.io/en/ax/topic/quality/"},{"@type":"ListItem","position":4,"name":"What to check before shipping an AI-built Android app: the release gate and an R8 crash"}]}</script>
   <link rel="stylesheet" href="/assets/ax.css?v=2227fbc3">
@@ -76,7 +76,7 @@
       <h1>What to check before shipping an AI-built Android app: the release gate and an R8 crash</h1>
       <p class="lead">An Android app built with an AI coding agent can run fine as a debug build and still crash the moment its release build starts. So every upload first passes a release gate, a release-build launch check and on-device tests.</p>
 
-    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Testing and release</span> <span aria-hidden="true">·</span> <span>5 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-10-22">October 22, 2026</time></p><!-- /build:meta -->
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Testing and release</span> <span aria-hidden="true">·</span> <span>5 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-10-25">October 25, 2026</time></p><!-- /build:meta -->
       <p>On September 23, 2026, the code shrinker R8 removed a single constructor from SugarMount's first app, <a href="/en/apps/image-compress/">Compress Image</a>, and every release build crashed at launch. Since then each upload goes through three steps: a release gate, a launch check of the minified release build, and on-device end-to-end tests.</p>
       <p class="note">Scripts and numbers come from the code, changelog and on-device QA reports of SugarMount's app repository (sugar-utils), as of October 18, 2026.</p>
     </section>
@@ -97,7 +97,6 @@
         <li><strong>Fix</strong>: One line in the shared ads module's consumer rules. Room 2.3 and later ship this rule themselves.</li>
       </ul>
       <div class="table-wrap"><table><tbody><tr><td><code>-keep class * extends androidx.room.RoomDatabase { &lt;init&gt;(); }</code></td></tr></tbody></table></div>
-      <p>The fix was one line. The lesson was bigger: nothing is verified until the release build has run on a device.</p>
     </section>
 
     <section aria-labelledby="release-gate">
@@ -147,7 +146,7 @@
         </table>
       </div>
       <p>No crashes and no damaged originals; the minified release builds of all three launched cleanly both times. But there were nine major defects with five distinct causes. The biggest, shared by all three apps: if the system killed the app mid-job, the progress screen froze at 0 / 0. Neither the emulator nor the unit tests had shown it.</p>
-      <p>These tests ran after the apps had been submitted for production review. Wrong order. Now end-to-end tests come before submission; after the fixes, 410 unit tests, lint and all three release gates passed again before release.</p>
+      <p>These tests ran after the apps had been submitted for production review, which was the wrong order. Now end-to-end tests come before submission; after the fixes, 410 unit tests, lint and all three release gates passed again before release.</p>
       <figure class="ax-fig"><img src="/assets/ax/release-gate-1-en.webp" width="1200" height="770" alt="Three-step diagram: release gate, two launches of the minified release build, and on-device E2E on a Galaxy S21 that found nine major defects." loading="lazy"><figcaption>The three checks every upload goes through; the last one, on a real device, found nine major defects.</figcaption></figure>
     </section>
 
@@ -156,7 +155,7 @@
       <ul>
         <li><strong>"It builds" is not "done".</strong> Agents tend to report completion once code compiles. Make them report which device checked what, and what was not checked.</li>
         <li><strong>Test the test tools.</strong> A script that waits for a screen once exited with success on timeout, so later checks ran on the wrong screen. It now fails on timeout.</li>
-        <li><strong>Verify with a different agent.</strong> In on-device QA, three per-app agents found defects and a fourth reproduced each one with its own screenshots and traced the cause in the code. Whoever built it misses things when checking their own work.</li>
+        <li><strong>Verify with a different agent.</strong> In on-device QA, three per-app agents found defects and a fourth reproduced each one with its own screenshots and traced the cause in the code.</li>
       </ul>
     </section>
 
