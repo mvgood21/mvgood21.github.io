@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI coding agents and secrets: chat, logs, tokens – SugarMount</title>
+  <meta name="description" content="Three ways secrets leak around an AI coding agent: a key in a session log, two exceptions a copied masking regex missed, a deploy plan asking for a wider token.">
+  <link rel="canonical" href="https://mvgood21.github.io/en/ax/secrets-three-layers/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/secrets-three-layers/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/secrets-three-layers/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/secrets-three-layers/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="AI coding agents and secrets: chat, logs, tokens – SugarMount">
+  <meta property="og:description" content="Three ways secrets leak around an AI coding agent: a key in a session log, two exceptions a copied masking regex missed, a deploy plan asking for a wider token.">
+  <meta property="og:url" content="https://mvgood21.github.io/en/ax/secrets-three-layers/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-secrets-three-layers-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/en/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=2227fbc3">
+  <link rel="stylesheet" href="/assets/site.css?v=2227fbc3">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=2227fbc3">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/en/ax/secrets-three-layers/#article","headline":"AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed","description":"Three ways secrets leak around an AI coding agent: a key in a session log, two exceptions a copied masking regex missed, a deploy plan asking for a wider token.","url":"https://mvgood21.github.io/en/ax/secrets-three-layers/","mainEntityOfPage":"https://mvgood21.github.io/en/ax/secrets-three-layers/","inLanguage":"en","articleSection":"Testing and release","datePublished":"2026-10-26T09:00:00+09:00","dateModified":"2026-10-26T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-secrets-three-layers-en.png","https://mvgood21.github.io/assets/ax/cover/secrets-three-layers-en.webp","https://mvgood21.github.io/assets/ax/secrets-three-layers-1-en.webp","https://mvgood21.github.io/assets/ax/secrets-three-layers-2-en.webp"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Is it safe to let an AI coding agent read my .env file?","acceptedAnswer":{"@type":"Answer","text":"Not in a way that prints values. Agent tool output is stored in the session log as is. With cut -d= -f1 .env for key names and grep -c for counts, the agent can still tell whether a setting is missing."}},{"@type":"Question","name":"Why is a masking regex copied into several files a problem?","acceptedAnswer":{"@type":"Answer","text":"What one copy handles doesn't carry over to the others. In this chat app the web copies masked failure messages too, while two failure exceptions in the mobile file sent the token unmasked. One function plus a source-guard test that fails on copies prevents it."}},{"@type":"Question","name":"How do I cut down the cloud token permissions an agent uses?","acceptedAnswer":{"@type":"Answer","text":"List the permissions each feature needs, and before creating a credential, check whether an existing binding or shared key can do the same job. That way the family app's Worker was redesigned to run without KV edit or billing read permissions, a usage-API token or S3 credentials; by design its token needs 2 permissions."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://mvgood21.github.io/en/ax/"},{"@type":"ListItem","position":3,"name":"Testing and release","item":"https://mvgood21.github.io/en/ax/topic/quality/"},{"@type":"ListItem","position":4,"name":"AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=2227fbc3">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/secrets-three-layers/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-quality">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/quality/">Testing and release</a></li><li><span aria-current="page">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/secrets-three-layers-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX notes · How-to</span>
+      <h1>AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</h1>
+      <p class="lead">Give the agent commands that check without printing values, keep log masking in one function guarded by a test that fails on copies, and give deploy tokens only the permissions the code needs.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Testing and release</span> <span aria-hidden="true">·</span> <span>13 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-10-26">October 26, 2026</time></p><!-- /build:meta -->
+      <p>Four copies of a log-masking regex were being merged into one function when two exceptions in one of those files turned out to carry the auth token in clear text. That was in a peer-to-peer chat app on September 13, 2026, six days after the defect had been marked fixed. The same pattern showed up twice more: on October 2 an agent printed the last 150 lines of the shell history and an API key landed in the session log, and on October 10 the deploy plan for a family app asked for a wider Cloudflare token.</p>
+      <p class="note">Sources: git history and tests from three repositories (the chat app, a Korean spell checker app, and a family app still in development) and the agent session logs. Session-log counts were redone on October 25, 2026. Every secret shown below is a placeholder such as <code>XXXX</code>.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (9)</summary><ol><li><a href="#three-layers">One rule, three places it has to hold</a></li><li><a href="#chat">Chat: the first secrets rule was written 47 seconds after a key reached the session log</a></li><li><a href="#logs">Logs: four copies of a masking regex, and two exceptions that never masked</a></li><li><a href="#release-log">Release logcat also carried what users typed</a></li><li><a href="#permissions">Permissions: the Worker was redesigned instead of adding permissions to the token</a></li><li><a href="#limits">A copy written another way passes the source guard, and masking does not protect the token</a></li><li><a href="#how-to">Checks to add to agent instructions, masking code and token scopes</a></li><li><a href="#next">One stale doc line, one transcript line, one undeployed Worker</a></li><li><a href="#faq">FAQ</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#three-layers">One rule, three places it has to hold</a></li><li><a href="#chat">Chat: the first secrets rule was written 47 seconds after a key reached the session log</a></li><li><a href="#logs">Logs: four copies of a masking regex, and two exceptions that never masked</a></li><li><a href="#release-log">Release logcat also carried what users typed</a></li><li><a href="#permissions">Permissions: the Worker was redesigned instead of adding permissions to the token</a></li><li><a href="#limits">A copy written another way passes the source guard, and masking does not protect the token</a></li><li><a href="#how-to">Checks to add to agent instructions, masking code and token scopes</a></li><li><a href="#next">One stale doc line, one transcript line, one undeployed Worker</a></li><li><a href="#faq">FAQ</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="three-layers">
+      <h2 id="three-layers">One rule, three places it has to hold</h2>
+      <p>The rule fits in a sentence: never copy a secret's value anywhere; say where it is and what kind it is. With a coding agent in the loop it has to hold in three places. Whatever the agent reads ends up in the session log, the code it writes can put values into logs and exception messages, and the deployments it designs can ask for broader tokens than the code needs.</p>
+      <figure class="ax-fig"><img src="/assets/ax/secrets-three-layers-1-en.webp" width="1200" height="966" alt="Step diagram: Sep 7-8, a masking regex copied into 4 files; Sep 13, one function and 2 unmasked exceptions fixed; Oct 2, a key printed into a session log, then a location-and-type-only rule; Oct 11, a Worker redesigned around a token with 2 permissions; Oct 17, a test that must catch 7 old leaking log lines." loading="lazy"><figcaption>The same rule went into chat, code and token permissions, and the first version in each place had a gap.</figcaption></figure>
+      <p>In all three places the agent did the fixing. The person running these projects (the operator below) made two main decisions: the rule should apply to every session, and the agent should stop handing work back and do it itself.</p>
+    </section>
+
+    <section aria-labelledby="chat">
+      <h2 id="chat">Chat: the first secrets rule was written 47 seconds after a key reached the session log</h2>
+      <p>The agent printed the last 150 lines of the shell history at 8:47 on October 2. The operator had asked it to fill in the shared instructions every session reads, and it wanted to learn the setup. One of them exported an AI API key. Tool output is saved verbatim in the session log, so the key was now part of the transcript.</p>
+      <p>At that moment the instruction file held only rules about reply format. Forty-seven seconds after the key was printed, the agent wrote the first secrets rule into it: one line saying secrets stay out of any output. It said what not to do and nothing about how to check, and for an agent, reading a file and printing it are the same action. Eighteen seconds later the agent told the operator that an AI API key sat in plain text in the shell history, giving the location and kind but not the value.</p>
+      <p>At 8:55 the operator asked for a rule that keeps passwords and personal data out of every session's chat, and the agent replaced the one line with a rule that also says how to check. The gist: never write a value, only where it is and what kind. Files are checked with commands that show key names and line counts (<code>grep -c</code>, <code>cut -d= -f1</code>), and commands take environment variables or file references instead of values. It covers commits, docs and memory files as well as chat, and a value someone pastes in is not quoted back; the agent recommends rotating it. The scope also widened from secrets to personal data.</p>
+      <p>The agent deleted the four history lines that held the key (three <code>export</code> lines and one secret-registration command that took the value as an argument) and counted again: zero. It reported two places it left for later: the log file of the session still running, which could break if edited mid-session, and the terminal window where the key had been typed. The report ended by saying that deleting doesn't undo the exposure and rotating the key is the only sure fix, and that a new key should be registered by name with the value typed at the prompt.</p>
+      <p>On October 25 we recounted across the 109 main session logs. The key-names-only command <code>cut -d= -f1</code> appears 24 times, every dated one from October 3 on; with subagent logs included it is 2 in September and 179 in October. Counting <code>.env</code> lines with <code>grep -c</code> was already a habit in September (25 times), so what grew is the names-only check. Lines matching three known key shapes (the newer AI API key format, GitHub tokens, <code>sk-</code> keys) came to exactly one across all 2,567 logs including subagents: that 8:47 output.</p>
+      <pre><code># .env: line count and key names, no values
+grep -c '=' .env
+cut -d= -f1 .env
+
+# shell history: how many lines mention that key name
+grep -c 'API_KEY' ~/.bash_history
+
+# commands reference values instead of containing them
+curl -H "Authorization: Bearer $API_TOKEN" https://api.example.com/v1/ping
+wrangler secret put SIGNING_KEY &lt; secrets/signing-key</code></pre>
+    </section>
+
+    <section aria-labelledby="logs">
+      <h2 id="logs">Logs: four copies of a masking regex, and two exceptions that never masked</h2>
+      <p>The chat app (Flutter) passes a shared token as <code>?token=</code> in the signaling server URL. On September 7, the agent reviewing platform security before release rated this High: the discovery logs went through <code>debugPrint</code>, which prints in release builds too, and four connect-log lines wrote the whole URL.</p>
+      <p>The reviewing agent proposed <code>Uri.parse(url).replace(query: null)</code>. The agent assigned to fix it reported that this keeps the query: in Dart's <code>Uri.replace</code>, a null argument means "keep the existing component". It switched to a one-line regex instead.</p>
+      <p>The copies came from how the work was split. Several fix agents each owned a set of files that day. The mobile owner's scope was "one masking line" in its two files, and the two web files went to another owner as a request. Shortly after midnight, the web side got its own <code>_maskToken</code> wrapping the same regex. A docs pass on September 8 and 9 wrote down "regex duplicated in 4 files; extracting a shared helper is still open", while the defect list already said Fixed, dated September 7.</p>
+      <p>On September 13 (555680e), writing the shared function meant looking at every place each file turned the URL into a string. Two <code>HttpException</code> sites in the mobile HTTP client had no masking at all: a failed SSE connection put the token into the exception's <code>uri</code>, and a failed POST put it into both the message and the <code>uri</code>. The mobile owner's first fix had covered the success log line only, and the failure exceptions in the same file were outside it. The web copies masked their failure messages too.</p>
+      <pre><code>String maskSignalingUrl(String url) =&gt;
+    url.replaceAllMapped(_signalingToken, (m) =&gt; '${m[1]}***');
+
+final RegExp _signalingToken = RegExp(
+  r'([?&amp;](?:token|secret)=)[^&amp;#\s]*',
+  caseSensitive: false,
+);</code></pre>
+      <p>The new pattern ignores case, also covers <code>secret=</code>, and stops at <code>#</code> or whitespace. We ran the old pattern <code>([?&amp;]token=)[^&amp;]*</code> and the new one through Python's <code>re</code> on placeholder values to see the difference:</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Input</th><th>Old regex</th><th>New regex</th></tr></thead>
+        <tbody>
+          <tr><td><code>ws://h/ws?TOKEN=XXXX</code></td><td>unchanged</td><td><code>?TOKEN=***</code></td></tr>
+          <tr><td><code>ws://h/ws?secret=XXXX</code></td><td>unchanged</td><td><code>?secret=***</code></td></tr>
+          <tr><td><code>ws://h/ws?token=XXXX#frag</code></td><td><code>?token=***</code> (fragment eaten)</td><td><code>?token=***#frag</code></td></tr>
+          <tr><td><code>http://h/api/token/list</code></td><td>unchanged</td><td>unchanged</td></tr>
+        </tbody>
+      </table></div>
+      <p>Three kinds of tests went in with it: 7 rule tests, 1 source guard, and 1 real failure path. The failure-path test starts an HTTP server on the loopback address that answers 401 and checks that the client's exception text contains <code>token=***</code> and not the value. The source guard, shortened:</p>
+      <pre><code>test('no copy of the masking regex comes back in discovery', () {
+  final offenders = &lt;String&gt;[];
+  for (final f in Directory('lib/core/discovery').listSync()) {
+    if (f is! File || !f.path.endsWith('.dart')) continue;
+    if (f.path.endsWith('discovery_log.dart')) continue; // the definition
+    final src = f.readAsStringSync();
+    if (src.contains('token=)') || src.contains('_maskToken')) {
+      offenders.add(f.path);
+    }
+  }
+  expect(offenders, isEmpty);
+});</code></pre>
+      <p>It fails if the regex fragment <code>token=)</code> or the old helper's name shows up in any file other than the definition. The duplication stayed for five days after it was written down on September 8, so copies are now blocked by a test rather than left to review. Keep one masking function, and commit a test that fails when a copy appears.</p>
+      <p>The same commit replaced the peer's public-key fingerprint in the diagnostics map with a yes/no flag. That map goes straight to the diagnostics screen, reports and logs; the fingerprint is meant for a person to compare by eye, so the confirmation dialog reads it on its own.</p>
+    </section>
+
+    <section aria-labelledby="release-log">
+      <h2 id="release-log">Release logcat also carried what users typed</h2>
+      <p>On October 17, QA on the <a href="/en/apps/sugarspeller/">SugarSpeller</a> spell checker found the same class of bug in its release logcat (21895f6). Up to version 1.6.030, release builds logged the check request URL (which contains the user's text), the first 500 characters of the raw response, a session key for the external checking service on every resume, and the FCM push token. In the app's logging wrapper, <code>log.e</code> prints regardless of <code>BuildConfig.DEBUG</code>.</p>
+      <p>The fix followed the chat app: diagnostic lines moved to <code>log.d</code>, and keys and text are logged only as a length or a present/absent flag. <code>ReleaseLogSecretsTest</code> scans all main sources for log calls that print in release and looks only at interpolations and arguments outside string literals. Its first test feeds in the 7 old leaking lines and requires all 7 to be caught; the test comment says that if these are missed, the scan below is fake too. A release build of 1.6.031, the next development version, went onto a Galaxy S20, and logcat showed zero such lines. The same yardstick first appeared in <a href="/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a>.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20AI%20coding%20agents%20and%20secrets%3A%20one%20rule%20in%20chat%2C%20logs%20and%20token%20permissions%2C%20and%20the%20two%20exceptions%20a%20copied%20masking%20regex%20missed">Email us</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="permissions">
+      <h2 id="permissions">Permissions: the Worker was redesigned instead of adding permissions to the token</h2>
+      <p>The family app keeps photos in Cloudflare R2, with a media Worker handling uploads and reads. The deploy notes from the afternoon of October 10 listed three jobs for a person: add Workers KV edit and billing read to the deploy token, create a separate token for the usage analytics API, and issue an R2 S3 key pair so Firebase functions could delete objects. The reason was a free-tier guard that read Cloudflare's analytics API every hour and wrote a pause flag to KV.</p>
+      <p>At 22:52 that night the operator told the agent to do the work itself instead of handing it over. At 23:13 the agent reported that work to make the Worker run without any extra token was already under way, and at 00:04 it committed 2c906c7: 33 files, 1,238 lines added and 1,146 removed. The first design, one new credential per feature, had been the agent's own; this time it rebuilt the same features on the R2 binding, the Durable Object and the shared key it already had. By design the token needs 2 permissions: Workers Scripts Edit and R2 Edit.</p>
+      <ul>
+        <li>A Durable Object (a stateful object that runs next to the Worker) now counts the day's Worker requests, Durable Object requests and R2 reads and writes itself. When the total passes 25 to 50% of the free allowance (the share moves with the time of day), uploads and reads close for the day and reopen at the next midnight, Korea time. The 248-line cron file that read the analytics API is gone.</li>
+        <li>Functions delete R2 objects through a signed DELETE request to the Worker instead of S3 credentials. The signing key is derived from an HMAC key the functions and the Worker already shared; the signature covers method, path, keys, timestamp and nonce. Timestamps must be within ±60 seconds, a nonce works once, there is a daily cap of 3,000 requests and 30,000 objects, and only paths under the requesting family's folder are deleted.</li>
+        <li>Worker secrets went from 3 to 1, and billing read was never added. Checking once in the dashboard that the account is on the free plan was left to the operator.</li>
+      </ul>
+      <figure class="ax-fig"><img src="/assets/ax/secrets-three-layers-2-en.webp" width="1200" height="731" alt="Comparison: the Oct 10 plan adds 2 token permissions, a usage-API token, an R2 S3 key pair and needs 3 Worker secrets; the design in commit 2c906c7 on Oct 11 needs a token with 2 permissions and 1 Worker secret." loading="lazy"><figcaption>After the operator declined to take work back, the agent rebuilt the same features on credentials it already had instead of asking for more.</figcaption></figure>
+      <p>The cost is written down in the ops notes. Because the delete-signing key comes from the shared HMAC key, all 4 function service accounts that can read that key could in theory sign a delete. Before, only the delete function's account could read the R2 token. Narrowing it again means a separate delete key, which is one more Worker secret.</p>
+      <p>A read-only ops check on October 11 looked at the real token and found 3 permissions, one more than the design: Workers Scripts Edit, R2 Edit and Account Settings Read. With no billing read, the plan API answered with auth error 10000, which also confirms this token cannot change the plan or billing.</p>
+    </section>
+
+    <section aria-labelledby="limits">
+      <h2 id="limits">A copy written another way passes the source guard, and masking does not protect the token</h2>
+      <p>The source guard looks for two strings in one folder. A regex written another way, or a copy in another folder, passes. The spell checker's log scan works line by line, so a log call split across lines gets through.</p>
+      <p>Masking does not protect the secret itself. The chat app's token is a constant in the app binary and can be extracted, which is why the app treats it only as spam control. The server also accepts the token in a header, but the client still sends it in the query; the review found the web client cannot set that header, so the fix closed the path from URL to log instead.</p>
+      <p>The chat rule works only while the agent follows it, and the count only finds key shapes we know.</p>
+      <p>The same night the Worker was reworked to need no extra token, the agent's own tool permissions grew. The agent's permission checker blocked the IAM grant commands, and approval in chat did not lift the block; an allow rule in the settings was required. The agent asked for two lines, one script and all <code>gcloud</code> commands, and the operator replied four minutes later that they were added. At 23:13 it asked for three more lines allowing the workflow tool and all <code>npx firebase-tools</code> and <code>curl</code> commands. How we scope what an agent may do on its own is in <a href="/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a>.</p>
+    </section>
+
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Checks to add to agent instructions, masking code and token scopes</h2>
+      <ol>
+        <li>Put checking commands next to the prohibition in your agent instructions: <code>grep -c</code>, <code>cut -d= -f1</code>, and <code>$NAME</code> references in commands (on the file itself: <a href="/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a>).</li>
+        <li>Don't let the agent read the shell history or <code>.env</code> whole. Have it count the lines that mention a key name; delete any key it finds there and rotate it. Pass new values through a prompt or a file, not a command argument.</li>
+        <li>For each kind of string that carries a secret (a URL, say), keep one masking function and call it everywhere that string is built: logs, exception messages, exception <code>uri</code> fields, diagnostics maps.</li>
+        <li>Write three tests: the rules (case, other key names, fragments, the same word in a path), a source guard (regex fragments outside the definition file), and a real failure path (a 4xx from a local server).</li>
+        <li>Feed a log checker the old leaking lines first and confirm it catches them.</li>
+        <li>Install a release build on a real device and search logcat by key name or marker. Grepping for the value puts the value back into your shell history.</li>
+        <li>For tokens, write down the permissions each feature needs, and before adding a credential check whether an existing binding or key can do the job. Confirm the real scope with read-only calls.</li>
+        <li>Where something got wider, write one line: what widened, and what it would take to narrow it.</li>
+      </ol>
+      <pre><code># release logcat: count token= lines that are not masked
+adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">One stale doc line, one transcript line, one undeployed Worker</h2>
+      <p>The chat app's security doc still says "regex duplicated in 4 files" as of its September 16 commit; the code changed and that line did not. The key-shaped line in the October 2 session log has not been deleted, and the logs don't show whether that key was rotated. For the family app, once the Worker is deployed, we need to confirm uploads and deletes work with the 2 designed permissions and whether the extra Account Settings Read is needed at all.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20AI%20coding%20agents%20and%20secrets%3A%20one%20rule%20in%20chat%2C%20logs%20and%20token%20permissions%2C%20and%20the%20two%20exceptions%20a%20copied%20masking%20regex%20missed">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Is it safe to let an AI coding agent read my .env file?</summary><div><p>Not in a way that prints values. Agent tool output is stored in the session log as is. With <code>cut -d= -f1 .env</code> for key names and <code>grep -c</code> for counts, the agent can still tell whether a setting is missing.</p></div></details>
+        <details><summary>Why is a masking regex copied into several files a problem?</summary><div><p>What one copy handles doesn't carry over to the others. In this chat app the web copies masked failure messages too, while two failure exceptions in the mobile file sent the token unmasked. One function plus a source-guard test that fails on copies prevents it.</p></div></details>
+        <details><summary>How do I cut down the cloud token permissions an agent uses?</summary><div><p>List the permissions each feature needs, and before creating a credential, check whether an existing binding or shared key can do the same job. That way the family app's Worker was redesigned to run without KV edit or billing read permissions, a usage-API token or S3 credentials; by design its token needs 2 permissions.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
+        <li><a href="/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
+        <li><a href="/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
+        <li><a href="/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
+        <li><a href="/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+      </ul>
+      <p><a href="/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/sitemap/">Site map</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>

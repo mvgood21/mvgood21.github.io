@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Co-Authored-By 트레일러로 AI 커밋 세기 – SugarMount</title>
+  <meta name="description" content="Co-Authored-By 트레일러가 없는 커밋 중 세션 기록과 대조할 수 있던 29개를 봤더니 26개는 에이전트가 낸 병합과 revert였습니다. 세는 명령과 한계를 적었습니다.">
+  <link rel="canonical" href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Co-Authored-By 트레일러로 AI 커밋 세기 – SugarMount">
+  <meta property="og:description" content="Co-Authored-By 트레일러가 없는 커밋 중 세션 기록과 대조할 수 있던 29개를 봤더니 26개는 에이전트가 낸 병합과 revert였습니다. 세는 명령과 한계를 적었습니다.">
+  <meta property="og:url" content="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-co-authored-by-trailer-audit-ko.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=2227fbc3">
+  <link rel="stylesheet" href="/assets/site.css?v=2227fbc3">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=2227fbc3">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/ax/co-authored-by-trailer-audit/#article","headline":"Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다","description":"Co-Authored-By 트레일러가 없는 커밋 중 세션 기록과 대조할 수 있던 29개를 봤더니 26개는 에이전트가 낸 병합과 revert였습니다. 세는 명령과 한계를 적었습니다.","url":"https://mvgood21.github.io/ax/co-authored-by-trailer-audit/","mainEntityOfPage":"https://mvgood21.github.io/ax/co-authored-by-trailer-audit/","inLanguage":"ko","articleSection":"에이전트와 일하는 법","datePublished":"2026-10-26T09:00:00+09:00","dateModified":"2026-10-26T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-co-authored-by-trailer-audit-ko.png","https://mvgood21.github.io/assets/ax/cover/co-authored-by-trailer-audit-ko.webp","https://mvgood21.github.io/assets/ax/co-authored-by-trailer-audit-2-ko.webp","https://mvgood21.github.io/assets/ax/co-authored-by-trailer-audit-1-ko.webp"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Co-Authored-By 트레일러가 없으면 사람이 쓴 커밋인가요?","acceptedAnswer":{"@type":"Answer","text":"아닙니다. 에이전트가 git merge 나 git revert --no-edit 을 기본 메시지로 돌리거나, 트레일러 줄 없이 -m 을 주면 에이전트가 만든 커밋에도 트레일러가 없습니다."}},{"@type":"Question","name":"git log --all로 세면 무엇이 더 들어가나요?","acceptedAnswer":{"@type":"Answer","text":"모든 브랜치와 태그 외에 refs/stash 도 들어갑니다. stash 맨 위 항목과 그 인덱스 커밋, 두 개가 커밋처럼 세집니다. git log --exclude=refs/stash --all 로 빼면 됩니다."}},{"@type":"Question","name":"병합 커밋에도 트레일러를 붙일 수 있나요?","acceptedAnswer":{"@type":"Answer","text":"붙일 수 있습니다. git merge --no-ff -m \"메시지\" 로 메시지를 직접 주고 마지막 줄에 트레일러를 넣습니다. 충돌이 나면 충돌을 푼 뒤 git commit -m 에 같은 줄을 넣습니다."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/"},{"@type":"ListItem","position":2,"name":"AX 노트","item":"https://mvgood21.github.io/ax/"},{"@type":"ListItem","position":3,"name":"에이전트와 일하는 법","item":"https://mvgood21.github.io/ax/topic/workflow/"},{"@type":"ListItem","position":4,"name":"Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=2227fbc3">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a class="nav-apps" href="/apps/">앱</a>
+        <a class="nav-ax" href="/ax/" aria-current="page">AX 노트</a>
+        <a class="nav-about" href="/about/">소개</a>
+        <a class="nav-privacy" href="/privacy/">개인정보처리방침</a>
+      </nav>
+      <a class="lang" href="/en/ax/co-authored-by-trailer-audit/" lang="en" hreflang="en">English</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>메뉴</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="전체 메뉴">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">닫기</button>
+      <p class="menu-title" id="m-photo">사진·영상</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>슈가앨범</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 용량 줄이기</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 반전·회전</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>이미지 변환 JPG·PNG·WebP</span></a></li></ul>
+      <p class="menu-title" id="m-document">문서·글</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글 띄어쓰기</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글뷰어 슈가독</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">생활</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>생생카드</span></a></li></ul>
+      <p class="menu-title" id="m-games">게임</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>화살표 매듭풀기</span></a></li><li><a class="app-tile" data-app="blocks" href="/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한판블록</span></a></li></ul>
+      <p><a href="/apps/">모든 앱 보기</a></p>
+      <ul class="menu-links"><li><a href="/ax/" aria-current="page">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-workflow">
+    <nav class="crumbs" aria-label="이동 경로"><ol><li><a href="/">SugarMount</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/ax/topic/workflow/">에이전트와 일하는 법</a></li><li><span aria-current="page">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/co-authored-by-trailer-audit-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX 노트 · 측정</span>
+      <h1>Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</h1>
+      <p class="lead">트레일러 수를 AI 코드 비율로 보고하지 마십시오. 세션 기록과 대조한 트레일러 없는 커밋 29개 중 26개도 에이전트가 만들었습니다.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/about/">작성 SugarMount</a> <span aria-hidden="true">·</span> <span>에이전트와 일하는 법</span> <span aria-hidden="true">·</span> <span>읽는 시간 13분</span> <span aria-hidden="true">·</span> 최종 업데이트 <time datetime="2026-10-26">2026년 10월 26일</time></p><!-- /build:meta -->
+      <p>맞춤법 앱 저장소에서 에이전트가 낸 git 명령과 시각이 맞는 커밋 26개(병합 25, revert 1)에 <code>Co-Authored-By: Claude</code> 트레일러가 없습니다. 기간은 Claude Code 세션 기록이 남아 있는 2026년 9월 13일 저녁부터 10월 24일까지이고, 이 기간 트레일러 없는 커밋 29개 중 세션 기록에 대응하는 명령이 없는 것은 3개뿐입니다. 2025년 8월 이후로 넓히면 트레일러 없는 커밋은 89개이고, 제목과 날짜로 나눠 보니 52개가 병합 커밋과 stash 항목이었습니다. 에이전트에게 병합과 revert를 맡긴다면 그때도 <code>-m</code>으로 트레일러를 넣게 지침에 적으십시오.</p>
+      <p class="note">근거는 저장소 4개의 git 기록(2026-10-25에 기준 시각을 2026-10-24로 고정해 다시 셈), 이 PC에 남은 Claude Code 세션 기록, GitHub의 PR 목록입니다. 작성자 이름과 세션 ID는 적지 않았습니다.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>목차 (9)</summary><ol><li><a href="#session-logs">9월 13일 저녁 이후 트레일러 없는 29개 중 26개에 에이전트 git 명령이 있었습니다</a></li><li><a href="#missing-89">2025년 8월 이후 트레일러 없는 89개: 병합 50, stash 2, 첫 트레일러 전 7, 단일 커밋 30</a></li><li><a href="#first-guess">채굴 메모는 89개 중 약 40개만 병합으로 보고 나머지를 손 커밋으로 적었습니다</a></li><li><a href="#four-repos">유틸리티 앱 7개와 퍼즐 게임 10개도 모두 에이전트 명령과 맞았습니다</a></li><li><a href="#other-signals">codex 라벨이 붙은 PR 2개는 git log --all에 나오지 않습니다</a></li><li><a href="#how-to">--exclude=refs/stash를 붙인 git log 여섯 줄</a></li><li><a href="#limits">세션 기록이 없는 기간과 squash 병합에서는 판정이 안 됩니다</a></li><li><a href="#next">다음에 확인할 것</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">목차</p><ol><li><a href="#session-logs">9월 13일 저녁 이후 트레일러 없는 29개 중 26개에 에이전트 git 명령이 있었습니다</a></li><li><a href="#missing-89">2025년 8월 이후 트레일러 없는 89개: 병합 50, stash 2, 첫 트레일러 전 7, 단일 커밋 30</a></li><li><a href="#first-guess">채굴 메모는 89개 중 약 40개만 병합으로 보고 나머지를 손 커밋으로 적었습니다</a></li><li><a href="#four-repos">유틸리티 앱 7개와 퍼즐 게임 10개도 모두 에이전트 명령과 맞았습니다</a></li><li><a href="#other-signals">codex 라벨이 붙은 PR 2개는 git log --all에 나오지 않습니다</a></li><li><a href="#how-to">--exclude=refs/stash를 붙인 git log 여섯 줄</a></li><li><a href="#limits">세션 기록이 없는 기간과 squash 병합에서는 판정이 안 됩니다</a></li><li><a href="#next">다음에 확인할 것</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="session-logs">
+      <h2 id="session-logs">9월 13일 저녁 이후 트레일러 없는 29개 중 26개에 에이전트 git 명령이 있었습니다</h2>
+      <p>트레일러가 없다는 사실만으로는 누가 커밋했는지 알 수 없습니다. 그래서 Claude Code가 남기는 세션 기록(jsonl)에서 에이전트가 실행한 명령 중 <code>git commit</code>, <code>merge</code>, <code>revert</code>, <code>stash</code>, <code>tag</code> 등이 들어 있고 작업 폴더나 명령에 저장소 이름이 들어간 것을 모았습니다. 커밋 시각 10분 전부터 30초 뒤 사이에 그런 명령이 있으면 "에이전트 명령 있음"으로 쳤습니다.</p>
+      <p>이 저장소에 대한 첫 에이전트 git 쓰기 명령은 2026년 9월 13일 20시 41분입니다. 그 뒤 10월 24일까지 커밋 282개 중 트레일러가 있는 253개는 253개 모두 에이전트 명령과 맞았습니다(대조 방법 검증).</p>
+      <figure class="ax-fig"><img src="/assets/ax/co-authored-by-trailer-audit-2-ko.webp" width="1200" height="498" alt="막대그림: 세션 기록이 남은 2026년 9월 13일 20시 41분부터 10월 24일까지 커밋 282개 중 트레일러 있음 253개, 트레일러 없지만 에이전트 명령이 있음 26개, 트레일러도 명령 기록도 없음 3개." loading="lazy"><figcaption>맞춤법 앱 저장소, 2026년 9월 13일 20시 41분~10월 24일 커밋 282개를 트레일러와 세션 기록 명령으로 나눈 것.</figcaption></figure>
+      <p>이 구간의 트레일러 비율은 89.7%인데, 에이전트의 git 명령이 확인된 커밋은 279개, 98.9%입니다(트레일러 없는 쪽은 병합 25, revert 1). 9월 30일 10시 47분의 revert(d378829)는 세션 기록에 <code>git revert --no-edit aa2d224</code>가 그대로 남아 있습니다. 되돌려진 aa2d224는 28분 전에 들어간 트레일러 커밋이고, 되돌린 쪽에는 트레일러가 없습니다. 10월 17일 병합 2b9d3a1은 <code>git merge --no-edit main</code>이었습니다. 같은 날 b356c72는 에이전트가 <code>-m</code>으로 병합 메시지를 직접 줬는데도 트레일러 줄을 넣지 않았습니다.</p>
+      <p>남은 3개는 9월 26일 20시 7~8분의 버전 커밋(16d9917)과 v16024 릴리스 병합 2개입니다. 세션 기록에 대응하는 명령이 없어 판정하지 않았습니다.</p>
+      <p>시각만 맞추는 방법이라 우연히 맞을 수도 있습니다. 커밋 시각을 3시간 앞뒤로 옮겨 같은 대조를 돌리자, 트레일러 커밋 253개 중 17개와 15개(6~7%)만 맞았고 트레일러 없는 29개는 0개와 1개였습니다.</p>
+      <p>같은 기간 트레일러가 붙은 병합 3개(857326b, 08b1f7a, 0458820)는 모두 세션 기록에 에이전트가 트레일러를 메시지에 직접 넣은 명령이 있습니다. 08b1f7a와 0458820은 <code>git merge … -m "… Co-Authored-By: Claude Opus 5.5 …"</code>였고, 857326b는 병합 충돌을 푼 뒤 <code>git commit -m</code>으로 같은 줄을 넣었습니다.</p>
+    </section>
+
+    <section aria-labelledby="missing-89">
+      <h2 id="missing-89">2025년 8월 이후 트레일러 없는 89개: 병합 50, stash 2, 첫 트레일러 전 7, 단일 커밋 30</h2>
+      <p>트레일러는 메시지 줄 머리의 <code>Co-Authored-By: Claude</code>로 세었습니다. git의 트레일러 파서(<code>%(trailers:key=Co-authored-by)</code>)로 센 값과 네 저장소 모두 차이가 없었습니다. 2026년 10월 24일까지 맞춤법 앱의 <code>git log --all</code>은 커밋 725개를 보여 주고, 2025년 8월 1일 이후 434개 중 345개(79.5%)에 트레일러가 있습니다. 기존 글 <a href="/ax/commit-messages-701/">커밋 701개로 본 AI 코딩 1년</a>의 701개는 develop 브랜치만 10월 19일까지 세고 submodule 커밋 1개를 제외한 값이라 이 글의 숫자와 다릅니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>묶음</th><th>개수</th><th>가른 기준</th></tr></thead>
+        <tbody>
+          <tr><td>git-flow 릴리스 병합</td><td>37</td><td>제목이 <code>Merge branch 'release/…'</code>, <code>'hotfix/…'</code>, <code>Merge tag …</code></td></tr>
+          <tr><td>기능·동기화·PR 병합</td><td>13</td><td>기능 브랜치 9, <code>develop</code>·<code>main</code> 동기화 3, PR 병합 1</td></tr>
+          <tr><td>stash 항목</td><td>2</td><td><code>On main: …</code>와 그 <code>index on main: …</code></td></tr>
+          <tr><td>첫 트레일러 전 커밋</td><td>7</td><td>8월 3일~7일 오전(첫 트레일러는 02cbb15, 8월 7일 22시 1분)</td></tr>
+          <tr><td>그 밖의 단일 커밋</td><td>30</td><td>코드 24, 자료·설정 5, revert 1</td></tr>
+        </tbody>
+      </table></div>
+      <figure class="ax-fig"><img src="/assets/ax/co-authored-by-trailer-audit-1-ko.webp" width="1200" height="662" alt="막대그림: 맞춤법 앱 저장소에서 2025년 8월 이후 트레일러 없는 커밋 89개 중 git-flow 릴리스 병합 37개, 기능·동기화·PR 병합 13개, stash 항목 2개, 첫 트레일러 전 커밋 7개, 그 밖의 단일 커밋 30개." loading="lazy"><figcaption>맞춤법 앱 저장소, 2025년 8월 1일~2026년 10월 24일 트레일러 없는 커밋 89개를 제목과 날짜로 나눈 것.</figcaption></figure>
+      <p>stash 2개는 커밋으로 셀 대상이 아닙니다. <code>git log --all</code>은 <code>refs/stash</code>도 따라가는데, 이 저장소에 쌓인 stash 5개 가운데 맨 위 하나(2026-09-10)와 그 인덱스 커밋만 결과에 들어옵니다. <code>--exclude=refs/stash</code>를 앞에 붙이면 432개 중 345개(79.9%), 트레일러 없음 87개가 됩니다.</p>
+      <p>병합을 빼고 첫 트레일러 이후로 자르면 비율은 병합 아닌 커밋 372개 중 342개(91.9%)로 올라갑니다.</p>
+      <p>단일 커밋 30개 중 자료·설정 5개는 이미지·PSD 9개(94773fa), 이미지·PSD 4개와 문구·DB 버전 몇 줄(417259d, 9개 파일 +8/−8), <code>.gitignore</code> 8줄을 한 줄로 합친 것(3c1bdca), <code>build.gradle</code> 버전 두 줄(36a6c23), 퀴즈 데이터 906줄과 버전 두 줄(16d9917)입니다. 코드 24개는 모두 2025년 8월 9일부터 9월 13일 사이에 있습니다. 그중 "fix: 기존 소스 잘못 수정한 거 복구 (claude code가... ㅜ)"(f43dada)는 AI가 잘못 고친 소스를 운영자가 되돌리며 남긴 커밋이고, 경위는 <a href="/ax/commit-messages-701/">커밋 701개로 본 AI 코딩 1년</a>에 있습니다.</p>
+    </section>
+
+    <section aria-labelledby="first-guess">
+      <h2 id="first-guess">채굴 메모는 89개 중 약 40개만 병합으로 보고 나머지를 손 커밋으로 적었습니다</h2>
+      <p>이 글감은 에이전트가 저장소를 읽어 만든 채굴 메모에서 나왔습니다. 메모에는 "트레일러 없는 89개 중 약 40개가 git-flow 병합, 나머지는 손 커밋"이라고 적혀 있었습니다. 다시 세 보니 병합 모양 커밋은 51개였고(그중 1개는 stash), 첫 트레일러보다 앞선 커밋 7개가 기간에 섞여 있었습니다. 대조할 수 있는 29개 중 26개는 에이전트가 낸 명령이었습니다.</p>
+      <p>메모의 숫자(728개, 348개)도 기준 시각 없이 센 값이었습니다. 10월 25일 오전에만 이 저장소에 새 커밋 5개가 들어와서 같은 명령의 결과가 730개로 바뀌었습니다. 그래서 이 글의 숫자는 모두 <code>--until=2026-10-25T00:00:00</code>으로 고정했습니다. P2P 채팅 저장소를 "2026년 9월에 시작한 저장소"로 적은 것도 틀렸습니다. 첫 커밋은 2025년 8월 21일입니다(그달 8개, 2026년 9월 95개).</p>
+    </section>
+
+    <section aria-labelledby="four-repos">
+      <h2 id="four-repos">유틸리티 앱 7개와 퍼즐 게임 10개도 모두 에이전트 명령과 맞았습니다</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>저장소</th><th>첫 커밋</th><th>커밋</th><th>트레일러</th><th>비율</th><th>트레일러 없음(병합)</th></tr></thead>
+        <tbody>
+          <tr><td>맞춤법 앱, 전체</td><td>2020-12-16</td><td>725</td><td>345</td><td>47.6%</td><td>380(205)</td></tr>
+          <tr><td>맞춤법 앱, 2025-08 이후</td><td></td><td>434</td><td>345</td><td>79.5%</td><td>89(51)</td></tr>
+          <tr><td>유틸리티 앱</td><td>2026-09-20</td><td>87</td><td>80</td><td>92.0%</td><td>7(6)</td></tr>
+          <tr><td>퍼즐 게임</td><td>2026-09-30</td><td>170</td><td>160</td><td>94.1%</td><td>10(10)</td></tr>
+          <tr><td>P2P 채팅 앱</td><td>2025-08-21</td><td>103</td><td>102</td><td>99.0%</td><td>1(0)</td></tr>
+        </tbody>
+      </table></div>
+      <p>처음부터 에이전트와 시작한 저장소에서도 트레일러가 빠진 자리는 대부분 병합입니다. 퍼즐 게임의 트레일러 없는 10개는 모두 병합이고, 10개 모두 세션 기록의 에이전트 git 명령과 시각이 맞습니다. 같은 저장소에 트레일러가 붙은 병합도 9개 있습니다.</p>
+      <p>유틸리티 앱의 병합 6개 중 5개는 <code>Merge branch 'worktree-agent-&lt;id&gt;'</code>입니다. 이 병합 5개는 세션 기록에도 에이전트가 낸 <code>git merge --no-edit worktree-agent-&lt;id&gt;</code>로 남아 있고, 첫 명령에 함께 들어 있던 <code>git worktree list</code> 출력에서 이 브랜치들은 Claude Code가 하위 에이전트에게 만들어 준 worktree 폴더 <code>.claude/worktrees/agent-&lt;id&gt;</code>에 걸려 있습니다. 남은 단일 커밋 1171dee는 에이전트가 <code>git commit -m "Ignore local upload keystores"</code>로 메시지를 직접 쓰면서 트레일러를 넣지 않은 커밋입니다. P2P 채팅 앱의 1개는 루트 커밋 "first commit"이고, 첫 트레일러 커밋은 그 3분 뒤입니다.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20Co-Authored-By%20%ED%8A%B8%EB%A0%88%EC%9D%BC%EB%9F%AC%20%EC%97%86%EB%8A%94%20%EC%BB%A4%EB%B0%8B%2C%20%ED%99%95%EC%9D%B8%ED%95%9C%2029%EA%B0%9C%20%EC%A4%91%2026%EA%B0%9C%EB%8A%94%20%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%EA%B0%80%20%EB%A7%8C%EB%93%A4%EC%97%88%EB%8B%A4">메일로 문의하기</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="other-signals">
+      <h2 id="other-signals">codex 라벨이 붙은 PR 2개는 git log --all에 나오지 않습니다</h2>
+      <p>작성자 계정은 쓸 수 없었습니다. 2025년 8월 이후 맞춤법 앱의 트레일러 없는 89개는 모두 한 계정이고, 그 계정이 트레일러 커밋 338개도 썼습니다.</p>
+      <p>PR 라벨은 GitHub에만 있습니다. 맞춤법 앱의 PR은 3개뿐입니다. 2025년 6월 29일의 #1과 #2에는 <code>codex</code> 라벨과 <code>codex/…</code> 브랜치가 있고, 둘 다 병합되지 않고 닫혔습니다. 커밋(09cb9b5, d318e22)은 어느 브랜치에도 없어 <code>git log --all</code>에 나오지 않고, 메시지에 트레일러도 없습니다. 병합된 #3(커밋 20개)에는 라벨이 없습니다.</p>
+      <p>브랜치 이름(<code>worktree-agent-</code>, <code>codex/</code>)은 병합된 뒤에는 병합 커밋 제목에만 남습니다. 커밋 말투도 봤습니다. 2025년 8월 7일 밤~9월 13일 단일 커밋의 제목 길이 중앙값은 트레일러 커밋 38자, 트레일러 없는 커밋 20자였고, 이 차이로 작성자를 가르지는 않았습니다.</p>
+      <p>세션 기록은 대조 구간에서 트레일러 커밋 253/253을 맞춰 가장 강한 신호입니다. 다만 이 PC에만 있고, 맞춤법 앱은 2026년 9월 13일 저녁 이후분만 남아 있습니다.</p>
+    </section>
+
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">--exclude=refs/stash를 붙인 git log 여섯 줄</h2>
+      <p>Git Bash, macOS, Linux에서 그대로 돌립니다. 기준 시각과 트레일러 문자열에는 자기 저장소 값을 넣습니다.</p>
+      <pre><code>U=2026-10-25T00:00:00; S=2025-08-01T00:00:00
+P='^Co-Authored-By: Claude'
+# 1. total and trailer commits (stash excluded)
+git log --exclude=refs/stash --all --since=$S --until=$U --format=%h | wc -l
+git log --exclude=refs/stash --all --since=$S --until=$U -i -E --grep="$P" --format=%h | wc -l
+# 2. commits without the trailer, merges among them
+git log --exclude=refs/stash --all --since=$S --until=$U -i -E --grep="$P" --invert-grep --format=%h | wc -l
+git log --exclude=refs/stash --all --merges --since=$S --until=$U -i -E --grep="$P" --invert-grep --format='%h %s'
+# 3. cross-check with git's trailer parser
+git log --exclude=refs/stash --all --until=$U --format='%(trailers:key=Co-authored-by,valueonly)' | grep -ci claude
+# 4. single-parent commits without the trailer, with size
+git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --grep="$P" --invert-grep --stat --format='%h %ad %s' --date=short</code></pre>
+      <ol>
+        <li>기준 시각을 <code>--until</code>로 고정합니다. 매일 커밋이 들어오는 저장소는 몇 시간 만에 숫자가 달라집니다.</li>
+        <li>첫 트레일러 날짜를 찾아 기간을 자릅니다(<code>--reverse</code>로 첫 줄).</li>
+        <li>트레일러 없는 커밋을 병합, stash, 자료·설정, 코드로 나눠 봅니다.</li>
+        <li>세션 기록이 있으면 커밋 시각과 에이전트의 git 명령 시각을 맞춰 보고, 시각을 몇 시간 옮긴 대조로 우연히 맞는 비율도 구합니다.</li>
+        <li>에이전트에게 병합과 revert를 맡긴다면 <code>-m</code>으로 트레일러를 넣으라고 지침 파일에 적습니다.</li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="limits">
+      <h2 id="limits">세션 기록이 없는 기간과 squash 병합에서는 판정이 안 됩니다</h2>
+      <p>맞춤법 앱에서 첫 트레일러 뒤, 세션 기록이 시작되기 전의 트레일러 없는 커밋 51개(병합 23, 단일 커밋 28)는 누가 만들었는지 판정하지 않았습니다. 그중 코드 커밋 24개는 Kotlin·Java 5,749줄을 더했고, 같은 기간(8월 7일 밤~9월 13일) 트레일러 커밋 39개는 14,762줄을 더했습니다. 트레일러가 코드 줄의 비율을 말해 주지 않는다는 점은 <a href="/ax/commit-messages-701/">커밋 701개 글</a>에 적었습니다.</p>
+      <p>이 측정이 맞지 않는 저장소도 있습니다. squash 병합을 쓰면 PR 하나가 커밋 하나가 되고, 트레일러는 병합 버튼을 누른 쪽의 도구에 달립니다. 여러 사람이 쓰는 저장소라면 작성자마다 커밋 습관이 달라 비율 해석이 더 어렵습니다. 세션 기록을 남기지 않는 도구나 기록을 지우는 환경에서는 대조 자체가 안 됩니다. GitLab이 2026년 6월 23일 낸 조사(6개국 1,528명)에서도 응답자 43%가 AI가 만든 코드와 사람이 쓴 코드를 믿을 만하게 구분하지 못한다고 답했고, 39%는 코드 출처를 추적하지 않는 시스템을 문제로 꼽았습니다(<a href="https://about.gitlab.com/press/releases/2026-06-23-gitlab-research-reveals-organizations-are-generating-ai-code-faster-than-they-can-control-it/">GitLab 보도자료</a>).</p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">다음에 확인할 것</h2>
+      <p>맞춤법 앱의 지침 파일과 전역 지침에는 트레일러 규칙이 한 줄도 없습니다(10월 25일 확인). 병합과 revert에 트레일러를 넣는 규칙을 적은 뒤 트레일러 없는 병합 수가 실제로 주는지 다시 세야 합니다.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20Co-Authored-By%20%ED%8A%B8%EB%A0%88%EC%9D%BC%EB%9F%AC%20%EC%97%86%EB%8A%94%20%EC%BB%A4%EB%B0%8B%2C%20%ED%99%95%EC%9D%B8%ED%95%9C%2029%EA%B0%9C%20%EC%A4%91%2026%EA%B0%9C%EB%8A%94%20%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%EA%B0%80%20%EB%A7%8C%EB%93%A4%EC%97%88%EB%8B%A4">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>Co-Authored-By 트레일러가 없으면 사람이 쓴 커밋인가요?</summary><div><p>아닙니다. 에이전트가 <code>git merge</code>나 <code>git revert --no-edit</code>을 기본 메시지로 돌리거나, 트레일러 줄 없이 <code>-m</code>을 주면 에이전트가 만든 커밋에도 트레일러가 없습니다.</p></div></details>
+        <details><summary>git log --all로 세면 무엇이 더 들어가나요?</summary><div><p>모든 브랜치와 태그 외에 <code>refs/stash</code>도 들어갑니다. stash 맨 위 항목과 그 인덱스 커밋, 두 개가 커밋처럼 세집니다. <code>git log --exclude=refs/stash --all</code>로 빼면 됩니다.</p></div></details>
+        <details><summary>병합 커밋에도 트레일러를 붙일 수 있나요?</summary><div><p>붙일 수 있습니다. <code>git merge --no-ff -m "메시지"</code>로 메시지를 직접 주고 마지막 줄에 트레일러를 넣습니다. 충돌이 나면 충돌을 푼 뒤 <code>git commit -m</code>에 같은 줄을 넣습니다.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
+        <li><a href="/ax/agent-review-refutation/">에이전트 84개가 돈 릴리스 전 검토: 발견마다 3명이 반박하고, 버틴 20건만 고쳤다</a></li>
+        <li><a href="/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li>
+        <li><a href="/ax/agents-md/">AGENTS.md 작성법: AI 코딩 에이전트가 틀리기 쉬운 규칙만 적는다</a></li>
+        <li><a href="/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
+        <li><a href="/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
+      </ul>
+      <p><a href="/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="/ax/">AX 노트 전체 보기</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>한 가지 일을 간단하게 하는 Android 앱</p>
+        <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">앱</p>
+        <ul><li><a href="/apps/sugaralbum/">슈가앨범</a></li><li><a href="/apps/image-compress/">사진 용량 줄이기</a></li><li><a href="/apps/image-flip/">사진 반전·회전</a></li><li><a href="/apps/image-convert/">이미지 변환 JPG·PNG·WebP</a></li><li><a href="/apps/sugarspeller/">한글 띄어쓰기</a></li><li><a href="/apps/sugarclip/">SugarClip</a></li><li><a href="/apps/doc-viewer/">한글뷰어 슈가독</a></li><li><a href="/apps/sugarcard/">생생카드</a></li><li><a href="/apps/arrow-knots/">화살표 매듭풀기</a></li><li><a href="/apps/blocks/">한판블록</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">사이트</p>
+        <ul><li><a href="/apps/">모든 앱</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li><li><a href="/sitemap/">사이트맵</a></li><li><a href="/rss.xml">RSS 피드</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play 개발자 페이지</a></div>
+    </div>
+  </footer>
+</body>
+</html>

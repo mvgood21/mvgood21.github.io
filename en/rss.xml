@@ -6,7 +6,388 @@
   <description>Small Android apps that each do one thing simply, from shrinking photos and opening Korean HWP documents to checking Korean spelling and playing puzzle games.</description>
   <language>en</language>
   <atom:link href="https://mvgood21.github.io/en/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Sun, 25 Oct 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Mon, 26 Oct 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Android 7 crash: java.time and a NewApi lint gate – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/android7-java-time-crash/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/android7-java-time-crash/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/android7-java-time-crash-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</h1>
+      <p class="lead">One java.time call in a shared module crashed two minSdk 24 games on Android 7 launch. It sat in the code for 14 days, and every device and emulator we tested on ran API 30 or higher.</p>
+      <p>Our arrow puzzle game (minSdk 24) closed on Android 7 before drawing its first screen: GA4 recorded <code>app_exception</code> on first launch and no screen views. Our block puzzle shares the same module and runs the same path. A sub-agent we dispatched at 08:50 on October 17, 2026 (KST) to analyze drop-off in the arrow game reported this at 08:56. The cause was one line in the ad module both games share. It called <code>java.time</code>, which exists only from API 26, in apps with minSdk 24, and it runs on every launch. The line had been in the code since a commit on October 3. We submitted fixed versions of both games at 09:29 the same day, and at 15:05 we watched the release builds start on an Android 7.0 emulator that had booted at 15:04.</p>
+      <p class="note">Sources: the game repository's git history (6bb016c, cc4e860, 44c6acd and others), build files and test code, the session log from the day of the fix, and the GA4 drop-off analysis document. Code re-checked at HEAD on October 25, 2026.</p>
+    </section>
+    <section aria-labelledby="crash-path">
+      <h2 id="crash-path">The line every launch runs: from Ads.start to java.time</h2>
+      <p>Both apps, <a href="https://mvgood21.github.io/en/apps/blocks/">Block Turn</a> and <a href="https://mvgood21.github.io/en/apps/arrow-knots/">Arrow Knots</a>, call <code>Ads.start()</code> from the shared <code>core-platform</code> module in their first Activity's onCreate. On the first start of the process, that calls <code>onLaunch()</code> on <code>Pacer</code>, the class that spaces out ads, and <code>rollDay()</code> inside it works out the local day number so daily ad caps reset at midnight. This was the default for that calculation:</p>
+      <pre><code>private val day: (Long) -&gt; Long = { java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate().toEpochDay() },</code></pre>
+      <p>Android ships <code>java.time</code> from Android 8.0 (API 26). Both apps and <code>core-platform</code> have minSdk 24, and nothing in the repository turns on core library desugaring. An Android 7 phone does not have the class, so the app dies before it draws anything. This is the lint output from later, when we put the old line back to test the gate:</p>
+      <pre><code>Pacer.kt:68: Error: Call requires API level 26, or core library desugaring (current min is 24): java.time.Instant#atZone [NewApi]</code></pre>
+      <p>The sub-agent found the crash in the arrow game's data and added in the same report that Block Turn uses the same <code>core-platform</code> and would crash the same way.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/android7-java-time-crash-1-en.webp" width="1200" height="970" alt="Step diagram: Oct 3, one java.time call lands in the shared Pacer class; Oct 4, two other files avoid java.time; Oct 17 at 08:56, a GA4 analysis reports the crash; at 09:04, a lintRelease gate on the shared module; at 15:04, an Android 7.0 emulator boots." loading="lazy"><figcaption>The line sat in the code for 14 days, and every device and emulator in use during that time ran API 30 or higher.</figcaption></figure>
+    </section>
+    <section aria-labelledby="why-missed">
+      <h2 id="why-missed">For two weeks, no check ran that line on Android 7</h2>
+      <p>The October 3 commit that added the line (6bb016c) was co-written with the agent, and its message ends with a verification note: "Verified on S21 … release (R8, test ads) monkey 3x1500 0 fatals." That is a release build, three monkey runs of 1,500 events and zero fatal errors, on an S21 running Android 15; minSdk 24 was never exercised by that check.</p>
+      <p>Our other phone, a Galaxy S20, runs Android 13, and the emulator images on the PC were API 30, 33, 34 and 35.</p>
+      <p>The unit tests never executed the line. <code>Pacer</code> was written as a pure class so every ad rule could be tested without Android, and all 13 tests build it through one helper, <code>Pacer(rules, state, now = { t }, day = { today })</code>. Injecting the clock and the day made the rules easy to test, and the injected spot was exactly the default that crashed. The JVM has <code>java.time</code>, so the line would have passed there anyway.</p>
+      <p>The release build never ran lint on the shared module. On October 17, <code>:core-platform:lintDebug</code> flagged NewApi on the old line, but the lint that runs automatically with a release build belonged to the app modules.</p>
+    </section>
+    <section aria-labelledby="same-rule">
+      <h2 id="same-rule">The next day, two other files avoided java.time</h2>
+      <p>Early on October 4, the commit that added Block Turn (cd62087) formats a date string with <code>SimpleDateFormat</code> and comments "java.time needs API 26". That night, the daily puzzle commit for Arrow Knots (89dc35a) computes dates with Howard Hinnant's civil algorithms, commented "so the app needs no java.time (minSdk 24, no desugaring)". The line added to the shared module the day before stayed as it was.</p>
+      <p>On October 17, <code>rg -n "java\.time" --type kotlin</code> across seven modules found exactly one <code>java.time</code> call in running code: that line in <code>Pacer</code>.</p>
+      <p>The fix uses only <code>java.util.TimeZone</code>:</p>
+      <pre><code>fun localEpochDay(ms: Long, zone: java.util.TimeZone = java.util.TimeZone.getDefault()): Long =
+    Math.floorDiv(ms + zone.getOffset(ms), 86_400_000L)</code></pre>
+      <p>This time the default itself is under test. <code>LocalEpochDayTest</code> walks seven time zones, including <code>Asia/Seoul</code>, <code>America/New_York</code>, <code>Pacific/Kiritimati</code> and <code>America/Adak</code>, for 400 days from December 31, 2025 in 37-minute steps, and compares each result with <code>java.time</code> on the JVM. Steps of 37 minutes cross every midnight and every daylight saving switch.</p>
+    </section>
+    <section aria-labelledby="lint-gate">
+      <h2 id="lint-gate">Lint settings in the app module did not stop the shared module</h2>
+      <p>The first attempt at a guard was wrong. The agent added <code>lint { checkDependencies = true; fatal += "NewApi" }</code> to both apps' <code>build.gradle.kts</code>, expecting that checking dependencies and raising NewApi to fatal would block the release build. It put the old <code>java.time</code> line back for a moment and ran <code>:app-block:lintVitalRelease</code>. The result was <code>BUILD SUCCESSFUL in 29s</code>.</p>
+      <p>The second attempt made the shared module run its own lint before every release build:</p>
+      <pre><code>// core-platform/build.gradle.kts
+lint {
+    checkOnly += "NewApi"
+    abortOnError = true
+}
+// app-block/build.gradle.kts, app-arrows/build.gradle.kts
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(":core-platform:lintRelease") }</code></pre>
+      <p>At 09:04, with the old line back in, the release build stopped with the NewApi error above, <code>BUILD FAILED in 28s</code> and exit code 1. With the fixed line, <code>:core-platform:lintRelease</code> exited 0. The build file comment records the reason as "lintVitalRelease does not look into library modules", and the first setting was removed.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/android7-java-time-crash-2-en.webp" width="1200" height="739" alt="Comparison: with the old java.time line put back, the app-module lint setting gives lintVitalRelease BUILD SUCCESSFUL in 29 s, while the shared module's lintRelease dependency gives BUILD FAILED in 28 s with exit code 1." loading="lazy"><figcaption>With the same old line in place, only the shared module's own lintRelease stopped the build.</figcaption></figure>
+      <p>Before shipping we also looked inside the release dex. Unzipping it and searching for <code>Ljava/time/</code> still finds <code>Instant</code>, <code>ZonedDateTime</code> and more. Running dexdump to find the calling classes and matching them against R8's <code>mapping.txt</code> showed a Compose API-version helper and Firebase classes; our own code had none. Then cc4e860 took Arrow Knots from 1.2.1 (versionCode 6) to 1.2.2 and Block Turn from 1.1.2 (versionCode 5) to 1.1.3. That commit also carries unrelated changes such as a new order for the first puzzles, so it touches 19 files with 241 added lines.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20launch%20crash%20only%20on%20Android%207%3A%20one%20java.time%20call%20in%20a%20shared%20module%20and%20a%20NewApi%20lint%20gate">Email us</a></p></aside>
+    <section aria-labelledby="api24-avd">
+      <h2 id="api24-avd">The Android 7 emulator booted five minutes after the download started</h2>
+      <p>On the morning of October 17 the agent noted the S20 and S21 could not answer the question and queried the Firebase Test Lab device list. The only models supporting API 26 or lower were four virtual devices, and the lowest level any of them offered was 26.</p>
+      <p>In its afternoon report the agent recommended waiting: watch a few days of Crashlytics data from real users on the new versions for Android 7 crashes. Downloading an Android 7 image (about 1 GB) for an emulator was its second option, pending approval. It also pointed out that buying a Galaxy S23 would not help, since it runs Android 14 or later. The operator approved the download (this setup asks before installing anything). It started at 14:59, and the Android 7.0 AVD booted at 15:04.</p>
+      <p>By then a 12:44 commit (b2d305d) had produced the next versions, Block Turn 1.1.4 and Arrow Knots 1.2.3, and both were public by the 14:51 report. We installed release APKs of those versions and started them with <code>am start -W</code>: both returned <code>Status: ok</code>, with an empty crash buffer. The analysis document from October 18 (44c6acd) records:</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Android 7.0 emulator, release (R8) build</th><th>Block Turn 1.1.4</th><th>Arrow Knots 1.2.3</th></tr></thead>
+        <tbody>
+          <tr><td>Crash on launch</td><td>None (0 FATAL)</td><td>None (0 FATAL)</td></tr>
+          <tr><td>Time to first screen</td><td>2.2 s</td><td>1.3 s</td></tr>
+          <tr><td>Monkey (seeds 7, 21, 99; 600 to 800 events)</td><td>0 crashes, 0 ANRs</td><td>0 crashes, 0 ANRs</td></tr>
+        </tbody>
+      </table></div>
+      <p>On Block Turn's first pass with seed 7, the emulator's <code>system_server</code> died with <code>DeadSystemException</code>. Two more runs with the same seed did not repeat it, and there was no crash log for our process. (The grey bar with the app name that appeared during monkey runs was Android 7's split-screen caption.)</p>
+      <p>The emulator is now in the agent's memory as the device for minSdk 24 regressions. If your minSdk is 24, do not call a release verified until the release build has started on an API 24 emulator.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">The gate covers one module and one lint check</h2>
+      <p>Another shared module would need the same <code>dependsOn</code> line in every app. Because <code>checkOnly</code> turns on NewApi alone, no other lint issue stops the build at this step. The full order of our release checks is in <a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a>.</p>
+      <p>The emulator ran a Google APIs x86_64 image, and the builds checked used test ad IDs.</p>
+      <p>The evidence for the cause is the GA4 events, the call path in the code, and the lint result. The exception name, <code>NoClassDefFoundError</code>, comes from the code comment and the analysis; we did not see it in a local stack trace.</p>
+      <p>Projects that use desugaring are in a different position: the lint message itself offers "or core library desugaring". In this repository two other files were already written without it, and the code to fix was one line. There is no record of comparing the two approaches.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">From two rg commands to an API 24 AVD</h2>
+      <ol>
+        <li>Run <code>rg -n "java\.time" --type kotlin</code> and <code>rg -n "desugar|minSdk" */build.gradle.kts</code> over every module to find calls in running code and see whether desugaring is on.</li>
+        <li>For each shared (library) module, run <code>./gradlew :module:lintDebug</code> and look for NewApi in the lint-results XML.</li>
+        <li>Add <code>lint { checkOnly += "NewApi"; abortOnError = true }</code> to the shared module, and make each app's <code>preReleaseBuild</code> depend on that module's <code>lintRelease</code>.</li>
+        <li>Put the bad line back and confirm the release build fails, then restore it and confirm it passes. If the old line passes, the setting is not a gate.</li>
+        <li>For classes that take an injected clock or day function, test the default too: use <code>java.time</code> on the JVM as the expected value and sweep several time zones and daylight saving changes.</li>
+        <li>Download the image with <code>sdkmanager "system-images;android-24;google_apis;x86_64"</code>, create an AVD, install the release APK, and run <code>am start -W</code>, <code>logcat -b crash</code> and a three-seed monkey test.</li>
+        <li>For any <code>Ljava/time/</code> reference left in the release dex, find the owning class through <code>mapping.txt</code>. Library code that branches on API level can stay.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">What is left</h2>
+      <p>No phone with a manufacturer's Android 7 build has run the apps yet. There is also no record of starting a pre-fix build on this emulator, so reproducing the crash and its exception name there is the next check. We have not counted affected users and will not put a number here until we have.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20launch%20crash%20only%20on%20Android%207%3A%20one%20java.time%20call%20in%20a%20shared%20module%20and%20a%20NewApi%20lint%20gate">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">Frequently asked questions</h2>
+      <div class="faq">
+        <details><summary>Why does java.time crash a minSdk 24 app only on Android 7?</summary><div><p>Android includes the java.time classes only from Android 8.0 (API 26). Without core library desugaring, an Android 7 device does not have them, and the app dies when it reaches the call. Android 8+ devices and JVM unit tests never show the problem.</p></div></details>
+        <details><summary>Why doesn't a release build catch NewApi errors in a library module?</summary><div><p>In this project, the lintVitalRelease task that runs with a release build did not look into the library module. Even with <code>checkDependencies = true</code> and <code>fatal += "NewApi"</code> in the app, the old code passed. Making the app's preReleaseBuild depend on the library's lintRelease is what stopped it.</p></div></details>
+        <details><summary>How can I test on Android 7 without an Android 7 phone?</summary><div><p>Create an emulator from the API 24 system image and start your release build on it. The Firebase Test Lab list we checked on October 17, 2026 had no API 24 or 25 devices. The emulator still lacks a manufacturer's system build.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Mon, 26 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>AI commit provenance: what Co-Authored-By misses – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/co-authored-by-trailer-audit-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Measurement</span>
+      <h1>Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</h1>
+      <p class="lead">Do not report a Co-Authored-By count as the share of AI-written code. Of 29 commits without the trailer that we could check against session logs, the agent made 26. Have it add the trailer to merges and reverts too.</p>
+      <p>In the repository of our Korean spell-checker app, 26 commits whose times match git commands the agent ran (25 merge commits, 1 revert) carry no <code>Co-Authored-By: Claude</code> trailer. The window is the one covered by Claude Code session logs, from the evening of September 13 to October 24, 2026; of the 29 trailer-less commits in it, only 3 have no matching command in the logs. Since August 2025 there are 89 commits without the trailer, and sorted by subject line and date, 52 of them are merge commits or stash entries. If the agent runs your merges and reverts, tell it in the instruction file to pass <code>-m</code> with the trailer.</p>
+      <p class="note">Sources: git history of four repositories (recounted on October 25, 2026 with the cutoff fixed at the end of October 24, KST), Claude Code session logs kept on this PC, and the GitHub pull request list. Author names and session IDs are left out.</p>
+    </section>
+    <section aria-labelledby="session-logs">
+      <h2 id="session-logs">After September 13, 26 of the 29 commits without a trailer match an agent git command</h2>
+      <p>A missing trailer says nothing about who made the commit. So we went through the Claude Code session logs (JSONL files) and collected every shell command the agent ran that contained <code>git commit</code>, <code>merge</code>, <code>revert</code>, <code>stash</code>, <code>tag</code> and the like, and that mentioned this repository in its working directory or command. A commit counted as "agent command found" when such a command ran between ten minutes before and 30 seconds after the commit time.</p>
+      <p>The agent's first git write command for this repository ran at 20:41 on September 13, 2026. From then to October 24 there are 282 commits, and all 253 with a trailer matched an agent command, so the method found every trailer commit in that window.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/co-authored-by-trailer-audit-2-en.webp" width="1200" height="606" alt="Bar chart: of 282 commits between September 13, 2026 at 20:41 and October 24, 253 carry the trailer, 26 have no trailer but match a git command the agent ran, and 3 have neither." loading="lazy"><figcaption>Spell-checker repository, 282 commits from September 13, 2026 at 20:41 to October 24, split by trailer and by commands in the session logs.</figcaption></figure>
+      <p>In this window 89.7% of commits carry the trailer, while 279 commits, 98.9%, match a git command the agent ran (on the trailer-less side, 25 merge commits and 1 revert). The revert d378829, at 10:47 on September 30, sits in the log as <code>git revert --no-edit aa2d224</code>. The commit it reverted had gone in 28 minutes earlier with a trailer; the revert has none. The merge 2b9d3a1 on October 17 was <code>git merge --no-edit main</code>. On the same day the agent wrote its own <code>-m</code> message for merge b356c72 and still left the trailer line out.</p>
+      <p>The remaining three are a version commit (16d9917) and the two v16024 release merges, made at 20:07 and 20:08 on September 26. No matching command is in the logs, so we left them undecided.</p>
+      <p>Matching on time alone could produce coincidences, so we shifted every commit time by three hours in each direction and ran the same match. Only 17 and 15 of the 253 trailer commits matched (6 to 7%), and 0 and 1 of the 29 without a trailer.</p>
+      <p>All three merges in the same period that do carry a trailer (857326b, 08b1f7a, 0458820) have an agent command in the logs that put the trailer in. For 08b1f7a and 0458820 it was <code>git merge … -m "… Co-Authored-By: Claude Opus 5.5 …"</code>; for 857326b the agent resolved a merge conflict and then added the same line with <code>git commit -m</code>.</p>
+    </section>
+    <section aria-labelledby="missing-89">
+      <h2 id="missing-89">The 89 trailer-less commits since August 2025: 50 merges, 2 stash entries, 7 early commits, 30 others</h2>
+      <p>We matched <code>Co-Authored-By: Claude</code> at the start of a message line, then recounted with git's own trailer parser (<code>%(trailers:key=Co-authored-by)</code>); the two counts were identical in all four repositories. Up to October 24, 2026, <code>git log --all</code> on the spell checker lists 725 commits, and 345 of the 434 since August 1, 2025 (79.5%) carry the trailer. The 701 commits in <a href="https://mvgood21.github.io/en/ax/commit-messages-701/">our note on 701 commit messages</a> were counted on the develop branch only, up to October 19, minus one submodule commit, which is why the totals differ.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Group</th><th>Count</th><th>How we sorted it</th></tr></thead>
+        <tbody>
+          <tr><td>git-flow release merges</td><td>37</td><td>Subject <code>Merge branch 'release/…'</code>, <code>'hotfix/…'</code> or <code>Merge tag …</code></td></tr>
+          <tr><td>Feature, sync and PR merges</td><td>13</td><td>9 feature branches, 3 syncs between <code>develop</code> and <code>main</code>, 1 pull request</td></tr>
+          <tr><td>Stash entries</td><td>2</td><td><code>On main: …</code> and its <code>index on main: …</code></td></tr>
+          <tr><td>Before the first trailer</td><td>7</td><td>August 3 to the morning of August 7 (the first trailer is 02cbb15, August 7 at 22:01)</td></tr>
+          <tr><td>Other single-parent commits</td><td>30</td><td>24 code, 5 data or config, 1 revert</td></tr>
+        </tbody>
+      </table></div>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/co-authored-by-trailer-audit-1-en.webp" width="1200" height="714" alt="Bar chart: of the 89 commits without a trailer since August 2025 in the spell-checker repository, 37 are git-flow release merges, 13 are feature, sync or PR merges, 2 are stash entries, 7 predate the first trailer and 30 are other single-parent commits." loading="lazy"><figcaption>Spell-checker repository, the 89 commits without a trailer from August 1, 2025 to October 24, 2026, sorted by subject line and date.</figcaption></figure>
+      <p>The two stash entries are not commits anyone meant to count. <code>git log --all</code> follows <code>refs/stash</code> as well, so of the five stashes in this repository, the newest one (September 10, 2026) and its index commit show up. Put <code>--exclude=refs/stash</code> before <code>--all</code> and the numbers become 345 of 432 (79.9%), with 87 lacking the trailer.</p>
+      <p>Drop merges and start the window at the first trailer, and the share rises to 342 of 372 single-parent commits (91.9%).</p>
+      <p>Of the 30 single-parent commits, the five data or config ones are 9 image and PSD files (94773fa), 4 image and PSD files plus a few string and DB-version lines (417259d, 9 files, +8/−8), collapsing eight <code>.gitignore</code> lines into one (3c1bdca), a two-line version bump in <code>build.gradle</code> (36a6c23), and 906 lines of quiz data plus a two-line version bump (16d9917). All 24 code commits fall between August 9 and September 13, 2025. One of them, f43dada, is the operator reverting source the AI had changed wrongly; its Korean message roughly reads "restore the existing source that was edited wrongly (Claude Code…)", and the story is in <a href="https://mvgood21.github.io/en/ax/commit-messages-701/">our note on 701 commit messages</a>.</p>
+    </section>
+    <section aria-labelledby="first-guess">
+      <h2 id="first-guess">The mining memo counted about 40 merges and called the rest hand commits</h2>
+      <p>This topic came from a mining memo an agent wrote while scanning the repository. It said about 40 of the 89 were git-flow merges and the rest were hand commits. The recount found 51 merge-shaped commits (one of them a stash) and 7 commits from before the first trailer inside the window. Of the 29 commits we could check against the logs, the agent's own commands made 26.</p>
+      <p>The memo's totals (728 and 348) had no cutoff either. Five new commits arrived in this repository on the morning of October 25 alone, and the same command then returned 730. Every number in this note uses <code>--until=2026-10-25T00:00:00</code>. The memo also said our peer-to-peer chat app repository started in September 2026; its first commit is from August 21, 2025 (8 commits that month, 95 in September 2026).</p>
+    </section>
+    <section aria-labelledby="four-repos">
+      <h2 id="four-repos">In the utilities app (7) and the puzzle game (10), every trailer-less commit matches an agent command</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Repository</th><th>First commit</th><th>Commits</th><th>Trailer</th><th>Share</th><th>No trailer (merges)</th></tr></thead>
+        <tbody>
+          <tr><td>Spell checker, all history</td><td>2020-12-16</td><td>725</td><td>345</td><td>47.6%</td><td>380 (205)</td></tr>
+          <tr><td>Spell checker, since Aug 2025</td><td></td><td>434</td><td>345</td><td>79.5%</td><td>89 (51)</td></tr>
+          <tr><td>Utilities app</td><td>2026-09-20</td><td>87</td><td>80</td><td>92.0%</td><td>7 (6)</td></tr>
+          <tr><td>Puzzle game</td><td>2026-09-30</td><td>170</td><td>160</td><td>94.1%</td><td>10 (10)</td></tr>
+          <tr><td>P2P chat app</td><td>2025-08-21</td><td>103</td><td>102</td><td>99.0%</td><td>1 (0)</td></tr>
+        </tbody>
+      </table></div>
+      <p>Even in repositories built with the agent from day one, the gaps are mostly merges. All 10 trailer-less commits in the puzzle game are merges, and all 10 line up with an agent git command in the session logs. The same repository has 9 merges that do carry the trailer.</p>
+      <p>In the utilities app, 5 of the 6 merges are <code>Merge branch 'worktree-agent-&lt;id&gt;'</code>. All five are in the session logs as <code>git merge --no-edit worktree-agent-&lt;id&gt;</code> commands the agent ran, and the <code>git worktree list</code> output in the first of those commands shows the branches sitting in <code>.claude/worktrees/agent-&lt;id&gt;</code>, the worktree folders Claude Code created for its subagents. The one single-parent commit, 1171dee, is the agent's own <code>git commit -m "Ignore local upload keystores"</code>, written without the trailer line. The single gap in the P2P chat app is its root commit, "first commit", three minutes before the first trailer commit.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Commits%20without%20a%20Co-Authored-By%20trailer%3A%20the%20agent%20made%2026%20of%20the%2029%20we%20could%20check">Email us</a></p></aside>
+    <section aria-labelledby="other-signals">
+      <h2 id="other-signals">Two pull requests labeled codex never appear in git log --all</h2>
+      <p>The author field is no help. All 89 trailer-less commits since August 2025 in the spell checker come from one account, which also authored 338 trailer commits.</p>
+      <p>Pull request labels live only on GitHub. The spell checker has three pull requests. #1 and #2, from June 29, 2025, have a <code>codex</code> label and <code>codex/…</code> branches, and both were closed without merging. Their commits (09cb9b5, d318e22) are on no branch, so <code>git log --all</code> never shows them, and their messages have no trailer either. #3, merged with 20 commits, has no label.</p>
+      <p>Branch names such as <code>worktree-agent-</code> and <code>codex/</code> survive a merge only in the merge commit's subject. Wording differs too: between the night of August 7 and September 13, 2025, the median subject length was 38 characters for trailer commits and 20 for the rest; we did not use it to decide who made a commit.</p>
+      <p>Session logs matched 253 of 253 trailer commits in the checked window, which makes them the strongest signal we have. They exist only on this PC, and for the spell checker they start on the evening of September 13, 2026.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Six git log lines with --exclude=refs/stash</h2>
+      <p>These run as-is in Git Bash or a macOS or Linux shell. Change the cutoff and the trailer text to match your repository.</p>
+      <pre><code>U=2026-10-25T00:00:00; S=2025-08-01T00:00:00
+P='^Co-Authored-By: Claude'
+# 1. total and trailer commits (stash excluded)
+git log --exclude=refs/stash --all --since=$S --until=$U --format=%h | wc -l
+git log --exclude=refs/stash --all --since=$S --until=$U -i -E --grep="$P" --format=%h | wc -l
+# 2. commits without the trailer, merges among them
+git log --exclude=refs/stash --all --since=$S --until=$U -i -E --grep="$P" --invert-grep --format=%h | wc -l
+git log --exclude=refs/stash --all --merges --since=$S --until=$U -i -E --grep="$P" --invert-grep --format='%h %s'
+# 3. cross-check with git's trailer parser
+git log --exclude=refs/stash --all --until=$U --format='%(trailers:key=Co-authored-by,valueonly)' | grep -ci claude
+# 4. single-parent commits without the trailer, with size
+git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --grep="$P" --invert-grep --stat --format='%h %ad %s' --date=short</code></pre>
+      <ol>
+        <li>Fix the cutoff with <code>--until</code>. In a repository that gets commits every day, the totals change within hours.</li>
+        <li>Find the date of the first trailer (first line with <code>--reverse</code>) and start the window there.</li>
+        <li>Sort the commits without a trailer into merges, stash entries, data or config, and code.</li>
+        <li>If you have session logs, match commit times against the times of the agent's git commands, and shift the times by a few hours to measure how often they match by chance.</li>
+        <li>If the agent runs your merges and reverts, add a rule to its instruction file to pass <code>-m</code> with the trailer.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">Periods without session logs and squash merges cannot be settled</h2>
+      <p>In the spell checker, the 51 trailer-less commits made after the first trailer but before the session logs start (23 merges, 28 single-parent commits) stay undecided. The 24 code commits among them added 5,749 lines of Kotlin and Java, while the 39 trailer commits of the same weeks (the night of August 7 to September 13) added 14,762. Why a trailer is not a share of code lines is covered in <a href="https://mvgood21.github.io/en/ax/commit-messages-701/">the 701-commit note</a>.</p>
+      <p>Some repositories will not fit this method. With squash merges, one pull request becomes one commit, and the trailer depends on the tool of whoever presses the merge button. In repositories with many contributors, each person's commit habits make the ratio harder to read. Tools that keep no session logs, or setups that delete them, rule out the cross-check entirely. In a GitLab survey of 1,528 developers and technology buyers in six countries, released on June 23, 2026, 43% said they cannot reliably distinguish AI-generated code from human-written code, and 39% pointed to systems that don't track code origin (<a href="https://about.gitlab.com/press/releases/2026-06-23-gitlab-research-reveals-organizations-are-generating-ai-code-faster-than-they-can-control-it/">GitLab press release</a>).</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">What we will check next</h2>
+      <p>Neither the spell checker's instruction file nor the global instructions say anything about trailers (checked October 25). Once a rule for merges and reverts is written down, the trailer-less merges have to be counted again to see whether it worked.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Commits%20without%20a%20Co-Authored-By%20trailer%3A%20the%20agent%20made%2026%20of%20the%2029%20we%20could%20check">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">Frequently asked questions</h2>
+      <div class="faq">
+        <details><summary>Does a commit without a Co-Authored-By trailer mean a person wrote it?</summary><div><p>No. When the agent runs <code>git merge</code> or <code>git revert --no-edit</code> with git's default message, or passes <code>-m</code> without the trailer line, the commit it makes has no trailer.</p></div></details>
+        <details><summary>What extra commits does git log --all count?</summary><div><p>Besides every branch and tag, it follows <code>refs/stash</code>, so the newest stash and its index commit count as two commits. <code>git log --exclude=refs/stash --all</code> leaves them out.</p></div></details>
+        <details><summary>Can a merge commit carry a Co-Authored-By trailer?</summary><div><p>It can if you pass the message yourself with <code>git merge --no-ff -m "message"</code> and put the trailer on its last line. After a merge conflict, add the same line to the <code>git commit -m</code> that concludes the merge.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Mon, 26 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>AI coding agents and secrets: chat, logs, tokens – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/secrets-three-layers/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/secrets-three-layers/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/secrets-three-layers-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · How-to</span>
+      <h1>AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</h1>
+      <p class="lead">Give the agent commands that check without printing values, keep log masking in one function guarded by a test that fails on copies, and give deploy tokens only the permissions the code needs.</p>
+      <p>Four copies of a log-masking regex were being merged into one function when two exceptions in one of those files turned out to carry the auth token in clear text. That was in a peer-to-peer chat app on September 13, 2026, six days after the defect had been marked fixed. The same pattern showed up twice more: on October 2 an agent printed the last 150 lines of the shell history and an API key landed in the session log, and on October 10 the deploy plan for a family app asked for a wider Cloudflare token.</p>
+      <p class="note">Sources: git history and tests from three repositories (the chat app, a Korean spell checker app, and a family app still in development) and the agent session logs. Session-log counts were redone on October 25, 2026. Every secret shown below is a placeholder such as <code>XXXX</code>.</p>
+    </section>
+    <section aria-labelledby="three-layers">
+      <h2 id="three-layers">One rule, three places it has to hold</h2>
+      <p>The rule fits in a sentence: never copy a secret's value anywhere; say where it is and what kind it is. With a coding agent in the loop it has to hold in three places. Whatever the agent reads ends up in the session log, the code it writes can put values into logs and exception messages, and the deployments it designs can ask for broader tokens than the code needs.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/secrets-three-layers-1-en.webp" width="1200" height="966" alt="Step diagram: Sep 7-8, a masking regex copied into 4 files; Sep 13, one function and 2 unmasked exceptions fixed; Oct 2, a key printed into a session log, then a location-and-type-only rule; Oct 11, a Worker redesigned around a token with 2 permissions; Oct 17, a test that must catch 7 old leaking log lines." loading="lazy"><figcaption>The same rule went into chat, code and token permissions, and the first version in each place had a gap.</figcaption></figure>
+      <p>In all three places the agent did the fixing. The person running these projects (the operator below) made two main decisions: the rule should apply to every session, and the agent should stop handing work back and do it itself.</p>
+    </section>
+    <section aria-labelledby="chat">
+      <h2 id="chat">Chat: the first secrets rule was written 47 seconds after a key reached the session log</h2>
+      <p>The agent printed the last 150 lines of the shell history at 8:47 on October 2. The operator had asked it to fill in the shared instructions every session reads, and it wanted to learn the setup. One of them exported an AI API key. Tool output is saved verbatim in the session log, so the key was now part of the transcript.</p>
+      <p>At that moment the instruction file held only rules about reply format. Forty-seven seconds after the key was printed, the agent wrote the first secrets rule into it: one line saying secrets stay out of any output. It said what not to do and nothing about how to check, and for an agent, reading a file and printing it are the same action. Eighteen seconds later the agent told the operator that an AI API key sat in plain text in the shell history, giving the location and kind but not the value.</p>
+      <p>At 8:55 the operator asked for a rule that keeps passwords and personal data out of every session's chat, and the agent replaced the one line with a rule that also says how to check. The gist: never write a value, only where it is and what kind. Files are checked with commands that show key names and line counts (<code>grep -c</code>, <code>cut -d= -f1</code>), and commands take environment variables or file references instead of values. It covers commits, docs and memory files as well as chat, and a value someone pastes in is not quoted back; the agent recommends rotating it. The scope also widened from secrets to personal data.</p>
+      <p>The agent deleted the four history lines that held the key (three <code>export</code> lines and one secret-registration command that took the value as an argument) and counted again: zero. It reported two places it left for later: the log file of the session still running, which could break if edited mid-session, and the terminal window where the key had been typed. The report ended by saying that deleting doesn't undo the exposure and rotating the key is the only sure fix, and that a new key should be registered by name with the value typed at the prompt.</p>
+      <p>On October 25 we recounted across the 109 main session logs. The key-names-only command <code>cut -d= -f1</code> appears 24 times, every dated one from October 3 on; with subagent logs included it is 2 in September and 179 in October. Counting <code>.env</code> lines with <code>grep -c</code> was already a habit in September (25 times), so what grew is the names-only check. Lines matching three known key shapes (the newer AI API key format, GitHub tokens, <code>sk-</code> keys) came to exactly one across all 2,567 logs including subagents: that 8:47 output.</p>
+      <pre><code># .env: line count and key names, no values
+grep -c '=' .env
+cut -d= -f1 .env
+# shell history: how many lines mention that key name
+grep -c 'API_KEY' ~/.bash_history
+# commands reference values instead of containing them
+curl -H "Authorization: Bearer $API_TOKEN" https://api.example.com/v1/ping
+wrangler secret put SIGNING_KEY &lt; secrets/signing-key</code></pre>
+    </section>
+    <section aria-labelledby="logs">
+      <h2 id="logs">Logs: four copies of a masking regex, and two exceptions that never masked</h2>
+      <p>The chat app (Flutter) passes a shared token as <code>?token=</code> in the signaling server URL. On September 7, the agent reviewing platform security before release rated this High: the discovery logs went through <code>debugPrint</code>, which prints in release builds too, and four connect-log lines wrote the whole URL.</p>
+      <p>The reviewing agent proposed <code>Uri.parse(url).replace(query: null)</code>. The agent assigned to fix it reported that this keeps the query: in Dart's <code>Uri.replace</code>, a null argument means "keep the existing component". It switched to a one-line regex instead.</p>
+      <p>The copies came from how the work was split. Several fix agents each owned a set of files that day. The mobile owner's scope was "one masking line" in its two files, and the two web files went to another owner as a request. Shortly after midnight, the web side got its own <code>_maskToken</code> wrapping the same regex. A docs pass on September 8 and 9 wrote down "regex duplicated in 4 files; extracting a shared helper is still open", while the defect list already said Fixed, dated September 7.</p>
+      <p>On September 13 (555680e), writing the shared function meant looking at every place each file turned the URL into a string. Two <code>HttpException</code> sites in the mobile HTTP client had no masking at all: a failed SSE connection put the token into the exception's <code>uri</code>, and a failed POST put it into both the message and the <code>uri</code>. The mobile owner's first fix had covered the success log line only, and the failure exceptions in the same file were outside it. The web copies masked their failure messages too.</p>
+      <pre><code>String maskSignalingUrl(String url) =&gt;
+    url.replaceAllMapped(_signalingToken, (m) =&gt; '${m[1]}***');
+final RegExp _signalingToken = RegExp(
+  r'([?&amp;](?:token|secret)=)[^&amp;#\s]*',
+  caseSensitive: false,
+);</code></pre>
+      <p>The new pattern ignores case, also covers <code>secret=</code>, and stops at <code>#</code> or whitespace. We ran the old pattern <code>([?&amp;]token=)[^&amp;]*</code> and the new one through Python's <code>re</code> on placeholder values to see the difference:</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Input</th><th>Old regex</th><th>New regex</th></tr></thead>
+        <tbody>
+          <tr><td><code>ws://h/ws?TOKEN=XXXX</code></td><td>unchanged</td><td><code>?TOKEN=***</code></td></tr>
+          <tr><td><code>ws://h/ws?secret=XXXX</code></td><td>unchanged</td><td><code>?secret=***</code></td></tr>
+          <tr><td><code>ws://h/ws?token=XXXX#frag</code></td><td><code>?token=***</code> (fragment eaten)</td><td><code>?token=***#frag</code></td></tr>
+          <tr><td><code>http://h/api/token/list</code></td><td>unchanged</td><td>unchanged</td></tr>
+        </tbody>
+      </table></div>
+      <p>Three kinds of tests went in with it: 7 rule tests, 1 source guard, and 1 real failure path. The failure-path test starts an HTTP server on the loopback address that answers 401 and checks that the client's exception text contains <code>token=***</code> and not the value. The source guard, shortened:</p>
+      <pre><code>test('no copy of the masking regex comes back in discovery', () {
+  final offenders = &lt;String&gt;[];
+  for (final f in Directory('lib/core/discovery').listSync()) {
+    if (f is! File || !f.path.endsWith('.dart')) continue;
+    if (f.path.endsWith('discovery_log.dart')) continue; // the definition
+    final src = f.readAsStringSync();
+    if (src.contains('token=)') || src.contains('_maskToken')) {
+      offenders.add(f.path);
+    }
+  }
+  expect(offenders, isEmpty);
+});</code></pre>
+      <p>It fails if the regex fragment <code>token=)</code> or the old helper's name shows up in any file other than the definition. The duplication stayed for five days after it was written down on September 8, so copies are now blocked by a test rather than left to review. Keep one masking function, and commit a test that fails when a copy appears.</p>
+      <p>The same commit replaced the peer's public-key fingerprint in the diagnostics map with a yes/no flag. That map goes straight to the diagnostics screen, reports and logs; the fingerprint is meant for a person to compare by eye, so the confirmation dialog reads it on its own.</p>
+    </section>
+    <section aria-labelledby="release-log">
+      <h2 id="release-log">Release logcat also carried what users typed</h2>
+      <p>On October 17, QA on the <a href="https://mvgood21.github.io/en/apps/sugarspeller/">SugarSpeller</a> spell checker found the same class of bug in its release logcat (21895f6). Up to version 1.6.030, release builds logged the check request URL (which contains the user's text), the first 500 characters of the raw response, a session key for the external checking service on every resume, and the FCM push token. In the app's logging wrapper, <code>log.e</code> prints regardless of <code>BuildConfig.DEBUG</code>.</p>
+      <p>The fix followed the chat app: diagnostic lines moved to <code>log.d</code>, and keys and text are logged only as a length or a present/absent flag. <code>ReleaseLogSecretsTest</code> scans all main sources for log calls that print in release and looks only at interpolations and arguments outside string literals. Its first test feeds in the 7 old leaking lines and requires all 7 to be caught; the test comment says that if these are missed, the scan below is fake too. A release build of 1.6.031, the next development version, went onto a Galaxy S20, and logcat showed zero such lines. The same yardstick first appeared in <a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a>.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20AI%20coding%20agents%20and%20secrets%3A%20one%20rule%20in%20chat%2C%20logs%20and%20token%20permissions%2C%20and%20the%20two%20exceptions%20a%20copied%20masking%20regex%20missed">Email us</a></p></aside>
+    <section aria-labelledby="permissions">
+      <h2 id="permissions">Permissions: the Worker was redesigned instead of adding permissions to the token</h2>
+      <p>The family app keeps photos in Cloudflare R2, with a media Worker handling uploads and reads. The deploy notes from the afternoon of October 10 listed three jobs for a person: add Workers KV edit and billing read to the deploy token, create a separate token for the usage analytics API, and issue an R2 S3 key pair so Firebase functions could delete objects. The reason was a free-tier guard that read Cloudflare's analytics API every hour and wrote a pause flag to KV.</p>
+      <p>At 22:52 that night the operator told the agent to do the work itself instead of handing it over. At 23:13 the agent reported that work to make the Worker run without any extra token was already under way, and at 00:04 it committed 2c906c7: 33 files, 1,238 lines added and 1,146 removed. The first design, one new credential per feature, had been the agent's own; this time it rebuilt the same features on the R2 binding, the Durable Object and the shared key it already had. By design the token needs 2 permissions: Workers Scripts Edit and R2 Edit.</p>
+      <ul>
+        <li>A Durable Object (a stateful object that runs next to the Worker) now counts the day's Worker requests, Durable Object requests and R2 reads and writes itself. When the total passes 25 to 50% of the free allowance (the share moves with the time of day), uploads and reads close for the day and reopen at the next midnight, Korea time. The 248-line cron file that read the analytics API is gone.</li>
+        <li>Functions delete R2 objects through a signed DELETE request to the Worker instead of S3 credentials. The signing key is derived from an HMAC key the functions and the Worker already shared; the signature covers method, path, keys, timestamp and nonce. Timestamps must be within ±60 seconds, a nonce works once, there is a daily cap of 3,000 requests and 30,000 objects, and only paths under the requesting family's folder are deleted.</li>
+        <li>Worker secrets went from 3 to 1, and billing read was never added. Checking once in the dashboard that the account is on the free plan was left to the operator.</li>
+      </ul>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/secrets-three-layers-2-en.webp" width="1200" height="731" alt="Comparison: the Oct 10 plan adds 2 token permissions, a usage-API token, an R2 S3 key pair and needs 3 Worker secrets; the design in commit 2c906c7 on Oct 11 needs a token with 2 permissions and 1 Worker secret." loading="lazy"><figcaption>After the operator declined to take work back, the agent rebuilt the same features on credentials it already had instead of asking for more.</figcaption></figure>
+      <p>The cost is written down in the ops notes. Because the delete-signing key comes from the shared HMAC key, all 4 function service accounts that can read that key could in theory sign a delete. Before, only the delete function's account could read the R2 token. Narrowing it again means a separate delete key, which is one more Worker secret.</p>
+      <p>A read-only ops check on October 11 looked at the real token and found 3 permissions, one more than the design: Workers Scripts Edit, R2 Edit and Account Settings Read. With no billing read, the plan API answered with auth error 10000, which also confirms this token cannot change the plan or billing.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">A copy written another way passes the source guard, and masking does not protect the token</h2>
+      <p>The source guard looks for two strings in one folder. A regex written another way, or a copy in another folder, passes. The spell checker's log scan works line by line, so a log call split across lines gets through.</p>
+      <p>Masking does not protect the secret itself. The chat app's token is a constant in the app binary and can be extracted, which is why the app treats it only as spam control. The server also accepts the token in a header, but the client still sends it in the query; the review found the web client cannot set that header, so the fix closed the path from URL to log instead.</p>
+      <p>The chat rule works only while the agent follows it, and the count only finds key shapes we know.</p>
+      <p>The same night the Worker was reworked to need no extra token, the agent's own tool permissions grew. The agent's permission checker blocked the IAM grant commands, and approval in chat did not lift the block; an allow rule in the settings was required. The agent asked for two lines, one script and all <code>gcloud</code> commands, and the operator replied four minutes later that they were added. At 23:13 it asked for three more lines allowing the workflow tool and all <code>npx firebase-tools</code> and <code>curl</code> commands. How we scope what an agent may do on its own is in <a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a>.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Checks to add to agent instructions, masking code and token scopes</h2>
+      <ol>
+        <li>Put checking commands next to the prohibition in your agent instructions: <code>grep -c</code>, <code>cut -d= -f1</code>, and <code>$NAME</code> references in commands (on the file itself: <a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a>).</li>
+        <li>Don't let the agent read the shell history or <code>.env</code> whole. Have it count the lines that mention a key name; delete any key it finds there and rotate it. Pass new values through a prompt or a file, not a command argument.</li>
+        <li>For each kind of string that carries a secret (a URL, say), keep one masking function and call it everywhere that string is built: logs, exception messages, exception <code>uri</code> fields, diagnostics maps.</li>
+        <li>Write three tests: the rules (case, other key names, fragments, the same word in a path), a source guard (regex fragments outside the definition file), and a real failure path (a 4xx from a local server).</li>
+        <li>Feed a log checker the old leaking lines first and confirm it catches them.</li>
+        <li>Install a release build on a real device and search logcat by key name or marker. Grepping for the value puts the value back into your shell history.</li>
+        <li>For tokens, write down the permissions each feature needs, and before adding a credential check whether an existing binding or key can do the job. Confirm the real scope with read-only calls.</li>
+        <li>Where something got wider, write one line: what widened, and what it would take to narrow it.</li>
+      </ol>
+      <pre><code># release logcat: count token= lines that are not masked
+adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">One stale doc line, one transcript line, one undeployed Worker</h2>
+      <p>The chat app's security doc still says "regex duplicated in 4 files" as of its September 16 commit; the code changed and that line did not. The key-shaped line in the October 2 session log has not been deleted, and the logs don't show whether that key was rotated. For the family app, once the Worker is deployed, we need to confirm uploads and deletes work with the 2 designed permissions and whether the extra Account Settings Read is needed at all.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20AI%20coding%20agents%20and%20secrets%3A%20one%20rule%20in%20chat%2C%20logs%20and%20token%20permissions%2C%20and%20the%20two%20exceptions%20a%20copied%20masking%20regex%20missed">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Is it safe to let an AI coding agent read my .env file?</summary><div><p>Not in a way that prints values. Agent tool output is stored in the session log as is. With <code>cut -d= -f1 .env</code> for key names and <code>grep -c</code> for counts, the agent can still tell whether a setting is missing.</p></div></details>
+        <details><summary>Why is a masking regex copied into several files a problem?</summary><div><p>What one copy handles doesn't carry over to the others. In this chat app the web copies masked failure messages too, while two failure exceptions in the mobile file sent the token unmasked. One function plus a source-guard test that fails on copies prevents it.</p></div></details>
+        <details><summary>How do I cut down the cloud token permissions an agent uses?</summary><div><p>List the permissions each feature needs, and before creating a credential, check whether an existing binding or shared key can do the same job. That way the family app's Worker was redesigned to run without KV edit or billing read permissions, a usage-API token or S3 credentials; by design its token needs 2 permissions.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Mon, 26 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>We checked the market after 3 apps: median 1,166 – SugarMount</title>
     <link>https://mvgood21.github.io/en/ax/market-check-before-app/</link>
@@ -131,10 +512,10 @@ print("my app in results:", MY_APP in ids)</code></pre>
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -259,10 +640,10 @@ out of date:
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -376,12 +757,12 @@ grep -rL --include='*Test.kt' -e 'assert' -e 'check(matches' app/src/</code></pr
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -520,10 +901,10 @@ git log --until=2026-10-20 --format='%(trailers:key=Co-authored-by,valueonly)' \
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -625,12 +1006,12 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -793,11 +1174,11 @@ after_hint = win(board after the correct first move, 2 pieces left, lines it cle
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/games/">All notes on Game development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -911,12 +1292,12 @@ Schedule expires: YYYY-MM-DD / register again on: YYYY-MM-DD
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1055,10 +1436,10 @@ curl -s "$POLICY_URL" | grep -o 'data-policy-version="[0-9-]*"'</code></pre>
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1203,12 +1584,12 @@ font.save(dst)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1295,12 +1676,12 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1385,12 +1766,12 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1506,12 +1887,12 @@ flutter test test/theme_matrix/ --dart-define=Y2_NO_SETTLE=true
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1630,12 +2011,12 @@ FlowRow(
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1714,12 +2095,12 @@ Mem:              13           8           2           0           2           4
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1843,12 +2224,12 @@ if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFract
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1968,12 +2349,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2071,12 +2452,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2139,10 +2520,10 @@ for mid, rel, edits, kind, target in MUT:
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2532,11 +2913,11 @@ room  = is there space for a 3×3 square, a 1×4 bar, a 4×1 bar (0–3)</code><
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/games/">All notes on Game development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2642,12 +3023,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2753,12 +3134,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4102,10 +4483,10 @@ done</code></pre>
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4203,12 +4584,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4232,9 +4613,9 @@ done</code></pre>
     <section aria-labelledby="topics">
       <h2 id="topics">Browse by topic</h2>
       <ul class="card-list">
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/workflow/">Working with agents</a></h3><p class="sub">How work is split between an AI coding agent and a person, how rules reach the agent, and what we changed after several sessions collided in one repository.</p><p class="meta">4 notes</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/quality/">Testing and release</a></h3><p class="sub">Unit tests, release gates and on-device checks that AI-written code goes through before each release, with the real defects those checks caught along the way.</p><p class="meta">6 notes</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/android/">Android development</a></h3><p class="sub">Gradle builds, library upgrades, UI and performance problems we ran into while building Android apps with a coding agent, and how each one was solved.</p><p class="meta">5 notes</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/workflow/">Working with agents</a></h3><p class="sub">How work is split between an AI coding agent and a person, how rules reach the agent, and what we changed after several sessions collided in one repository.</p><p class="meta">5 notes</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/quality/">Testing and release</a></h3><p class="sub">Unit tests, release gates and on-device checks that AI-written code goes through before each release, with the real defects those checks caught along the way.</p><p class="meta">7 notes</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/android/">Android development</a></h3><p class="sub">Gradle builds, library upgrades, UI and performance problems we ran into while building Android apps with a coding agent, and how each one was solved.</p><p class="meta">6 notes</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/games/">Game development</a></h3><p class="sub">Generating puzzle game levels with an agent, proving every level can be solved, and tuning difficulty: the rules we settled on and the numbers we measured.</p><p class="meta">2 notes</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/store/">Play Store and monetization</a></h3><p class="sub">Google Play listings and review, store screenshots and descriptions, and ad setup: the work of shipping and running apps, shared with an AI coding agent.</p><p class="meta">1 notes</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/web/">Website and search</a></h3><p class="sub">The page structure, Google and Naver search optimization, structured data and design system of this site, built with an agent and explained from the actual code.</p><p class="meta">3 notes</p></li>
@@ -4252,12 +4633,12 @@ done</code></pre>
     <section aria-labelledby="notes">
       <h2 id="notes">Latest notes</h2>
       <ul class="card-list">
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></h3><p class="sub">Two minSdk 24 games died on every Android 7 launch because of one java.time call in a shared ad module. A NewApi lint gate now fails the release build.</p><p class="meta">Android development · Incident · October 26, 2026</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></h3><p class="sub">We checked 29 commits without a Co-Authored-By trailer against agent session logs: the agent made 26, mostly merges. Commands to count your own repository.</p><p class="meta">Working with agents · Measurement · October 26, 2026</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></h3><p class="sub">Three ways secrets leak around an AI coding agent: a key in a session log, two exceptions a copied masking regex missed, a deploy plan asking for a wider token.</p><p class="meta">Testing and release · How-to · October 26, 2026</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></h3><p class="sub">We scraped Google Play only after building three photo apps. The 32 compress apps from 2026 had a median of 1,166 installs; 11 apps were logged as on hold.</p><p class="meta">Retrospectives and numbers · Retrospective · October 25, 2026</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></h3><p class="sub">Several AI agent sessions edit this GitHub Pages site; one --check before each commit demands zero rebuild changes and zero gate errors. Four times it stopped.</p><p class="meta">Website and search · How-to · October 25, 2026</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></h3><p class="sub">Seven runners behind a &quot;100% E2E pass&quot; since Aug 2025 had zero expect() calls; five never called the app. The night we deleted them, a real E2E logged 7 bugs.</p><p class="meta">Testing and release · Incident · October 25, 2026</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></h3><p class="sub">701 commits recounted: after adopting AI, messages grew from 26 to 233 characters, but fixes stating a cause went from 1 of 29 to 56 of 73 only a year later.</p><p class="meta">Retrospectives and numbers · Retrospective · October 24, 2026</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></h3><p class="sub">A gate that diffs edited HWP files record by record caught a form-field bug. 1.1.0 shipped with edit behind a flag; 1.3.0 turned it on nine days later.</p><p class="meta">Testing and release · Incident · October 24, 2026</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></h3><p class="sub">7 of 16 ad-acquired devices stalled on board 4 of a block puzzle without a solve. Per-device event timelines and exact per-board win rates found four walls.</p><p class="meta">Game development · Measurement · October 24, 2026</p></li>
       </ul>
     </section>
     <section aria-labelledby="by-the-numbers">
@@ -4388,12 +4769,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>

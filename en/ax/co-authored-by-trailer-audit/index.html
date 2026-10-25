@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI commit provenance: what Co-Authored-By misses – SugarMount</title>
+  <meta name="description" content="We checked 29 commits without a Co-Authored-By trailer against agent session logs: the agent made 26, mostly merges. Commands to count your own repository.">
+  <link rel="canonical" href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="AI commit provenance: what Co-Authored-By misses – SugarMount">
+  <meta property="og:description" content="We checked 29 commits without a Co-Authored-By trailer against agent session logs: the agent made 26, mostly merges. Commands to count your own repository.">
+  <meta property="og:url" content="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-co-authored-by-trailer-audit-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/en/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=2227fbc3">
+  <link rel="stylesheet" href="/assets/site.css?v=2227fbc3">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=2227fbc3">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/#article","headline":"Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check","description":"We checked 29 commits without a Co-Authored-By trailer against agent session logs: the agent made 26, mostly merges. Commands to count your own repository.","url":"https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/","mainEntityOfPage":"https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/","inLanguage":"en","articleSection":"Working with agents","datePublished":"2026-10-26T09:00:00+09:00","dateModified":"2026-10-26T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-co-authored-by-trailer-audit-en.png","https://mvgood21.github.io/assets/ax/cover/co-authored-by-trailer-audit-en.webp","https://mvgood21.github.io/assets/ax/co-authored-by-trailer-audit-2-en.webp","https://mvgood21.github.io/assets/ax/co-authored-by-trailer-audit-1-en.webp"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does a commit without a Co-Authored-By trailer mean a person wrote it?","acceptedAnswer":{"@type":"Answer","text":"No. When the agent runs git merge or git revert --no-edit with git's default message, or passes -m without the trailer line, the commit it makes has no trailer."}},{"@type":"Question","name":"What extra commits does git log --all count?","acceptedAnswer":{"@type":"Answer","text":"Besides every branch and tag, it follows refs/stash , so the newest stash and its index commit count as two commits. git log --exclude=refs/stash --all leaves them out."}},{"@type":"Question","name":"Can a merge commit carry a Co-Authored-By trailer?","acceptedAnswer":{"@type":"Answer","text":"It can if you pass the message yourself with git merge --no-ff -m \"message\" and put the trailer on its last line. After a merge conflict, add the same line to the git commit -m that concludes the merge."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://mvgood21.github.io/en/ax/"},{"@type":"ListItem","position":3,"name":"Working with agents","item":"https://mvgood21.github.io/en/ax/topic/workflow/"},{"@type":"ListItem","position":4,"name":"Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=2227fbc3">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/co-authored-by-trailer-audit/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-workflow">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/workflow/">Working with agents</a></li><li><span aria-current="page">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/co-authored-by-trailer-audit-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX notes · Measurement</span>
+      <h1>Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</h1>
+      <p class="lead">Do not report a Co-Authored-By count as the share of AI-written code. Of 29 commits without the trailer that we could check against session logs, the agent made 26. Have it add the trailer to merges and reverts too.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Working with agents</span> <span aria-hidden="true">·</span> <span>10 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-10-26">October 26, 2026</time></p><!-- /build:meta -->
+      <p>In the repository of our Korean spell-checker app, 26 commits whose times match git commands the agent ran (25 merge commits, 1 revert) carry no <code>Co-Authored-By: Claude</code> trailer. The window is the one covered by Claude Code session logs, from the evening of September 13 to October 24, 2026; of the 29 trailer-less commits in it, only 3 have no matching command in the logs. Since August 2025 there are 89 commits without the trailer, and sorted by subject line and date, 52 of them are merge commits or stash entries. If the agent runs your merges and reverts, tell it in the instruction file to pass <code>-m</code> with the trailer.</p>
+      <p class="note">Sources: git history of four repositories (recounted on October 25, 2026 with the cutoff fixed at the end of October 24, KST), Claude Code session logs kept on this PC, and the GitHub pull request list. Author names and session IDs are left out.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (9)</summary><ol><li><a href="#session-logs">After September 13, 26 of the 29 commits without a trailer match an agent git command</a></li><li><a href="#missing-89">The 89 trailer-less commits since August 2025: 50 merges, 2 stash entries, 7 early commits, 30 others</a></li><li><a href="#first-guess">The mining memo counted about 40 merges and called the rest hand commits</a></li><li><a href="#four-repos">In the utilities app (7) and the puzzle game (10), every trailer-less commit matches an agent command</a></li><li><a href="#other-signals">Two pull requests labeled codex never appear in git log --all</a></li><li><a href="#how-to">Six git log lines with --exclude=refs/stash</a></li><li><a href="#limits">Periods without session logs and squash merges cannot be settled</a></li><li><a href="#next">What we will check next</a></li><li><a href="#faq">Frequently asked questions</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#session-logs">After September 13, 26 of the 29 commits without a trailer match an agent git command</a></li><li><a href="#missing-89">The 89 trailer-less commits since August 2025: 50 merges, 2 stash entries, 7 early commits, 30 others</a></li><li><a href="#first-guess">The mining memo counted about 40 merges and called the rest hand commits</a></li><li><a href="#four-repos">In the utilities app (7) and the puzzle game (10), every trailer-less commit matches an agent command</a></li><li><a href="#other-signals">Two pull requests labeled codex never appear in git log --all</a></li><li><a href="#how-to">Six git log lines with --exclude=refs/stash</a></li><li><a href="#limits">Periods without session logs and squash merges cannot be settled</a></li><li><a href="#next">What we will check next</a></li><li><a href="#faq">Frequently asked questions</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="session-logs">
+      <h2 id="session-logs">After September 13, 26 of the 29 commits without a trailer match an agent git command</h2>
+      <p>A missing trailer says nothing about who made the commit. So we went through the Claude Code session logs (JSONL files) and collected every shell command the agent ran that contained <code>git commit</code>, <code>merge</code>, <code>revert</code>, <code>stash</code>, <code>tag</code> and the like, and that mentioned this repository in its working directory or command. A commit counted as "agent command found" when such a command ran between ten minutes before and 30 seconds after the commit time.</p>
+      <p>The agent's first git write command for this repository ran at 20:41 on September 13, 2026. From then to October 24 there are 282 commits, and all 253 with a trailer matched an agent command, so the method found every trailer commit in that window.</p>
+      <figure class="ax-fig"><img src="/assets/ax/co-authored-by-trailer-audit-2-en.webp" width="1200" height="606" alt="Bar chart: of 282 commits between September 13, 2026 at 20:41 and October 24, 253 carry the trailer, 26 have no trailer but match a git command the agent ran, and 3 have neither." loading="lazy"><figcaption>Spell-checker repository, 282 commits from September 13, 2026 at 20:41 to October 24, split by trailer and by commands in the session logs.</figcaption></figure>
+      <p>In this window 89.7% of commits carry the trailer, while 279 commits, 98.9%, match a git command the agent ran (on the trailer-less side, 25 merge commits and 1 revert). The revert d378829, at 10:47 on September 30, sits in the log as <code>git revert --no-edit aa2d224</code>. The commit it reverted had gone in 28 minutes earlier with a trailer; the revert has none. The merge 2b9d3a1 on October 17 was <code>git merge --no-edit main</code>. On the same day the agent wrote its own <code>-m</code> message for merge b356c72 and still left the trailer line out.</p>
+      <p>The remaining three are a version commit (16d9917) and the two v16024 release merges, made at 20:07 and 20:08 on September 26. No matching command is in the logs, so we left them undecided.</p>
+      <p>Matching on time alone could produce coincidences, so we shifted every commit time by three hours in each direction and ran the same match. Only 17 and 15 of the 253 trailer commits matched (6 to 7%), and 0 and 1 of the 29 without a trailer.</p>
+      <p>All three merges in the same period that do carry a trailer (857326b, 08b1f7a, 0458820) have an agent command in the logs that put the trailer in. For 08b1f7a and 0458820 it was <code>git merge … -m "… Co-Authored-By: Claude Opus 5.5 …"</code>; for 857326b the agent resolved a merge conflict and then added the same line with <code>git commit -m</code>.</p>
+    </section>
+
+    <section aria-labelledby="missing-89">
+      <h2 id="missing-89">The 89 trailer-less commits since August 2025: 50 merges, 2 stash entries, 7 early commits, 30 others</h2>
+      <p>We matched <code>Co-Authored-By: Claude</code> at the start of a message line, then recounted with git's own trailer parser (<code>%(trailers:key=Co-authored-by)</code>); the two counts were identical in all four repositories. Up to October 24, 2026, <code>git log --all</code> on the spell checker lists 725 commits, and 345 of the 434 since August 1, 2025 (79.5%) carry the trailer. The 701 commits in <a href="/en/ax/commit-messages-701/">our note on 701 commit messages</a> were counted on the develop branch only, up to October 19, minus one submodule commit, which is why the totals differ.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Group</th><th>Count</th><th>How we sorted it</th></tr></thead>
+        <tbody>
+          <tr><td>git-flow release merges</td><td>37</td><td>Subject <code>Merge branch 'release/…'</code>, <code>'hotfix/…'</code> or <code>Merge tag …</code></td></tr>
+          <tr><td>Feature, sync and PR merges</td><td>13</td><td>9 feature branches, 3 syncs between <code>develop</code> and <code>main</code>, 1 pull request</td></tr>
+          <tr><td>Stash entries</td><td>2</td><td><code>On main: …</code> and its <code>index on main: …</code></td></tr>
+          <tr><td>Before the first trailer</td><td>7</td><td>August 3 to the morning of August 7 (the first trailer is 02cbb15, August 7 at 22:01)</td></tr>
+          <tr><td>Other single-parent commits</td><td>30</td><td>24 code, 5 data or config, 1 revert</td></tr>
+        </tbody>
+      </table></div>
+      <figure class="ax-fig"><img src="/assets/ax/co-authored-by-trailer-audit-1-en.webp" width="1200" height="714" alt="Bar chart: of the 89 commits without a trailer since August 2025 in the spell-checker repository, 37 are git-flow release merges, 13 are feature, sync or PR merges, 2 are stash entries, 7 predate the first trailer and 30 are other single-parent commits." loading="lazy"><figcaption>Spell-checker repository, the 89 commits without a trailer from August 1, 2025 to October 24, 2026, sorted by subject line and date.</figcaption></figure>
+      <p>The two stash entries are not commits anyone meant to count. <code>git log --all</code> follows <code>refs/stash</code> as well, so of the five stashes in this repository, the newest one (September 10, 2026) and its index commit show up. Put <code>--exclude=refs/stash</code> before <code>--all</code> and the numbers become 345 of 432 (79.9%), with 87 lacking the trailer.</p>
+      <p>Drop merges and start the window at the first trailer, and the share rises to 342 of 372 single-parent commits (91.9%).</p>
+      <p>Of the 30 single-parent commits, the five data or config ones are 9 image and PSD files (94773fa), 4 image and PSD files plus a few string and DB-version lines (417259d, 9 files, +8/−8), collapsing eight <code>.gitignore</code> lines into one (3c1bdca), a two-line version bump in <code>build.gradle</code> (36a6c23), and 906 lines of quiz data plus a two-line version bump (16d9917). All 24 code commits fall between August 9 and September 13, 2025. One of them, f43dada, is the operator reverting source the AI had changed wrongly; its Korean message roughly reads "restore the existing source that was edited wrongly (Claude Code…)", and the story is in <a href="/en/ax/commit-messages-701/">our note on 701 commit messages</a>.</p>
+    </section>
+
+    <section aria-labelledby="first-guess">
+      <h2 id="first-guess">The mining memo counted about 40 merges and called the rest hand commits</h2>
+      <p>This topic came from a mining memo an agent wrote while scanning the repository. It said about 40 of the 89 were git-flow merges and the rest were hand commits. The recount found 51 merge-shaped commits (one of them a stash) and 7 commits from before the first trailer inside the window. Of the 29 commits we could check against the logs, the agent's own commands made 26.</p>
+      <p>The memo's totals (728 and 348) had no cutoff either. Five new commits arrived in this repository on the morning of October 25 alone, and the same command then returned 730. Every number in this note uses <code>--until=2026-10-25T00:00:00</code>. The memo also said our peer-to-peer chat app repository started in September 2026; its first commit is from August 21, 2025 (8 commits that month, 95 in September 2026).</p>
+    </section>
+
+    <section aria-labelledby="four-repos">
+      <h2 id="four-repos">In the utilities app (7) and the puzzle game (10), every trailer-less commit matches an agent command</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Repository</th><th>First commit</th><th>Commits</th><th>Trailer</th><th>Share</th><th>No trailer (merges)</th></tr></thead>
+        <tbody>
+          <tr><td>Spell checker, all history</td><td>2020-12-16</td><td>725</td><td>345</td><td>47.6%</td><td>380 (205)</td></tr>
+          <tr><td>Spell checker, since Aug 2025</td><td></td><td>434</td><td>345</td><td>79.5%</td><td>89 (51)</td></tr>
+          <tr><td>Utilities app</td><td>2026-09-20</td><td>87</td><td>80</td><td>92.0%</td><td>7 (6)</td></tr>
+          <tr><td>Puzzle game</td><td>2026-09-30</td><td>170</td><td>160</td><td>94.1%</td><td>10 (10)</td></tr>
+          <tr><td>P2P chat app</td><td>2025-08-21</td><td>103</td><td>102</td><td>99.0%</td><td>1 (0)</td></tr>
+        </tbody>
+      </table></div>
+      <p>Even in repositories built with the agent from day one, the gaps are mostly merges. All 10 trailer-less commits in the puzzle game are merges, and all 10 line up with an agent git command in the session logs. The same repository has 9 merges that do carry the trailer.</p>
+      <p>In the utilities app, 5 of the 6 merges are <code>Merge branch 'worktree-agent-&lt;id&gt;'</code>. All five are in the session logs as <code>git merge --no-edit worktree-agent-&lt;id&gt;</code> commands the agent ran, and the <code>git worktree list</code> output in the first of those commands shows the branches sitting in <code>.claude/worktrees/agent-&lt;id&gt;</code>, the worktree folders Claude Code created for its subagents. The one single-parent commit, 1171dee, is the agent's own <code>git commit -m "Ignore local upload keystores"</code>, written without the trailer line. The single gap in the P2P chat app is its root commit, "first commit", three minutes before the first trailer commit.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Commits%20without%20a%20Co-Authored-By%20trailer%3A%20the%20agent%20made%2026%20of%20the%2029%20we%20could%20check">Email us</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="other-signals">
+      <h2 id="other-signals">Two pull requests labeled codex never appear in git log --all</h2>
+      <p>The author field is no help. All 89 trailer-less commits since August 2025 in the spell checker come from one account, which also authored 338 trailer commits.</p>
+      <p>Pull request labels live only on GitHub. The spell checker has three pull requests. #1 and #2, from June 29, 2025, have a <code>codex</code> label and <code>codex/…</code> branches, and both were closed without merging. Their commits (09cb9b5, d318e22) are on no branch, so <code>git log --all</code> never shows them, and their messages have no trailer either. #3, merged with 20 commits, has no label.</p>
+      <p>Branch names such as <code>worktree-agent-</code> and <code>codex/</code> survive a merge only in the merge commit's subject. Wording differs too: between the night of August 7 and September 13, 2025, the median subject length was 38 characters for trailer commits and 20 for the rest; we did not use it to decide who made a commit.</p>
+      <p>Session logs matched 253 of 253 trailer commits in the checked window, which makes them the strongest signal we have. They exist only on this PC, and for the spell checker they start on the evening of September 13, 2026.</p>
+    </section>
+
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Six git log lines with --exclude=refs/stash</h2>
+      <p>These run as-is in Git Bash or a macOS or Linux shell. Change the cutoff and the trailer text to match your repository.</p>
+      <pre><code>U=2026-10-25T00:00:00; S=2025-08-01T00:00:00
+P='^Co-Authored-By: Claude'
+# 1. total and trailer commits (stash excluded)
+git log --exclude=refs/stash --all --since=$S --until=$U --format=%h | wc -l
+git log --exclude=refs/stash --all --since=$S --until=$U -i -E --grep="$P" --format=%h | wc -l
+# 2. commits without the trailer, merges among them
+git log --exclude=refs/stash --all --since=$S --until=$U -i -E --grep="$P" --invert-grep --format=%h | wc -l
+git log --exclude=refs/stash --all --merges --since=$S --until=$U -i -E --grep="$P" --invert-grep --format='%h %s'
+# 3. cross-check with git's trailer parser
+git log --exclude=refs/stash --all --until=$U --format='%(trailers:key=Co-authored-by,valueonly)' | grep -ci claude
+# 4. single-parent commits without the trailer, with size
+git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --grep="$P" --invert-grep --stat --format='%h %ad %s' --date=short</code></pre>
+      <ol>
+        <li>Fix the cutoff with <code>--until</code>. In a repository that gets commits every day, the totals change within hours.</li>
+        <li>Find the date of the first trailer (first line with <code>--reverse</code>) and start the window there.</li>
+        <li>Sort the commits without a trailer into merges, stash entries, data or config, and code.</li>
+        <li>If you have session logs, match commit times against the times of the agent's git commands, and shift the times by a few hours to measure how often they match by chance.</li>
+        <li>If the agent runs your merges and reverts, add a rule to its instruction file to pass <code>-m</code> with the trailer.</li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="limits">
+      <h2 id="limits">Periods without session logs and squash merges cannot be settled</h2>
+      <p>In the spell checker, the 51 trailer-less commits made after the first trailer but before the session logs start (23 merges, 28 single-parent commits) stay undecided. The 24 code commits among them added 5,749 lines of Kotlin and Java, while the 39 trailer commits of the same weeks (the night of August 7 to September 13) added 14,762. Why a trailer is not a share of code lines is covered in <a href="/en/ax/commit-messages-701/">the 701-commit note</a>.</p>
+      <p>Some repositories will not fit this method. With squash merges, one pull request becomes one commit, and the trailer depends on the tool of whoever presses the merge button. In repositories with many contributors, each person's commit habits make the ratio harder to read. Tools that keep no session logs, or setups that delete them, rule out the cross-check entirely. In a GitLab survey of 1,528 developers and technology buyers in six countries, released on June 23, 2026, 43% said they cannot reliably distinguish AI-generated code from human-written code, and 39% pointed to systems that don't track code origin (<a href="https://about.gitlab.com/press/releases/2026-06-23-gitlab-research-reveals-organizations-are-generating-ai-code-faster-than-they-can-control-it/">GitLab press release</a>).</p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">What we will check next</h2>
+      <p>Neither the spell checker's instruction file nor the global instructions say anything about trailers (checked October 25). Once a rule for merges and reverts is written down, the trailer-less merges have to be counted again to see whether it worked.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Commits%20without%20a%20Co-Authored-By%20trailer%3A%20the%20agent%20made%2026%20of%20the%2029%20we%20could%20check">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">Frequently asked questions</h2>
+      <div class="faq">
+        <details><summary>Does a commit without a Co-Authored-By trailer mean a person wrote it?</summary><div><p>No. When the agent runs <code>git merge</code> or <code>git revert --no-edit</code> with git's default message, or passes <code>-m</code> without the trailer line, the commit it makes has no trailer.</p></div></details>
+        <details><summary>What extra commits does git log --all count?</summary><div><p>Besides every branch and tag, it follows <code>refs/stash</code>, so the newest stash and its index commit count as two commits. <code>git log --exclude=refs/stash --all</code> leaves them out.</p></div></details>
+        <details><summary>Can a merge commit carry a Co-Authored-By trailer?</summary><div><p>It can if you pass the message yourself with <code>git merge --no-ff -m "message"</code> and put the trailer on its last line. After a merge conflict, add the same line to the <code>git commit -m</code> that concludes the merge.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
+        <li><a href="/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
+        <li><a href="/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
+        <li><a href="/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li>
+        <li><a href="/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
+      </ul>
+      <p><a href="/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/sitemap/">Site map</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>
