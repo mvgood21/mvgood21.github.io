@@ -6,7 +6,7 @@
 
 Generated from data:   index.html, en/index.html, apps/index.html, en/apps/index.html (app hub),
                        privacy/index.html, en/privacy/index.html, apps/<app_path>/ for apps with
-                       "page": "generated", 404.html, sitemap.xml (XSL view: sitemap.xsl, static), rss.xml, en/rss.xml
+                       "page": "generated", 404.html, sitemap.xml (index) + sitemap-{main,apps,ax}.xml, rss.xml, en/rss.xml
                        (full <main> per item), robots.txt, llms.txt, /<IndexNow key>.txt, assets/sds-apps.css and
                        assets/fonts/pretendard.css (tools/sds_apps.py), data/content-dates.json (tools/dates.py)
 Hand-written pages:    every other *.html keeps its <main> content byte for byte, except the build-owned
@@ -1362,27 +1362,41 @@ def alternates(relpath, pages):
         return ko_p, en_p
     return None
 
+SITEMAP_PARTS = (("sitemap-main.xml", (0, 3)), ("sitemap-apps.xml", (1,)), ("sitemap-ax.xml", (2,)))  # home+about+policies, apps, AX notes
+
 def build_sitemap(pages, outputs):
-    out = ['<?xml version="1.0" encoding="UTF-8"?>',
-           '<?xml-stylesheet type="text/xsl" href="/sitemap.xsl"?>',
-           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml"'
-           ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">']
-    for relpath in sorted(pages, key=lambda p: (p.startswith("en/"), section_rank(p), p.count("/"), p)):
-        if not relpath.endswith("index.html") or relpath in NOINDEX_PATHS: continue
-        path = "/" + relpath[:-len("index.html")]
-        out.append("  <url>")
-        out.append(f"    <loc>{SITE + path}</loc>")
-        out.append(f"    <lastmod>{modified(relpath)}</lastmod>")
-        alt = alternates(relpath, pages)
-        if alt:
-            out.append(f'    <xhtml:link rel="alternate" hreflang="ko" href="{SITE + alt[0]}"/>')
-            out.append(f'    <xhtml:link rel="alternate" hreflang="en" href="{SITE + alt[1]}"/>')
-            out.append(f'    <xhtml:link rel="alternate" hreflang="x-default" href="{SITE + alt[0]}"/>')
-        for src in page_images(relpath, outputs):
-            out.append(f"    <image:image><image:loc>{esc(SITE + src)}</image:loc></image:image>")
-        out.append("  </url>")
-    out.append("</urlset>")
-    return "\n".join(out) + "\n"
+    """Plain sitemaps.org files, no stylesheet: sitemap.xml is a <sitemapindex> (the file robots.txt and Search Console
+    point at) over one <urlset> per section, each with Google's hreflang (xhtml:link) and image extensions."""
+    files, index = {}, []
+    ordered = sorted(pages, key=lambda p: (p.startswith("en/"), section_rank(p), p.count("/"), p))
+    for name, ranks in SITEMAP_PARTS:
+        out = ['<?xml version="1.0" encoding="UTF-8"?>',
+               '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml"'
+               ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">']
+        mods = []
+        for relpath in ordered:
+            if not relpath.endswith("index.html") or relpath in NOINDEX_PATHS or section_rank(relpath) not in ranks: continue
+            path = "/" + relpath[:-len("index.html")]
+            mods.append(modified(relpath))
+            out.append("  <url>")
+            out.append(f"    <loc>{SITE + path}</loc>")
+            out.append(f"    <lastmod>{mods[-1]}</lastmod>")
+            alt = alternates(relpath, pages)
+            if alt:
+                out.append(f'    <xhtml:link rel="alternate" hreflang="ko" href="{SITE + alt[0]}"/>')
+                out.append(f'    <xhtml:link rel="alternate" hreflang="en" href="{SITE + alt[1]}"/>')
+                out.append(f'    <xhtml:link rel="alternate" hreflang="x-default" href="{SITE + alt[0]}"/>')
+            for src in page_images(relpath, outputs):
+                out.append(f"    <image:image><image:loc>{esc(SITE + src)}</image:loc></image:image>")
+            out.append("  </url>")
+        if not mods: continue
+        out.append("</urlset>")
+        files[name] = "\n".join(out) + "\n"
+        index += ["  <sitemap>", f"    <loc>{SITE}/{name}</loc>", f"    <lastmod>{max(mods)}</lastmod>", "  </sitemap>"]
+    files["sitemap.xml"] = "\n".join(['<?xml version="1.0" encoding="UTF-8"?>',
+                                      '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+                                     + index + ["</sitemapindex>"]) + "\n"
+    return files
 
 def feed_kind(relpath):
     """RSS item scope (IA spec 4.3): help articles, AX notes and hub, app pages, /apps/, /about/. Not policies."""
@@ -1681,7 +1695,7 @@ def main():
             [(u, n, d, (ax_topic_of(u) or {}).get(lang, {}).get("name", ""), ax_type(u), fmt_date(lang, published(relpath_of(u))))
              for u, n, d in ax_articles(lang)])
     outputs["llms.txt"] = build_llms(outputs)
-    outputs["sitemap.xml"] = build_sitemap(pages, outputs)
+    outputs.update(build_sitemap(pages, outputs))
     outputs["rss.xml"] = build_rss(outputs, "ko")
     outputs["en/rss.xml"] = build_rss(outputs, "en")
     outputs["robots.txt"] = build_robots()

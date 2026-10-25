@@ -906,16 +906,35 @@ def check_page(site, relpath, report, *, file_mode=False, org_urls=None, dates_e
 SM_NS = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9", "xhtml": "http://www.w3.org/1999/xhtml"}
 
 
+def sitemap_urls(site, report):
+    """<url> elements of sitemap.xml: a <urlset> itself, or every child <urlset> its <sitemapindex> lists (same site)."""
+    def parse(name):
+        text = site.read(name)
+        if text is None:
+            report.error("SITEMAP-MISSING", name, f"no {name}"); return None
+        try:
+            return ET.fromstring(text.encode("utf-8"))
+        except ET.ParseError as e:
+            report.error("SITEMAP-XML", name, str(e)); return None
+    root = parse("sitemap.xml")
+    if root is None: return None
+    if root.tag != "{%s}sitemapindex" % SM_NS["sm"]:
+        return root.findall("sm:url", SM_NS)
+    urls = []
+    for s in root.findall("sm:sitemap", SM_NS):
+        loc = (s.findtext("sm:loc", "", SM_NS) or "").strip()
+        if not re.fullmatch(re.escape(SITE) + r"/sitemap-[\w-]+\.xml", loc):
+            report.error("SITEMAP-INDEX", "sitemap.xml", f"{loc} is not a sitemap-*.xml file on this site"); continue
+        child = parse(loc[len(SITE) + 1:])
+        if child is not None: urls += child.findall("sm:url", SM_NS)
+    return urls
+
+
 def check_sitemap(site, report, pages, dates_entries):
-    text = site.read("sitemap.xml")
-    if text is None:
-        report.error("SITEMAP-MISSING", "sitemap.xml", "no sitemap.xml"); return set()
-    try:
-        root = ET.fromstring(text.encode("utf-8"))
-    except ET.ParseError as e:
-        report.error("SITEMAP-XML", "sitemap.xml", str(e)); return set()
+    urls = sitemap_urls(site, report)
+    if urls is None: return set()
     listed = set()
-    for u in root.findall("sm:url", SM_NS):
+    for u in urls:
         loc = (u.findtext("sm:loc", "", SM_NS) or "").strip()
         lm = (u.findtext("sm:lastmod", "", SM_NS) or "").strip()
         lk = resolve(loc, "")

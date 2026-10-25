@@ -740,6 +740,17 @@ class MoreGates(Base):
         f = self.edit(self.files(), "sitemap.xml", "</urlset>", "<url></urlset>")
         self.assertGate(f, "SITEMAP-XML")
 
+    def test_sitemap_index(self):
+        f = self.files()
+        f["sitemap-all.xml"] = f["sitemap.xml"]
+        f["sitemap.xml"] = ('<?xml version="1.0" encoding="UTF-8"?><sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+                            f"<sitemap><loc>{SITE}/sitemap-all.xml</loc></sitemap></sitemapindex>")
+        self.assertFalse([c for c in run(f).codes() if c.startswith("SITEMAP")])
+        del f["sitemap-all.xml"]
+        self.assertGate(f, "SITEMAP-MISSING")
+        f["sitemap.xml"] = f["sitemap.xml"].replace(f"{SITE}/sitemap-all.xml", "https://example.com/sitemap-all.xml")
+        self.assertGate(f, "SITEMAP-INDEX")
+
     def test_sitemap_loc_resolves(self):
         f = self.edit(self.files(), "sitemap.xml", "</urlset>", f"<url><loc>{SITE}/apps/nope/</loc></url></urlset>")
         self.assertGate(f, "SITEMAP-LOC")

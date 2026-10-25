@@ -12,7 +12,7 @@ Plain static files, no framework. `tools/build.py` (Python standard library only
 | `index.html`, `en/index.html` (home), `apps/index.html`, `en/apps/index.html` (app hub) | `data/apps.json` | generated |
 | `privacy/index.html`, `en/privacy/index.html` (policy list, incl. AXFamily delete/terms links) | `data/apps.json` + effective dates read from each policy | generated |
 | `apps/<app_path>/` for apps with `"page": "generated"` | `data/apps.json` (`title_topic`, `meta`, `summary`, `features`, `facts`, `privacy`, `limits`, `faq`, `tasks`, `releases`) | generated |
-| `sitemap.xml` (lastmod = modified; images: screenshots/article captures + app share image), `rss.xml` + `en/rss.xml` (full `<main>` per item, for Naver and subscribers; never submit RSS as a sitemap), `robots.txt` (one `User-agent: *` group, one `Sitemap:` line), `llms.txt`, `404.html`, `/<IndexNow key>.txt` (from `data/indexnow-key.txt`) | all pages + `data/apps.json` | generated |
+| `sitemap.xml` (a plain `<sitemapindex>` over `sitemap-main.xml`, `sitemap-apps.xml`, `sitemap-ax.xml`; no stylesheet; lastmod = modified; images: screenshots/article captures + app share image), `rss.xml` + `en/rss.xml` (full `<main>` per item, for Naver and subscribers; never submit RSS as a sitemap), `robots.txt` (one `User-agent: *` group, one `Sitemap:` line), `llms.txt`, `404.html`, `/<IndexNow key>.txt` (from `data/indexnow-key.txt`) | all pages + `data/apps.json` | generated |
 | `assets/sds-apps.css` (per-app accent tokens for `[data-app]`), `assets/fonts/pretendard.css` (only the Pretendard subsets the site's text needs) | `data/apps.json`, rendered pages | generated in memory by `tools/sds_apps.py` before the CSS version `?v=` is computed |
 | `data/content-dates.json` (published/modified per page) | hash of each hand page's `<main>` minus build blocks, or of a generated page's input data | `tools/dates.py` via the build; never edit dates by hand |
 | articles under an app: `apps/<app_path>/<slug>/index.html` (ko and en pair) | the file's own `<title>`, description and `<main>` | you; build adds breadcrumbs, `build:meta` (byline, read time, updated), `build:toc` (3+ `h2[id]`), `Article` JSON-LD with the `assets/og/article-*` images, and lists the article on the app page, hub and home |
@@ -23,7 +23,7 @@ Plain static files, no framework. `tools/build.py` (Python standard library only
 | share images `assets/og/app-<id>-<lang>.png`, `assets/og/article-*.png`, hub/about/AX/privacy cards, `assets/og.png` (ko home) + `assets/og/home-en.png` (en home), `assets/logo.png`, `favicon.ico`, `assets/favicon.png`, `assets/apple-touch-icon.png` | real screenshots in `assets/apps`, `data/apps.json` | `tools/og.py` (needs Pillow); `python tools/og.py --articles` after adding an article |
 
 Never edit generated files by hand; the next build overwrites them. Edit `data/apps.json` or `tools/build.py` instead.
-`assets/site.css` is hand-written (SDS tokens and components); `sitemap.xsl` is static (SDS neutral colours).
+`assets/site.css` is hand-written (SDS tokens and components).
 
 ```bash
 python tools/og.py                 # when an app is added or its screenshots/name change (all share images)
