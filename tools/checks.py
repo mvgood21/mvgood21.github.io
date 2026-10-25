@@ -952,7 +952,7 @@ def check_sitemap(site, report, pages, dates_entries):
                 report.error("SITEMAP-LASTMOD", "sitemap.xml", f"{loc} lastmod {lm!r} != content-dates modified {e['modified']}")
         alts = {l.get("hreflang"): l.get("href") for l in u.findall("xhtml:link", SM_NS)}
         pg = site.page(rp)
-        if pg is not None and rp not in NOINDEX_PATHS and alts != pg.hreflangs():
+        if alts and pg is not None and rp not in NOINDEX_PATHS and alts != pg.hreflangs():  # optional; pages carry hreflang
             report.error("SITEMAP-HREFLANG", "sitemap.xml", f"{loc}: sitemap alternates {alts} != page hreflang {pg.hreflangs()}")
     for rp in pages:
         if rp not in NOINDEX_PATHS and rp not in listed:

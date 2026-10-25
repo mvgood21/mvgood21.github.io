@@ -347,7 +347,8 @@ def footer(lang):
                       for _, apps in grouped(lang, live_apps()) for a in apps)
     site_li = "".join(f'<li><a href="{h}">{esc(n)}</a></li>' for h, n in (
         (url(lang, "/apps/"), t["footer_all_apps"]), (url(lang, "/ax/"), t["ax_nav"]), (url(lang, "/about/"), t["about"]),
-        (url(lang, "/privacy/"), t["privacy"]), ("/en/rss.xml" if lang == "en" else "/rss.xml", t["rss"])))
+        (url(lang, "/privacy/"), t["privacy"]), (url(lang, "/sitemap/"), SITEMAP_T[lang]["title"]),
+        ("/en/rss.xml" if lang == "en" else "/rss.xml", t["rss"])))
     return f'''<footer class="site-footer">
     <div class="container">
       <div>
@@ -1329,26 +1330,90 @@ def build_404():
     h = head("ko", t["nf_title"], t["nf_p"], "/404.html", None)
     return page("ko", h, "", header("ko", None, "/en/"), main, footer("ko"))
 
+# ---------------------------------------------------------------- HTML site map (people and crawlers; the XML files are for search consoles)
+SITEMAP_T = {
+    "ko": {"title": "사이트맵", "lead": "SugarMount의 모든 페이지를 한곳에 모았습니다. 앱 소개와 도움말, AX 노트, 개인정보처리방침을 묶음별로 찾을 수 있습니다.",
+           "main_h": "주요 페이지", "apps_h": "앱과 도움말", "ax_h": "AX 노트 전체", "privacy_h": "개인정보처리방침", "n": "{n}쪽"},
+    "en": {"title": "Site map", "lead": "Every page on SugarMount in one place: app pages and help articles, AX notes by topic, and the privacy policies.",
+           "main_h": "Main pages", "apps_h": "Apps and help", "ax_h": "All AX notes", "privacy_h": "Privacy policies", "n": "{n} pages"},
+}
+
+def sitemap_page_input(lang, pages):
+    """Hash input for /sitemap/: the list of pages it links to (titles live on those pages, not here)."""
+    return dates.data_input("sitemap", sorted(p for p in pages if lang_of(p) == lang and p not in NOINDEX_PATHS and bare_of(p) != "sitemap/index.html"))
+
+def build_sitemap_page(lang, outputs, pages):
+    """Every indexable page of one language as plain links: main pages, apps with their help articles, AX notes by topic
+    (with dates), privacy policies, then anything else. Linked from every footer, so no page is more than two clicks deep."""
+    t, st = T[lang], SITEMAP_T[lang]
+    path = url(lang, "/sitemap/")
+    def title_of(rp):
+        return h1_text(outputs.get(rp) or read(rp)) or rp
+    mine = sorted(p for p in pages if lang_of(p) == lang and p not in NOINDEX_PATHS and p.endswith("index.html") and bare_of(p) != "sitemap/index.html")
+    done = set()
+    def li(u, label, extra=""):
+        done.add(relpath_of(u))
+        return f'<li><a href="{u}">{esc(label)}</a>{extra}</li>'
+    main_li = "".join(li(url(lang, p), n) for p, n in (("/", "SugarMount"), ("/apps/", t["footer_all_apps"]), ("/ax/", t["ax_nav"]),
+                                                      ("/about/", t["about"]), ("/privacy/", t["privacy"])) if relpath_of(url(lang, p)) in pages)
+    app_rows = []
+    for g, apps in grouped(lang, [a for a in APPS if app_url(a, lang) and relpath_of(app_url(a, lang)) in pages]):
+        items = []
+        for a in apps:
+            arts = article_links(lang, a["app_path"]) if a.get("app_path") else []
+            sub = "<ul>" + "".join(li(u, n) for u, n in arts) + "</ul>" if arts else ""
+            items.append(li(app_url(a, lang), full_name(a, lang), sub))
+        app_rows.append(f'      <h3>{esc(g)}</h3>\n      <ul>{"".join(items)}</ul>')
+    ax_rows = []
+    for tp, arts in ax_by_topic(lang):
+        tu = ax_topic_url(tp, lang)
+        head_link = f'<a href="{tu}">{esc(tp[lang]["name"])}</a>' if relpath_of(tu) in pages else esc(tp[lang]["name"])
+        done.add(relpath_of(tu))
+        notes = "".join(li(u, n, f' <span class="muted">{fmt_date(lang, published(relpath_of(u)))}</span>') for u, n, _ in arts)
+        ax_rows.append(f'      <h3>{head_link} <span class="muted">{st["n"].format(n=len(arts))}</span></h3>\n      <ul>{notes}</ul>')
+    pol = [p for p in mine if bare_of(p).startswith("privacy/") and p not in done]
+    pol_li = "".join(li("/" + p[:-len("index.html")], title_of(p)) for p in sorted(pol, key=title_of))
+    rest = [p for p in mine if p not in done]
+    rest_li = "".join(li("/" + p[:-len("index.html")], title_of(p)) for p in rest)
+    nav, bc = crumbs(lang, [(st["title"], None)])
+    main = f'''    {nav}
+    <header class="hero">
+      <h1>{st["title"]}</h1>
+      <p class="lead">{st["lead"]}</p>
+    </header>
+
+    <section aria-labelledby="sm-main">
+      <h2 id="sm-main">{st["main_h"]}</h2>
+      <ul>{main_li}{rest_li}</ul>
+    </section>
+
+    <section aria-labelledby="sm-apps">
+      <h2 id="sm-apps">{st["apps_h"]}</h2>
+{chr(10).join(app_rows)}
+    </section>
+
+    <section aria-labelledby="sm-ax">
+      <h2 id="sm-ax">{st["ax_h"]}</h2>
+{chr(10).join(ax_rows)}
+    </section>
+
+    <section aria-labelledby="sm-privacy">
+      <h2 id="sm-privacy">{st["privacy_h"]}</h2>
+      <ul>{pol_li}</ul>
+    </section>'''
+    title = fit_title(st["title"], lang)
+    lds = [{"@context": "https://schema.org", "@type": "CollectionPage", "@id": SITE + path, "url": SITE + path, "name": title,
+            "description": st["lead"], "inLanguage": lang, "isPartOf": SITE_REF, "publisher": ORG_REF,
+            "dateModified": dates.iso_datetime(modified(relpath_of(path)))}, bc]
+    h = head(lang, title, st["lead"], path, url(other(lang), "/sitemap/"), lds=lds)
+    return page(lang, h, ' class="page-read"', header(lang, None, url(other(lang), "/sitemap/")), main, footer(lang))
+
 # ---------------------------------------------------------------- sitemap, feeds, robots, llms.txt
 MAIN_RE = re.compile(r"<main\b[^>]*>(.*)</main>", re.S)
 
 def main_html(content):
     m = MAIN_RE.search(content)
     return m.group(1) if m else ""
-
-def page_images(relpath, outputs):
-    """Image sitemap entries (IA spec 4.2): app pages and help articles list the images their <main> shows (screenshots,
-    article captures; app icons left out), and app pages add their share image."""
-    parts = bare_of(relpath)[:-len("index.html")].strip("/").split("/")
-    if parts[0] == "ax" and len(parts) == 2 and parts[1] != "topic":  # AX notes: their figures (ax_extras.figures)
-        return [x for x in ax_extras.figures(main_html(outputs.get(relpath, ""))) if exists(x.lstrip("/"))]
-    if parts[0] != "apps" or len(parts) not in (2, 3) or parts[1] not in BY_APP_PATH: return []
-    out = []
-    for src in re.findall(r'<img\b[^>]*\bsrc="(/[^"]+)"', main_html(outputs.get(relpath, ""))):
-        if not re.search(r"/icon\.\w+$", src) and src not in out and exists(src.lstrip("/")): out.append(src)
-    og = app_og(BY_APP_PATH[parts[1]], lang_of(relpath))
-    if len(parts) == 2 and exists(og.lstrip("/")): out.append(og)
-    return out
 
 def section_rank(relpath):
     bare = bare_of(relpath)
@@ -1364,31 +1429,31 @@ def alternates(relpath, pages):
 
 SITEMAP_PARTS = (("sitemap-main.xml", (0, 3)), ("sitemap-apps.xml", (1,)), ("sitemap-ax.xml", (2,)))  # home+about+policies, apps, AX notes
 
+def sitemap_rank(relpath):
+    """(priority, changefreq) per page kind. Hubs first, then content, policies last."""
+    parts = bare_of(relpath)[:-len("index.html")].strip("/").split("/")
+    if parts == [""]: return "1.0", "daily"
+    if parts in (["apps"], ["ax"]): return "0.9", "daily"
+    if parts[0] == "ax": return ("0.6", "weekly") if parts[1] == "topic" else ("0.8", "monthly")
+    if parts[0] == "apps": return ("0.8", "weekly") if len(parts) == 2 else ("0.7", "monthly")
+    if parts[0] == "privacy": return "0.3", "yearly"
+    return "0.5", "monthly"
+
 def build_sitemap(pages, outputs):
-    """Plain sitemaps.org files, no stylesheet: sitemap.xml is a <sitemapindex> (the file robots.txt and Search Console
-    point at) over one <urlset> per section, each with Google's hreflang (xhtml:link) and image extensions."""
+    """Plain sitemaps.org files, like any large site's: sitemap.xml is a <sitemapindex> (the file robots.txt and Search
+    Console point at) over one <urlset> per section with loc, lastmod, priority and changefreq only. hreflang pairs and
+    images live in each page's <head> and JSON-LD, not here."""
     files, index = {}, []
     ordered = sorted(pages, key=lambda p: (p.startswith("en/"), section_rank(p), p.count("/"), p))
     for name, ranks in SITEMAP_PARTS:
-        out = ['<?xml version="1.0" encoding="UTF-8"?>',
-               '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml"'
-               ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">']
+        out = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
         mods = []
         for relpath in ordered:
             if not relpath.endswith("index.html") or relpath in NOINDEX_PATHS or section_rank(relpath) not in ranks: continue
-            path = "/" + relpath[:-len("index.html")]
             mods.append(modified(relpath))
-            out.append("  <url>")
-            out.append(f"    <loc>{SITE + path}</loc>")
-            out.append(f"    <lastmod>{mods[-1]}</lastmod>")
-            alt = alternates(relpath, pages)
-            if alt:
-                out.append(f'    <xhtml:link rel="alternate" hreflang="ko" href="{SITE + alt[0]}"/>')
-                out.append(f'    <xhtml:link rel="alternate" hreflang="en" href="{SITE + alt[1]}"/>')
-                out.append(f'    <xhtml:link rel="alternate" hreflang="x-default" href="{SITE + alt[0]}"/>')
-            for src in page_images(relpath, outputs):
-                out.append(f"    <image:image><image:loc>{esc(SITE + src)}</image:loc></image:image>")
-            out.append("  </url>")
+            pri, freq = sitemap_rank(relpath)
+            out += ["  <url>", f"    <loc>{SITE}/{relpath[:-len('index.html')]}</loc>", f"    <lastmod>{mods[-1]}</lastmod>",
+                    f"    <priority>{pri}</priority>", f"    <changefreq>{freq}</changefreq>", "  </url>"]
         if not mods: continue
         out.append("</urlset>")
         files[name] = "\n".join(out) + "\n"
@@ -1676,11 +1741,17 @@ def main():
     for gp, (tp, lang) in ax_topic_pages().items():
         generated.add(gp); outputs[gp] = build_ax_topic(tp, lang)
     outputs["404.html"] = build_404()
+    generated |= {"sitemap/index.html", "en/sitemap/index.html"}  # built last, below
     stale = [p for p in all_pages() if bare_of(p).startswith("ax/topic/") and p not in generated]  # topic left without notes
     for p in all_pages():
         if p not in generated and p not in stale:
             outputs[p] = wrap_hand(p)
     pages = (set(all_pages()) - set(stale)) | {p for p in outputs if p.endswith("index.html")}
+    for lang in ("ko", "en"):  # the HTML site map last: it lists every other page
+        sp = ("en/" if lang == "en" else "") + "sitemap/index.html"
+        pages.add(sp); generated.add(sp)
+        GEN_INPUTS[sp] = sitemap_page_input(lang, pages)
+        outputs[sp] = build_sitemap_page(lang, outputs, pages)
     for p in sorted(pages):
         if p not in NOINDEX_PATHS: page_dates(p)  # every indexable page has an entry, even if nothing above asked
     # generated CSS first (in memory, from the rendered pages' characters), then ONE version for all three stylesheets,

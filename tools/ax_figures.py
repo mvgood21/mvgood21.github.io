@@ -4,7 +4,7 @@ Every number in a figure must already be in the note's text (the figure restates
 A note shows a figure with:
   <figure class="ax-fig"><img src="/assets/ax/<slug>-<n>-<lang>.webp" width="1200" height="<h>" alt="..." loading="lazy">
   <figcaption>...</figcaption></figure>
-build.py puts these images into the note's Article JSON-LD and the image sitemap (ax_extras.figures).
+build.py puts these images into the note's Article JSON-LD (ax_extras.figures).
 
 Spec: data/ax-figures/<slug>.json holds a list of figures, text per language under "ko"/"en"
 (unit is appended as written: "개", "ms", " MB"; optional "alt" and "caption" feed --html):

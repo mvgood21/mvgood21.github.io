@@ -8,7 +8,7 @@
   Plain mailto with a subject that names the note, so no form and no personal data stored on the site.
   Common syllables only: the box is on every note and counts toward each note's 470 KB font budget.
 - figures: <figure> images in a note's <main> under /assets/ax/ (made by tools/ax_figures.py) go into the Article
-  JSON-LD image list and the image sitemap.
+  JSON-LD image list.
 """
 import html
 import json
