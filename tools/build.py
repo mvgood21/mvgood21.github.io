@@ -834,6 +834,11 @@ def app_extra(a, lang, relpath):
         lis = "".join(f'\n        <li><a href="{u}">{esc(n)}</a></li>' for u, n in arts)
         out.append(f'    <section aria-labelledby="guides-heading">\n      <h2 id="guides-heading">{t["guides_h"]}</h2>\n'
                    f'      <ul class="related-links">{lis}\n      </ul>\n    </section>')
+    notes = ax_notes_for_app(a, lang)
+    if notes:
+        lis = "".join(f'\n        <li><a href="{u}">{esc(n)}</a></li>' for u, n, _ in notes)
+        out.append(f'    <section aria-labelledby="ax-app-heading">\n      <h2 id="ax-app-heading">{AX_APP_H[lang]}</h2>\n'
+                   f'      <ul class="related-links">{lis}\n      </ul>\n    </section>')
     rel_ = d.get("releases") or []
     if rel_:
         lis = "".join(f'\n        <li><strong>{esc(r["version"])}</strong> · <time datetime="{r["date"]}">{fmt_date(lang, r["date"])}</time> · {esc(r["note"])}</li>'
@@ -975,6 +980,20 @@ def ax_articles(lang):
                         html.unescape(md.group(1)) if md else ""))
     out.sort(key=lambda x: x[1]); out.sort(key=lambda x: x[0], reverse=True)
     return [(u, n, d) for _, _, u, n, d in out]
+
+AX_APP_H = {"ko": "이 앱의 AX 노트", "en": "AX notes on this app"}  # kept out of T so a new key does not re-date every generated page
+
+def ax_notes_for_app(a, lang, limit=3):
+    """Newest AX notes whose hand-written body links this app's page (build blocks and site menus ignored)."""
+    target = app_url(a, lang)
+    if not target: return []
+    out = []
+    for u, n, d in ax_articles(lang):
+        m = re.search(r"<main.*?</main>", read(relpath_of(u)), re.S)
+        body = re.sub(r"<!-- build:([\w-]+) -->.*?<!-- /build:\1 -->", "", m.group(0), flags=re.S) if m else ""
+        if f'href="{target}"' in body: out.append((u, n, d))
+        if len(out) == limit: break
+    return out
 
 def ax_slug(u): return u.rstrip("/").rsplit("/", 1)[-1]
 def ax_topic_of(u): return AX_TOPICS.get(AX_NOTE_TOPIC.get(ax_slug(u)))
