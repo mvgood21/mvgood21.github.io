@@ -1,34 +1,37 @@
-"""Tests for the "AX notes on this app" list on app pages (tools/build.py ax_notes_for_app), against the repo's own pages.
+"""Tests for the "AX notes on this app" list on app pages (tools/build.py ax_notes_for_app).
 Run: python -m unittest discover -s tools/tests
 """
-import os, re, sys, unittest
+import os, sys, unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 import build  # noqa: E402
 
+APP = {"app_path": "x", "page": "generated", "ko": {}, "en": {}}
+MENU = '<nav><a href="/apps/x/">X</a></nav>'
+BLOCK = '<!-- build:cta --><a href="/apps/x/">X</a><!-- /build:cta -->'
+BODY = '<p><a href="/apps/x/">X</a></p>'
+
+
+def notes(pages):
+    """ax_notes_for_app over fake notes: pages maps note url -> its <main> inner HTML (the menu sits outside <main>)."""
+    arts = [(u, u, "") for u in pages]
+    html_of = {build.relpath_of(u): f"<html>{MENU}<main>{inner}</main></html>" for u, inner in pages.items()}
+    with mock.patch.object(build, "ax_articles", lambda lang: arts), \
+         mock.patch.object(build, "read", lambda relp: html_of[relp]), \
+         mock.patch.object(build, "app_url", lambda a, lang: "/apps/x/"):
+        return [u for u, _, _ in build.ax_notes_for_app(APP, "ko")]
+
 
 class AxNotesForApp(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        build.STORE = build.dates.ContentDates(check=True)  # read-only: newest-first order needs published dates
+    def test_menu_and_build_block_links_do_not_count(self):
+        self.assertEqual(notes({"/ax/a/": "<p>no link</p>", "/ax/b/": BLOCK}), [])
 
-    def test_site_menu_links_do_not_count(self):
-        # every note's menu and footer link every live app; only body links may put a note on an app page
-        a = next(x for x in build.APPS if x.get("app_path") == "sugaralbum")
-        for lang in ("ko", "en"):
-            self.assertEqual(build.ax_notes_for_app(a, lang), [])
-
-    def test_listed_notes_link_the_app_in_their_body(self):
-        a = next(x for x in build.APPS if x.get("app_path") == "doc-viewer")
-        for lang in ("ko", "en"):
-            notes = build.ax_notes_for_app(a, lang)
-            self.assertTrue(1 <= len(notes) <= 3)
-            target = build.app_url(a, lang)
-            for u, _, _ in notes:
-                s = build.read(build.relpath_of(u))
-                body = re.sub(r"<!-- build:([\w-]+) -->.*?<!-- /build:\1 -->", "", s, flags=re.S)
-                self.assertIn(f'href="{target}"', body, u)
+    def test_body_link_counts_in_article_order_up_to_three(self):
+        pages = {f"/ax/n{i}/": BODY for i in range(5)}
+        pages["/ax/n1/"] = BLOCK
+        self.assertEqual(notes(pages), ["/ax/n0/", "/ax/n2/", "/ax/n3/"])
 
 
 if __name__ == "__main__":
