@@ -8,6 +8,342 @@
   <atom:link href="https://mvgood21.github.io/en/rss.xml" rel="self" type="application/rss+xml"/>
   <lastBuildDate>Wed, 28 Oct 2026 09:00:00 +0900</lastBuildDate>
   <item>
+    <title>Android 16 KB page size, NDK 27 and a blue tint – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/ndk-16kb-page-blue-tint-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</h1>
+      <p class="lead">In our video app, 16 KB alignment came from one linker flag, not from the NDK upgrade that came first, and that upgrade is where a blue color regression came in.</p>
+      <p>Six of the twelve arm64 native libraries in SugarAlbum, the ones we build ourselves, were 4 KB aligned (0x1000). Commit aedf831 on January 3, 2026 rebuilt them with NDK 26.3 at 16 KB (0x4000). Along the way, builds made with NDK 27.0 and 29.0 put a blue cast on photo transitions. On October 27, 2026 we rebuilt the libnative_filter source (two C files) with four NDK versions: NDK 25.1, which the commit lists as "16KB unsupported", gave 0x4000 once the linker flag was in.</p>
+      <p class="note">Sources: the SugarAlbum git history (c3e09b1, d73db50 to 7efd9c1, aedf831) and the work notes committed with it, .so alignment values rechecked with llvm-readelf on 2026-10-27, and the official Android Developers documentation.</p>
+    </section>
+    <section aria-labelledby="timeline">
+      <h2 id="timeline">The three .so files rebuilt for targetSdk 36 were still 4 KB aligned</h2>
+      <p>SugarAlbum turns a set of photos into a video. At aedf831 the app has 763 Java files and 32 Kotlin files, and the video and filter work runs in C/C++ libraries built with ndk-build. We raised targetSdk from 33 to 34 on July 15, 2024 (c3e09b1) and from 34 to 36 between August 27 and September 1, 2025 (d73db50 to 7efd9c1). On August 31 (3e7e099) we rebuilt the three arm64 libraries of the multimediaFramework module (libBeatTracker, libPixelCanvas, libPixelUtils) without telling the linker about page size, and the other three (libnative_filter, libFFmpegProcessor, libKwpFFmpegMuxer) were still the November 2022 builds. So right before aedf831, all six had LOAD segments aligned to 0x1000.</p>
+      <p>Google announced on the Android Developers Blog on May 8, 2025 that starting November 1, 2025, new apps and updates targeting Android 15 or higher must support 16 KB pages. The current <a href="https://developer.android.com/guide/practices/page-sizes">page size guide</a> (updated 2026-10-16) says that starting February 1, 2027, updates without 16 KB support can't be released. Our repo notes say a Play Console warning asked for a fix "by May 2025". That date appears in neither official source, and the warning text itself isn't saved anywhere in the repo.</p>
+      <p>The January work was done with Claude Code; the commit carries its Co-Authored-By line. A work note committed alongside it, ffmpeg.md, records the first move: "After: NDK 27.0.12077973. Reason: the <code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES</code> flag is only supported in NDK r27 and later." The final commit used 26.3, and ffmpeg.md went in still saying 27.0.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/ndk-16kb-page-blue-tint-1-en.webp" width="1200" height="970" alt="Step diagram: in August 2025 three .so files are rebuilt for targetSdk 36, and all six stay at 0x1000; in January 2026 the NDK goes to 27.0; 27.0 and 29.0 tint photo transitions blue; 26.3 plus the linker flag gives 0x4000; the October recheck shows NDK 25.1 also reaches 0x4000 with the flag." loading="lazy"><figcaption>After the August 2025 rebuild all six were still 0x1000; in January 2026, NDK 26.3 with the linker flag made them 0x4000.</figcaption></figure>
+    </section>
+    <section aria-labelledby="blue-tint">
+      <h2 id="blue-tint">NDK 27.0 and 29.0 builds tinted photo transitions blue</h2>
+      <p>The commit message has a three-line NDK table: 25.x does not support 16 KB, 26.3 works (adopted), 27.0 and 29.0 show "a blue tint bug with -O3 optimization". progress.md, in the same commit, describes the symptom as a bluish cast during photo transitions, places it in the PixelUtils and libyuv code of the multimediaFramework module, and notes that an -O0 build looks normal. All five modules in that module's Android.mk (libYUV, libMasp, PixelCanvas, PixelUtils, BeatTracker) compile with <code>-O3</code>.</p>
+      <p>No automated check caught it. The only tests in the repo are the two placeholder tests Android Studio generates (ExampleUnitTest and ExampleInstrumentedTest); nothing compares colors or rendered frames. NDK 27.0 and 29.0 both built cleanly and both produced aligned libraries. The tint showed up only when someone ran the app and watched a transition.</p>
+      <p>progress.md names the cause as "a Clang -O3 optimization bug". The only evidence on record is that -O0 looks fine. The bundled compilers are clang 17.0.2 in NDK 26.3, 18.0.1 in 27.0 and 21.0.0 in 29.0, so the tint lines up with clang 18 and later. A clean -O0 build is also what you'd see if our own code had undefined behavior that the newer optimizer treats differently, and nobody narrowed it down to a function.</p>
+      <p>The same commit tidied the libyuv NEON lines in Android.mk, so we checked that too. libPixelUtils.so exports 198 symbols with NEON in the name both before and after the commit. The NEON code was already in the old build, so it isn't the variable.</p>
+    </section>
+    <section aria-labelledby="flag-r26">
+      <h2 id="flag-r26">NDK 26.3 ignores APP_SUPPORT_FLEXIBLE_PAGE_SIZES</h2>
+      <p>The final commit sets alignment in three places: <code>android.ndk.maxPageSize=16384</code> in gradle.properties, <code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES := true</code> in three Application.mk files, and <code>LOCAL_LDFLAGS += -Wl,-z,max-page-size=16384</code> in six Android.mk modules. To see which one did the work, we searched each NDK's build/core for the flag name. It isn't in 25.1 or 26.3; it's only in build-binary.mk of 27.0 and 29.0. In 27.0, a true value adds max-page-size=16384 to the link. In 29.0, 16 KB is the default and a false value sets it back to 4096.</p>
+      <p>Then we rebuilt the libnative_filter source from aedf831 with each NDK and read the LOAD alignment with <code>llvm-readelf -lW</code> on 2026-10-27.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>NDK</th><th>Linker flag in Android.mk</th><th>arm64-v8a LOAD alignment</th></tr></thead>
+        <tbody>
+          <tr><td>25.1.8937393</td><td>no</td><td>0x1000</td></tr>
+          <tr><td>25.1.8937393</td><td>yes</td><td>0x4000</td></tr>
+          <tr><td>26.3.11579264</td><td>no (Application.mk flag only)</td><td>0x1000</td></tr>
+          <tr><td>26.3.11579264</td><td>yes (as committed)</td><td>0x4000</td></tr>
+          <tr><td>27.0.12077973</td><td>no (Application.mk flag only)</td><td>0x4000</td></tr>
+          <tr><td>29.0.14206865</td><td>no</td><td>0x4000</td></tr>
+        </tbody>
+      </table></div>
+      <p>Under 26.3 the 16 KB alignment came from the Android.mk linker flag; the Application.mk line did nothing. The same flag gave 0x4000 under 25.1. The commit's "NDK 25.x: 16KB unsupported" was never tested with the flag in place, and it follows from the first assumption that the feature needs r27. The official guide's "Android NDK r27 and lower" section also gets 16 KB alignment from the <code>max-page-size</code> and <code>common-page-size</code> linker flags and never mentions <code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES</code>.</p>
+    </section>
+    <section aria-labelledby="ffmpeg-relro">
+      <h2 id="ffmpeg-relro">The six prebuilt FFmpeg libraries pass the LOAD check and fail the RELRO formula</h2>
+      <p>progress.md left six prebuilt FFmpeg libraries (libavcodec-56, libavfilter-5, libavformat-56, libavutil-54, libswresample-1, libswscale-3) marked as needing a separate 16 KB rebuild. Their LOAD segments were already aligned to 0x10000 (64 KB) before the commit. 64 KB is a multiple of 16 KB, so they pass the guide's rule that no LOAD segment may be below 2**14.</p>
+      <p>The guide has a second check. (VirtAddr + MemSiz) of the GNU_RELRO segment should divide evenly by 0x4000. If it doesn't, and RELRO shares a LOAD segment with writable data that follows it (.data, .bss), the app can crash at runtime with a segmentation fault. A LOAD segment holding only RELRO data, followed by a writable LOAD that starts on a separate 16 KB page, is a case where the formula doesn't apply; the guide's example of that layout is still 16 KB compliant. We ran all twelve arm64 libraries from aedf831 through that formula.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Library</th><th>RELRO end % 0x4000</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>libnative_filter, libBeatTracker, libFFmpegProcessor, libKwpFFmpegMuxer</td><td>0x0</td><td>pass</td></tr>
+          <tr><td>libPixelCanvas, libPixelUtils</td><td>0x1000</td><td>formula doesn't apply (RELRO-only LOAD)</td></tr>
+          <tr><td>six prebuilt FFmpeg libraries</td><td>0x1000 to 0x3000</td><td>RELRO shares a LOAD with .data/.bss</td></tr>
+        </tbody>
+      </table></div>
+      <p>In libavcodec-56, the writable LOAD segment is 0x257f00 bytes in memory and only its first 0xfbf8 bytes are RELRO, which is the shape the guide uses as its crash example. The commit added only <code>max-page-size</code>; the guide's examples also pass <code>common-page-size=16384</code>. Our six self-built libraries passed without it. The repo has FFmpeg's source and build scripts, but nothing records which flags produced the .so files it ships. ffmpeg.md says <code>-Wl,-z,max-page-size=16384</code> was added to ADDI_LDFLAGS in both build scripts; in this commit the two scripts were only moved, and ADDI_LDFLAGS on line 28 of build_arm64-v8a.sh doesn't have that flag.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/ndk-16kb-page-blue-tint-2-en.webp" width="1200" height="871" alt="Comparison: the commit records say NDK 25 is unsupported, 26.3 is adopted, FFmpeg needs a rebuild and the cause is a Clang -O3 bug; the recheck shows NDK 25.1 reaches 0x4000 with the linker flag, 26.3 ignores the Application.mk flag, FFmpeg is LOAD 0x10000 but its RELRO remainders are 0x1000 to 0x3000, and the cause is unconfirmed." loading="lazy"><figcaption>The six FFmpeg libraries are LOAD 0x10000, but their RELRO remainders are 0x1000 to 0x3000.</figcaption></figure>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%2016%20KB%20page%20size%20support%3A%20a%20blue%20tint%20that%20only%20NDK%2027%20and%2029%20produced%2C%20and%2012%20.so%20files%20measured%20again">Email us</a></p></aside>
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">Keeping NDK 25.1 and adding the linker flag would have worked</h2>
+      <p>There were three ways to go in January. We pinned NDK 26.3 and wrote "do not use NDK 27 or later" into the notes.</p>
+      <ul>
+        <li>Stay on NDK 25.1 and add the linker flag. The table above says alignment would have been fine, and since the records show no tint on 25.1 and the compiler would have stayed the same, there was no reason to expect a color regression. It was ruled out by the "25 unsupported" call.</li>
+        <li>Use NDK 27 or 29 and lower -O3 only in multimediaFramework. -O0 is recorded as looking fine, but nobody measured how much slower video processing gets.</li>
+        <li>Find and fix the function that shifts the color. There's no record of an attempt.</li>
+      </ul>
+      <p>Don't upgrade the NDK first. Put the linker flag into the NDK you already use and check the alignment with readelf. If you have another reason to move to a newer NDK, do it as a separate change and compare rendered output against the previous build.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">CMake builds and NDK r28 or later need a different procedure</h2>
+      <p>This is an ndk-build project (Android.mk, Application.mk). With CMake, the guide puts the flags in <code>target_link_options</code>, and the Android.mk line is irrelevant. NDK r28 and later align to 16 KB by default, so the flag isn't needed at all; our 29.0 build gave 0x4000 on arm64 with no flag.</p>
+      <p>There's no basis for saying NDK 27 will do the same to other code. We didn't check 32-bit (armeabi-v7a) libraries; the guide's requirement covers 64-bit devices.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Checking with readelf twice and the same set of photos</h2>
+      <ol>
+        <li>For each arm64-v8a .so that ships in the APK or AAB, read the LOAD alignment. The last column must be 0x4000 or larger.<pre><code>llvm-readelf -lW libfoo.so | grep -E "LOAD|GNU_RELRO"</code></pre></li>
+        <li>If there's a GNU_RELRO line, add VirtAddr and MemSiz and take the remainder mod 0x4000. If it isn't zero, check whether the LOAD segment holding RELRO also holds .data/.bss (its MemSiz is much larger than RELRO's).</li>
+        <li>Before changing the NDK, add both flags from the guide to Android.mk in your current NDK and repeat step 1.<pre><code>LOCAL_LDFLAGS += -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384</code></pre></li>
+        <li><code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES</code> is read only by NDK r27 and later. On r26 or older, that line alone does nothing.</li>
+        <li>Delete the .so files in jniLibs and rebuild every time you change the NDK or the flags. Our notes record that Android Studio's Clean Project doesn't remove jniLibs, so the build script deletes them first.</li>
+        <li>Export a video from the same photos with the old build and the new one, and watch the transitions side by side.</li>
+        <li>If you ship uncompressed .so files, confirm Android Gradle Plugin 8.5.1 or later and run <code>zipalign -v -c -P 16 4 app.apk</code>. SugarAlbum uses AGP 8.12.0.</li>
+      </ol>
+      <p>Another Play Console warning we traced is in <a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a>. The app itself is on the <a href="https://mvgood21.github.io/en/apps/sugaralbum/">SugarAlbum</a> page.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Not done yet: a 16 KB emulator run and a per-module -O3 check</h2>
+      <p>Video export has to run end to end on a 16 KB page emulator image to see whether the FFmpeg libraries crash on RELRO. If they do, FFmpeg needs a rebuild with <code>common-page-size=16384</code>. We still don't know which module the tint comes from; one way to narrow it down is to take the five multimediaFramework modules off -O3 one at a time. The NDK 27.0 in ffmpeg.md should be corrected to 26.3.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%2016%20KB%20page%20size%20support%3A%20a%20blue%20tint%20that%20only%20NDK%2027%20and%2029%20produced%2C%20and%2012%20.so%20files%20measured%20again">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Do I need NDK r27 or later to support 16 KB pages?</summary><div><p>Not for the alignment itself. With <code>-Wl,-z,max-page-size=16384</code> in Android.mk, NDK 25.1 rebuilt libnative_filter.so (arm64) with 0x4000 LOAD alignment (measured 2026-10-27). r27 is only needed for the one-line <code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES</code> approach.</p></div></details>
+        <details><summary>How do I check whether a .so is 16 KB aligned?</summary><div><p>Run <code>llvm-readelf -lW</code> or <code>llvm-objdump -p</code> and confirm every LOAD segment is aligned to 0x4000 (2**14) or more. If GNU_RELRO shares a LOAD segment with writable data, also check that (VirtAddr + MemSiz) % 0x4000 is zero.</p></div></details>
+        <details><summary>Can I keep a prebuilt .so that is 64 KB aligned?</summary><div><p>It passes the LOAD alignment check. SugarAlbum's six FFmpeg libraries are 0x10000 and pass that check, but their RELRO remainders are 0x1000 to 0x3000.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 28 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Puzzle game time limits: 3-star par by simulation – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/puzzle-time-limit-simulation-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX note · Measurement</span>
+      <h1>Testers said the time was "too long, so it's easy": checking that with a simulation before cutting puzzle par times by 30%</h1>
+      <p class="lead">We picked the size of the par-time cut from simulated three-star rates per level band. The first proposal, a 45% cut, left casual players a 1% three-star rate on later levels, so we cut 30% instead.</p>
+      <p>On levels 41-200 of <a href="https://mvgood21.github.io/en/apps/arrow-knots/">Arrow Knots</a>, the median par was 65 seconds while our simulated casual player finished in a median 41. On the afternoon of October 4, 2026 the operator passed on feedback from three real testers: the time was too long, so the game was easy. That evening commit efe26ae multiplied every par by 0.7. The cut we first agreed on was 45%. The coding agent recommended it and the operator approved it. A rerun over 158 levels then showed casual players earning three stars on 1% of attempts past level 500. At 30% that rate is 30%, and par lands next to the casual median (45 s against 41 s, 190 s against 188 s).</p>
+      <p class="note">Sources: the game repository's git history (efe26ae, 632adb5, 89dc35a and others), design docs 05, 06, 09a and 09b, the October 4 agent session log, and an October 27 GA4 check. The simulation tables are copied from that session's output; constants were rechecked at HEAD on October 27, 2026.</p>
+    </section>
+    <section aria-labelledby="scale-grid">
+      <h2 id="scale-grid">Eight par scales applied to one set of simulated runs</h2>
+      <p>Par in Arrow Knots is a countdown at the top of the screen, but nothing happens when it reaches zero; the level keeps going. It matters for stars: a three-star clear needs at most one mistake per 12 arrows and a finish inside par. Shorter par means fewer three-star clears, and how many fewer depends on where in the game you are.</p>
+      <p>The simulator has two players. The casual one checks arrows in random order at 120 ms per arrow; the skilled one checks outward from its last tap at 60 ms. Tap time follows Fitts's law (far and small targets take longer), and mis-touches and taps on blocked arrows happen with set probabilities. The agent took every 7th level from 1 to 1,100 (158 levels), ran each 30 times as the casual player and 15 times as the skilled one, then rescored the same runs under each candidate scale and floor. The candidate scales were split into two batches and run twice, taking about 5 and 3 seconds.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Scale (floor)</th><th>Par, 41-200</th><th>Par, 501-1100</th><th>Casual runs inside par, 501-1100</th><th>Casual 3-star (41-200 / 201-500 / 501-1100)</th></tr></thead>
+        <tbody>
+          <tr><td>1.0 (20 s, shipped)</td><td>65 s</td><td>265 s</td><td>88%</td><td>50 / 45 / 40%</td></tr>
+          <tr><td>0.8 (15 s)</td><td>55 s</td><td>215 s</td><td>88%</td><td>50 / 44 / 40%</td></tr>
+          <tr><td>0.75 (15 s)</td><td>50 s</td><td>200 s</td><td>81%</td><td>50 / 43 / 39%</td></tr>
+          <tr><td>0.7 (15 s)</td><td>45 s</td><td>190 s</td><td>52%</td><td>50 / 38 / 30%</td></tr>
+          <tr><td>0.65 (15 s)</td><td>45 s</td><td>175 s</td><td>17%</td><td>46 / 27 / 12%</td></tr>
+          <tr><td>0.6 (15 s)</td><td>40 s</td><td>160 s</td><td>3%</td><td>37 / 16 / 2%</td></tr>
+          <tr><td>0.55 (15 s)</td><td>40 s</td><td>150 s</td><td>1%</td><td>23 / 9 / 1%</td></tr>
+          <tr><td>0.5 (10 s)</td><td>35 s</td><td>135 s</td><td>0%</td><td>14 / 2 / 0%</td></tr>
+        </tbody>
+      </table></div>
+      <p>Par figures are medians across the levels in each band. In the same runs the casual median was 41 s for levels 41-200, 93 s for 201-500 and 188 s for 501-1100, and the skilled three-star rate was 67 / 71 / 77% on every scale. On levels 41-200 the casual three-star rate is 50% at both 1.0 and 0.7: runs inside par fell from 88% to 84%, yet three-star clears did not move, so the runs pushed past par were mostly runs that had already lost the third star to mistakes.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/puzzle-time-limit-simulation-1-en.webp" width="1200" height="794" alt="Bar chart: on levels 501-1100 the simulated casual 3-star rate is 40% at par scale 1.0 and 0.8, 39% at 0.75, 30% at 0.7, 12% at 0.65, 2% at 0.6 and 1% at 0.55." loading="lazy"><figcaption>Below 0.7, three stars on the later levels disappear fast.</figcaption></figure>
+    </section>
+    <section aria-labelledby="first-proposal">
+      <h2 id="first-proposal">The agent called par "about 2x" the casual median and proposed a 45% cut</h2>
+      <p>The testers' list had 11 items; the timer was item 4: shorten the time because it is too long and therefore easy, and when time runs out, restart the level or show the watch-an-ad prompt. The operator pasted the list at 14:41 KST. Two minutes later the agent, having read the code, answered that par was "about 2 times" the casual median solve time and "about 3.5 times" the skilled one. The example in that same answer was a 22-arrow board with a 54 s par, a 41 s casual median and a 24 s skilled median. Those numbers give 1.3 and 2.3.</p>
+      <p>Working from that "about 2x" figure, the agent recommended cutting every par by about 45%, bringing par down to roughly the casual median. At 14:54 the operator picked that option, which also limited real time-out failures to one or two levels per world.</p>
+      <p>What stopped the 45% was a done-condition the agent wrote onto the task card a few minutes later: "recompute 3-star rates per band by simulation: skilled 60-75%, casual 25-40%." The agent ran that check before touching the code. At 0.55, casual runs on levels 501-1100 finished inside par 1% of the time and earned three stars 1% of the time. On levels 41-200, par (40 s) dropped below the casual median (41 s).</p>
+      <p>Par was 1.6 times the casual median on 41-200 (65 s against 41 s) but only 1.4 times on 501-1100 (265 s against 188 s). A single scale taken from one board's ratio pushes the later bands, which had less slack, under the median first. Take the direction from testers, and pick the amount from a per-band three-star table.</p>
+      <p>At 15:06 the agent asked again with three options: a 30% cut (recommended; casual three stars 30-50%, skilled 67-77%), 35% (later-band casual 12-27%) and 45% (the first plan; later-band casual 1-9%). It had also simulated 0.75 and 0.8 but did not offer them. The operator chose 30% at 18:44, and the commit ten minutes later applied the 0.7 scale and lowered the par floor from 20 s to 15 s.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/puzzle-time-limit-simulation-2-en.webp" width="1200" height="992" alt="Step diagram: Oct 4 at 14:41 tester feedback, 14:43 the 'about 2x' read, 14:54 a 45% cut approved, 15:06 simulation shows 1% casual 3-star past level 500 at 0.55, 18:44 30% chosen, 18:54 commit efe26ae." loading="lazy"><figcaption>A simulation overturned the 45% cut after it had been approved; the operator picked the final number.</figcaption></figure>
+    </section>
+    <section aria-labelledby="why-generous">
+      <h2 id="why-generous">The design docs made par generous on purpose</h2>
+      <p>The October 2 design doc (05) made par a soft countdown: run past it and you lose only the third star. It cited a fan-wiki summary saying Candy Crush removed its timed levels in May 2018 (the doc notes the original page was blocked and never read) and the Two Dots help page line "Two Dots is not timed!", and it followed the game's earlier positioning as a relaxing puzzle (doc 00).</p>
+      <p>The solve-time model doc (06) multiplied its fitted formula by 1.42 so that casual players would have 30% of the clock left on average. The October 3 check gate for the 1.1.0 expansion to 1,000 levels plus an endless mode, called G1, required the same thing: casual mean time left of at least 30%. Big boards add a per-screen term, <code>PAR_SCREEN_S</code>, which the spec allowed to be 2-4 s. The model spent 12.4 s per extra screen on camera pans and off-screen checks, and 2-4 s left only 13-22% of the clock, so the term was frozen at 19 s (632adb5).</p>
+      <p>That 19 s is item 1 under "Spec deviations" in the G1 report, with its reason, because the workstream rules (09b) said: "Never weaken a test to make it pass. If the spec looks wrong, record it under 'Spec deviations' in your final report, with the reason." The G1 report's check table lists part 3 casual mean time left at 30.6%, against a 30% minimum.</p>
+      <p>None of the model's constants were fitted to real players. Doc 06 took search and tap speeds from ranges in visual-search and Fitts's-law studies, and marked the chance of tapping a blocked arrow as "an estimate, to be calibrated with telemetry." Doc 05 planned to reset each level's par to the 70th percentile of real mistake-free clears after launch, but on October 4 there was no such data.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Testers%20said%20the%20time%20was%20%22too%20long%2C%20so%20it%27s%20easy%22%3A%20checking%20that%20with%20a%20simulation%20before%20cutting%20puzzle%20par%20times%20by%2030%25">Email us</a></p></aside>
+    <section aria-labelledby="fail-on-timeout">
+      <h2 id="fail-on-timeout">Time-out failure went into a boss time attack, not the main levels</h2>
+      <p>The second half of the testers' suggestion, failing the level when time runs out, was not adopted as asked. It was option two in the agent's 14:44 question ("every level fails from world 2", i.e. from level 31), described as more rewarded-ad views but a risk of losing players who like to solve calmly. The task card that day also recorded the agent's market check: the top two apps in the genre advertised "no timer" in their store text, and one app used a hard timer with a +60 s ad.</p>
+      <p>A real time limit went into the code that night as a mini game. Commit 89dc35a at 23:15 added four mini games every 25 levels, one of them a boss time attack where the clock can run out and a rewarded ad buys 30 more seconds. Main levels still never fail on time; efe26ae's message says: "Missing par still never fails a level."</p>
+    </section>
+    <section aria-labelledby="still-outside">
+      <h2 id="still-outside">Even at 0.7, early levels and skilled players missed the done-condition</h2>
+      <p>The skilled three-star rate did not move between scales 0.5 and 1.0. Skilled runs finished inside par 97-99% of the time on every scale; mistakes were what cost them the third star. Casual three stars on levels 1-40 also stayed at 56% (55% at 0.5).</p>
+      <p>Against the task card's done-condition, 0.7 was inside 25-40% only for casual players on levels 201-500 (38%) and 501-1100 (30%). Casual players on levels 1-200 sat at 50-56% and skilled players on 501-1100 at 77%, both outside the range. The commit message says only "casual 3-star 30-50%", and the mistake allowance (<code>STAR3_DIV</code> 12) was left alone.</p>
+      <p>The sample is thin at the start: levels 1-40 contributed six levels (1, 8, 15, 22, 29 and 36). If running out of time fails the level, don't tune to the median, since that fails half of all attempts; the time attack in doc 05 set its limit at 1.3 times the median.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Storing simulated runs and rescoring them per candidate scale</h2>
+      <ol>
+        <li>Make the game and the simulator use the same par function. Here <code>pace.py</code> reads its constants out of the app's <code>Pace.kt</code>, so the model plays the shipped numbers.</li>
+        <li>Run a sample of levels with at least two player types and keep (cleared, time, mistakes) for every run.</li>
+        <li>Write the target three-star range per band before you look at results.</li>
+        <li>Rescore the stored runs under each candidate scale and floor, and tabulate per band: median par, casual median, share inside par, and three-star rate.</li>
+        <li>Give the person deciding two or three options, each with its later-band numbers.</li>
+        <li>When the constant changes, regenerate the par column of the level data and update the checkpoint tests and the all-levels comparison in the same commit. efe26ae changed 13 checkpoints (level 1000 went from 380 s to 270 s) along with the 1,100-level table.</li>
+      </ol>
+      <p>The rescoring in that day's script centres on these lines (variable names spelled out):</p>
+      <pre><code>def par(base, scale, floor):
+    t = base * scale + AUTOSTART_SLACK_S   # 5 s before the first tap
+    return min(max(round(t / 5) * 5, floor), PAR_MAX_S)
+three_star = cleared and time &lt;= par(base, scale, floor) and mistakes &lt;= arrows // 12</code></pre>
+      <p>We also had bots play a block puzzle before players did; that write-up is <a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a>.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">What's left</h2>
+      <p>We have not measured real players' three-star rate yet. An October 27, 2026 check found the GA4 custom dimensions <code>level</code>, <code>stars</code> and <code>world</code> reading (not set) for all time (1,258 level_up events in Arrow Knots). The app appears to send these integers as numeric parameters that the dimensions don't pick up, and sending them as strings too is proposed for the next release. There is no record yet of the G1 checks being rerun after 0.7 (the report is unchanged since October 3).</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Testers%20said%20the%20time%20was%20%22too%20long%2C%20so%20it%27s%20easy%22%3A%20checking%20that%20with%20a%20simulation%20before%20cutting%20puzzle%20par%20times%20by%2030%25">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>How do you set a three-star threshold in a puzzle game?</summary><div><p>Arrow Knots gives three stars for at most one mistake per 12 arrows plus a finish inside par. We chose the par scale, 0.7, so that simulated casual players earn three stars on 30-38% of attempts in the later level bands.</p></div></details>
+        <details><summary>Should a level fail when the timer runs out?</summary><div><p>Not in this game's main levels: running past par only costs the third star. A fail-on-timeout rule exists only in the boss time attack, one of four mini games that rotate every 25 levels (so it comes every 100 levels).</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/games/">All notes on Game development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 28 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Structured data after FAQ rich results ended – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/structured-data-after-faq-rich-results-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX note · How-to</span>
+      <h1>Structured data after FAQ rich results ended: what we kept for GEO</h1>
+      <p class="lead">There is no special markup for GEO (generative engine optimization). We leave the FAQPage JSON-LD we already generate as it is and spend the time on the visible Q&amp;A and on dated, measured body text.</p>
+      <p>Of the 173 HTML files on this site, 106 carry FAQPage JSON-LD, with 374 questions between them. We counted them at HEAD 849c6d8 on October 27, 2026, and none of that markup can produce a Google rich result. Google stopped showing FAQ rich results on May 7, 2026, and Naver stopped on July 9. Yet the commit that extended FAQ JSON-LD to our hand-written pages (12ed443) landed on October 18 under the title "Site-wide SEO/GEO pass". Research run the same afternoon caught the five-month gap, and we decided to keep the markup and stop maintaining it.</p>
+      <p class="note">Sources: the site repository's git history (bdbbe97, 12ed443, 3f504be, b82faac), a recount of the HTML at HEAD 849c6d8 on October 27, the October 18 working documents (research reports 01 to 06, the information architecture spec, adversarial review 1), our search operations log, and the Google Search Central and Naver Search Advisor announcements, which we reopened on October 27, 2026.</p>
+    </section>
+    <section aria-labelledby="count-today">
+      <h2 id="count-today">106 FAQPage pages, 374 questions, zero rich results</h2>
+      <p>Pages per <code>@type</code>, counted from every <code>application/ld+json</code> block in the deployed HTML:</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Type</th><th>Pages</th><th>Search display as of October 2026</th></tr></thead>
+        <tbody>
+          <tr><td>BreadcrumbList</td><td>166</td><td>Google: desktop breadcrumbs. Naver: second line of the site info</td></tr>
+          <tr><td>FAQPage</td><td>106</td><td>Ended on both Google and Naver</td></tr>
+          <tr><td>Article</td><td>84</td><td>No rich result; dates and author</td></tr>
+          <tr><td>MobileApplication</td><td>22</td><td>Naver: eligible for its software summary</td></tr>
+          <tr><td>CollectionPage · ItemList</td><td>22 · 16</td><td>Describes list pages</td></tr>
+        </tbody>
+      </table></div>
+      <p>Of the 106 FAQPage pages, 60 are AX notes, 42 are app and help pages, and 4 are the home pages and AX hubs. The build script writes FAQPage from the same source as the visible Q&amp;A: the <code>&lt;details&gt;&lt;summary&gt;</code> pairs on hand-written pages and notes, the <code>faq</code> field of <code>apps.json</code> on generated app pages, and <code>home_faq</code> on the home page. So every new note with its two to four FAQ entries adds one more page. Recounting past commits the same way gives 10 pages at 4:09 p.m. on October 18, 13 right after 12ed443, 50 after that night's restructure (b82faac), and 58 on the evening of October 19. The jump from 13 to 50 happened in b82faac, the commit that implemented the spec. 40 of those 50 were app and help pages: 8 generated from the <code>faq</code> field, 32 from <code>&lt;details&gt;</code> on hand-written app and help pages. Of the 56 pages added after the first 50, 54 are AX notes.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/structured-data-after-faq-rich-results-1-en.webp" width="1200" height="662" alt="Bar chart: pages with FAQPage JSON-LD went from 10 before commit 12ed443 on Oct 18 to 13 right after it, 50 after b82faac, 58 on Oct 19 and 106 on Oct 27." loading="lazy"><figcaption>After we decided not to expand it, FAQPage went from 13 pages to 106; 54 of the 56 pages added after the first 50 are AX notes.</figcaption></figure>
+    </section>
+    <section aria-labelledby="wrong-pass">
+      <h2 id="wrong-pass">The commit that extended FAQ JSON-LD came five months after Google ended the feature</h2>
+      <p>FAQPage first reached the app pages and the home page in the October 5 redesign (bdbbe97). At 4:24 p.m. on October 18 another agent session pushed 12ed443, "Site-wide SEO/GEO pass: FAQ JSON-LD, …". The first line of its body read "FAQPage from &lt;details&gt; on hand pages". The commit treated FAQ markup as something that helps search and AI answers, and extended it to hand-written pages that have &lt;details&gt;.</p>
+      <p>The Google Search Central updates list has a May 8 entry, "This feature will no longer appear in Google Search starting May 7, 2026.", and a June 15 entry that removed the FAQ rich result documentation. Since September 2023 the feature had only appeared for well-known government and health sites. Naver Search Advisor announced on July 8 that FAQ display in web results would end on July 9.</p>
+      <p>Twenty-nine minutes after the commit, at 4:53 p.m., we started parallel research on Google, Naver and generative search. The Google report put the FAQ shutdown in the second line of its conclusions; 12ed443 had not taken it into account. Google's guide to optimizing for generative AI features (updated July 10) says: "Structured data isn't required for generative AI search, and there's no special schema.org markup you need to add."</p>
+    </section>
+    <section aria-labelledby="keep-no-work">
+      <h2 id="keep-no-work">We kept the markup, dropped its validation, and stopped working on it</h2>
+      <p>The information architecture spec written that day says of FAQPage: keep the current generation, don't expand it, and remove it from Rich Results validation. Adversarial review 1 suggested deleting the generator if it cost anything to maintain; the spec declined. The generator already existed and cost close to nothing, since one function turns the source of the visible Q&amp;A into JSON-LD, and Naver's shutdown notice says leftover FAQ markup does not affect ranking and "may be used as a supplement for analyzing web documents" (our translation).</p>
+      <p>Because the markup comes from the same source as the visible Q&amp;A, the two match. Google's AI features page lists "Making sure your structured data matches the visible text on the page" among its best practices.</p>
+      <p>Adding FAQs to chase rich results was never on the table once both engines had ended the display. Keeping Rich Results validation as a gate made no sense either after Google removed the documentation it would validate against. "Don't expand", though, turned into "don't touch" because of how the markup is generated. From b82faac on, 40 app and help pages carried FAQPage, and because every note gets an FAQ the count reached 106. No commit since has changed the FAQPage generator in the build.</p>
+      <p>The on-page Q&amp;A stays. Each FAQ puts the answer in its first sentence, and that sentence reads as body text with or without JSON-LD. On October 25 we rewrote a slogan-like sentence in one note's FAQ answer (72a3ada), and the JSON-LD changed with it.</p>
+    </section>
+    <section aria-labelledby="review-seven">
+      <h2 id="review-seven">Three of adversarial review 1's seven defects: RSS body, date signals, app markup</h2>
+      <p>On October 18, adversarial review 1 checked every SEO and generative-search claim in the spec against Google's documentation and Naver Search Advisor's own pages, and returned seven must-fix defects. The big picture held: the FAQ shutdown dates were right, and so was Google's statement that it ignores llms.txt.</p>
+      <p>The RSS body was in the wrong place. The spec put the full article in <code>content:encoded</code> and left <code>&lt;description&gt;</code> as a summary. Naver's feed submission guide shows only <code>&lt;description&gt;</code> in its example, asks for "all of the content, not part of it" in every item (our translation), and never mentions <code>content:encoded</code>. Today the 56 items in our Korean feed carry the article HTML in <code>&lt;description&gt;</code>, a median of about 10,000 characters of HTML per item.</p>
+      <p>The date signals conflicted. Google accepts RSS as a sitemap, and its October 2014 post on sitemaps and feeds says "XML sitemap uses &lt;lastmod&gt; RSS uses &lt;pubDate&gt;". With <code>pubDate</code> set to the publication date, as the spec wanted, a feed submitted to Google would report a different modification time for each URL than the sitemap does. The review marked this as an inference because it could not open the post; we opened it this time, and the review was right. The fix was to give Google only sitemap.xml, which carries the modified dates. How we derive modified dates from a content hash is in <a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a>. The RSS <code>Sitemap:</code> line that 3f504be added to robots.txt at 4:20 p.m. was gone after that night's restructure.</p>
+      <p>The spec also concluded that breadcrumbs and the site name were the only rich results left for us. Naver's October 15 notice ended HowTo display and said software schema items would show as a short summary under the result. We have not confirmed that our app pages appear that way. The build gate now requires <code>name</code>, <code>applicationCategory</code>, <code>operatingSystem</code>, an absolute URL, screenshots with width and height, and a description of 160 characters or less on every MobileApplication node. How that gate blocks a commit is in <a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a>.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/structured-data-after-faq-rich-results-2-en.webp" width="1200" height="1022" alt="Step diagram: Oct 18 4:24 p.m., commit extends FAQ JSON-LD; 4:53 p.m., research finds Google ended FAQ rich results on May 7 and Naver on July 9; the same day adversarial review 1 lists seven defects; 8:07 p.m., the restructure ships full-text RSS and sitemap.xml only; Oct 25, two RSS sitemaps removed from Search Console." loading="lazy"><figcaption>The FAQ markup stayed as it was; the fixes went into the feed, the dates and the app markup.</figcaption></figure>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Structured%20data%20after%20FAQ%20rich%20results%20ended%3A%20what%20we%20kept%20for%20GEO">Email us</a></p></aside>
+    <section aria-labelledby="gsc-path">
+      <h2 id="gsc-path">The no-RSS-sitemap rule broke again in the Search Console UI</h2>
+      <p>In the code the rule held. robots.txt still has a single <code>Sitemap:</code> line for sitemap.xml, and the repository's agent instructions say "never submit RSS as a sitemap". Even so, rss.xml and en/rss.xml were submitted to Search Console as sitemaps on October 22. In the 2 p.m. round on October 25 an agent resubmitted sitemap.xml and both feeds through the API. About three hours later, in the round that restructured the sitemap, an agent noticed the conflict with the instructions and, with the owner's approval, deleted the two feeds from the list. The build gate only reads files in the repository, so it could not check Search Console settings.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">With 12 impressions and no clicks, we could not measure any effect</h2>
+      <p>This note rests on Google's and Naver's documentation, not on our own measurements. From September 29 to October 26 Search Console showed 12 impressions and no clicks, and a full inspection on October 27 found 44 pages indexed. Those numbers can't tell us whether our visible FAQs get cited in AI answers, or whether Naver actually uses the leftover markup. We also haven't checked whether Bing or ChatGPT search read FAQPage.</p>
+      <p>Government and health sites that kept FAQ rich results after September 2023 may have real display history from before May 7; check your own Search Console data before copying our decision.</p>
+      <p>The generator has one flaw of its own: the build turns HTML tags into spaces when it extracts text, so an extra space lands where a link ends. One Korean note's FAQ JSON-LD has a space before a particle that the page itself doesn't show; we first noticed it in the October 26 operations log.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Count by type, open the shutdown notices, and keep feeds off the sitemap list</h2>
+      <ol>
+        <li>Count pages per JSON-LD type in the deployed HTML. Unpack nodes inside <code>@graph</code> and array types such as <code>["MobileApplication","VideoGame"]</code>.</li>
+        <li>For each type, search the Google Search Central updates list and the Naver Search Advisor announcements for shutdown or restriction dates. Reopen the original even when a research document already quotes the date.</li>
+        <li>Before deleting a retired type, look at how it is produced. If it is generated from visible text, leave it and only drop it from validation. If it is hand-written JSON-LD, deleting it is the better choice.</li>
+        <li>In RSS, put the full article in each item's <code>&lt;description&gt;</code> and keep <code>pubDate</code> as the publication date. Give Google sitemap.xml only.</li>
+        <li>If you have app pages, put the required fields and screenshot sizes of your SoftwareApplication markup under a build check.</li>
+        <li>Open the Search Console sitemap list and make sure no feed is on it. A repository check will not catch this path.</li>
+      </ol>
+      <p>Step 1 was this script.</p>
+      <pre><code>import json, os, re, sys, collections
+pages, questions = collections.Counter(), 0
+for d, _, fs in os.walk(sys.argv[1]):
+    for f in fs:
+        if not f.endswith(".html"): continue
+        s = open(os.path.join(d, f), encoding="utf-8").read()
+        seen = set()
+        for m in re.finditer(r'&lt;script type="application/ld\+json"&gt;(.*?)&lt;/script&gt;', s, re.S):
+            data = json.loads(m.group(1))
+            nodes = data if isinstance(data, list) else data.get("@graph", [data])
+            for node in nodes:
+                t = node.get("@type")
+                seen.update(t if isinstance(t, list) else [t])
+                if t == "FAQPage": questions += len(node.get("mainEntity", []))
+        pages.update(seen)
+print(pages.most_common(), "FAQ questions:", questions)</code></pre>
+      <p>Don't spend more time on FAQ markup. That time is better spent adding one more date or measured number to the body.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Next</h2>
+      <p>Fix the extra space after links when the build extracts FAQ text. Once impressions are high enough to compare pages, split search performance between notes with an FAQ and pages without one.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Structured%20data%20after%20FAQ%20rich%20results%20ended%3A%20what%20we%20kept%20for%20GEO">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Does Google still show FAQPage structured data in 2026?</summary><div><p>Google stopped showing FAQ rich results on May 7, 2026 and removed the documentation on June 15. Naver ended FAQ display in its web results on July 9, 2026.</p></div></details>
+        <details><summary>Should I remove my FAQPage JSON-LD?</summary><div><p>If it is generated from the Q&amp;A on the page, there is little to gain from removing it. Naver says leftover FAQ markup does not affect ranking and may support document analysis. If you maintain it by hand, it can drift from the page, and removing it is the safer choice.</p></div></details>
+        <details><summary>Is there a schema I need to add for generative engine optimization?</summary><div><p>Not for Google. Its guide to generative AI features says structured data isn't required for generative AI search and there is no special schema.org markup to add. Google also says Search ignores llms.txt.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 28 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
     <title>GA4 installs: 11 of 19 were test devices – SugarMount</title>
     <link>https://mvgood21.github.io/en/ax/ga4-test-device-filter/</link>
     <guid isPermaLink="true">https://mvgood21.github.io/en/ax/ga4-test-device-filter/</guid>
@@ -115,11 +451,11 @@ NOT_TEST = {"notExpression": {"orGroup": {"expressions": [
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -224,8 +560,8 @@ export function cacheKey(api, group, original, corrected, model) {
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -355,8 +691,8 @@ const gaps = await agent(CTX + CHECKLIST + final + dossier, { schema: CRIT })</c
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -467,12 +803,12 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(":core
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -595,8 +931,8 @@ git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --gre
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -736,8 +1072,8 @@ adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -867,10 +1203,10 @@ print("my app in results:", MY_APP in ids)</code></pre>
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -993,12 +1329,12 @@ out of date:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1116,8 +1452,8 @@ grep -rL --include='*Test.kt' -e 'assert' -e 'check(matches' app/src/</code></pr
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1256,10 +1592,10 @@ git log --until=2026-10-20 --format='%(trailers:key=Co-authored-by,valueonly)' \
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1365,8 +1701,8 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1528,12 +1864,12 @@ after_hint = win(board after the correct first move, 2 pieces left, lines it cle
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/games/">All notes on Game development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1651,8 +1987,8 @@ Schedule expires: YYYY-MM-DD / register again on: YYYY-MM-DD
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1789,12 +2125,12 @@ curl -s "$POLICY_URL" | grep -o 'data-policy-version="[0-9-]*"'</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1939,12 +2275,12 @@ font.save(dst)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2036,8 +2372,8 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2122,12 +2458,12 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2247,8 +2583,8 @@ flutter test test/theme_matrix/ --dart-define=Y2_NO_SETTLE=true
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2367,12 +2703,12 @@ FlowRow(
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2455,8 +2791,8 @@ Mem:              13           8           2           0           2           4
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2581,11 +2917,11 @@ if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFract
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2709,8 +3045,8 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2808,12 +3144,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2874,12 +3210,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3268,12 +3604,12 @@ room  = is there space for a 3×3 square, a 1×4 bar, a 4×1 bar (0–3)</code><
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/games/">All notes on Game development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3383,8 +3719,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3490,12 +3826,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4839,10 +5175,10 @@ done</code></pre>
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4944,8 +5280,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4971,10 +5307,10 @@ done</code></pre>
       <ul class="card-list">
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/workflow/">Working with agents</a></h3><p class="sub">How work is split between an AI coding agent and a person, how rules reach the agent, and what we changed after several sessions collided in one repository.</p><p class="meta">6 notes</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/quality/">Testing and release</a></h3><p class="sub">Unit tests, release gates and on-device checks that AI-written code goes through before each release, with the real defects those checks caught along the way.</p><p class="meta">8 notes</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/android/">Android development</a></h3><p class="sub">Gradle builds, library upgrades, UI and performance problems we ran into while building Android apps with a coding agent, and how each one was solved.</p><p class="meta">6 notes</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/games/">Game development</a></h3><p class="sub">Generating puzzle game levels with an agent, proving every level can be solved, and tuning difficulty: the rules we settled on and the numbers we measured.</p><p class="meta">2 notes</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/android/">Android development</a></h3><p class="sub">Gradle builds, library upgrades, UI and performance problems we ran into while building Android apps with a coding agent, and how each one was solved.</p><p class="meta">7 notes</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/games/">Game development</a></h3><p class="sub">Generating puzzle game levels with an agent, proving every level can be solved, and tuning difficulty: the rules we settled on and the numbers we measured.</p><p class="meta">3 notes</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/store/">Play Store and monetization</a></h3><p class="sub">Google Play listings and review, store screenshots and descriptions, and ad setup: the work of shipping and running apps, shared with an AI coding agent.</p><p class="meta">2 notes</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/web/">Website and search</a></h3><p class="sub">The page structure, Google and Naver search optimization, structured data and design system of this site, built with an agent and explained from the actual code.</p><p class="meta">3 notes</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/web/">Website and search</a></h3><p class="sub">The page structure, Google and Naver search optimization, structured data and design system of this site, built with an agent and explained from the actual code.</p><p class="meta">4 notes</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/retro/">Retrospectives and numbers</a></h3><p class="sub">Looking back over a period of work: what went fast and what went wrong, with numbers we counted ourselves from the git history and QA reports.</p><p class="meta">3 notes</p></li>
       </ul>
     </section>
@@ -4989,12 +5325,12 @@ done</code></pre>
     <section aria-labelledby="notes">
       <h2 id="notes">Latest notes</h2>
       <ul class="card-list">
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></h3><p class="sub">Six .so files rebuilt for Google Play&#x27;s 16 KB page rule; NDK 27 and 29 tinted photo transitions blue. Rechecked: NDK 25 aligns to 16 KB with one linker flag.</p><p class="meta">Android development · Incident · October 28, 2026</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></h3><p class="sub">Testers said our puzzle game gave too much time. A 158-level simulation set the cut at 30%; a 45% cut left casual players a 1% three-star rate past level 500.</p><p class="meta">Game development · Measurement · October 28, 2026</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></h3><p class="sub">Google ended FAQ rich results on May 7, 2026 and Naver on July 9. Why our 106 FAQPage pages stay untouched, and the feed, date and app markup we fixed instead.</p><p class="meta">Website and search · How-to · October 28, 2026</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></h3><p class="sub">GA4 counted 19 installs in a day; 11 were our test phones and Play review devices. Per the docs, setprop alone does not keep test events out of reports.</p><p class="meta">Play Store and monetization · Incident · October 27, 2026</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></h3><p class="sub">A shared LLM cache keyed without the context could serve one injected answer to every user. A blind A/B showed the context added nothing: 96.0% vs 96.6%.</p><p class="meta">Testing and release · Measurement · October 27, 2026</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></h3><p class="sub">Before coding a document viewer, 3 agent designs competed and 3 judges scored them. A crash on every KakaoTalk file and 23 plan gaps surfaced before code.</p><p class="meta">Working with agents · How-to · October 27, 2026</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></h3><p class="sub">Two minSdk 24 games died on every Android 7 launch because of one java.time call in a shared ad module. A NewApi lint gate now fails the release build.</p><p class="meta">Android development · Incident · October 26, 2026</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></h3><p class="sub">We checked 29 commits without a Co-Authored-By trailer against agent session logs: the agent made 26, mostly merges. Commands to count your own repository.</p><p class="meta">Working with agents · Measurement · October 26, 2026</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></h3><p class="sub">Three ways secrets leak around an AI coding agent: a key in a session log, two exceptions a copied masking regex missed, a deploy plan asking for a wider token.</p><p class="meta">Testing and release · How-to · October 26, 2026</p></li>
       </ul>
     </section>
     <section aria-labelledby="by-the-numbers">
@@ -5129,8 +5465,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5507,6 +5843,12 @@ done</code></pre>
         <details><summary>Are my photos uploaded?</summary><div><p>No. Photos and videos are processed on your device only.</p></div></details>
         <details><summary>What resolutions can I save?</summary><div><p>The resolution you choose on screen, such as FHD (1920×1080).</p></div></details>
       </div>
+    </section>
+    <section aria-labelledby="ax-app-heading">
+      <h2 id="ax-app-heading">AX notes on this app</h2>
+      <ul class="related-links">
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+      </ul>
     </section>
     <section aria-labelledby="releases-heading">
       <h2 id="releases-heading">Recent updates</h2>
@@ -5938,9 +6280,9 @@ done</code></pre>
     <section aria-labelledby="ax-app-heading">
       <h2 id="ax-app-heading">AX notes on this app</h2>
       <ul class="related-links">
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
       </ul>
     </section>
     <section aria-labelledby="releases-heading">

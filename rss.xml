@@ -8,6 +8,342 @@
   <atom:link href="https://mvgood21.github.io/rss.xml" rel="self" type="application/rss+xml"/>
   <lastBuildDate>Wed, 28 Oct 2026 09:00:00 +0900</lastBuildDate>
   <item>
+    <title>안드로이드 16KB 페이지 NDK 대응과 파란 색조 – SugarMount</title>
+    <link>https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/ndk-16kb-page-blue-tint-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX 노트 · 사고 기록</span>
+      <h1>16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</h1>
+      <p class="lead">슈가앨범의 .so 6개를 16KB로 정렬한 것은 Android.mk 링커 플래그 한 줄이었고, NDK를 27로 먼저 올린 단계에서 파란 색조 회귀가 생겼습니다.</p>
+      <p>슈가앨범의 arm64 네이티브 라이브러리 12개 가운데 직접 빌드하는 6개가 4KB(0x1000) 정렬이었습니다. 2026년 1월 3일 커밋 aedf831에서 이 6개를 NDK 26.3으로 다시 빌드해 16KB(0x4000)로 맞췄고, 그 과정에서 NDK 27.0과 29.0으로 만든 빌드는 사진이 넘어갈 때 화면에 파란 색조를 남겼습니다. 2026년 10월 27일에 libnative_filter 소스(C 파일 두 개)를 NDK 네 버전으로 다시 빌드해 보니, 커밋이 "16KB 미지원"이라고 적은 NDK 25.1도 링커 플래그를 넣자 0x4000이 나왔습니다.</p>
+      <p class="note">근거는 슈가앨범 저장소의 git 기록(c3e09b1, d73db50~7efd9c1, aedf831)과 같은 커밋에 들어간 작업 문서, 2026-10-27에 llvm-readelf로 다시 확인한 .so 정렬값, Android Developers 공식 문서입니다.</p>
+    </section>
+    <section aria-labelledby="timeline">
+      <h2 id="timeline">targetSdk 36으로 올릴 때 다시 빌드한 .so 3개도 4KB 정렬이었습니다</h2>
+      <p>슈가앨범은 사진을 골라 영상으로 만드는 앱이고, aedf831 시점에 Java 파일 763개와 Kotlin 파일 32개가 있습니다. 영상과 필터 처리는 ndk-build로 만드는 C/C++ 라이브러리가 맡습니다. 2024년 7월 15일(c3e09b1)에 targetSdk를 33에서 34로, 2025년 8월 27일부터 9월 1일까지(d73db50~7efd9c1) 34에서 36으로 올렸습니다. 8월 31일(3e7e099)에 multimediaFramework의 arm64 .so 3개(libBeatTracker, libPixelCanvas, libPixelUtils)를 다시 빌드했지만 링커에 페이지 크기를 지정하지 않았고, 나머지 3개(libnative_filter, libFFmpegProcessor, libKwpFFmpegMuxer)는 2022년 11월 빌드 그대로였습니다. 그래서 aedf831 직전 6개 모두 LOAD 세그먼트 정렬이 0x1000이었습니다.</p>
+      <p>Google은 2025년 5월 8일 Android Developers Blog에서 "2025년 11월 1일부터 Android 15 이상을 타깃하는 새 앱과 업데이트는 16KB 페이지를 지원해야 한다"고 공지했습니다. 지금(2026-10-16 갱신) <a href="https://developer.android.com/guide/practices/page-sizes">페이지 크기 안내 문서</a>는 "2027년 2월 1일부터 16KB를 지원하지 않는 업데이트는 출시할 수 없다"고 적습니다. 저장소 문서에는 Play Console 경고를 받고 "2025년 5월까지" 고쳐야 한다고 적혀 있는데, 이 날짜는 두 공식 문서 어디에도 없고 경고 원문도 저장소에 남아 있지 않습니다.</p>
+      <p>2026년 1월 3일 작업은 Claude Code와 함께 했습니다(커밋에 Co-Authored-By 줄이 있습니다). 같은 커밋에 들어간 작업 문서 ffmpeg.md는 첫 단계를 이렇게 적었습니다. "변경 후: NDK 27.0.12077973. 이유: <code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES</code> 플래그는 NDK r27 이상에서만 지원." 최종 커밋은 26.3을 썼고, ffmpeg.md는 27.0이라고 적힌 채로 커밋됐습니다.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/ndk-16kb-page-blue-tint-1-ko.webp" width="1200" height="898" alt="단계 그림: 2025년 8월 targetSdk 36 대응 때 .so 3개를 다시 빌드했지만 나머지 3개와 함께 6개 모두 0x1000 정렬로 남음, 2026년 1월 NDK 27.0으로 올림, 27.0과 29.0에서 사진 전환에 파란 색조, 26.3과 링커 플래그로 0x4000, 10월 재측정에서 NDK 25.1도 링커 플래그로 0x4000." loading="lazy"><figcaption>2025년 8월 재빌드 뒤에도 6개 모두 0x1000이었고, 2026년 1월 NDK 26.3과 링커 플래그로 0x4000이 됐습니다.</figcaption></figure>
+    </section>
+    <section aria-labelledby="blue-tint">
+      <h2 id="blue-tint">NDK 27.0과 29.0으로 빌드하면 사진이 넘어갈 때 파란 색조가 끼었습니다</h2>
+      <p>커밋 메시지의 NDK 비교 표는 세 줄입니다. 25.x는 16KB 미지원, 26.3은 정상(채택), 27.0과 29.0은 "-O3 최적화 시 파란색 색조 버그 발생". 같은 커밋의 progress.md는 증상을 "사진 전환 시 파란색 계열 색조가 끼면서 전환됨"으로, 영향 범위를 multimediaFramework의 PixelUtils와 libyuv 코드로, 검증을 "-O0(최적화 없음)으로 빌드하면 정상 동작"으로 적었습니다. multimediaFramework의 Android.mk는 libYUV, libMasp, PixelCanvas, PixelUtils, BeatTracker 다섯 모듈 모두 <code>-O3</code>로 컴파일합니다.</p>
+      <p>이 회귀를 잡은 자동 검사는 없었습니다. 저장소의 테스트는 프로젝트를 만들 때 생기는 예제 테스트 두 개(ExampleUnitTest, ExampleInstrumentedTest)뿐이고, 색이나 렌더링 결과를 비교하는 테스트는 없습니다. 빌드는 NDK 27.0에서도 29.0에서도 성공했고, 정렬도 맞았습니다. 색조는 앱을 실행해 사진 전환을 화면으로 봐야 보이는 증상이었습니다.</p>
+      <p>progress.md는 원인을 "Clang 컴파일러의 -O3 최적화 버그"로 단정합니다. 기록에 있는 근거는 -O0이면 정상이라는 것 하나입니다. NDK에 든 clang 버전을 보면 26.3은 17.0.2, 27.0은 18.0.1, 29.0은 21.0.0이라 색조는 clang 18 이후와 겹칩니다. 그러나 -O0에서 정상인 것은 컴파일러 버그일 때도, 우리 코드의 미정의 동작을 새 최적화가 다르게 처리할 때도 똑같이 나옵니다. 어느 함수에서 색이 바뀌는지 좁힌 기록은 없습니다.</p>
+      <p>같은 커밋에서 libyuv의 NEON 빌드 줄도 정리됐기 때문에 이것이 원인인지도 확인했습니다. libPixelUtils.so의 동적 심볼 가운데 이름에 NEON이 든 것이 커밋 전에도 후에도 198개였습니다. NEON 코드는 예전 빌드에도 들어 있었으니 색조의 변수에서 뺐습니다.</p>
+    </section>
+    <section aria-labelledby="flag-r26">
+      <h2 id="flag-r26">NDK 26.3은 APP_SUPPORT_FLEXIBLE_PAGE_SIZES를 읽지 않습니다</h2>
+      <p>최종 커밋은 정렬 설정을 세 곳에 넣었습니다. gradle.properties의 <code>android.ndk.maxPageSize=16384</code>, Application.mk 세 개의 <code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES := true</code>, 그리고 Android.mk 여섯 모듈의 <code>LOCAL_LDFLAGS += -Wl,-z,max-page-size=16384</code>입니다. 이 가운데 무엇이 정렬을 바꿨는지 보려고, NDK 폴더의 build/core에서 플래그 이름을 찾았습니다. 25.1과 26.3에는 그 문자열이 없고, 27.0과 29.0의 build-binary.mk에만 있습니다. 27.0은 값이 true일 때 max-page-size=16384를 링커에 붙이고, 29.0은 기본이 16KB라 값이 false일 때만 4096으로 되돌립니다.</p>
+      <p>그다음 aedf831의 libnative_filter 소스를 NDK별로 다시 빌드하고 <code>llvm-readelf -lW</code>로 LOAD 정렬을 읽었습니다(2026-10-27).</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>NDK</th><th>Android.mk 링커 플래그</th><th>arm64-v8a LOAD 정렬</th></tr></thead>
+        <tbody>
+          <tr><td>25.1.8937393</td><td>없음</td><td>0x1000</td></tr>
+          <tr><td>25.1.8937393</td><td>있음</td><td>0x4000</td></tr>
+          <tr><td>26.3.11579264</td><td>없음(Application.mk 플래그만)</td><td>0x1000</td></tr>
+          <tr><td>26.3.11579264</td><td>있음(커밋과 같음)</td><td>0x4000</td></tr>
+          <tr><td>27.0.12077973</td><td>없음(Application.mk 플래그만)</td><td>0x4000</td></tr>
+          <tr><td>29.0.14206865</td><td>없음</td><td>0x4000</td></tr>
+        </tbody>
+      </table></div>
+      <p>26.3에서 16KB를 만든 것은 Android.mk의 링커 플래그였고, Application.mk의 플래그는 아무 일도 하지 않았습니다. 같은 링커 플래그는 25.1에서도 0x4000을 냈습니다. 커밋 표의 "NDK 25.x: 16KB 미지원"은 플래그를 넣고 재 본 결과가 아니었고, "플래그는 r27 이상"이라는 처음 판단이 거기까지 이어졌습니다. 공식 문서도 "Android NDK r27 이하" 항목에서 <code>max-page-size</code>와 <code>common-page-size</code> 링커 플래그로 16KB 정렬을 만들라고 안내하고, <code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES</code>는 언급하지 않습니다.</p>
+    </section>
+    <section aria-labelledby="ffmpeg-relro">
+      <h2 id="ffmpeg-relro">prebuilt FFmpeg 6개는 LOAD 검사를 통과하고 RELRO 공식에서 걸립니다</h2>
+      <p>progress.md는 미리 빌드된 FFmpeg 라이브러리 6개(libavcodec-56, libavfilter-5, libavformat-56, libavutil-54, libswresample-1, libswscale-3)를 "별도로 16KB 재빌드 필요"로 남겼습니다. 다시 재 보니 이 6개는 커밋 전부터 LOAD 정렬이 0x10000(64KB)이었습니다. 64KB는 16KB의 배수라, 공식 문서의 "LOAD가 2**14보다 작으면 안 된다"는 검사는 통과합니다.</p>
+      <p>공식 문서에는 검사가 하나 더 있습니다. GNU_RELRO 세그먼트의 (VirtAddr + MemSiz)를 0x4000으로 나눈 나머지가 0이어야 하고, 0이 아니면서 RELRO가 뒤따르는 쓰기 데이터(.data, .bss)와 한 LOAD를 같이 쓰면 앱이 실행 중에 세그폴트로 죽을 수 있다고 적습니다. RELRO만 든 LOAD이고 다음 쓰기 LOAD가 다른 16KB 페이지에서 시작하면 이 공식이 적용되지 않습니다. 문서는 이런 배치의 예를 16KB 호환으로 봅니다. aedf831의 arm64 라이브러리 12개를 이 공식으로 계산했습니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>라이브러리</th><th>RELRO 끝 % 0x4000</th><th>판정</th></tr></thead>
+        <tbody>
+          <tr><td>libnative_filter, libBeatTracker, libFFmpegProcessor, libKwpFFmpegMuxer</td><td>0x0</td><td>통과</td></tr>
+          <tr><td>libPixelCanvas, libPixelUtils</td><td>0x1000</td><td>공식 적용 안 됨(RELRO만 든 LOAD)</td></tr>
+          <tr><td>prebuilt FFmpeg 6개</td><td>0x1000~0x3000</td><td>RELRO와 .data/.bss가 같은 LOAD</td></tr>
+        </tbody>
+      </table></div>
+      <p>libavcodec-56을 예로 들면 쓰기 가능 LOAD의 메모리 크기가 0x257f00이고 그 앞부분 0xfbf8만 RELRO입니다. 문서가 세그폴트 사례로 든 모양과 같습니다. 커밋은 링커 플래그로 <code>max-page-size</code>만 넣었고, 공식 예시는 <code>common-page-size=16384</code>도 함께 씁니다. 직접 빌드한 6개는 그 플래그 없이도 통과했습니다. FFmpeg 6개는 저장소에 소스와 빌드 스크립트가 있지만, 지금 들어 있는 .so를 어떤 플래그로 만들었는지는 기록에 없습니다. ffmpeg.md는 두 빌드 스크립트의 ADDI_LDFLAGS에 <code>-Wl,-z,max-page-size=16384</code>를 넣었다고 적었는데, 이 커밋에서 두 스크립트는 경로만 옮겨졌고 build_arm64-v8a.sh 28행의 ADDI_LDFLAGS에는 그 플래그가 없습니다.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/ndk-16kb-page-blue-tint-2-ko.webp" width="1200" height="752" alt="비교 그림: 커밋 기록은 NDK 25 미지원, 26.3 채택, FFmpeg 재빌드 필요, 원인 Clang -O3 버그라고 적었고, 다시 측정하니 NDK 25.1도 링커 플래그로 0x4000, 26.3은 Application.mk 플래그를 읽지 않음, FFmpeg는 LOAD 0x10000이지만 RELRO 나머지 0x1000~0x3000, 원인은 확정 못 함." loading="lazy"><figcaption>FFmpeg 6개는 LOAD 0x10000이지만 RELRO 나머지는 0x1000~0x3000이었습니다.</figcaption></figure>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%2016KB%20%ED%8E%98%EC%9D%B4%EC%A7%80%20%ED%81%AC%EA%B8%B0%20%EB%8C%80%EC%9D%91%EA%B8%B0%3A%20NDK%2027%C2%B729%EC%97%90%EC%84%9C%EB%A7%8C%20%EC%83%9D%EA%B8%B4%20%ED%8C%8C%EB%9E%80%20%EC%83%89%EC%A1%B0%EC%99%80%20%EB%8B%A4%EC%8B%9C%20%EC%B8%A1%EC%A0%95%ED%95%9C%20.so%2012%EA%B0%9C">메일로 문의하기</a></p></aside>
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">NDK 25.1에 링커 플래그만 넣는 길이 있었습니다</h2>
+      <p>1월에 고를 수 있었던 길은 세 가지였습니다. 실제로 고른 것은 NDK 26.3 고정이고, 문서에 "NDK 27 이상 버전 사용 금지"를 남겼습니다.</p>
+      <ul>
+        <li>NDK 25.1을 그대로 두고 링커 플래그만 넣기. 위 표대로 정렬은 됐을 것이고, 기록상 25.1에서는 색조가 없었고 컴파일러도 그대로이니 색조 회귀를 예상할 이유가 없었습니다. "25는 미지원"이라는 판정 때문에 버려졌습니다.</li>
+        <li>NDK 27·29를 쓰고 multimediaFramework만 -O3를 낮추기. -O0에서 정상이라는 기록은 있지만, 영상 처리 속도가 얼마나 떨어지는지 잰 기록은 없습니다.</li>
+        <li>색이 바뀌는 함수를 찾아 고치기. 시도한 기록이 없습니다.</li>
+      </ul>
+      <p>NDK 버전부터 올리지 마십시오. 지금 쓰는 NDK에 링커 플래그를 넣고 readelf로 정렬부터 재십시오. NDK를 올려야 할 다른 이유가 있다면 그때 따로 올리고, 렌더링 결과를 이전 빌드와 비교하십시오.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">CMake 빌드와 NDK r28 이후에는 이 절차가 그대로 맞지 않습니다</h2>
+      <p>이 기록은 ndk-build(Android.mk, Application.mk) 프로젝트입니다. CMake로 빌드한다면 공식 문서의 CMake 예시처럼 <code>target_link_options</code>에 플래그를 넣어야 하고, Android.mk 줄은 쓸모가 없습니다. NDK r28 이상은 기본으로 16KB 정렬이라 링커 플래그 자체가 필요 없습니다(29.0 측정에서도 arm64는 플래그 없이 0x4000이었습니다).</p>
+      <p>다른 코드베이스에서 NDK 27이 같은 문제를 일으킨다고 말할 근거는 없습니다. 32비트(armeabi-v7a) 라이브러리는 정렬을 따지지 않았습니다. 공식 문서의 요건은 64비트 기기 대상입니다.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">readelf 두 번과 같은 사진 세트로 확인하는 순서</h2>
+      <ol>
+        <li>APK나 AAB에 들어가는 arm64-v8a .so마다 LOAD 정렬을 봅니다. 마지막 열이 0x4000 이상이어야 합니다.<pre><code>llvm-readelf -lW libfoo.so | grep -E "LOAD|GNU_RELRO"</code></pre></li>
+        <li>GNU_RELRO 줄이 있으면 VirtAddr와 MemSiz를 더해 0x4000으로 나눈 나머지를 봅니다. 0이 아니면, RELRO가 든 LOAD에 .data/.bss까지 들어 있는지(LOAD의 MemSiz가 RELRO보다 훨씬 큰지) 확인합니다.</li>
+        <li>NDK를 바꾸기 전에 지금 NDK의 Android.mk에 공식 문서의 두 플래그를 넣고 다시 1번을 합니다.<pre><code>LOCAL_LDFLAGS += -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384</code></pre></li>
+        <li><code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES</code>는 NDK r27 이상에서만 읽힙니다. r26 이하에서 이 줄만 넣고 끝내지 않습니다.</li>
+        <li>NDK나 플래그를 바꿀 때마다 jniLibs의 .so를 지우고 다시 빌드합니다. 슈가앨범 기록에 따르면 Android Studio의 Clean Project는 jniLibs를 지우지 않아, 빌드 스크립트가 먼저 지우게 했습니다.</li>
+        <li>같은 사진 세트로 이전 빌드와 새 빌드의 영상을 만들어 화면 전환 장면을 나란히 봅니다.</li>
+        <li>비압축 .so를 쓰면 Android Gradle Plugin 8.5.1 이상인지 보고 <code>zipalign -v -c -P 16 4 app.apk</code>로 zip 정렬을 확인합니다. 슈가앨범은 AGP 8.12.0입니다.</li>
+      </ol>
+      <p>Play Console 쪽 경고를 다룬 다른 기록으로는 <a href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">Play Console 'DEX 최적화 39%'의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a>이 있습니다. 앱 소개는 <a href="https://mvgood21.github.io/apps/sugaralbum/">슈가앨범</a> 페이지에 있습니다.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">아직 하지 않은 확인: 16KB 에뮬레이터 실행과 모듈별 -O3</h2>
+      <p>16KB 페이지 에뮬레이터 이미지에서 영상 만들기를 끝까지 실행해 FFmpeg 라이브러리가 RELRO 때문에 죽는지 봐야 합니다. 죽는다면 FFmpeg를 <code>common-page-size=16384</code>와 함께 다시 빌드해야 합니다. 색조는 아직 어느 모듈에서 생기는지도 모릅니다. 좁히려면 multimediaFramework 다섯 모듈에서 하나씩 -O3를 빼 보는 방법이 있습니다. ffmpeg.md의 NDK 27.0 표기는 26.3으로 고쳐야 합니다.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%2016KB%20%ED%8E%98%EC%9D%B4%EC%A7%80%20%ED%81%AC%EA%B8%B0%20%EB%8C%80%EC%9D%91%EA%B8%B0%3A%20NDK%2027%C2%B729%EC%97%90%EC%84%9C%EB%A7%8C%20%EC%83%9D%EA%B8%B4%20%ED%8C%8C%EB%9E%80%20%EC%83%89%EC%A1%B0%EC%99%80%20%EB%8B%A4%EC%8B%9C%20%EC%B8%A1%EC%A0%95%ED%95%9C%20.so%2012%EA%B0%9C">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>16KB 페이지를 지원하려면 NDK를 r27 이상으로 올려야 하나요?</summary><div><p>아닙니다. NDK 25.1에서도 Android.mk에 <code>-Wl,-z,max-page-size=16384</code>를 넣자 다시 빌드한 libnative_filter.so(arm64)의 LOAD 정렬이 0x4000이 됐습니다(2026-10-27 측정). r27 이상은 <code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES</code> 한 줄로 처리하려는 경우에만 있으면 됩니다.</p></div></details>
+        <details><summary>.so가 16KB 정렬인지 어떻게 확인하나요?</summary><div><p><code>llvm-readelf -lW</code>나 <code>llvm-objdump -p</code>로 LOAD 세그먼트의 정렬이 0x4000(2**14) 이상인지 봅니다. GNU_RELRO가 쓰기 데이터와 한 LOAD에 있으면 (VirtAddr + MemSiz) % 0x4000도 0인지 확인합니다.</p></div></details>
+        <details><summary>64KB로 정렬된 미리 빌드된 .so는 그대로 써도 되나요?</summary><div><p>LOAD 정렬 검사는 통과합니다. 슈가앨범의 FFmpeg 6개는 0x10000이라 LOAD 검사는 통과했지만 RELRO 공식의 나머지가 0x1000~0x3000이었습니다.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/androidx-pdf-isolated-process/">androidx.pdf beta01: 격리 프로세스에서 Application.onCreate가 한 번 더 돌아 PDF가 조용히 안 열렸다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 28 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>퍼즐 게임 제한시간 밸런스: 별 3개 시뮬레이션 – SugarMount</title>
+    <link>https://mvgood21.github.io/ax/puzzle-time-limit-simulation/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/ax/puzzle-time-limit-simulation/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/puzzle-time-limit-simulation-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX 노트 · 측정</span>
+      <h1>'시간이 너무 길어서 쉬움' 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</h1>
+      <p class="lead">목표 시간을 줄일 폭은 구간별 별 3개 비율 시뮬레이션으로 골랐습니다. 처음 안 45%는 뒤쪽 레벨 일반 플레이어 별 3개 비율이 1%라 버렸습니다.</p>
+      <p><a href="https://mvgood21.github.io/apps/arrow-knots/">화살표 매듭풀기</a>의 41~200레벨 목표 시간은 중앙값 65초였고, 시뮬레이션한 일반 플레이어는 같은 구간을 중앙값 41초에 풀었습니다. 2026년 10월 4일 오후 운영자가 전한 실사용 테스터 3명의 의견은 "시간이 너무 길어서 쉬움"이었고, 그날 저녁 모든 판의 목표 시간에 0.7을 곱하는 커밋(efe26ae)이 들어갔습니다. 처음 정한 폭은 45%였습니다. 에이전트가 권했고 운영자도 한 번 승인한 숫자인데, 158개 레벨로 다시 돌려 보니 501레벨 이후 일반 플레이어가 별 3개를 받는 비율이 1%로 떨어졌습니다. 30%만 줄이면 그 비율은 30%이고, 목표 시간은 일반 중앙값과 거의 같아집니다(45초 대 41초, 190초 대 188초).</p>
+      <p class="note">근거는 게임 저장소의 git 기록(efe26ae, 632adb5, 89dc35a 등), 설계 문서 05·06·09a·09b, 2026년 10월 4일 작업 세션 기록, 10월 27일 GA4 점검 문서입니다. 시뮬레이션 표는 그날 세션에서 돌린 결과를 그대로 옮겼고, 상수는 2026년 10월 27일 HEAD에서 다시 확인했습니다.</p>
+    </section>
+    <section aria-labelledby="scale-grid">
+      <h2 id="scale-grid">같은 플레이 기록에 배율 8개를 대 보았습니다</h2>
+      <p>화살표 매듭풀기의 목표 시간(par)은 화면 위에서 줄어드는 카운트다운이지만, 0이 지나도 판이 끝나지 않습니다. 대신 별 3개는 실수가 화살표 수의 12분의 1 이하이면서 목표 시간 안에 끝냈을 때만 줍니다. 목표 시간을 줄이면 별 3개를 받는 사람이 줄어드는데, 얼마나 줄어드는지는 레벨 구간마다 달랐습니다.</p>
+      <p>시뮬레이터에는 플레이어가 둘 있습니다. 일반 플레이어는 화살표를 무작위 순서로 하나씩 확인하고(한 개에 120ms), 숙련 플레이어는 방금 탭한 곳에서 가까운 순서로 확인합니다(60ms). 탭에 걸리는 시간은 Fitts 법칙(목표가 멀고 작을수록 오래 걸린다는 식)으로 계산하고, 손가락이 옆 칸을 누르는 오터치와 막힌 화살표를 잘못 누르는 실수도 확률로 넣었습니다. 1~1,100레벨에서 7레벨 간격으로 158개를 골라 레벨마다 일반 30번, 숙련 15번씩 풀게 한 뒤, 그 기록 하나에 배율과 하한 후보만 바꿔 가며 별을 다시 매겼습니다. 배율 후보를 두 묶음으로 나눠 두 번 돌렸고, 각각 5초와 3초쯤 걸렸습니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>배율 (하한)</th><th>41~200 목표</th><th>501~1100 목표</th><th>501~1100 일반 목표 안</th><th>일반 별 3개 (41~200 / 201~500 / 501~1100)</th></tr></thead>
+        <tbody>
+          <tr><td>1.0 (20초, 당시 값)</td><td>65초</td><td>265초</td><td>88%</td><td>50 / 45 / 40%</td></tr>
+          <tr><td>0.8 (15초)</td><td>55초</td><td>215초</td><td>88%</td><td>50 / 44 / 40%</td></tr>
+          <tr><td>0.75 (15초)</td><td>50초</td><td>200초</td><td>81%</td><td>50 / 43 / 39%</td></tr>
+          <tr><td>0.7 (15초)</td><td>45초</td><td>190초</td><td>52%</td><td>50 / 38 / 30%</td></tr>
+          <tr><td>0.65 (15초)</td><td>45초</td><td>175초</td><td>17%</td><td>46 / 27 / 12%</td></tr>
+          <tr><td>0.6 (15초)</td><td>40초</td><td>160초</td><td>3%</td><td>37 / 16 / 2%</td></tr>
+          <tr><td>0.55 (15초)</td><td>40초</td><td>150초</td><td>1%</td><td>23 / 9 / 1%</td></tr>
+          <tr><td>0.5 (10초)</td><td>35초</td><td>135초</td><td>0%</td><td>14 / 2 / 0%</td></tr>
+        </tbody>
+      </table></div>
+      <p>목표 시간은 구간 안 레벨들의 중앙값입니다. 같은 기록에서 일반 플레이어의 중앙값은 41~200레벨 41초, 201~500레벨 93초, 501~1100레벨 188초였고, 숙련 플레이어의 별 3개 비율은 모든 배율에서 67 / 71 / 77%로 같았습니다. 41~200레벨은 0.7에서도 일반 별 3개가 1.0과 같은 50%입니다. 이 구간에서는 목표 시간 안에 든 실행이 88%에서 84%로 줄었는데도 별 3개는 그대로였으니, 목표 시간을 넘긴 실행은 대부분 이미 실수 조건에서 별을 놓친 실행이었습니다.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/puzzle-time-limit-simulation-1-ko.webp" width="1200" height="794" alt="막대 그림: 501~1100레벨 일반 플레이어 별 3개 비율은 배율 1.0과 0.8에서 40%, 0.75에서 39%, 0.7에서 30%, 0.65에서 12%, 0.6에서 2%, 0.55에서 1%." loading="lazy"><figcaption>0.7 아래로 내려가면 뒤쪽 레벨의 별 3개가 빠르게 사라졌습니다.</figcaption></figure>
+    </section>
+    <section aria-labelledby="first-proposal">
+      <h2 id="first-proposal">에이전트는 목표 시간이 '약 2배'라고 보고 45%를 권했습니다</h2>
+      <p>테스터 의견은 11개 항목이었고, 목표 시간은 4번이었습니다. "시간을 더 단축시키기 - 시간이 너무 길어서 쉬움"이라는 말 뒤에 "시간 다되면 처음부터 다시 시작이나 광고보기 팝업"을 띄우자는 제안이 붙어 있었습니다. 운영자가 14시 41분에 이 목록을 붙여 넣자, 에이전트는 2분 뒤 코드를 확인한 결과로 목표 시간이 일반 사용자 중간 풀이시간의 "약 2배", 숙련자의 "약 3.5배"라고 답했습니다. 같은 답에 든 예시는 화살표 22개 판의 목표 54초, 일반 41초, 숙련 24초였습니다. 그 숫자로 계산하면 1.3배와 2.3배입니다.</p>
+      <p>에이전트는 '약 2배'라는 판단을 근거로 "모든 판의 목표 시간을 약 45% 단축", 곧 목표를 일반 사용자 중간값 수준으로 내리는 안을 권했습니다. 운영자는 14시 54분에 이 안을 골랐습니다. 시간이 다 되면 실패하는 판은 월드마다 1~2개로 한정하는 조건이 함께 붙은 선택지였습니다.</p>
+      <p>45%를 걸러 낸 것은 몇 분 뒤 에이전트가 작업 카드에 적은 완료 조건이었습니다. 카드에는 "시뮬레이션으로 밴드별 별3 비율 재계산: 숙련 60~75%, 일반 25~40%"가 들어갔고, 에이전트는 코드를 고치기 전에 그 계산부터 돌렸습니다. 0.55에서 501~1100레벨 일반 플레이어는 목표 시간 안에 끝낸 실행도, 별 3개도 1%였습니다. 41~200레벨에서도 목표 40초가 일반 중앙값 41초보다 짧았습니다.</p>
+      <p>원래 목표 시간은 41~200레벨에서 일반 중앙값의 1.6배(65초 대 41초)였지만 501~1100레벨에서는 1.4배(265초 대 188초)였습니다. 판 하나의 비율로 전체 배율을 정하면 여유가 적은 뒤쪽 구간이 먼저 중앙값 밑으로 내려갑니다. 테스터의 말에서는 방향만 받고, 얼마나 줄일지는 구간별 별 3개 표를 보고 정하십시오.</p>
+      <p>에이전트는 15시 6분에 다시 물었습니다. 선택지는 30% 단축(권장, 일반 별 3개 30~50%, 숙련 67~77%), 35% 단축(뒤쪽 일반 12~27%), 45% 단축(처음 안, 뒤쪽 일반 1~9%) 셋이었습니다. 0.75와 0.8도 계산했지만 선택지에는 넣지 않았습니다. 운영자는 18시 44분에 30%를 골랐고, 10분 뒤 들어간 커밋은 배율 0.7과 함께 하한도 20초에서 15초로 내렸습니다.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/puzzle-time-limit-simulation-2-ko.webp" width="1200" height="888" alt="단계 그림: 10월 4일 14시 41분 테스터 의견, 14시 43분 '약 2배' 분석, 14시 54분 45% 단축 승인, 15시 6분 시뮬레이션에서 0.55의 뒤쪽 별 3개 1%, 18시 44분 30% 선택, 18시 54분 efe26ae 커밋." loading="lazy"><figcaption>한 번 승인된 45%를 시뮬레이션이 뒤집었고, 최종 폭은 운영자가 골랐습니다.</figcaption></figure>
+    </section>
+    <section aria-labelledby="why-generous">
+      <h2 id="why-generous">긴 목표 시간은 설계 문서가 정한 값이었습니다</h2>
+      <p>10월 2일 설계 문서(05)는 목표 시간을 넘겨도 실패하지 않고 세 번째 별만 잃게 정했습니다. 근거로는 Candy Crush가 2018년 5월에 시간제 레벨을 모두 제거했다는 팬 위키 요약(원문은 접근이 막혀 읽지 못했다고 문서에 적혀 있습니다)과 Two Dots 도움말의 "Two Dots is not timed!"를 들었고, 기존 포지셔닝인 '편안한 퍼즐'(00 문서)을 따랐습니다.</p>
+      <p>풀이 시간 모델 문서(06)는 회귀식에 1.42를 곱해서 일반 플레이어가 평균 30%의 시간을 남기도록 한도를 정했습니다. 10월 3일 1,000레벨과 무한 모드 확장(1.1.0)의 확인 게이트(G1)도 "일반 평균 남은 시간 30% 이상"을 요구했습니다. 큰 판에서는 화면이 하나 늘 때마다 더하는 시간 <code>PAR_SCREEN_S</code>가 있는데, 스펙이 준 범위는 2~4초였습니다. 모델에서 화면 하나당 카메라 이동과 화면 밖 확인에 12.4초가 들었고 2~4초로는 남은 시간이 13~22%에 그쳐서, 이 값은 19초로 동결됐습니다(632adb5).</p>
+      <p>이 19초는 G1 보고서의 "Spec deviations" 절 1번에 이유와 함께 적혀 있습니다. 작업 규칙 문서(09b)에 이런 줄이 있었기 때문입니다. "Never weaken a test to make it pass. If the spec looks wrong, record it under 'Spec deviations' in your final report, with the reason." G1 보고서 판정표에는 파트 3 일반 평균 남은 시간이 30.6%(기준 30% 이상)로 적혀 있습니다.</p>
+      <p>모델의 상수는 실제 사용자로 맞춘 값이 아닙니다. 06 문서는 탐색 속도와 탭 시간을 시각 탐색과 Fitts 법칙 연구에서 나온 범위로 골랐고, 막힌 화살표를 잘못 누를 확률은 "추정치, 텔레메트리로 보정 필요"라고 적었습니다. 05 문서도 출시 뒤 레벨마다 실수 없이 클리어한 기록의 70번째 백분위(P70)로 목표 시간을 바꾸자고 했지만, 10월 4일에는 그 데이터가 없었습니다.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%27%EC%8B%9C%EA%B0%84%EC%9D%B4%20%EB%84%88%EB%AC%B4%20%EA%B8%B8%EC%96%B4%EC%84%9C%20%EC%89%AC%EC%9B%80%27%20%ED%85%8C%EC%8A%A4%ED%84%B0%20%EC%9D%98%EA%B2%AC%EC%9D%84%20%EC%8B%9C%EB%AE%AC%EB%A0%88%EC%9D%B4%EC%85%98%EC%9C%BC%EB%A1%9C%20%EA%B2%80%EC%A6%9D%ED%95%B4%20%ED%8D%BC%EC%A6%90%20%EB%AA%A9%ED%91%9C%20%EC%8B%9C%EA%B0%84%EC%9D%84%2030%25%20%EC%A4%84%EC%98%80%EB%8B%A4">메일로 문의하기</a></p></aside>
+    <section aria-labelledby="fail-on-timeout">
+      <h2 id="fail-on-timeout">시간 초과 실패는 본편에 넣지 않고 보스 타임어택으로 보냈습니다</h2>
+      <p>테스터 제안의 뒤쪽 절반, 시간이 다 되면 처음부터 하거나 광고를 보게 하자는 부분은 그대로 받지 않았습니다. 14시 44분 질문의 두 번째 선택지가 바로 그 안("월드 2부터 전 판 실패", 31레벨부터)이었고, 에이전트는 보상형 광고 노출은 늘지만 차분하게 푸는 사용자가 떠날 위험이 있다고 설명을 붙였습니다. 그날 작업 카드에는 장르 상위 앱 두 개가 스토어 문구에 "타이머 없음"을 내세우고, 하드 타이머와 광고 +60초를 쓰는 앱은 하나였다는 조사 결과도 적혔습니다.</p>
+      <p>진짜 제한 시간은 그날 밤 미니게임으로 들어갔습니다. 23시 15분 커밋(89dc35a)은 25레벨마다 나오는 미니게임 넷 가운데 하나로 보스 타임어택을 넣었고, 여기서는 시간이 다 되면 지고 보상형 광고로 30초를 더 받을 수 있습니다. efe26ae 본문에도 "Missing par still never fails a level."이라고 적혀 있습니다.</p>
+    </section>
+    <section aria-labelledby="still-outside">
+      <h2 id="still-outside">0.7에서도 앞쪽 구간과 숙련 플레이어는 완료 조건 밖이었습니다</h2>
+      <p>숙련 플레이어의 별 3개 비율은 배율 0.5에서 1.0까지 한 번도 움직이지 않았습니다. 숙련 실행은 어느 배율에서든 97~99%가 목표 시간 안에 끝났고, 별을 놓친 이유는 실수였습니다. 1~40레벨 일반 별 3개도 56%(0.5에서 55%)로 거의 그대로였습니다.</p>
+      <p>작업 카드의 완료 조건과 맞춰 보면, 0.7은 201~500레벨(38%)과 501~1100레벨(30%)의 일반 플레이어에서만 25~40% 안에 들었습니다. 1~200레벨 일반은 50~56%, 501~1100레벨 숙련은 77%로 범위 밖이었습니다. 커밋 본문에는 "casual 3-star 30-50%"까지만 적혔고, 실수 허용치(<code>STAR3_DIV</code> 12)는 이번에 건드리지 않았습니다.</p>
+      <p>표본은 구간마다 크기가 달라서, 1~40레벨은 레벨 6개(1, 8, 15, 22, 29, 36)뿐입니다. 시간 초과가 곧 실패인 판에는 이 방식을 그대로 쓰면 안 됩니다. 목표를 중앙값에 맞추면 절반이 지게 되니, 05 문서의 타임어택은 제한 시간을 중앙값의 1.3배로 잡았습니다.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">플레이 기록을 저장하고 배율 후보로 다시 채점하는 순서</h2>
+      <ol>
+        <li>게임과 시뮬레이터가 같은 목표 시간 함수를 쓰게 합니다. 이 저장소의 <code>pace.py</code>는 앱의 <code>Pace.kt</code>에서 상수를 읽어 그대로 계산합니다.</li>
+        <li>플레이어 유형 둘 이상으로 레벨 표본을 돌려 실행마다 (클리어 여부, 시간, 실수)를 저장합니다.</li>
+        <li>숫자를 보기 전에 구간별 별 3개 목표 범위부터 적습니다.</li>
+        <li>저장한 기록에 배율과 하한 후보를 바꿔 적용하고, 구간마다 목표 중앙값, 일반 중앙값, 목표 안 비율, 별 3개 비율을 한 표로 뽑습니다.</li>
+        <li>사람에게는 선택지 2~3개를 뒤쪽 구간 숫자와 함께 보입니다.</li>
+        <li>상수를 바꾸면 레벨 데이터의 목표 시간 열을 다시 만들고, 검사점 테스트와 전 레벨 대조 테스트를 같은 커밋에서 갱신합니다. efe26ae는 검사점 13개(L1000은 380초에서 270초로)와 1,100레벨 표를 함께 고쳤습니다.</li>
+      </ol>
+      <p>그날 스크립트에서 별을 다시 매기는 식은 아래와 같습니다(변수 이름만 풀어 썼습니다).</p>
+      <pre><code>def par(base, scale, floor):
+    t = base * scale + AUTOSTART_SLACK_S   # 첫 탭 전 5초
+    return min(max(round(t / 5) * 5, floor), PAR_MAX_S)
+three_star = cleared and time &lt;= par(base, scale, floor) and mistakes &lt;= arrows // 12</code></pre>
+      <p>한판블록의 난이도를 같은 방식으로 봇에게 먼저 풀려 본 기록은 <a href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a>에 있습니다.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">남은 일</h2>
+      <p>실제 사용자의 별 3개 비율은 아직 재지 못했습니다. 2026년 10월 27일 점검에서 GA4의 <code>level</code>, <code>stars</code>, <code>world</code> 맞춤 측정기준이 전 기간 (not set)으로 나왔습니다(화살표 매듭풀기 level_up 1,258건). 앱이 정수 값을 숫자 파라미터로 보내서 잡히지 않는 것으로 보이고, 다음 릴리스에 문자열로도 함께 보내는 안이 올라가 있습니다. 0.7 적용 뒤 G1 판정을 다시 돌린 기록은 아직 없습니다(보고서는 10월 3일 이후 그대로).</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%27%EC%8B%9C%EA%B0%84%EC%9D%B4%20%EB%84%88%EB%AC%B4%20%EA%B8%B8%EC%96%B4%EC%84%9C%20%EC%89%AC%EC%9B%80%27%20%ED%85%8C%EC%8A%A4%ED%84%B0%20%EC%9D%98%EA%B2%AC%EC%9D%84%20%EC%8B%9C%EB%AE%AC%EB%A0%88%EC%9D%B4%EC%85%98%EC%9C%BC%EB%A1%9C%20%EA%B2%80%EC%A6%9D%ED%95%B4%20%ED%8D%BC%EC%A6%90%20%EB%AA%A9%ED%91%9C%20%EC%8B%9C%EA%B0%84%EC%9D%84%2030%25%20%EC%A4%84%EC%98%80%EB%8B%A4">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>퍼즐 게임에서 별 3개 기준은 어떻게 정하나요?</summary><div><p>화살표 매듭풀기는 실수가 화살표 수의 12분의 1 이하이고 목표 시간 안에 깨면 별 3개입니다. 목표 시간 배율은 시뮬레이션에서 뒤쪽 레벨 일반 플레이어의 별 3개가 30~38%가 되는 0.7로 골랐습니다.</p></div></details>
+        <details><summary>제한 시간이 끝나면 레벨을 실패시켜야 하나요?</summary><div><p>이 게임의 본편은 실패시키지 않고 세 번째 별만 잃습니다. 시간이 다 되면 지는 규칙은 25레벨마다 나오는 미니게임 4종 중 보스 타임어택(100레벨마다)에만 있습니다.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-first-chapter-walls/">퍼즐 게임 첫날 이탈 분석: 기기별 이벤트 순서와 판별 계산으로 찾은 첫 장의 벽 4판</a></li>
+        <li><a href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 28 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>FAQ 리치 결과 종료 뒤 GEO용 구조화 데이터 – SugarMount</title>
+    <link>https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/structured-data-after-faq-rich-results-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX 노트 · 방법</span>
+      <h1>FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</h1>
+      <p class="lead">GEO(생성형 검색 최적화)용 특별 마크업은 없습니다. FAQPage JSON-LD는 그대로 두고, 시간은 화면의 Q&amp;A와 날짜가 붙은 측정값 본문에 씁니다.</p>
+      <p>이 사이트 HTML 173개 가운데 106개에 FAQPage JSON-LD가 들어 있고, 질문은 374개입니다. 2026년 10월 27일 HEAD(849c6d8)에서 센 값이고, 이 마크업으로 생기는 Google 리치 결과는 0입니다. Google은 5월 7일, 네이버는 7월 9일에 FAQ 노출을 끝냈습니다. 그런데 이 사이트에서 FAQ JSON-LD를 손으로 쓴 페이지까지 넓힌 커밋(12ed443)은 10월 18일에 "SEO/GEO pass"라는 이름으로 들어갔습니다. 종료 공지보다 5개월 늦은 작업이었고, 같은 날 리서치가 그 사실을 찾은 뒤 FAQPage는 남기고 더 손보지 않기로 정했습니다.</p>
+      <p class="note">근거는 사이트 저장소의 git 기록(bdbbe97, 12ed443, 3f504be, b82faac), 10월 27일 HEAD(849c6d8)의 HTML 재집계, 10월 18일 작업 문서(리서치 01~06, 정보구조 명세, 적대적 리뷰 1), 검색 운영 기록, Google Search Central과 네이버 서치어드바이저 공지입니다. 외부 정책은 2026년 10월 27일에 원문을 다시 열어 확인했습니다.</p>
+    </section>
+    <section aria-labelledby="count-today">
+      <h2 id="count-today">FAQPage 106쪽, 질문 374개, 리치 결과 0</h2>
+      <p>배포되는 HTML의 <code>application/ld+json</code> 블록을 <code>@type</code>별로 센 결과입니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>타입</th><th>페이지 수</th><th>2026-10 기준 검색 노출</th></tr></thead>
+        <tbody>
+          <tr><td>BreadcrumbList</td><td>166</td><td>Google은 데스크톱 이동 경로, 네이버는 사이트 정보 둘째 줄</td></tr>
+          <tr><td>FAQPage</td><td>106</td><td>Google·네이버 모두 노출 종료</td></tr>
+          <tr><td>Article</td><td>84</td><td>리치 결과 없음, 날짜·저자 정보</td></tr>
+          <tr><td>MobileApplication</td><td>22</td><td>네이버 소프트웨어 요약 대상</td></tr>
+          <tr><td>CollectionPage · ItemList</td><td>22 · 16</td><td>목록 페이지 설명용</td></tr>
+        </tbody>
+      </table></div>
+      <p>FAQPage 106쪽 가운데 60쪽이 AX 노트, 42쪽이 앱 소개와 도움말, 나머지 4쪽이 홈과 AX 허브입니다. 빌드 스크립트는 화면 Q&amp;A와 같은 원본(노트·손 페이지는 <code>&lt;details&gt;&lt;summary&gt;</code>, 생성 앱 페이지는 <code>apps.json</code>의 <code>faq</code>, 홈은 <code>home_faq</code>)에서 FAQPage를 만듭니다. 그래서 FAQ 2~4개를 두는 노트가 하나 늘 때마다 FAQPage도 하나 늘어납니다. 같은 방식으로 지난 커밋들을 다시 세면 10월 18일 오후 4시 9분 10쪽, 12ed443 직후 13쪽, 그날 밤 개편(b82faac) 뒤 50쪽, 10월 19일 밤 58쪽이었습니다. 13쪽에서 50쪽으로 늘어난 것은 명세를 구현한 b82faac에서였고, 그 50쪽 가운데 40쪽이 앱 소개·도움말 페이지였습니다(apps.json <code>faq</code>로 만든 생성 앱 페이지 8쪽, <code>&lt;details&gt;</code>가 있는 손 앱 페이지·도움말 32쪽). 50쪽 이후 늘어난 56쪽 가운데 54쪽은 AX 노트입니다.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/structured-data-after-faq-rich-results-1-ko.webp" width="1200" height="662" alt="막대 그림: FAQPage JSON-LD가 들어간 페이지는 10월 18일 12ed443 전 10쪽, 직후 13쪽, b82faac 뒤 50쪽, 10월 19일 58쪽, 10월 27일 106쪽." loading="lazy"><figcaption>"늘리지 않는다"고 정한 뒤에도 FAQPage는 13쪽에서 106쪽이 됐고, 50쪽 이후 늘어난 56쪽 중 54쪽이 AX 노트입니다.</figcaption></figure>
+    </section>
+    <section aria-labelledby="wrong-pass">
+      <h2 id="wrong-pass">FAQ JSON-LD를 넓힌 커밋은 Google 종료 5개월 뒤에 들어갔습니다</h2>
+      <p>FAQPage는 10월 5일 사이트 개편(bdbbe97)에서 앱 페이지와 홈에 처음 들어갔습니다. 10월 18일 오후 4시 24분, 다른 에이전트 세션이 올린 12ed443의 제목은 "Site-wide SEO/GEO pass: FAQ JSON-LD, …"였고, 본문 첫 항목이 "FAQPage from &lt;details&gt; on hand pages"였습니다. FAQ 마크업을 검색과 AI 답변 노출을 돕는 장치로 보고 손으로 쓴 페이지까지 넓힌 커밋입니다.</p>
+      <p>Google Search Central 업데이트 목록에는 5월 8일자로 "This feature will no longer appear in Google Search starting May 7, 2026."이, 6월 15일자로 FAQ 리치 결과 문서를 지웠다는 항목이 있습니다. 그 전에도 2023년 9월부터는 잘 알려진 정부·보건 사이트에만 나오던 기능이었습니다. 네이버 서치어드바이저는 7월 8일 공지에서 웹 검색의 FAQ 노출을 7월 9일에 끝낸다고 알렸습니다.</p>
+      <p>29분 뒤인 오후 4시 53분에 Google·네이버·GEO 리서치를 병렬로 돌렸고, Google 리서치 문서 01이 FAQ 종료를 첫머리 결론 둘째 줄에 적었습니다. 12ed443에는 그 종료가 반영되지 않았습니다. Google의 생성형 AI 최적화 가이드(7월 10일 갱신)는 "Structured data isn't required for generative AI search, and there's no special schema.org markup you need to add."라고 적습니다.</p>
+    </section>
+    <section aria-labelledby="keep-no-work">
+      <h2 id="keep-no-work">지우지 않고, 검증하지 않고, 손대지 않기로 했습니다</h2>
+      <p>같은 날 쓴 정보구조 명세는 FAQPage 행에 "현행 생성을 유지하되 늘리지 않고 Rich Results 검증 대상에서 뺀다"고 적었습니다. 적대적 리뷰 1은 생성 코드에 유지비가 들면 지우라고 권했지만, 명세는 그 부분을 받아들이지 않았습니다. 생성 코드가 이미 있고 함수 하나가 화면 Q&amp;A의 원본을 읽어 JSON-LD를 쓰니 유지비가 0에 가깝다는 점, 네이버 종료 공지가 "남아있는 자주 묻는 질문(FAQ) 구조화 데이터 마크업은 웹 문서 분석 등에 보조적으로 활용될 수 있습니다"라고 하고 순위나 노출에는 영향이 없다고 한 점이 이유였습니다.</p>
+      <p>화면 Q&amp;A와 같은 원본에서 만들기 때문에 마크업과 화면 내용이 같습니다. Google의 AI 기능 문서도 모범 사례로 "structured data matches the visible text on the page"를 꼽습니다.</p>
+      <p>FAQ를 늘려 리치 결과를 노리는 안은 두 검색엔진이 모두 노출을 끝낸 시점이라 처음부터 버렸습니다. Rich Results 검증을 게이트에 남기는 안도 Google이 문서를 지운 뒤라 검증할 기준이 없었습니다. 그런데 명세의 "늘리지 않는다"는 생성 방식 때문에 실제로는 "손대지 않는다"가 됐습니다. b82faac부터 앱·도움말 페이지 40쪽에 FAQPage가 붙었고, 그 뒤 노트마다 FAQ를 두는 규칙으로 106쪽이 됐습니다. 그동안 빌드의 FAQPage 생성 코드를 바꾼 커밋은 없습니다.</p>
+      <p>화면의 Q&amp;A는 남깁니다. FAQ는 첫 문장에 답을 두는 규칙으로 쓰고, 그 문장은 JSON-LD가 없어도 본문으로 읽힙니다. 10월 25일에 한 노트의 FAQ 답에서 구호 같은 문장을 고쳤을 때(72a3ada) JSON-LD도 같은 문장으로 바뀌었습니다.</p>
+    </section>
+    <section aria-labelledby="review-seven">
+      <h2 id="review-seven">적대적 리뷰 1의 결함 7건 가운데 RSS 본문·날짜 신호·앱 마크업 세 건</h2>
+      <p>10월 18일 적대적 리뷰 1은 명세의 SEO·GEO 주장을 Google 문서와 네이버 서치어드바이저 원문에 하나씩 맞춰 보고 반드시 고칠 결함 7건을 냈습니다. FAQ 종료 날짜, llms.txt를 Google이 무시한다는 입장 같은 큰 줄기는 맞았습니다.</p>
+      <p>첫째 결함은 RSS 본문 위치였는데, 명세는 본문 전체를 <code>content:encoded</code>에 넣고 <code>&lt;description&gt;</code>은 요약으로 두려 했습니다. 네이버 피드 제출 가이드의 예제에는 <code>&lt;description&gt;</code>만 있고, 주의사항은 "각 item의 본문은 일부가 아닌 모든 내용(본문 전체 공개)이 포함될 수 있도록" 하라고 합니다. <code>content:encoded</code>는 가이드에 나오지 않습니다. 지금 ko 피드의 item 56개는 <code>&lt;description&gt;</code>에 본문 HTML을 담고 있고, 그 HTML 길이의 중앙값은 약 1만 자입니다.</p>
+      <p>둘째는 날짜 신호 충돌이었습니다. Google은 RSS도 사이트맵으로 받고, 2014년 10월 Google 블로그는 "XML sitemap uses &lt;lastmod&gt; RSS uses &lt;pubDate&gt;"라고 적습니다. 명세처럼 <code>pubDate</code>를 발행일로 두고 RSS를 Google에 내면, 같은 URL에 사이트맵은 수정일을, RSS는 발행일을 수정 시각으로 보냅니다. 리뷰는 이 근거를 블로그 본문을 열지 못해 "추정"으로 적었는데, 이번에 원문을 열어 보니 맞았습니다. 해결은 Google에는 수정일을 담은 sitemap.xml만 내는 것이었습니다. 수정일을 본문 해시로 정하는 방법은 <a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a>에 있습니다. 오후 4시 20분 커밋(3f504be)이 robots.txt에 넣은 RSS <code>Sitemap:</code> 줄은 그날 밤 개편에서 빠졌습니다.</p>
+      <p>셋째는 명세의 "받을 수 있는 리치 결과는 Breadcrumb와 사이트 이름뿐"이라는 결론이었습니다. 네이버는 10월 15일 공지에서 HowTo 노출을 끝내면서, 소프트웨어 schema 항목은 본문 아래 요약으로 보여 준다고 했습니다(이 사이트 앱 페이지의 실제 노출은 확인하지 못했습니다). 그래서 MobileApplication에 <code>name</code>, <code>applicationCategory</code>, <code>operatingSystem</code>, 절대 URL, 너비·높이가 있는 스크린샷, 160자 이하 설명을 요구하는 검사가 빌드 게이트에 들어갔습니다. 게이트가 어떻게 커밋을 막는지는 <a href="https://mvgood21.github.io/ax/static-site-check-gate/">여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</a>에 적었습니다.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/structured-data-after-faq-rich-results-2-ko.webp" width="1200" height="862" alt="단계 그림: 10월 18일 16시 24분 FAQ JSON-LD 확대 커밋, 16시 53분 리서치가 Google 5월 7일·네이버 7월 9일 종료를 찾음, 같은 날 적대적 리뷰 1이 결함 7건, 20시 7분 개편에서 RSS 본문 전체와 sitemap.xml만, 10월 25일 GSC에 남은 RSS 사이트맵 2개 삭제." loading="lazy"><figcaption>FAQ 마크업은 그대로 두고, 고친 것은 피드와 날짜와 앱 마크업이었습니다.</figcaption></figure>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20FAQ%20%EB%A6%AC%EC%B9%98%20%EA%B2%B0%EA%B3%BC%EA%B0%80%20%EB%81%9D%EB%82%9C%20%EB%92%A4%EC%9D%98%20%EA%B5%AC%EC%A1%B0%ED%99%94%20%EB%8D%B0%EC%9D%B4%ED%84%B0%3A%20GEO%EC%9A%A9%EC%9C%BC%EB%A1%9C%20%EB%AC%B4%EC%97%87%EC%9D%84%20%EB%82%A8%EA%B2%BC%EB%82%98">메일로 문의하기</a></p></aside>
+    <section aria-labelledby="gsc-path">
+      <h2 id="gsc-path">RSS를 사이트맵으로 내지 않는다는 결정은 Search Console 화면에서 다시 깨졌습니다</h2>
+      <p>코드에서는 결정이 지켜졌습니다. robots.txt의 <code>Sitemap:</code> 줄은 지금도 sitemap.xml 하나뿐입니다. 저장소 작업 지침에도 "never submit RSS as a sitemap"이 적혀 있습니다. 그런데 10월 22일 Search Console에 rss.xml과 en/rss.xml이 사이트맵으로 제출됐습니다. 10월 25일 오후 2시대에는 에이전트가 이 둘과 sitemap.xml, 모두 세 개를 API로 다시 제출했습니다. 세 시간쯤 뒤 사이트맵 구조를 손보던 회차에서 에이전트가 지침과 어긋난 것을 발견했고, 운영자 승인을 받아 RSS 두 개를 목록에서 지웠습니다. 빌드 게이트는 저장소 안의 파일만 보기 때문에 Search Console 설정은 검사하지 못했습니다.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">노출 12회, 클릭 0회인 사이트에서는 효과를 잴 수 없었습니다</h2>
+      <p>이 글의 판단은 Google과 네이버 문서를 근거로 한 것이고, 측정값으로 확인한 것이 아닙니다. Search Console 실적은 9월 29일부터 10월 26일까지 노출 12회, 클릭 0회였고, 10월 27일 전수 검사에서 색인된 페이지는 44개였습니다. 화면의 FAQ가 AI 답변에 인용되는지, 네이버가 남은 FAQ 마크업을 실제로 분석에 쓰는지는 이 숫자로 알 수 없습니다. Bing이나 ChatGPT 검색이 FAQPage를 읽는지도 확인하지 않았습니다.</p>
+      <p>2023년 9월 이후에도 FAQ가 나오던 정부·보건 권위 사이트라면 5월 7일 이전의 실제 노출 기록이 있을 테니, 이 판단을 그대로 옮기지 말고 자기 Search Console 기록부터 보십시오.</p>
+      <p>자동 생성 쪽에도 고칠 곳이 하나 있습니다. 빌드가 HTML 태그를 공백으로 바꿔 텍스트를 뽑아서, 링크가 끝나는 자리에 공백이 하나 더 들어갑니다. 한 노트의 FAQ JSON-LD에는 화면의 "여는 법에" 대신 "여는 법 에"가 들어가 있습니다(10월 26일 운영 기록에서 처음 확인).</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">타입별로 세고, 종료 공지를 원문으로 열고, RSS가 사이트맵 목록에 없는지 봅니다</h2>
+      <ol>
+        <li>배포 결과물의 HTML에서 JSON-LD 타입별 페이지 수를 셉니다. <code>@graph</code> 안의 노드와 배열 타입(<code>["MobileApplication","VideoGame"]</code>)도 풀어서 셉니다.</li>
+        <li>센 타입마다 Google Search Central 업데이트 목록과 네이버 서치어드바이저 공지를 검색해 종료·제한 날짜를 확인합니다. 리서치 문서가 적은 날짜도 원문으로 한 번 더 엽니다.</li>
+        <li>종료된 타입은 지우기 전에 생성 방식을 봅니다. 화면 텍스트에서 자동으로 만들어지면 그대로 두고 검증 목록에서만 뺍니다. 손으로 쓴 JSON-LD라면 지우는 쪽이 낫습니다.</li>
+        <li>RSS는 item의 <code>&lt;description&gt;</code>에 본문 전체를 넣고, <code>pubDate</code>는 발행일로 둡니다. Google에는 sitemap.xml만 냅니다.</li>
+        <li>앱 페이지가 있으면 SoftwareApplication 계열 마크업의 필수 항목과 스크린샷 크기를 빌드 검사로 묶습니다.</li>
+        <li>Search Console 사이트맵 목록을 열어 RSS가 들어가 있지 않은지 봅니다. 저장소 검사로는 잡히지 않는 경로입니다.</li>
+      </ol>
+      <p>1번은 이 스크립트로 했습니다.</p>
+      <pre><code>import json, os, re, sys, collections
+pages, questions = collections.Counter(), 0
+for d, _, fs in os.walk(sys.argv[1]):
+    for f in fs:
+        if not f.endswith(".html"): continue
+        s = open(os.path.join(d, f), encoding="utf-8").read()
+        seen = set()
+        for m in re.finditer(r'&lt;script type="application/ld\+json"&gt;(.*?)&lt;/script&gt;', s, re.S):
+            data = json.loads(m.group(1))
+            nodes = data if isinstance(data, list) else data.get("@graph", [data])
+            for node in nodes:
+                t = node.get("@type")
+                seen.update(t if isinstance(t, list) else [t])
+                if t == "FAQPage": questions += len(node.get("mainEntity", []))
+        pages.update(seen)
+print(pages.most_common(), "FAQ questions:", questions)</code></pre>
+      <p>FAQ 마크업에 시간을 더 쓰지 마십시오. 같은 시간이면 본문에 날짜와 직접 잰 숫자를 하나 더 넣는 편이 낫습니다.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">남은 일</h2>
+      <p>FAQ JSON-LD 텍스트를 뽑을 때 링크 끝에 생기는 공백을 고칩니다. 노출이 쌓여 페이지별 비교가 가능해지면, FAQ가 있는 노트와 없는 페이지의 검색 실적을 나눠서 다시 봅니다.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20FAQ%20%EB%A6%AC%EC%B9%98%20%EA%B2%B0%EA%B3%BC%EA%B0%80%20%EB%81%9D%EB%82%9C%20%EB%92%A4%EC%9D%98%20%EA%B5%AC%EC%A1%B0%ED%99%94%20%EB%8D%B0%EC%9D%B4%ED%84%B0%3A%20GEO%EC%9A%A9%EC%9C%BC%EB%A1%9C%20%EB%AC%B4%EC%97%87%EC%9D%84%20%EB%82%A8%EA%B2%BC%EB%82%98">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>FAQPage 구조화 데이터는 2026년에도 Google 검색에 표시되나요?</summary><div><p>표시되지 않습니다. Google은 2026년 5월 7일부터 FAQ 리치 결과를 검색에 보여 주지 않고, 6월 15일에 해당 문서를 지웠습니다. 네이버도 2026년 7월 9일에 웹 검색의 FAQ 노출을 끝냈습니다.</p></div></details>
+        <details><summary>FAQPage JSON-LD를 지워야 하나요?</summary><div><p>화면의 Q&amp;A에서 자동으로 만들어진다면 지울 이득이 거의 없습니다. 네이버는 남은 FAQ 마크업이 순위에 영향이 없고 문서 분석에 보조로 쓰일 수 있다고 했습니다. 손으로 따로 관리하는 마크업이라면 화면과 어긋날 위험이 있으니 지우는 편을 권합니다.</p></div></details>
+        <details><summary>GEO를 위해 따로 넣어야 하는 schema가 있나요?</summary><div><p>Google 기준으로는 없습니다. Google의 생성형 AI 최적화 가이드는 구조화 데이터가 생성형 AI 검색에 필요하지 않고 따로 넣을 schema.org 마크업도 없다고 적습니다. llms.txt도 Google 검색은 무시한다고 밝혔습니다.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/ax/static-site-check-gate/">여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ai-region-privacy-policy/">개인정보처리방침 AI 처리 위치(국외 이전): 하루에 두 번 고친 고지를 코드에 묶기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 28 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
     <title>GA4 설치 19건 중 11건은 테스트 기기 – SugarMount</title>
     <link>https://mvgood21.github.io/ax/ga4-test-device-filter/</link>
     <guid isPermaLink="true">https://mvgood21.github.io/ax/ga4-test-device-filter/</guid>
@@ -115,11 +451,11 @@ NOT_TEST = {"notExpression": {"orGroup": {"expressions": [
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
         <li><a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
         <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -224,8 +560,8 @@ export function cacheKey(api, group, original, corrected, model) {
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
         <li><a href="https://mvgood21.github.io/ax/contrast-checker-missed-40-percent/">대비 검사기는 텍스트 조각 40%를 재지 못하고도 통과를 냈다: &#x27;몇 개를 측정했나&#x27;를 출력하게 바꾸기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -355,8 +691,8 @@ const gaps = await agent(CTX + CHECKLIST + final + dossier, { schema: CRIT })</c
         <li><a href="https://mvgood21.github.io/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-review-refutation/">에이전트 84개가 돈 릴리스 전 검토: 발견마다 3명이 반박하고, 버틴 20건만 고쳤다</a></li>
         <li><a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -467,12 +803,12 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(":core
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
         <li><a href="https://mvgood21.github.io/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/androidx-pdf-isolated-process/">androidx.pdf beta01: 격리 프로세스에서 Application.onCreate가 한 번 더 돌아 PDF가 조용히 안 열렸다</a></li>
         <li><a href="https://mvgood21.github.io/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -595,8 +931,8 @@ git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --gre
         <li><a href="https://mvgood21.github.io/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-review-refutation/">에이전트 84개가 돈 릴리스 전 검토: 발견마다 3명이 반박하고, 버틴 20건만 고쳤다</a></li>
         <li><a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -729,8 +1065,8 @@ adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
         <li><a href="https://mvgood21.github.io/ax/contrast-checker-missed-40-percent/">대비 검사기는 텍스트 조각 40%를 재지 못하고도 통과를 냈다: &#x27;몇 개를 측정했나&#x27;를 출력하게 바꾸기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -860,10 +1196,10 @@ print("my app in results:", MY_APP in ids)</code></pre>
       <ul>
         <li><a href="https://mvgood21.github.io/ax/commit-messages-701/">커밋 701개로 본 AI 코딩 1년: &#x27;완성&#x27;에서 &#x27;원인·검증&#x27;으로</a></li>
         <li><a href="https://mvgood21.github.io/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
-        <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/retro/">회고와 숫자 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -990,12 +1326,12 @@ $ SOURCE_DATE=2026-12-31 python tools/build.py
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://mvgood21.github.io/ax/ai-region-privacy-policy/">개인정보처리방침 AI 처리 위치(국외 이전): 하루에 두 번 고친 고지를 코드에 묶기</a></li>
         <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
-        <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1113,8 +1449,8 @@ grep -rL --include='*Test.kt' -e 'assert' -e 'check(matches' app/src/</code></pr
         <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
         <li><a href="https://mvgood21.github.io/ax/contrast-checker-missed-40-percent/">대비 검사기는 텍스트 조각 40%를 재지 못하고도 통과를 냈다: &#x27;몇 개를 측정했나&#x27;를 출력하게 바꾸기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1252,10 +1588,10 @@ git log --until=2026-10-20 --format='%(trailers:key=Co-authored-by,valueonly)' \
       <ul>
         <li><a href="https://mvgood21.github.io/ax/market-check-before-app/">사진 앱 3개를 만든 뒤에야 시장 조사를 했다: 올해 나온 경쟁 앱 설치 중앙값 1,166</a></li>
         <li><a href="https://mvgood21.github.io/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
-        <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/retro/">회고와 숫자 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1361,8 +1697,8 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
         <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/contrast-checker-missed-40-percent/">대비 검사기는 텍스트 조각 40%를 재지 못하고도 통과를 냈다: &#x27;몇 개를 측정했나&#x27;를 출력하게 바꾸기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1524,12 +1860,12 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
         <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
-        <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1647,8 +1983,8 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
         <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-review-refutation/">에이전트 84개가 돈 릴리스 전 검토: 발견마다 3명이 반박하고, 버틴 20건만 고쳤다</a></li>
         <li><a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1785,12 +2121,12 @@ curl -s "$POLICY_URL" | grep -o 'data-policy-version="[0-9-]*"'</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://mvgood21.github.io/ax/static-site-check-gate/">여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</a></li>
         <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
-        <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1935,12 +2271,12 @@ font.save(dst)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
         <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/androidx-pdf-isolated-process/">androidx.pdf beta01: 격리 프로세스에서 Application.onCreate가 한 번 더 돌아 PDF가 조용히 안 열렸다</a></li>
         <li><a href="https://mvgood21.github.io/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2031,8 +2367,8 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
         <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
         <li><a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2117,12 +2453,12 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
         <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2242,8 +2578,8 @@ flutter test test/theme_matrix/ --dart-define=Y2_NO_SETTLE=true
         <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2362,12 +2698,12 @@ FlowRow(
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
         <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/androidx-pdf-isolated-process/">androidx.pdf beta01: 격리 프로세스에서 Application.onCreate가 한 번 더 돌아 PDF가 조용히 안 열렸다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2450,8 +2786,8 @@ Mem:              13           8           2           0           2           4
         <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-review-refutation/">에이전트 84개가 돈 릴리스 전 검토: 발견마다 3명이 반박하고, 버틴 20건만 고쳤다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2576,11 +2912,11 @@ if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFract
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
         <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
         <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2700,8 +3036,8 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2799,12 +3135,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
         <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/androidx-pdf-isolated-process/">androidx.pdf beta01: 격리 프로세스에서 Application.onCreate가 한 번 더 돌아 PDF가 조용히 안 열렸다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2865,12 +3201,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://mvgood21.github.io/ax/static-site-check-gate/">여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</a></li>
         <li><a href="https://mvgood21.github.io/ax/ai-region-privacy-policy/">개인정보처리방침 AI 처리 위치(국외 이전): 하루에 두 번 고친 고지를 코드에 묶기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
-        <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3260,12 +3596,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/puzzle-first-chapter-walls/">퍼즐 게임 첫날 이탈 분석: 기기별 이벤트 순서와 판별 계산으로 찾은 첫 장의 벽 4판</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
         <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
-        <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3376,8 +3712,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3478,12 +3814,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
         <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/androidx-pdf-isolated-process/">androidx.pdf beta01: 격리 프로세스에서 Application.onCreate가 한 번 더 돌아 PDF가 조용히 안 열렸다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4827,10 +5163,10 @@ done</code></pre>
       <ul>
         <li><a href="https://mvgood21.github.io/ax/market-check-before-app/">사진 앱 3개를 만든 뒤에야 시장 조사를 했다: 올해 나온 경쟁 앱 설치 중앙값 1,166</a></li>
         <li><a href="https://mvgood21.github.io/ax/commit-messages-701/">커밋 701개로 본 AI 코딩 1년: &#x27;완성&#x27;에서 &#x27;원인·검증&#x27;으로</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
-        <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/retro/">회고와 숫자 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4932,8 +5268,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-review-refutation/">에이전트 84개가 돈 릴리스 전 검토: 발견마다 3명이 반박하고, 버틴 20건만 고쳤다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4959,10 +5295,10 @@ done</code></pre>
       <ul class="card-list">
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법</a></h3><p class="sub">AI 코딩 에이전트에게 일을 나누고 규칙을 전하는 방법, 여러 세션을 한 저장소에서 함께 돌리며 겪은 충돌과 그 뒤에 정한 작업 방식입니다.</p><p class="meta">글 6개</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시</a></h3><p class="sub">AI가 만든 코드를 출시하기 전에 거치는 단위 테스트, 릴리스 게이트, 실기기 확인과, 그 과정에서 실제로 잡힌 결함을 정리했습니다.</p><p class="meta">글 8개</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발</a></h3><p class="sub">에이전트와 Android 앱을 만들며 만난 Gradle 빌드, 라이브러리 업그레이드, 화면 구성, 성능 문제와 각각을 어떻게 풀었는지 적은 기록입니다.</p><p class="meta">글 6개</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/games/">게임 개발</a></h3><p class="sub">퍼즐 게임의 레벨을 에이전트와 함께 만들고, 풀 수 있는지 검증하고, 난이도를 맞추면서 정한 규칙과 측정한 숫자를 모았습니다.</p><p class="meta">글 2개</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발</a></h3><p class="sub">에이전트와 Android 앱을 만들며 만난 Gradle 빌드, 라이브러리 업그레이드, 화면 구성, 성능 문제와 각각을 어떻게 풀었는지 적은 기록입니다.</p><p class="meta">글 7개</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/games/">게임 개발</a></h3><p class="sub">퍼즐 게임의 레벨을 에이전트와 함께 만들고, 풀 수 있는지 검증하고, 난이도를 맞추면서 정한 규칙과 측정한 숫자를 모았습니다.</p><p class="meta">글 3개</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/store/">스토어와 수익화</a></h3><p class="sub">Google Play 등록과 심사, 스토어 스크린샷과 설명, 광고 설정처럼 앱을 내놓은 뒤 운영하는 일을 에이전트와 나눠 한 기록입니다.</p><p class="meta">글 2개</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/web/">웹사이트와 검색</a></h3><p class="sub">이 사이트를 에이전트와 만들며 정한 페이지 구조, 구글·네이버 검색 최적화, 구조화 데이터, 디자인 시스템을 실제 코드 기준으로 설명합니다.</p><p class="meta">글 3개</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/web/">웹사이트와 검색</a></h3><p class="sub">이 사이트를 에이전트와 만들며 정한 페이지 구조, 구글·네이버 검색 최적화, 구조화 데이터, 디자인 시스템을 실제 코드 기준으로 설명합니다.</p><p class="meta">글 4개</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/retro/">회고와 숫자</a></h3><p class="sub">기간을 끊어 돌아본 결과입니다. 무엇이 빨랐고 무엇이 틀렸는지를 git 기록과 QA 보고서에서 직접 센 숫자와 함께 적습니다.</p><p class="meta">글 3개</p></li>
       </ul>
     </section>
@@ -4977,12 +5313,12 @@ done</code></pre>
     <section aria-labelledby="notes">
       <h2 id="notes">최신 글</h2>
       <ul class="card-list">
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></h3><p class="sub">Play 16KB 페이지 요건으로 .so 6개를 다시 빌드할 때 NDK 27·29는 사진 전환에 파란 색조를 냈습니다. 다시 재 보니 NDK 25도 링커 플래그 하나로 16KB 정렬이 됐습니다.</p><p class="meta">Android 개발 · 사고 기록 · 2026년 10월 28일</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></h3><p class="sub">테스터 의견 &#x27;시간이 너무 길어서 쉬움&#x27;을 듣고 퍼즐 목표 시간을 158개 레벨 시뮬레이션으로 30% 줄였습니다. 처음 안 45%는 501레벨 이후 일반 플레이어 별 3개 비율이 1%라 버렸습니다.</p><p class="meta">게임 개발 · 측정 · 2026년 10월 28일</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></h3><p class="sub">Google은 2026-05-07, 네이버는 07-09에 FAQ 노출을 끝냈습니다. FAQPage 106쪽을 지우지 않고 손을 뗀 이유와, 대신 고친 RSS 본문·날짜 신호·앱 마크업입니다.</p><p class="meta">웹사이트와 검색 · 방법 · 2026년 10월 28일</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></h3><p class="sub">GA4 하루 설치 19건 중 11건이 테스트 기기와 Play 사전 출시·심사 기기였습니다. 필터를 세 번 고친 기록과, 공식 문서상 setprop만으로는 보고서에서 빠지지 않는 이유입니다.</p><p class="meta">스토어와 수익화 · 사고 기록 · 2026년 10월 27일</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></h3><p class="sub">LLM 응답을 공유 캐시에 둘 때 키에 없는 문맥을 모델에 넣으면 프롬프트 인젝션이 모든 사용자에게 굳을 수 있습니다. 문맥 없이 돌린 블라인드 A/B는 96.0% 대 96.6%였습니다.</p><p class="meta">검증과 출시 · 측정 · 2026년 10월 27일</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></h3><p class="sub">문서 뷰어를 코딩하기 전에 에이전트 설계 3안을 심사자 3명이 채점했습니다. 카톡 열기 크래시와 최종안 결함 23건이 코드 전에 나왔습니다. 단계, 프롬프트 모양, 비용을 적었습니다.</p><p class="meta">에이전트와 일하는 법 · 방법 · 2026년 10월 27일</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></h3><p class="sub">minSdk 24 게임 두 개가 Android 7에서 실행마다 꺼졌습니다. 공용 광고 모듈의 java.time 한 줄이 원인이었고, 그 모듈의 NewApi lint를 릴리스 빌드 앞에 걸었습니다.</p><p class="meta">Android 개발 · 사고 기록 · 2026년 10월 26일</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></h3><p class="sub">Co-Authored-By 트레일러가 없는 커밋 중 세션 기록과 대조할 수 있던 29개를 봤더니 26개는 에이전트가 낸 병합과 revert였습니다. 세는 명령과 한계를 적었습니다.</p><p class="meta">에이전트와 일하는 법 · 측정 · 2026년 10월 26일</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></h3><p class="sub">AI 코딩 에이전트가 비밀값을 흘린 세 경로와 막은 방법입니다. 대화 기록에 찍힌 키, 복사된 마스킹 정규식이 놓친 예외 2곳, 권한을 더하지 않고 다시 설계한 배포 토큰, 점검 명령.</p><p class="meta">검증과 출시 · 방법 · 2026년 10월 26일</p></li>
       </ul>
     </section>
     <section aria-labelledby="by-the-numbers">
@@ -5117,8 +5453,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5495,6 +5831,12 @@ done</code></pre>
         <details><summary>사진이 서버로 올라가나요?</summary><div><p>아니요. 사진과 영상은 기기 안에서만 처리되고 업로드되지 않아요.</p></div></details>
         <details><summary>어떤 해상도로 저장할 수 있나요?</summary><div><p>FHD(1920×1080) 등 화면에서 고른 해상도로 저장해요.</p></div></details>
       </div>
+    </section>
+    <section aria-labelledby="ax-app-heading">
+      <h2 id="ax-app-heading">이 앱의 AX 노트</h2>
+      <ul class="related-links">
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+      </ul>
     </section>
     <section aria-labelledby="releases-heading">
       <h2 id="releases-heading">최근 업데이트</h2>
@@ -5926,9 +6268,9 @@ done</code></pre>
     <section aria-labelledby="ax-app-heading">
       <h2 id="ax-app-heading">이 앱의 AX 노트</h2>
       <ul class="related-links">
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">&#x27;에이전트 수백 개 써도 돼&#x27;의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a></li>
       </ul>
     </section>
     <section aria-labelledby="releases-heading">

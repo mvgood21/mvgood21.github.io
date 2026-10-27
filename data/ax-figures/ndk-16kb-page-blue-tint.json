@@ -1,0 +1,112 @@
+[
+ {
+  "kind": "steps",
+  "ko": {
+   "title": "슈가앨범 16KB 페이지 대응 경과 (git 기록, 2025-08 ~ 2026-10)",
+   "items": [
+    [
+     "2025-08 targetSdk 36",
+     "multimediaFramework arm64 .so 3개를 다시 빌드했지만 링커에 페이지 크기 지정이 없음. 나머지 3개는 2022년 빌드 그대로. 6개 모두 0x1000."
+    ],
+    [
+     "2026-01 첫 판단",
+     "'APP_SUPPORT_FLEXIBLE_PAGE_SIZES는 r27 이상'이라며 NDK를 25.1에서 27.0으로 올림."
+    ],
+    [
+     "NDK 27.0·29.0",
+     "빌드와 정렬은 통과. 앱을 실행하니 사진 전환에 파란 색조. -O0이면 정상."
+    ],
+    [
+     "aedf831 (01-03)",
+     "NDK 26.3과 Android.mk 링커 플래그로 6개가 0x4000. 'NDK 27 이상 사용 금지'를 남김."
+    ],
+    [
+     "2026-10-27 재측정",
+     "NDK 25.1도 링커 플래그로 0x4000. 26.3은 Application.mk 플래그를 읽지 않음."
+    ]
+   ],
+   "note": "색조는 자동 테스트가 아니라 화면에서 본 증상으로 기록됐습니다.",
+   "alt": "단계 그림: 2025년 8월 targetSdk 36 대응 때 .so 3개를 다시 빌드했지만 나머지 3개와 함께 6개 모두 0x1000 정렬로 남음, 2026년 1월 NDK 27.0으로 올림, 27.0과 29.0에서 사진 전환에 파란 색조, 26.3과 링커 플래그로 0x4000, 10월 재측정에서 NDK 25.1도 링커 플래그로 0x4000.",
+   "caption": "2025년 8월 재빌드 뒤에도 6개 모두 0x1000이었고, 2026년 1월 NDK 26.3과 링커 플래그로 0x4000이 됐습니다."
+  },
+  "en": {
+   "title": "How SugarAlbum got to 16 KB pages (git history, Aug 2025 to Oct 2026)",
+   "items": [
+    [
+     "Aug 2025, targetSdk 36",
+     "Three multimediaFramework arm64 libraries are rebuilt with no page size given to the linker; the other three are 2022 builds. All six stay at 0x1000."
+    ],
+    [
+     "Jan 2026, first move",
+     "'APP_SUPPORT_FLEXIBLE_PAGE_SIZES needs r27', so the NDK goes from 25.1 to 27.0."
+    ],
+    [
+     "NDK 27.0 and 29.0",
+     "Builds and alignment pass. Running the app, photo transitions get a blue cast. -O0 looks fine."
+    ],
+    [
+     "aedf831 (Jan 3)",
+     "NDK 26.3 plus the Android.mk linker flag puts all six at 0x4000. Notes say: do not use NDK 27 or later."
+    ],
+    [
+     "Oct 27, 2026 recheck",
+     "NDK 25.1 also reaches 0x4000 with the linker flag. 26.3 ignores the Application.mk flag."
+    ]
+   ],
+   "note": "The tint was recorded as something seen on screen, not caught by a test.",
+   "alt": "Step diagram: in August 2025 three .so files are rebuilt for targetSdk 36, and all six stay at 0x1000; in January 2026 the NDK goes to 27.0; 27.0 and 29.0 tint photo transitions blue; 26.3 plus the linker flag gives 0x4000; the October recheck shows NDK 25.1 also reaches 0x4000 with the flag.",
+   "caption": "After the August 2025 rebuild all six were still 0x1000; in January 2026, NDK 26.3 with the linker flag made them 0x4000."
+  }
+ },
+ {
+  "kind": "compare",
+  "ko": {
+   "title": "커밋 기록과 2026-10-27 재측정 (aedf831, llvm-readelf)",
+   "left": [
+    "2026-01 커밋 기록",
+    [
+     "NDK 25.x: 16KB 미지원",
+     "NDK 26.3: 16KB 지원 + -O3 정상, 채택",
+     "prebuilt FFmpeg 6개: 16KB 재빌드 필요",
+     "색조 원인: Clang -O3 최적화 버그"
+    ]
+   ],
+   "right": [
+    "다시 측정한 값",
+    [
+     "NDK 25.1 + 링커 플래그: LOAD 0x4000",
+     "NDK 26.3의 16KB는 Android.mk 링커 플래그 덕분, Application.mk 플래그만이면 0x1000",
+     "FFmpeg 6개: LOAD 0x10000이라 LOAD 검사 통과, RELRO 나머지 0x1000~0x3000",
+     "색조 원인: 확정 못 함 (-O0 정상만 기록)"
+    ]
+   ],
+   "note": "RELRO 판정은 Android 공식 문서의 (VirtAddr + MemSiz) % 0x4000 공식으로 계산했습니다.",
+   "alt": "비교 그림: 커밋 기록은 NDK 25 미지원, 26.3 채택, FFmpeg 재빌드 필요, 원인 Clang -O3 버그라고 적었고, 다시 측정하니 NDK 25.1도 링커 플래그로 0x4000, 26.3은 Application.mk 플래그를 읽지 않음, FFmpeg는 LOAD 0x10000이지만 RELRO 나머지 0x1000~0x3000, 원인은 확정 못 함.",
+   "caption": "FFmpeg 6개는 LOAD 0x10000이지만 RELRO 나머지는 0x1000~0x3000이었습니다."
+  },
+  "en": {
+   "title": "Commit records vs. the Oct 27, 2026 recheck (aedf831, llvm-readelf)",
+   "left": [
+    "Commit records, Jan 2026",
+    [
+     "NDK 25.x: 16 KB unsupported",
+     "NDK 26.3: 16 KB support and a clean -O3, adopted",
+     "Six prebuilt FFmpeg libraries: need a 16 KB rebuild",
+     "Tint cause: a Clang -O3 optimization bug"
+    ]
+   ],
+   "right": [
+    "Measured again",
+    [
+     "NDK 25.1 plus linker flag: LOAD 0x4000",
+     "NDK 26.3 gets 16 KB from the Android.mk linker flag; the Application.mk flag alone gives 0x1000",
+     "FFmpeg: LOAD 0x10000 passes, but RELRO remainders are 0x1000 to 0x3000",
+     "Tint cause: unconfirmed (only '-O0 looks fine' is on record)"
+    ]
+   ],
+   "note": "RELRO was checked with the (VirtAddr + MemSiz) % 0x4000 formula from the official Android guide.",
+   "alt": "Comparison: the commit records say NDK 25 is unsupported, 26.3 is adopted, FFmpeg needs a rebuild and the cause is a Clang -O3 bug; the recheck shows NDK 25.1 reaches 0x4000 with the linker flag, 26.3 ignores the Application.mk flag, FFmpeg is LOAD 0x10000 but its RELRO remainders are 0x1000 to 0x3000, and the cause is unconfirmed.",
+   "caption": "The six FFmpeg libraries are LOAD 0x10000, but their RELRO remainders are 0x1000 to 0x3000."
+  }
+ }
+]

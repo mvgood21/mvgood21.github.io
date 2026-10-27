@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>안드로이드 16KB 페이지 NDK 대응과 파란 색조 – SugarMount</title>
+  <meta name="description" content="Play 16KB 페이지 요건으로 .so 6개를 다시 빌드할 때 NDK 27·29는 사진 전환에 파란 색조를 냈습니다. 다시 재 보니 NDK 25도 링커 플래그 하나로 16KB 정렬이 됐습니다.">
+  <link rel="canonical" href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="안드로이드 16KB 페이지 NDK 대응과 파란 색조 – SugarMount">
+  <meta property="og:description" content="Play 16KB 페이지 요건으로 .so 6개를 다시 빌드할 때 NDK 27·29는 사진 전환에 파란 색조를 냈습니다. 다시 재 보니 NDK 25도 링커 플래그 하나로 16KB 정렬이 됐습니다.">
+  <meta property="og:url" content="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-ndk-16kb-page-blue-tint-ko.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=51d09451">
+  <link rel="stylesheet" href="/assets/site.css?v=51d09451">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=51d09451">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/#article","headline":"16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개","description":"Play 16KB 페이지 요건으로 .so 6개를 다시 빌드할 때 NDK 27·29는 사진 전환에 파란 색조를 냈습니다. 다시 재 보니 NDK 25도 링커 플래그 하나로 16KB 정렬이 됐습니다.","url":"https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/","mainEntityOfPage":"https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/","inLanguage":"ko","articleSection":"Android 개발","datePublished":"2026-10-28T09:00:00+09:00","dateModified":"2026-10-28T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-ndk-16kb-page-blue-tint-ko.png","https://mvgood21.github.io/assets/ax/cover/ndk-16kb-page-blue-tint-ko.webp","https://mvgood21.github.io/assets/ax/ndk-16kb-page-blue-tint-1-ko.webp","https://mvgood21.github.io/assets/ax/ndk-16kb-page-blue-tint-2-ko.webp"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"16KB 페이지를 지원하려면 NDK를 r27 이상으로 올려야 하나요?","acceptedAnswer":{"@type":"Answer","text":"아닙니다. NDK 25.1에서도 Android.mk에 -Wl,-z,max-page-size=16384 를 넣자 다시 빌드한 libnative_filter.so(arm64)의 LOAD 정렬이 0x4000이 됐습니다(2026-10-27 측정). r27 이상은 APP_SUPPORT_FLEXIBLE_PAGE_SIZES 한 줄로 처리하려는 경우에만 있으면 됩니다."}},{"@type":"Question","name":".so가 16KB 정렬인지 어떻게 확인하나요?","acceptedAnswer":{"@type":"Answer","text":"llvm-readelf -lW 나 llvm-objdump -p 로 LOAD 세그먼트의 정렬이 0x4000(2**14) 이상인지 봅니다. GNU_RELRO가 쓰기 데이터와 한 LOAD에 있으면 (VirtAddr + MemSiz) % 0x4000도 0인지 확인합니다."}},{"@type":"Question","name":"64KB로 정렬된 미리 빌드된 .so는 그대로 써도 되나요?","acceptedAnswer":{"@type":"Answer","text":"LOAD 정렬 검사는 통과합니다. 슈가앨범의 FFmpeg 6개는 0x10000이라 LOAD 검사는 통과했지만 RELRO 공식의 나머지가 0x1000~0x3000이었습니다."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/"},{"@type":"ListItem","position":2,"name":"AX 노트","item":"https://mvgood21.github.io/ax/"},{"@type":"ListItem","position":3,"name":"Android 개발","item":"https://mvgood21.github.io/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=51d09451">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a class="nav-apps" href="/apps/">앱</a>
+        <a class="nav-ax" href="/ax/" aria-current="page">AX 노트</a>
+        <a class="nav-about" href="/about/">소개</a>
+        <a class="nav-privacy" href="/privacy/">개인정보처리방침</a>
+      </nav>
+      <a class="lang" href="/en/ax/ndk-16kb-page-blue-tint/" lang="en" hreflang="en">English</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>메뉴</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="전체 메뉴">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">닫기</button>
+      <p class="menu-title" id="m-photo">사진·영상</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>슈가앨범</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 용량 줄이기</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 반전·회전</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>이미지 변환 JPG·PNG·WebP</span></a></li></ul>
+      <p class="menu-title" id="m-document">문서·글</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글 띄어쓰기</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글뷰어 슈가독</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">생활</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>생생카드</span></a></li></ul>
+      <p class="menu-title" id="m-games">게임</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>화살표 매듭풀기</span></a></li><li><a class="app-tile" data-app="blocks" href="/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한판블록</span></a></li></ul>
+      <p><a href="/apps/">모든 앱 보기</a></p>
+      <ul class="menu-links"><li><a href="/ax/" aria-current="page">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-android">
+    <nav class="crumbs" aria-label="이동 경로"><ol><li><a href="/">SugarMount</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/ax/topic/android/">Android 개발</a></li><li><span aria-current="page">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/ndk-16kb-page-blue-tint-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX 노트 · 사고 기록</span>
+      <h1>16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</h1>
+      <p class="lead">슈가앨범의 .so 6개를 16KB로 정렬한 것은 Android.mk 링커 플래그 한 줄이었고, NDK를 27로 먼저 올린 단계에서 파란 색조 회귀가 생겼습니다.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/about/">작성 SugarMount</a> <span aria-hidden="true">·</span> <span>Android 개발</span> <span aria-hidden="true">·</span> <span>읽는 시간 14분</span> <span aria-hidden="true">·</span> 최종 업데이트 <time datetime="2026-10-28">2026년 10월 28일</time></p><!-- /build:meta -->
+      <p>슈가앨범의 arm64 네이티브 라이브러리 12개 가운데 직접 빌드하는 6개가 4KB(0x1000) 정렬이었습니다. 2026년 1월 3일 커밋 aedf831에서 이 6개를 NDK 26.3으로 다시 빌드해 16KB(0x4000)로 맞췄고, 그 과정에서 NDK 27.0과 29.0으로 만든 빌드는 사진이 넘어갈 때 화면에 파란 색조를 남겼습니다. 2026년 10월 27일에 libnative_filter 소스(C 파일 두 개)를 NDK 네 버전으로 다시 빌드해 보니, 커밋이 "16KB 미지원"이라고 적은 NDK 25.1도 링커 플래그를 넣자 0x4000이 나왔습니다.</p>
+      <p class="note">근거는 슈가앨범 저장소의 git 기록(c3e09b1, d73db50~7efd9c1, aedf831)과 같은 커밋에 들어간 작업 문서, 2026-10-27에 llvm-readelf로 다시 확인한 .so 정렬값, Android Developers 공식 문서입니다.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>목차 (9)</summary><ol><li><a href="#timeline">targetSdk 36으로 올릴 때 다시 빌드한 .so 3개도 4KB 정렬이었습니다</a></li><li><a href="#blue-tint">NDK 27.0과 29.0으로 빌드하면 사진이 넘어갈 때 파란 색조가 끼었습니다</a></li><li><a href="#flag-r26">NDK 26.3은 APP_SUPPORT_FLEXIBLE_PAGE_SIZES를 읽지 않습니다</a></li><li><a href="#ffmpeg-relro">prebuilt FFmpeg 6개는 LOAD 검사를 통과하고 RELRO 공식에서 걸립니다</a></li><li><a href="#alternatives">NDK 25.1에 링커 플래그만 넣는 길이 있었습니다</a></li><li><a href="#limits">CMake 빌드와 NDK r28 이후에는 이 절차가 그대로 맞지 않습니다</a></li><li><a href="#how-to">readelf 두 번과 같은 사진 세트로 확인하는 순서</a></li><li><a href="#next">아직 하지 않은 확인: 16KB 에뮬레이터 실행과 모듈별 -O3</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">목차</p><ol><li><a href="#timeline">targetSdk 36으로 올릴 때 다시 빌드한 .so 3개도 4KB 정렬이었습니다</a></li><li><a href="#blue-tint">NDK 27.0과 29.0으로 빌드하면 사진이 넘어갈 때 파란 색조가 끼었습니다</a></li><li><a href="#flag-r26">NDK 26.3은 APP_SUPPORT_FLEXIBLE_PAGE_SIZES를 읽지 않습니다</a></li><li><a href="#ffmpeg-relro">prebuilt FFmpeg 6개는 LOAD 검사를 통과하고 RELRO 공식에서 걸립니다</a></li><li><a href="#alternatives">NDK 25.1에 링커 플래그만 넣는 길이 있었습니다</a></li><li><a href="#limits">CMake 빌드와 NDK r28 이후에는 이 절차가 그대로 맞지 않습니다</a></li><li><a href="#how-to">readelf 두 번과 같은 사진 세트로 확인하는 순서</a></li><li><a href="#next">아직 하지 않은 확인: 16KB 에뮬레이터 실행과 모듈별 -O3</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="timeline">
+      <h2 id="timeline">targetSdk 36으로 올릴 때 다시 빌드한 .so 3개도 4KB 정렬이었습니다</h2>
+      <p>슈가앨범은 사진을 골라 영상으로 만드는 앱이고, aedf831 시점에 Java 파일 763개와 Kotlin 파일 32개가 있습니다. 영상과 필터 처리는 ndk-build로 만드는 C/C++ 라이브러리가 맡습니다. 2024년 7월 15일(c3e09b1)에 targetSdk를 33에서 34로, 2025년 8월 27일부터 9월 1일까지(d73db50~7efd9c1) 34에서 36으로 올렸습니다. 8월 31일(3e7e099)에 multimediaFramework의 arm64 .so 3개(libBeatTracker, libPixelCanvas, libPixelUtils)를 다시 빌드했지만 링커에 페이지 크기를 지정하지 않았고, 나머지 3개(libnative_filter, libFFmpegProcessor, libKwpFFmpegMuxer)는 2022년 11월 빌드 그대로였습니다. 그래서 aedf831 직전 6개 모두 LOAD 세그먼트 정렬이 0x1000이었습니다.</p>
+      <p>Google은 2025년 5월 8일 Android Developers Blog에서 "2025년 11월 1일부터 Android 15 이상을 타깃하는 새 앱과 업데이트는 16KB 페이지를 지원해야 한다"고 공지했습니다. 지금(2026-10-16 갱신) <a href="https://developer.android.com/guide/practices/page-sizes">페이지 크기 안내 문서</a>는 "2027년 2월 1일부터 16KB를 지원하지 않는 업데이트는 출시할 수 없다"고 적습니다. 저장소 문서에는 Play Console 경고를 받고 "2025년 5월까지" 고쳐야 한다고 적혀 있는데, 이 날짜는 두 공식 문서 어디에도 없고 경고 원문도 저장소에 남아 있지 않습니다.</p>
+      <p>2026년 1월 3일 작업은 Claude Code와 함께 했습니다(커밋에 Co-Authored-By 줄이 있습니다). 같은 커밋에 들어간 작업 문서 ffmpeg.md는 첫 단계를 이렇게 적었습니다. "변경 후: NDK 27.0.12077973. 이유: <code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES</code> 플래그는 NDK r27 이상에서만 지원." 최종 커밋은 26.3을 썼고, ffmpeg.md는 27.0이라고 적힌 채로 커밋됐습니다.</p>
+      <figure class="ax-fig"><img src="/assets/ax/ndk-16kb-page-blue-tint-1-ko.webp" width="1200" height="898" alt="단계 그림: 2025년 8월 targetSdk 36 대응 때 .so 3개를 다시 빌드했지만 나머지 3개와 함께 6개 모두 0x1000 정렬로 남음, 2026년 1월 NDK 27.0으로 올림, 27.0과 29.0에서 사진 전환에 파란 색조, 26.3과 링커 플래그로 0x4000, 10월 재측정에서 NDK 25.1도 링커 플래그로 0x4000." loading="lazy"><figcaption>2025년 8월 재빌드 뒤에도 6개 모두 0x1000이었고, 2026년 1월 NDK 26.3과 링커 플래그로 0x4000이 됐습니다.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="blue-tint">
+      <h2 id="blue-tint">NDK 27.0과 29.0으로 빌드하면 사진이 넘어갈 때 파란 색조가 끼었습니다</h2>
+      <p>커밋 메시지의 NDK 비교 표는 세 줄입니다. 25.x는 16KB 미지원, 26.3은 정상(채택), 27.0과 29.0은 "-O3 최적화 시 파란색 색조 버그 발생". 같은 커밋의 progress.md는 증상을 "사진 전환 시 파란색 계열 색조가 끼면서 전환됨"으로, 영향 범위를 multimediaFramework의 PixelUtils와 libyuv 코드로, 검증을 "-O0(최적화 없음)으로 빌드하면 정상 동작"으로 적었습니다. multimediaFramework의 Android.mk는 libYUV, libMasp, PixelCanvas, PixelUtils, BeatTracker 다섯 모듈 모두 <code>-O3</code>로 컴파일합니다.</p>
+      <p>이 회귀를 잡은 자동 검사는 없었습니다. 저장소의 테스트는 프로젝트를 만들 때 생기는 예제 테스트 두 개(ExampleUnitTest, ExampleInstrumentedTest)뿐이고, 색이나 렌더링 결과를 비교하는 테스트는 없습니다. 빌드는 NDK 27.0에서도 29.0에서도 성공했고, 정렬도 맞았습니다. 색조는 앱을 실행해 사진 전환을 화면으로 봐야 보이는 증상이었습니다.</p>
+      <p>progress.md는 원인을 "Clang 컴파일러의 -O3 최적화 버그"로 단정합니다. 기록에 있는 근거는 -O0이면 정상이라는 것 하나입니다. NDK에 든 clang 버전을 보면 26.3은 17.0.2, 27.0은 18.0.1, 29.0은 21.0.0이라 색조는 clang 18 이후와 겹칩니다. 그러나 -O0에서 정상인 것은 컴파일러 버그일 때도, 우리 코드의 미정의 동작을 새 최적화가 다르게 처리할 때도 똑같이 나옵니다. 어느 함수에서 색이 바뀌는지 좁힌 기록은 없습니다.</p>
+      <p>같은 커밋에서 libyuv의 NEON 빌드 줄도 정리됐기 때문에 이것이 원인인지도 확인했습니다. libPixelUtils.so의 동적 심볼 가운데 이름에 NEON이 든 것이 커밋 전에도 후에도 198개였습니다. NEON 코드는 예전 빌드에도 들어 있었으니 색조의 변수에서 뺐습니다.</p>
+    </section>
+
+    <section aria-labelledby="flag-r26">
+      <h2 id="flag-r26">NDK 26.3은 APP_SUPPORT_FLEXIBLE_PAGE_SIZES를 읽지 않습니다</h2>
+      <p>최종 커밋은 정렬 설정을 세 곳에 넣었습니다. gradle.properties의 <code>android.ndk.maxPageSize=16384</code>, Application.mk 세 개의 <code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES := true</code>, 그리고 Android.mk 여섯 모듈의 <code>LOCAL_LDFLAGS += -Wl,-z,max-page-size=16384</code>입니다. 이 가운데 무엇이 정렬을 바꿨는지 보려고, NDK 폴더의 build/core에서 플래그 이름을 찾았습니다. 25.1과 26.3에는 그 문자열이 없고, 27.0과 29.0의 build-binary.mk에만 있습니다. 27.0은 값이 true일 때 max-page-size=16384를 링커에 붙이고, 29.0은 기본이 16KB라 값이 false일 때만 4096으로 되돌립니다.</p>
+      <p>그다음 aedf831의 libnative_filter 소스를 NDK별로 다시 빌드하고 <code>llvm-readelf -lW</code>로 LOAD 정렬을 읽었습니다(2026-10-27).</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>NDK</th><th>Android.mk 링커 플래그</th><th>arm64-v8a LOAD 정렬</th></tr></thead>
+        <tbody>
+          <tr><td>25.1.8937393</td><td>없음</td><td>0x1000</td></tr>
+          <tr><td>25.1.8937393</td><td>있음</td><td>0x4000</td></tr>
+          <tr><td>26.3.11579264</td><td>없음(Application.mk 플래그만)</td><td>0x1000</td></tr>
+          <tr><td>26.3.11579264</td><td>있음(커밋과 같음)</td><td>0x4000</td></tr>
+          <tr><td>27.0.12077973</td><td>없음(Application.mk 플래그만)</td><td>0x4000</td></tr>
+          <tr><td>29.0.14206865</td><td>없음</td><td>0x4000</td></tr>
+        </tbody>
+      </table></div>
+      <p>26.3에서 16KB를 만든 것은 Android.mk의 링커 플래그였고, Application.mk의 플래그는 아무 일도 하지 않았습니다. 같은 링커 플래그는 25.1에서도 0x4000을 냈습니다. 커밋 표의 "NDK 25.x: 16KB 미지원"은 플래그를 넣고 재 본 결과가 아니었고, "플래그는 r27 이상"이라는 처음 판단이 거기까지 이어졌습니다. 공식 문서도 "Android NDK r27 이하" 항목에서 <code>max-page-size</code>와 <code>common-page-size</code> 링커 플래그로 16KB 정렬을 만들라고 안내하고, <code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES</code>는 언급하지 않습니다.</p>
+    </section>
+
+    <section aria-labelledby="ffmpeg-relro">
+      <h2 id="ffmpeg-relro">prebuilt FFmpeg 6개는 LOAD 검사를 통과하고 RELRO 공식에서 걸립니다</h2>
+      <p>progress.md는 미리 빌드된 FFmpeg 라이브러리 6개(libavcodec-56, libavfilter-5, libavformat-56, libavutil-54, libswresample-1, libswscale-3)를 "별도로 16KB 재빌드 필요"로 남겼습니다. 다시 재 보니 이 6개는 커밋 전부터 LOAD 정렬이 0x10000(64KB)이었습니다. 64KB는 16KB의 배수라, 공식 문서의 "LOAD가 2**14보다 작으면 안 된다"는 검사는 통과합니다.</p>
+      <p>공식 문서에는 검사가 하나 더 있습니다. GNU_RELRO 세그먼트의 (VirtAddr + MemSiz)를 0x4000으로 나눈 나머지가 0이어야 하고, 0이 아니면서 RELRO가 뒤따르는 쓰기 데이터(.data, .bss)와 한 LOAD를 같이 쓰면 앱이 실행 중에 세그폴트로 죽을 수 있다고 적습니다. RELRO만 든 LOAD이고 다음 쓰기 LOAD가 다른 16KB 페이지에서 시작하면 이 공식이 적용되지 않습니다. 문서는 이런 배치의 예를 16KB 호환으로 봅니다. aedf831의 arm64 라이브러리 12개를 이 공식으로 계산했습니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>라이브러리</th><th>RELRO 끝 % 0x4000</th><th>판정</th></tr></thead>
+        <tbody>
+          <tr><td>libnative_filter, libBeatTracker, libFFmpegProcessor, libKwpFFmpegMuxer</td><td>0x0</td><td>통과</td></tr>
+          <tr><td>libPixelCanvas, libPixelUtils</td><td>0x1000</td><td>공식 적용 안 됨(RELRO만 든 LOAD)</td></tr>
+          <tr><td>prebuilt FFmpeg 6개</td><td>0x1000~0x3000</td><td>RELRO와 .data/.bss가 같은 LOAD</td></tr>
+        </tbody>
+      </table></div>
+      <p>libavcodec-56을 예로 들면 쓰기 가능 LOAD의 메모리 크기가 0x257f00이고 그 앞부분 0xfbf8만 RELRO입니다. 문서가 세그폴트 사례로 든 모양과 같습니다. 커밋은 링커 플래그로 <code>max-page-size</code>만 넣었고, 공식 예시는 <code>common-page-size=16384</code>도 함께 씁니다. 직접 빌드한 6개는 그 플래그 없이도 통과했습니다. FFmpeg 6개는 저장소에 소스와 빌드 스크립트가 있지만, 지금 들어 있는 .so를 어떤 플래그로 만들었는지는 기록에 없습니다. ffmpeg.md는 두 빌드 스크립트의 ADDI_LDFLAGS에 <code>-Wl,-z,max-page-size=16384</code>를 넣었다고 적었는데, 이 커밋에서 두 스크립트는 경로만 옮겨졌고 build_arm64-v8a.sh 28행의 ADDI_LDFLAGS에는 그 플래그가 없습니다.</p>
+      <figure class="ax-fig"><img src="/assets/ax/ndk-16kb-page-blue-tint-2-ko.webp" width="1200" height="752" alt="비교 그림: 커밋 기록은 NDK 25 미지원, 26.3 채택, FFmpeg 재빌드 필요, 원인 Clang -O3 버그라고 적었고, 다시 측정하니 NDK 25.1도 링커 플래그로 0x4000, 26.3은 Application.mk 플래그를 읽지 않음, FFmpeg는 LOAD 0x10000이지만 RELRO 나머지 0x1000~0x3000, 원인은 확정 못 함." loading="lazy"><figcaption>FFmpeg 6개는 LOAD 0x10000이지만 RELRO 나머지는 0x1000~0x3000이었습니다.</figcaption></figure>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%2016KB%20%ED%8E%98%EC%9D%B4%EC%A7%80%20%ED%81%AC%EA%B8%B0%20%EB%8C%80%EC%9D%91%EA%B8%B0%3A%20NDK%2027%C2%B729%EC%97%90%EC%84%9C%EB%A7%8C%20%EC%83%9D%EA%B8%B4%20%ED%8C%8C%EB%9E%80%20%EC%83%89%EC%A1%B0%EC%99%80%20%EB%8B%A4%EC%8B%9C%20%EC%B8%A1%EC%A0%95%ED%95%9C%20.so%2012%EA%B0%9C">메일로 문의하기</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">NDK 25.1에 링커 플래그만 넣는 길이 있었습니다</h2>
+      <p>1월에 고를 수 있었던 길은 세 가지였습니다. 실제로 고른 것은 NDK 26.3 고정이고, 문서에 "NDK 27 이상 버전 사용 금지"를 남겼습니다.</p>
+      <ul>
+        <li>NDK 25.1을 그대로 두고 링커 플래그만 넣기. 위 표대로 정렬은 됐을 것이고, 기록상 25.1에서는 색조가 없었고 컴파일러도 그대로이니 색조 회귀를 예상할 이유가 없었습니다. "25는 미지원"이라는 판정 때문에 버려졌습니다.</li>
+        <li>NDK 27·29를 쓰고 multimediaFramework만 -O3를 낮추기. -O0에서 정상이라는 기록은 있지만, 영상 처리 속도가 얼마나 떨어지는지 잰 기록은 없습니다.</li>
+        <li>색이 바뀌는 함수를 찾아 고치기. 시도한 기록이 없습니다.</li>
+      </ul>
+      <p>NDK 버전부터 올리지 마십시오. 지금 쓰는 NDK에 링커 플래그를 넣고 readelf로 정렬부터 재십시오. NDK를 올려야 할 다른 이유가 있다면 그때 따로 올리고, 렌더링 결과를 이전 빌드와 비교하십시오.</p>
+    </section>
+
+    <section aria-labelledby="limits">
+      <h2 id="limits">CMake 빌드와 NDK r28 이후에는 이 절차가 그대로 맞지 않습니다</h2>
+      <p>이 기록은 ndk-build(Android.mk, Application.mk) 프로젝트입니다. CMake로 빌드한다면 공식 문서의 CMake 예시처럼 <code>target_link_options</code>에 플래그를 넣어야 하고, Android.mk 줄은 쓸모가 없습니다. NDK r28 이상은 기본으로 16KB 정렬이라 링커 플래그 자체가 필요 없습니다(29.0 측정에서도 arm64는 플래그 없이 0x4000이었습니다).</p>
+      <p>다른 코드베이스에서 NDK 27이 같은 문제를 일으킨다고 말할 근거는 없습니다. 32비트(armeabi-v7a) 라이브러리는 정렬을 따지지 않았습니다. 공식 문서의 요건은 64비트 기기 대상입니다.</p>
+    </section>
+
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">readelf 두 번과 같은 사진 세트로 확인하는 순서</h2>
+      <ol>
+        <li>APK나 AAB에 들어가는 arm64-v8a .so마다 LOAD 정렬을 봅니다. 마지막 열이 0x4000 이상이어야 합니다.<pre><code>llvm-readelf -lW libfoo.so | grep -E "LOAD|GNU_RELRO"</code></pre></li>
+        <li>GNU_RELRO 줄이 있으면 VirtAddr와 MemSiz를 더해 0x4000으로 나눈 나머지를 봅니다. 0이 아니면, RELRO가 든 LOAD에 .data/.bss까지 들어 있는지(LOAD의 MemSiz가 RELRO보다 훨씬 큰지) 확인합니다.</li>
+        <li>NDK를 바꾸기 전에 지금 NDK의 Android.mk에 공식 문서의 두 플래그를 넣고 다시 1번을 합니다.<pre><code>LOCAL_LDFLAGS += -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384</code></pre></li>
+        <li><code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES</code>는 NDK r27 이상에서만 읽힙니다. r26 이하에서 이 줄만 넣고 끝내지 않습니다.</li>
+        <li>NDK나 플래그를 바꿀 때마다 jniLibs의 .so를 지우고 다시 빌드합니다. 슈가앨범 기록에 따르면 Android Studio의 Clean Project는 jniLibs를 지우지 않아, 빌드 스크립트가 먼저 지우게 했습니다.</li>
+        <li>같은 사진 세트로 이전 빌드와 새 빌드의 영상을 만들어 화면 전환 장면을 나란히 봅니다.</li>
+        <li>비압축 .so를 쓰면 Android Gradle Plugin 8.5.1 이상인지 보고 <code>zipalign -v -c -P 16 4 app.apk</code>로 zip 정렬을 확인합니다. 슈가앨범은 AGP 8.12.0입니다.</li>
+      </ol>
+      <p>Play Console 쪽 경고를 다룬 다른 기록으로는 <a href="/ax/r8-dex-optimization-keep-rule/">Play Console 'DEX 최적화 39%'의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a>이 있습니다. 앱 소개는 <a href="/apps/sugaralbum/">슈가앨범</a> 페이지에 있습니다.</p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">아직 하지 않은 확인: 16KB 에뮬레이터 실행과 모듈별 -O3</h2>
+      <p>16KB 페이지 에뮬레이터 이미지에서 영상 만들기를 끝까지 실행해 FFmpeg 라이브러리가 RELRO 때문에 죽는지 봐야 합니다. 죽는다면 FFmpeg를 <code>common-page-size=16384</code>와 함께 다시 빌드해야 합니다. 색조는 아직 어느 모듈에서 생기는지도 모릅니다. 좁히려면 multimediaFramework 다섯 모듈에서 하나씩 -O3를 빼 보는 방법이 있습니다. ffmpeg.md의 NDK 27.0 표기는 26.3으로 고쳐야 합니다.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%2016KB%20%ED%8E%98%EC%9D%B4%EC%A7%80%20%ED%81%AC%EA%B8%B0%20%EB%8C%80%EC%9D%91%EA%B8%B0%3A%20NDK%2027%C2%B729%EC%97%90%EC%84%9C%EB%A7%8C%20%EC%83%9D%EA%B8%B4%20%ED%8C%8C%EB%9E%80%20%EC%83%89%EC%A1%B0%EC%99%80%20%EB%8B%A4%EC%8B%9C%20%EC%B8%A1%EC%A0%95%ED%95%9C%20.so%2012%EA%B0%9C">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>16KB 페이지를 지원하려면 NDK를 r27 이상으로 올려야 하나요?</summary><div><p>아닙니다. NDK 25.1에서도 Android.mk에 <code>-Wl,-z,max-page-size=16384</code>를 넣자 다시 빌드한 libnative_filter.so(arm64)의 LOAD 정렬이 0x4000이 됐습니다(2026-10-27 측정). r27 이상은 <code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES</code> 한 줄로 처리하려는 경우에만 있으면 됩니다.</p></div></details>
+        <details><summary>.so가 16KB 정렬인지 어떻게 확인하나요?</summary><div><p><code>llvm-readelf -lW</code>나 <code>llvm-objdump -p</code>로 LOAD 세그먼트의 정렬이 0x4000(2**14) 이상인지 봅니다. GNU_RELRO가 쓰기 데이터와 한 LOAD에 있으면 (VirtAddr + MemSiz) % 0x4000도 0인지 확인합니다.</p></div></details>
+        <details><summary>64KB로 정렬된 미리 빌드된 .so는 그대로 써도 되나요?</summary><div><p>LOAD 정렬 검사는 통과합니다. 슈가앨범의 FFmpeg 6개는 0x10000이라 LOAD 검사는 통과했지만 RELRO 공식의 나머지가 0x1000~0x3000이었습니다.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
+        <li><a href="/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
+        <li><a href="/ax/androidx-pdf-isolated-process/">androidx.pdf beta01: 격리 프로세스에서 Application.onCreate가 한 번 더 돌아 PDF가 조용히 안 열렸다</a></li>
+        <li><a href="/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
+        <li><a href="/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
+        <li><a href="/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
+      </ul>
+      <p><a href="/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="/ax/">AX 노트 전체 보기</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>한 가지 일을 간단하게 하는 Android 앱</p>
+        <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">앱</p>
+        <ul><li><a href="/apps/sugaralbum/">슈가앨범</a></li><li><a href="/apps/image-compress/">사진 용량 줄이기</a></li><li><a href="/apps/image-flip/">사진 반전·회전</a></li><li><a href="/apps/image-convert/">이미지 변환 JPG·PNG·WebP</a></li><li><a href="/apps/sugarspeller/">한글 띄어쓰기</a></li><li><a href="/apps/sugarclip/">SugarClip</a></li><li><a href="/apps/doc-viewer/">한글뷰어 슈가독</a></li><li><a href="/apps/sugarcard/">생생카드</a></li><li><a href="/apps/arrow-knots/">화살표 매듭풀기</a></li><li><a href="/apps/blocks/">한판블록</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">사이트</p>
+        <ul><li><a href="/apps/">모든 앱</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li><li><a href="/sitemap/">사이트맵</a></li><li><a href="/rss.xml">RSS 피드</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play 개발자 페이지</a></div>
+    </div>
+  </footer>
+</body>
+</html>

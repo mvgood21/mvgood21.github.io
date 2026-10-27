@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Android 16 KB page size, NDK 27 and a blue tint – SugarMount</title>
+  <meta name="description" content="Six .so files rebuilt for Google Play&#x27;s 16 KB page rule; NDK 27 and 29 tinted photo transitions blue. Rechecked: NDK 25 aligns to 16 KB with one linker flag.">
+  <link rel="canonical" href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Android 16 KB page size, NDK 27 and a blue tint – SugarMount">
+  <meta property="og:description" content="Six .so files rebuilt for Google Play&#x27;s 16 KB page rule; NDK 27 and 29 tinted photo transitions blue. Rechecked: NDK 25 aligns to 16 KB with one linker flag.">
+  <meta property="og:url" content="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-ndk-16kb-page-blue-tint-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/en/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=51d09451">
+  <link rel="stylesheet" href="/assets/site.css?v=51d09451">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=51d09451">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/#article","headline":"16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again","description":"Six .so files rebuilt for Google Play's 16 KB page rule; NDK 27 and 29 tinted photo transitions blue. Rechecked: NDK 25 aligns to 16 KB with one linker flag.","url":"https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/","mainEntityOfPage":"https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/","inLanguage":"en","articleSection":"Android development","datePublished":"2026-10-28T09:00:00+09:00","dateModified":"2026-10-28T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-ndk-16kb-page-blue-tint-en.png","https://mvgood21.github.io/assets/ax/cover/ndk-16kb-page-blue-tint-en.webp","https://mvgood21.github.io/assets/ax/ndk-16kb-page-blue-tint-1-en.webp","https://mvgood21.github.io/assets/ax/ndk-16kb-page-blue-tint-2-en.webp"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Do I need NDK r27 or later to support 16 KB pages?","acceptedAnswer":{"@type":"Answer","text":"Not for the alignment itself. With -Wl,-z,max-page-size=16384 in Android.mk, NDK 25.1 rebuilt libnative_filter.so (arm64) with 0x4000 LOAD alignment (measured 2026-10-27). r27 is only needed for the one-line APP_SUPPORT_FLEXIBLE_PAGE_SIZES approach."}},{"@type":"Question","name":"How do I check whether a .so is 16 KB aligned?","acceptedAnswer":{"@type":"Answer","text":"Run llvm-readelf -lW or llvm-objdump -p and confirm every LOAD segment is aligned to 0x4000 (2**14) or more. If GNU_RELRO shares a LOAD segment with writable data, also check that (VirtAddr + MemSiz) % 0x4000 is zero."}},{"@type":"Question","name":"Can I keep a prebuilt .so that is 64 KB aligned?","acceptedAnswer":{"@type":"Answer","text":"It passes the LOAD alignment check. SugarAlbum's six FFmpeg libraries are 0x10000 and pass that check, but their RELRO remainders are 0x1000 to 0x3000."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://mvgood21.github.io/en/ax/"},{"@type":"ListItem","position":3,"name":"Android development","item":"https://mvgood21.github.io/en/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=51d09451">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/ndk-16kb-page-blue-tint/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-android">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/android/">Android development</a></li><li><span aria-current="page">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/ndk-16kb-page-blue-tint-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</h1>
+      <p class="lead">In our video app, 16 KB alignment came from one linker flag, not from the NDK upgrade that came first, and that upgrade is where a blue color regression came in.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Android development</span> <span aria-hidden="true">·</span> <span>9 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-10-28">October 28, 2026</time></p><!-- /build:meta -->
+      <p>Six of the twelve arm64 native libraries in SugarAlbum, the ones we build ourselves, were 4 KB aligned (0x1000). Commit aedf831 on January 3, 2026 rebuilt them with NDK 26.3 at 16 KB (0x4000). Along the way, builds made with NDK 27.0 and 29.0 put a blue cast on photo transitions. On October 27, 2026 we rebuilt the libnative_filter source (two C files) with four NDK versions: NDK 25.1, which the commit lists as "16KB unsupported", gave 0x4000 once the linker flag was in.</p>
+      <p class="note">Sources: the SugarAlbum git history (c3e09b1, d73db50 to 7efd9c1, aedf831) and the work notes committed with it, .so alignment values rechecked with llvm-readelf on 2026-10-27, and the official Android Developers documentation.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (9)</summary><ol><li><a href="#timeline">The three .so files rebuilt for targetSdk 36 were still 4 KB aligned</a></li><li><a href="#blue-tint">NDK 27.0 and 29.0 builds tinted photo transitions blue</a></li><li><a href="#flag-r26">NDK 26.3 ignores APP_SUPPORT_FLEXIBLE_PAGE_SIZES</a></li><li><a href="#ffmpeg-relro">The six prebuilt FFmpeg libraries pass the LOAD check and fail the RELRO formula</a></li><li><a href="#alternatives">Keeping NDK 25.1 and adding the linker flag would have worked</a></li><li><a href="#limits">CMake builds and NDK r28 or later need a different procedure</a></li><li><a href="#how-to">Checking with readelf twice and the same set of photos</a></li><li><a href="#next">Not done yet: a 16 KB emulator run and a per-module -O3 check</a></li><li><a href="#faq">FAQ</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#timeline">The three .so files rebuilt for targetSdk 36 were still 4 KB aligned</a></li><li><a href="#blue-tint">NDK 27.0 and 29.0 builds tinted photo transitions blue</a></li><li><a href="#flag-r26">NDK 26.3 ignores APP_SUPPORT_FLEXIBLE_PAGE_SIZES</a></li><li><a href="#ffmpeg-relro">The six prebuilt FFmpeg libraries pass the LOAD check and fail the RELRO formula</a></li><li><a href="#alternatives">Keeping NDK 25.1 and adding the linker flag would have worked</a></li><li><a href="#limits">CMake builds and NDK r28 or later need a different procedure</a></li><li><a href="#how-to">Checking with readelf twice and the same set of photos</a></li><li><a href="#next">Not done yet: a 16 KB emulator run and a per-module -O3 check</a></li><li><a href="#faq">FAQ</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="timeline">
+      <h2 id="timeline">The three .so files rebuilt for targetSdk 36 were still 4 KB aligned</h2>
+      <p>SugarAlbum turns a set of photos into a video. At aedf831 the app has 763 Java files and 32 Kotlin files, and the video and filter work runs in C/C++ libraries built with ndk-build. We raised targetSdk from 33 to 34 on July 15, 2024 (c3e09b1) and from 34 to 36 between August 27 and September 1, 2025 (d73db50 to 7efd9c1). On August 31 (3e7e099) we rebuilt the three arm64 libraries of the multimediaFramework module (libBeatTracker, libPixelCanvas, libPixelUtils) without telling the linker about page size, and the other three (libnative_filter, libFFmpegProcessor, libKwpFFmpegMuxer) were still the November 2022 builds. So right before aedf831, all six had LOAD segments aligned to 0x1000.</p>
+      <p>Google announced on the Android Developers Blog on May 8, 2025 that starting November 1, 2025, new apps and updates targeting Android 15 or higher must support 16 KB pages. The current <a href="https://developer.android.com/guide/practices/page-sizes">page size guide</a> (updated 2026-10-16) says that starting February 1, 2027, updates without 16 KB support can't be released. Our repo notes say a Play Console warning asked for a fix "by May 2025". That date appears in neither official source, and the warning text itself isn't saved anywhere in the repo.</p>
+      <p>The January work was done with Claude Code; the commit carries its Co-Authored-By line. A work note committed alongside it, ffmpeg.md, records the first move: "After: NDK 27.0.12077973. Reason: the <code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES</code> flag is only supported in NDK r27 and later." The final commit used 26.3, and ffmpeg.md went in still saying 27.0.</p>
+      <figure class="ax-fig"><img src="/assets/ax/ndk-16kb-page-blue-tint-1-en.webp" width="1200" height="970" alt="Step diagram: in August 2025 three .so files are rebuilt for targetSdk 36, and all six stay at 0x1000; in January 2026 the NDK goes to 27.0; 27.0 and 29.0 tint photo transitions blue; 26.3 plus the linker flag gives 0x4000; the October recheck shows NDK 25.1 also reaches 0x4000 with the flag." loading="lazy"><figcaption>After the August 2025 rebuild all six were still 0x1000; in January 2026, NDK 26.3 with the linker flag made them 0x4000.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="blue-tint">
+      <h2 id="blue-tint">NDK 27.0 and 29.0 builds tinted photo transitions blue</h2>
+      <p>The commit message has a three-line NDK table: 25.x does not support 16 KB, 26.3 works (adopted), 27.0 and 29.0 show "a blue tint bug with -O3 optimization". progress.md, in the same commit, describes the symptom as a bluish cast during photo transitions, places it in the PixelUtils and libyuv code of the multimediaFramework module, and notes that an -O0 build looks normal. All five modules in that module's Android.mk (libYUV, libMasp, PixelCanvas, PixelUtils, BeatTracker) compile with <code>-O3</code>.</p>
+      <p>No automated check caught it. The only tests in the repo are the two placeholder tests Android Studio generates (ExampleUnitTest and ExampleInstrumentedTest); nothing compares colors or rendered frames. NDK 27.0 and 29.0 both built cleanly and both produced aligned libraries. The tint showed up only when someone ran the app and watched a transition.</p>
+      <p>progress.md names the cause as "a Clang -O3 optimization bug". The only evidence on record is that -O0 looks fine. The bundled compilers are clang 17.0.2 in NDK 26.3, 18.0.1 in 27.0 and 21.0.0 in 29.0, so the tint lines up with clang 18 and later. A clean -O0 build is also what you'd see if our own code had undefined behavior that the newer optimizer treats differently, and nobody narrowed it down to a function.</p>
+      <p>The same commit tidied the libyuv NEON lines in Android.mk, so we checked that too. libPixelUtils.so exports 198 symbols with NEON in the name both before and after the commit. The NEON code was already in the old build, so it isn't the variable.</p>
+    </section>
+
+    <section aria-labelledby="flag-r26">
+      <h2 id="flag-r26">NDK 26.3 ignores APP_SUPPORT_FLEXIBLE_PAGE_SIZES</h2>
+      <p>The final commit sets alignment in three places: <code>android.ndk.maxPageSize=16384</code> in gradle.properties, <code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES := true</code> in three Application.mk files, and <code>LOCAL_LDFLAGS += -Wl,-z,max-page-size=16384</code> in six Android.mk modules. To see which one did the work, we searched each NDK's build/core for the flag name. It isn't in 25.1 or 26.3; it's only in build-binary.mk of 27.0 and 29.0. In 27.0, a true value adds max-page-size=16384 to the link. In 29.0, 16 KB is the default and a false value sets it back to 4096.</p>
+      <p>Then we rebuilt the libnative_filter source from aedf831 with each NDK and read the LOAD alignment with <code>llvm-readelf -lW</code> on 2026-10-27.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>NDK</th><th>Linker flag in Android.mk</th><th>arm64-v8a LOAD alignment</th></tr></thead>
+        <tbody>
+          <tr><td>25.1.8937393</td><td>no</td><td>0x1000</td></tr>
+          <tr><td>25.1.8937393</td><td>yes</td><td>0x4000</td></tr>
+          <tr><td>26.3.11579264</td><td>no (Application.mk flag only)</td><td>0x1000</td></tr>
+          <tr><td>26.3.11579264</td><td>yes (as committed)</td><td>0x4000</td></tr>
+          <tr><td>27.0.12077973</td><td>no (Application.mk flag only)</td><td>0x4000</td></tr>
+          <tr><td>29.0.14206865</td><td>no</td><td>0x4000</td></tr>
+        </tbody>
+      </table></div>
+      <p>Under 26.3 the 16 KB alignment came from the Android.mk linker flag; the Application.mk line did nothing. The same flag gave 0x4000 under 25.1. The commit's "NDK 25.x: 16KB unsupported" was never tested with the flag in place, and it follows from the first assumption that the feature needs r27. The official guide's "Android NDK r27 and lower" section also gets 16 KB alignment from the <code>max-page-size</code> and <code>common-page-size</code> linker flags and never mentions <code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES</code>.</p>
+    </section>
+
+    <section aria-labelledby="ffmpeg-relro">
+      <h2 id="ffmpeg-relro">The six prebuilt FFmpeg libraries pass the LOAD check and fail the RELRO formula</h2>
+      <p>progress.md left six prebuilt FFmpeg libraries (libavcodec-56, libavfilter-5, libavformat-56, libavutil-54, libswresample-1, libswscale-3) marked as needing a separate 16 KB rebuild. Their LOAD segments were already aligned to 0x10000 (64 KB) before the commit. 64 KB is a multiple of 16 KB, so they pass the guide's rule that no LOAD segment may be below 2**14.</p>
+      <p>The guide has a second check. (VirtAddr + MemSiz) of the GNU_RELRO segment should divide evenly by 0x4000. If it doesn't, and RELRO shares a LOAD segment with writable data that follows it (.data, .bss), the app can crash at runtime with a segmentation fault. A LOAD segment holding only RELRO data, followed by a writable LOAD that starts on a separate 16 KB page, is a case where the formula doesn't apply; the guide's example of that layout is still 16 KB compliant. We ran all twelve arm64 libraries from aedf831 through that formula.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Library</th><th>RELRO end % 0x4000</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>libnative_filter, libBeatTracker, libFFmpegProcessor, libKwpFFmpegMuxer</td><td>0x0</td><td>pass</td></tr>
+          <tr><td>libPixelCanvas, libPixelUtils</td><td>0x1000</td><td>formula doesn't apply (RELRO-only LOAD)</td></tr>
+          <tr><td>six prebuilt FFmpeg libraries</td><td>0x1000 to 0x3000</td><td>RELRO shares a LOAD with .data/.bss</td></tr>
+        </tbody>
+      </table></div>
+      <p>In libavcodec-56, the writable LOAD segment is 0x257f00 bytes in memory and only its first 0xfbf8 bytes are RELRO, which is the shape the guide uses as its crash example. The commit added only <code>max-page-size</code>; the guide's examples also pass <code>common-page-size=16384</code>. Our six self-built libraries passed without it. The repo has FFmpeg's source and build scripts, but nothing records which flags produced the .so files it ships. ffmpeg.md says <code>-Wl,-z,max-page-size=16384</code> was added to ADDI_LDFLAGS in both build scripts; in this commit the two scripts were only moved, and ADDI_LDFLAGS on line 28 of build_arm64-v8a.sh doesn't have that flag.</p>
+      <figure class="ax-fig"><img src="/assets/ax/ndk-16kb-page-blue-tint-2-en.webp" width="1200" height="871" alt="Comparison: the commit records say NDK 25 is unsupported, 26.3 is adopted, FFmpeg needs a rebuild and the cause is a Clang -O3 bug; the recheck shows NDK 25.1 reaches 0x4000 with the linker flag, 26.3 ignores the Application.mk flag, FFmpeg is LOAD 0x10000 but its RELRO remainders are 0x1000 to 0x3000, and the cause is unconfirmed." loading="lazy"><figcaption>The six FFmpeg libraries are LOAD 0x10000, but their RELRO remainders are 0x1000 to 0x3000.</figcaption></figure>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%2016%20KB%20page%20size%20support%3A%20a%20blue%20tint%20that%20only%20NDK%2027%20and%2029%20produced%2C%20and%2012%20.so%20files%20measured%20again">Email us</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">Keeping NDK 25.1 and adding the linker flag would have worked</h2>
+      <p>There were three ways to go in January. We pinned NDK 26.3 and wrote "do not use NDK 27 or later" into the notes.</p>
+      <ul>
+        <li>Stay on NDK 25.1 and add the linker flag. The table above says alignment would have been fine, and since the records show no tint on 25.1 and the compiler would have stayed the same, there was no reason to expect a color regression. It was ruled out by the "25 unsupported" call.</li>
+        <li>Use NDK 27 or 29 and lower -O3 only in multimediaFramework. -O0 is recorded as looking fine, but nobody measured how much slower video processing gets.</li>
+        <li>Find and fix the function that shifts the color. There's no record of an attempt.</li>
+      </ul>
+      <p>Don't upgrade the NDK first. Put the linker flag into the NDK you already use and check the alignment with readelf. If you have another reason to move to a newer NDK, do it as a separate change and compare rendered output against the previous build.</p>
+    </section>
+
+    <section aria-labelledby="limits">
+      <h2 id="limits">CMake builds and NDK r28 or later need a different procedure</h2>
+      <p>This is an ndk-build project (Android.mk, Application.mk). With CMake, the guide puts the flags in <code>target_link_options</code>, and the Android.mk line is irrelevant. NDK r28 and later align to 16 KB by default, so the flag isn't needed at all; our 29.0 build gave 0x4000 on arm64 with no flag.</p>
+      <p>There's no basis for saying NDK 27 will do the same to other code. We didn't check 32-bit (armeabi-v7a) libraries; the guide's requirement covers 64-bit devices.</p>
+    </section>
+
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Checking with readelf twice and the same set of photos</h2>
+      <ol>
+        <li>For each arm64-v8a .so that ships in the APK or AAB, read the LOAD alignment. The last column must be 0x4000 or larger.<pre><code>llvm-readelf -lW libfoo.so | grep -E "LOAD|GNU_RELRO"</code></pre></li>
+        <li>If there's a GNU_RELRO line, add VirtAddr and MemSiz and take the remainder mod 0x4000. If it isn't zero, check whether the LOAD segment holding RELRO also holds .data/.bss (its MemSiz is much larger than RELRO's).</li>
+        <li>Before changing the NDK, add both flags from the guide to Android.mk in your current NDK and repeat step 1.<pre><code>LOCAL_LDFLAGS += -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384</code></pre></li>
+        <li><code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES</code> is read only by NDK r27 and later. On r26 or older, that line alone does nothing.</li>
+        <li>Delete the .so files in jniLibs and rebuild every time you change the NDK or the flags. Our notes record that Android Studio's Clean Project doesn't remove jniLibs, so the build script deletes them first.</li>
+        <li>Export a video from the same photos with the old build and the new one, and watch the transitions side by side.</li>
+        <li>If you ship uncompressed .so files, confirm Android Gradle Plugin 8.5.1 or later and run <code>zipalign -v -c -P 16 4 app.apk</code>. SugarAlbum uses AGP 8.12.0.</li>
+      </ol>
+      <p>Another Play Console warning we traced is in <a href="/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a>. The app itself is on the <a href="/en/apps/sugaralbum/">SugarAlbum</a> page.</p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">Not done yet: a 16 KB emulator run and a per-module -O3 check</h2>
+      <p>Video export has to run end to end on a 16 KB page emulator image to see whether the FFmpeg libraries crash on RELRO. If they do, FFmpeg needs a rebuild with <code>common-page-size=16384</code>. We still don't know which module the tint comes from; one way to narrow it down is to take the five multimediaFramework modules off -O3 one at a time. The NDK 27.0 in ffmpeg.md should be corrected to 26.3.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%2016%20KB%20page%20size%20support%3A%20a%20blue%20tint%20that%20only%20NDK%2027%20and%2029%20produced%2C%20and%2012%20.so%20files%20measured%20again">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Do I need NDK r27 or later to support 16 KB pages?</summary><div><p>Not for the alignment itself. With <code>-Wl,-z,max-page-size=16384</code> in Android.mk, NDK 25.1 rebuilt libnative_filter.so (arm64) with 0x4000 LOAD alignment (measured 2026-10-27). r27 is only needed for the one-line <code>APP_SUPPORT_FLEXIBLE_PAGE_SIZES</code> approach.</p></div></details>
+        <details><summary>How do I check whether a .so is 16 KB aligned?</summary><div><p>Run <code>llvm-readelf -lW</code> or <code>llvm-objdump -p</code> and confirm every LOAD segment is aligned to 0x4000 (2**14) or more. If GNU_RELRO shares a LOAD segment with writable data, also check that (VirtAddr + MemSiz) % 0x4000 is zero.</p></div></details>
+        <details><summary>Can I keep a prebuilt .so that is 64 KB aligned?</summary><div><p>It passes the LOAD alignment check. SugarAlbum's six FFmpeg libraries are 0x10000 and pass that check, but their RELRO remainders are 0x1000 to 0x3000.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
+        <li><a href="/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
+        <li><a href="/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
+      </ul>
+      <p><a href="/en/ax/topic/android/">All notes on Android development</a> · <a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/sitemap/">Site map</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>
