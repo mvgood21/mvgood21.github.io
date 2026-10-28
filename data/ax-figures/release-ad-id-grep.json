@@ -1,0 +1,108 @@
+[
+ {
+  "kind": "steps",
+  "ko": {
+   "title": "한판블록 vc2 업로드 전 광고 ID 건수 (2026-10-04, 커밋·세션 기록과 10-28 재측정)",
+   "items": [
+    [
+     "12:25 vc1",
+     "조건은 배너 하나만 확인. dex에 실제 광고 단위 4개, 테스트 0개."
+    ],
+    [
+     "16:14 조건 확장",
+     "네 단위를 listOf(...).any { it.isEmpty() }로 묶음. 반쪽짜리 조합을 막으려는 수정."
+    ],
+    [
+     "16:49 코드 리뷰",
+     "리뷰 에이전트가 19건을 지적했지만 테스트 문자열은 놓침."
+    ],
+    [
+     "17:16 첫 실제 ID AAB",
+     "업로드 전 빌드. checkReleaseAdIds 통과, dex에 실제 4개·테스트 5개."
+    ],
+    [
+     "17:18 1aecbc2",
+     "상수끼리 || 로 바꾸고 다시 빌드. 실제 4개, 테스트 0개."
+    ]
+   ],
+   "note": "17:16·17:18 건수는 당시 grep -c 값, vc1 건수는 10-28 재측정 값입니다. ID 값은 출력하지 않았습니다.",
+   "alt": "단계 그림: 12시 25분 vc1은 실제 광고 단위 4개와 테스트 0개, 16시 14분 조건을 listOf any로 넓힘, 16시 49분 코드 리뷰는 19건을 지적했지만 테스트 문자열은 놓침, 17시 16분 업로드 전 첫 실제 ID AAB는 가드를 통과했지만 테스트 문자열 5개, 17시 18분 상수끼리 or로 바꾸자 테스트 0개.",
+   "caption": "가드를 통과하고 코드 리뷰에서도 지적되지 않은 첫 실제 ID AAB의 dex에 테스트 문자열이 5개, 2분 뒤 빌드에는 0개였습니다."
+  },
+  "en": {
+   "title": "Ad ID counts before the Block Turn vc2 upload (Oct 4, 2026, commits, session log, Oct 28 recount)",
+   "items": [
+    [
+     "12:25 vc1",
+     "The condition checks the banner only. The dex holds 4 real ad units and 0 test strings."
+    ],
+    [
+     "16:14 wider check",
+     "All four units go into listOf(...).any { it.isEmpty() } to rule out a half-real mix."
+    ],
+    [
+     "16:49 code review",
+     "A review agent makes 19 findings but misses the test strings."
+    ],
+    [
+     "17:16 first real-ID AAB",
+     "Built before upload. checkReleaseAdIds passes; the dex holds 4 real units and 5 test strings."
+    ],
+    [
+     "17:18 1aecbc2",
+     "A plain || over the constants, rebuilt: 4 real, 0 test."
+    ]
+   ],
+   "note": "17:16 and 17:18 counts are grep -c values from that day; the vc1 count is from the Oct 28 recount. No ID value was printed.",
+   "alt": "Step diagram: at 12:25 vc1 has 4 real ad units and 0 test strings; at 16:14 the check is widened with listOf any; at 16:49 a code review makes 19 findings but misses the test strings; at 17:16 the first real-ID bundle, before upload, passes the Gradle guard but carries 5 test strings; at 17:18 a plain or over the constants brings it to 0.",
+   "caption": "The first real-ID bundle passed the Gradle guard, and the code review had not flagged the line; a dex count found the 5 test IDs."
+  }
+ },
+ {
+  "kind": "compare",
+  "ko": {
+   "title": "같은 조건을 두 모양으로 쓴 R8 재현 (2026-10-28, R8 9.4.24, Kotlin 2.3.21)",
+   "left": [
+    "listOf(...).any { it.isEmpty() }",
+    [
+     "kotlinc가 상수 넷을 리스트에 담고 Iterator로 돎",
+     "R8이 조건 값을 빌드 때 정하지 못함",
+     "dex에 테스트 문자열 5개, 실제 4개"
+    ]
+   ],
+   "right": [
+    "상수끼리 || 연결",
+    [
+     "상수마다 length()를 바로 부름",
+     "R8이 조건을 false로 계산해 테스트 분기를 지움",
+     "dex에 테스트 문자열 0개, 실제 4개"
+    ]
+   ],
+   "note": "가짜 ID 문자열로 만든 작은 프로젝트에 AGP 9.4.1의 proguard-android-optimize.txt를 그대로 썼습니다.",
+   "alt": "비교 그림: listOf any 모양은 리스트와 Iterator 루프를 거쳐 R8이 조건을 계산하지 못해 테스트 문자열 5개가 남고, 상수끼리 or 모양은 R8이 조건을 false로 계산해 테스트 문자열 0개.",
+   "caption": "같은 뜻의 조건인데 listOf 판은 테스트 문자열 5개를 남기고, || 판은 0개를 남겼습니다."
+  },
+  "en": {
+   "title": "The same condition written two ways, rebuilt with R8 (Oct 28, 2026, R8 9.4.24, Kotlin 2.3.21)",
+   "left": [
+    "listOf(...).any { it.isEmpty() }",
+    [
+     "kotlinc puts the four constants in a list and walks it with an Iterator",
+     "R8 cannot settle the condition at build time",
+     "dex: 5 test strings, 4 real"
+    ]
+   ],
+   "right": [
+    "Plain || over the constants",
+    [
+     "Each constant gets a direct length() call",
+     "R8 evaluates the condition to false and drops the test branch",
+     "dex: 0 test strings, 4 real"
+    ]
+   ],
+   "note": "A small project with dummy ID strings, shrunk with AGP 9.4.1's proguard-android-optimize.txt as shipped.",
+   "alt": "Comparison: the listOf any form goes through a list and an Iterator loop, R8 cannot evaluate it and 5 test strings remain; the plain or form lets R8 evaluate the condition to false and 0 test strings remain.",
+   "caption": "Two conditions that mean the same thing: the listOf form left 5 test strings, the || form left none."
+  }
+ }
+]

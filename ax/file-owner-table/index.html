@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claude Code 여러 세션 충돌과 파일 주인 표 – SugarMount</title>
+  <meta name="description" content="같은 작업 트리의 커밋 하나가 다른 세션 파일 50개를 담아 간 뒤 공유 파일 주인 표를 만들었습니다. 머지 13개 중 7개의 손 머지가 어디서 났는지 git으로 세었습니다.">
+  <link rel="canonical" href="https://mvgood21.github.io/ax/file-owner-table/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/file-owner-table/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/file-owner-table/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/file-owner-table/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Claude Code 여러 세션 충돌과 파일 주인 표 – SugarMount">
+  <meta property="og:description" content="같은 작업 트리의 커밋 하나가 다른 세션 파일 50개를 담아 간 뒤 공유 파일 주인 표를 만들었습니다. 머지 13개 중 7개의 손 머지가 어디서 났는지 git으로 세었습니다.">
+  <meta property="og:url" content="https://mvgood21.github.io/ax/file-owner-table/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-file-owner-table-ko.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=51d09451">
+  <link rel="stylesheet" href="/assets/site.css?v=51d09451">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=51d09451">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/ax/file-owner-table/#article","headline":"Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표","description":"같은 작업 트리의 커밋 하나가 다른 세션 파일 50개를 담아 간 뒤 공유 파일 주인 표를 만들었습니다. 머지 13개 중 7개의 손 머지가 어디서 났는지 git으로 세었습니다.","url":"https://mvgood21.github.io/ax/file-owner-table/","mainEntityOfPage":"https://mvgood21.github.io/ax/file-owner-table/","inLanguage":"ko","articleSection":"에이전트와 일하는 법","datePublished":"2026-10-29T09:00:00+09:00","dateModified":"2026-10-29T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-file-owner-table-ko.png","https://mvgood21.github.io/assets/ax/cover/file-owner-table-ko.webp","https://mvgood21.github.io/assets/ax/file-owner-table-1-ko.webp","https://mvgood21.github.io/assets/ax/file-owner-table-2-ko.webp"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Claude Code 세션 두 개를 같은 작업 트리에서 돌려도 되나요?","acceptedAnswer":{"@type":"Answer","text":"돌릴 수는 있지만, 운영자가 요청하지 않으면 어느 세션도 커밋하지 않게 하십시오. sugar-utils에서는 한 세션의 커밋 32fca47이 다른 세션이 만들던 파일 50개를 함께 담았습니다. 그 뒤로 같은 트리의 세션은 commit, stash, reset, gradlew --stop 을 하지 않습니다."}},{"@type":"Question","name":"git worktree를 쓰면 병렬 에이전트 충돌이 없어지나요?","acceptedAnswer":{"@type":"Answer","text":"작업 중 파일이 섞이는 문제는 없어지지만, 여러 작업이 함께 고치는 연결 파일의 충돌은 머지 때 그대로 나옵니다. 9월 20일 머지 4개 중 3개에서 AppContainer.kt를 손으로 합쳤습니다."}},{"@type":"Question","name":"gradlew --stop이 다른 프로젝트 빌드까지 멈추나요?","acceptedAnswer":{"@type":"Answer","text":"같은 Gradle 버전으로 뜬 데몬이면 함께 끝납니다. Gradle 문서가 그렇게 적고 있고, 같은 PC에서 Gradle 9.6.0을 쓰던 다른 저장소의 clean 빌드 두 번이 \"stop command received\"로 끊겼습니다. 긴 빌드는 --no-daemon 으로 돌리십시오."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/"},{"@type":"ListItem","position":2,"name":"AX 노트","item":"https://mvgood21.github.io/ax/"},{"@type":"ListItem","position":3,"name":"에이전트와 일하는 법","item":"https://mvgood21.github.io/ax/topic/workflow/"},{"@type":"ListItem","position":4,"name":"Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=51d09451">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a class="nav-apps" href="/apps/">앱</a>
+        <a class="nav-ax" href="/ax/" aria-current="page">AX 노트</a>
+        <a class="nav-about" href="/about/">소개</a>
+        <a class="nav-privacy" href="/privacy/">개인정보처리방침</a>
+      </nav>
+      <a class="lang" href="/en/ax/file-owner-table/" lang="en" hreflang="en">English</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>메뉴</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="전체 메뉴">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">닫기</button>
+      <p class="menu-title" id="m-photo">사진·영상</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>슈가앨범</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 용량 줄이기</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 반전·회전</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>이미지 변환 JPG·PNG·WebP</span></a></li></ul>
+      <p class="menu-title" id="m-document">문서·글</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글 띄어쓰기</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글뷰어 슈가독</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">생활</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>생생카드</span></a></li></ul>
+      <p class="menu-title" id="m-games">게임</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>화살표 매듭풀기</span></a></li><li><a class="app-tile" data-app="blocks" href="/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한판블록</span></a></li></ul>
+      <p><a href="/apps/">모든 앱 보기</a></p>
+      <ul class="menu-links"><li><a href="/ax/" aria-current="page">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-workflow">
+    <nav class="crumbs" aria-label="이동 경로"><ol><li><a href="/">SugarMount</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/ax/topic/workflow/">에이전트와 일하는 법</a></li><li><span aria-current="page">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/file-owner-table-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX 노트 · 방법</span>
+      <h1>Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</h1>
+      <p class="lead">커밋 하나가 다른 세션이 만들던 파일 50개를 담아 간 뒤, 공유 파일마다 주인을 한 명씩 적는 표를 만들어 병렬 작업을 나눴습니다.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/about/">작성 SugarMount</a> <span aria-hidden="true">·</span> <span>에이전트와 일하는 법</span> <span aria-hidden="true">·</span> <span>읽는 시간 13분</span> <span aria-hidden="true">·</span> 최종 업데이트 <time datetime="2026-10-29">2026년 10월 29일</time></p><!-- /build:meta -->
+      <p>출시 1.0.3의 크래시를 고친 커밋 32fca47에는 파일 74개가 바뀌어 있었고, 그중 50개는 같은 작업 트리에서 다른 Claude Code 세션이 만들던 다음 앱의 파일이었습니다. 2026년 9월 23일, 유틸리티 앱 저장소(sugar-utils)의 일입니다. 16일 뒤 가족 일정 앱 AXFamily는 공유 파일 주인 표를 담은 계획서를 쓰고, 다음 날 기능 브랜치 13개를 2분 11초 만에 머지했습니다. 손으로 합친 머지는 7개였습니다. 기능별로 나눈 번역 조각 파일에서는 한 번도 나오지 않았고, 커밋해 둔 합본 번역 파일(머지 4개), stub 목록에 없던 이름과 오류 코드(M1), 다른 주인 칸의 색인 파일(A1·A2), 테스트 파일(F2)에서 나왔습니다.</p>
+      <p class="note">근거는 두 저장소의 git 기록(32fca47, ca1ade4, 머지 3e9d0cb~e5f9798, 58920b9~ff0c975, a0351cf, 5d51b5b), AXFamily의 2026-10-09 출시 계획서, 당시 세션들이 남긴 메모리 노트, 이 사이트의 AGENTS.md입니다. 손 머지 수는 2026-10-28에 <code>git show --cc</code>로 다시 세었습니다.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>목차 (9)</summary><ol><li><a href="#swept-commit">출시 수정 커밋에 다른 세션이 만들던 파일 50개가 들어갔습니다</a></li><li><a href="#why-git-missed">같은 작업 트리에서는 git이 내 변경과 남의 변경을 가르지 못합니다</a></li><li><a href="#worktree-wiring">worktree로 나눠도 AppContainer.kt는 머지 4번 중 3번을 손으로 합쳤습니다</a></li><li><a href="#owner-table">AXFamily 계획서는 공유 파일 행마다 주인과 다른 패키지가 쓸 길을 적었습니다</a></li><li><a href="#merge-count">머지 13개 중 7개를 손으로 합쳤고, 번역 조각 파일은 0번이었습니다</a></li><li><a href="#contract-drift">git이 조용했던 6쌍과 통합 리뷰의 12건은 파일 주인 표 밖의 문제였습니다</a></li><li><a href="#how-to">나누기 전에 적는 표 한 장과 머지 뒤에 돌리는 명령 두 개</a></li><li><a href="#next">아직 커밋되고 있는 합본 번역 파일과 개념 주인 칸</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">목차</p><ol><li><a href="#swept-commit">출시 수정 커밋에 다른 세션이 만들던 파일 50개가 들어갔습니다</a></li><li><a href="#why-git-missed">같은 작업 트리에서는 git이 내 변경과 남의 변경을 가르지 못합니다</a></li><li><a href="#worktree-wiring">worktree로 나눠도 AppContainer.kt는 머지 4번 중 3번을 손으로 합쳤습니다</a></li><li><a href="#owner-table">AXFamily 계획서는 공유 파일 행마다 주인과 다른 패키지가 쓸 길을 적었습니다</a></li><li><a href="#merge-count">머지 13개 중 7개를 손으로 합쳤고, 번역 조각 파일은 0번이었습니다</a></li><li><a href="#contract-drift">git이 조용했던 6쌍과 통합 리뷰의 12건은 파일 주인 표 밖의 문제였습니다</a></li><li><a href="#how-to">나누기 전에 적는 표 한 장과 머지 뒤에 돌리는 명령 두 개</a></li><li><a href="#next">아직 커밋되고 있는 합본 번역 파일과 개념 주인 칸</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="swept-commit">
+      <h2 id="swept-commit">출시 수정 커밋에 다른 세션이 만들던 파일 50개가 들어갔습니다</h2>
+      <p>9월 23일 저녁 sugar-utils 작업 트리에서는 세션 두 개가 돌고 있었습니다. 하나는 사진 용량 줄이기 앱(U01)의 1.0.3 출시를 마무리했고, 다른 하나는 다음 앱인 <a href="/apps/image-flip/">사진 반전·회전</a>(U02)을 만들고 있었습니다. 22시 24분에 U01 세션이 커밋한 32fca47의 메시지는 R8이 지운 생성자를 살린 수정, 출시 점검 스크립트, 분석 기본값 변경과 백로그 메모를 적었을 뿐 U02 이야기는 없었습니다. 실제 변경은 74파일, 3,946줄 추가였고 <code>apps/sugarflip/</code>과 <code>docs/store/sugarflip/</code> 아래 50파일(3,313줄)과 이미지 엔진 <code>core/images</code> 5파일(428줄)은 U02 세션이 아직 만드는 중이던 코드였습니다. U02 세션의 메모리 노트는 이것을 "git add -A 식으로 쓸어 담았다"고 적었습니다. U02의 엔진과 화면은 다음 날 13시 29분 7821dbd에서야 제대로 된 설명과 함께 커밋됐습니다.</p>
+      <p>같은 커밋이 새로 넣은 <code>scripts/qa/release_launch.sh</code> 13행에는 <code>./gradlew --stop</code>이 있었습니다. Gradle 문서에 따르면 <code>--stop</code>은 명령을 낸 Gradle과 같은 버전으로 뜬 데몬을 모두 끝냅니다. 같은 PC에서 한글 띄어쓰기 앱을 빌드하던 세션도 Gradle 9.6.0을 썼고, 그 세션의 메모리 노트에는 이날 clean 빌드 두 번이 <code>Gradle build daemon has been stopped: stop command received</code>로 끊겼다고 남아 있습니다.</p>
+      <p>세션들은 서로 이웃을 의심했습니다. U02 세션은 데몬을 멈춘 쪽을 한글 띄어쓰기 앱 빌드로 적었고, 한글 띄어쓰기 세션은 sugar-utils를 지목했습니다. 두 저장소의 전체 이력에서 <code>--stop</code>이 들어간 곳은 32fca47의 출시 스크립트 하나뿐입니다(누가 몇 시에 그 줄을 실행했는지는 기록이 없습니다). 그 줄은 15일 동안 스크립트에 남아 있다가 10월 8일 ca1ade4에서 <code>--no-daemon</code>으로 교체됐습니다.</p>
+      <figure class="ax-fig"><img src="/assets/ax/file-owner-table-1-ko.webp" width="1200" height="898" alt="단계 그림: 9월 20일 worktree 머지 4개 중 3개에서 AppContainer.kt 손 머지, 9월 23일 32fca47에 다른 세션 파일 50개와 --stop이 들어감, 같은 작업 트리 세션의 커밋 금지 규칙과 10월 8일 --no-daemon, 10월 9일 주인 표와 export 16개 등록(stub 9개), 10월 10일 머지 13개 중 7개 손 머지에 번역 조각 파일은 0번." loading="lazy"><figcaption>주인 없는 연결 파일에서 충돌이 났고, 주인 표와 stub를 깐 뒤에는 손 머지가 합본 번역 파일, stub 밖 이름, 다른 칸의 색인 파일, 테스트 파일에서 나왔습니다.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="why-git-missed">
+      <h2 id="why-git-missed">같은 작업 트리에서는 git이 내 변경과 남의 변경을 가르지 못합니다</h2>
+      <p>같은 작업 트리에서는 git이 알릴 충돌이 생기지 않습니다. 두 세션의 변경이 한 인덱스에 섞이고, 먼저 커밋한 세션이 그 순간 작업 트리에 있던 모든 파일의 주인이 됩니다. 파일마다 주인이 정해져 있지 않으면 에이전트는 "이 파일은 내가 고친 것"인지 판단할 근거가 없습니다. Gradle 데몬도 같은 구조였습니다. 데몬은 파일이 아닌데도 같은 PC의 세션들이 함께 쓰는 공유물이었고, 주인 없이 아무 세션이나 끌 수 있었습니다.</p>
+      <p>U02 세션은 그날 메모리 노트에 규칙을 남겼습니다. 공유 파일(AGENTS.md, 백로그, CHANGELOG, 템플릿)은 고치기 직전에 다시 읽고 Write 대신 부분 Edit을 쓴다. commit, stash, reset, <code>gradlew --stop</code>은 하지 않는다. 빌드가 다른 세션 때문에 끊길 수 있으니 종료 코드를 믿지 말고 테스트 결과 XML의 시각을 보고 다시 돌린다. 같은 규칙은 지금 운영자의 전역 지침(모든 프로젝트에 적용)에도 들어 있고, 거기에는 긴 Gradle 빌드를 <code>--no-daemon</code>으로 돌린다는 줄이 함께 있습니다.</p>
+    </section>
+
+    <section aria-labelledby="worktree-wiring">
+      <h2 id="worktree-wiring">worktree로 나눠도 AppContainer.kt는 머지 4번 중 3번을 손으로 합쳤습니다</h2>
+      <p>작업 트리를 나누는 방법은 그보다 먼저 써 봤습니다. 9월 20일 23시 10분에 저장소를 만들고, 기반 작업 4개(파일 처리, 이미지 엔진, 광고·결제, 분석)를 서브에이전트마다 git worktree 하나씩 맡겼습니다. 23시 28분부터 40분까지 12분 동안 브랜치 4개가 머지됐고, 다음 날 0시 26분까지 두 개가 더 들어가 모두 6개였습니다. <code>git show --cc</code>로 보면 기반 작업 머지 4개 중 3개에서 <code>AppContainer.kt</code>를 손으로 합쳤습니다. 이 저장소는 DI 프레임워크 없이 앱마다 이 파일 하나에서 의존성을 직접 엮기로 정해 두었고(ADR 0001), 그래서 모든 기반 작업이 이 파일에 자기 줄을 보태야 했습니다.</p>
+      <p>worktree는 작업 중인 파일이 섞이는 것을 막아 줍니다. 여러 작업이 한 줄씩 보태야 하는 연결 파일의 충돌은 머지할 때 그대로 나옵니다. 게임 저장소에서는 <a href="/ax/parallel-agent-workstreams/">'에이전트 수백 개 써도 돼'의 실제: 워크스트림 10개, 하루 59커밋, 동시 실행은 3개</a>에 쓴 대로 워크스트림마다 "독점 소유" 파일 열을 두었습니다. AXFamily는 거기서 빠져 있던 공유 연결 파일 쪽을 표로 따로 적었습니다.</p>
+    </section>
+
+    <section aria-labelledby="owner-table">
+      <h2 id="owner-table">AXFamily 계획서는 공유 파일 행마다 주인과 다른 패키지가 쓸 길을 적었습니다</h2>
+      <p>10월 9일 AXFamily의 출시 계획서는 결론 1번에 "Wave 0 한 명이 공유 파일을 먼저 전부 깐다. … 이 공유 파일을 Wave 1 이후에는 아무도 고치지 않는다"를 두었습니다. 2장 "병렬 작업 충돌 규칙"의 표는 열이 세 개입니다. 아래는 그 표를 줄인 것입니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>공유 파일</th><th>주인</th><th>다른 패키지가 하는 방법</th></tr></thead>
+        <tbody>
+          <tr><td>계약 스키마와 생성물</td><td>W0 계약 레인</td><td>손대지 않는다. 필요한 계약은 W0의 후속 PR 큐에 올린다</td></tr>
+          <tr><td><code>firestore.rules</code>, 색인 파일</td><td>R1</td><td>테스트용 JSON만 <code>rules-tests/fixtures/&lt;pkg&gt;/</code>에 둔다</td></tr>
+          <tr><td>함수 <code>index.ts</code>, <code>errors.ts</code> 등</td><td>W0</td><td>W0가 예정된 export를 모두 stub(<code>NOT_IMPLEMENTED</code>)로 등록하고, 각 패키지는 자기 handler 파일만 채운다</td></tr>
+          <tr><td>앱 기본 틀(pubspec, 라우터, 서비스 등록, 매니페스트, Gradle 파일)</td><td>W0</td><td>라우트·광고 정책·채널은 기능 폴더의 파일로 내고 W0의 레지스트리가 모은다</td></tr>
+          <tr><td>합본 번역 파일 <code>app_ko.arb</code></td><td>W0의 병합 도구</td><td>각 기능은 <code>parts/&lt;f&gt;_ko.arb</code>에만 쓰고 도구가 합친다</td></tr>
+          <tr><td>CI 워크플로</td><td>W0</td><td>검사 파일 하나를 추가하면 자동 발견된다</td></tr>
+          <tr><td>Gradle 빌드·기기</td><td>없음</td><td>워크트리와 관계없이 동시에 하나만, <code>--no-daemon</code></td></tr>
+        </tbody>
+      </table></div>
+      <p>W0 한 에이전트가 이 파일들을 직렬로 깔았고(10월 9일 19시 54분 머지), 그 뒤 Wave 1 표의 패키지 12개가 "주요 파일(배타)" 열에 적힌 폴더 안에서 병렬로 일했습니다. 세션끼리 말로 맞추는 방식은 32fca47에서 파일 50개가 섞였고, worktree만 나누는 방식은 AppContainer.kt를 머지 4번 중 3번 손으로 합쳤습니다. 세션 하나로 전부 직렬 처리하면 충돌은 없지만 패키지 12개를 하나씩 해야 했습니다. 직렬로 했을 때 걸렸을 시간은 재지 않았습니다.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20Claude%20%EC%84%B8%EC%85%98%20%EC%97%AC%EB%9F%AC%20%EA%B0%9C%EA%B0%80%20%ED%95%9C%20%EC%A0%80%EC%9E%A5%EC%86%8C%EB%A5%BC%20%EA%B3%A0%EC%B9%A0%20%EB%95%8C%3A%20%EB%A8%B8%EC%A7%80%2013%EA%B0%9C%EB%A1%9C%20%ED%99%95%EC%9D%B8%ED%95%9C%20%ED%8C%8C%EC%9D%BC%20%EC%A3%BC%EC%9D%B8%20%ED%91%9C">메일로 문의하기</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="merge-count">
+      <h2 id="merge-count">머지 13개 중 7개를 손으로 합쳤고, 번역 조각 파일은 0번이었습니다</h2>
+      <p>10월 10일 1시 51분 06초부터 53분 17초까지 통합 브랜치에 기능 브랜치 13개가 들어갔습니다. 계획서 표의 12개에 표에 없던 디자인 시스템 브랜치(UX0)가 더해진 수입니다. <code>git show --cc</code>로 머지마다 양쪽을 섞어 합친 구간(결합 hunk)이 남은 파일을 뽑으면 7개 머지에 그런 구간이 있습니다.</p>
+      <ul>
+        <li>앱 화면 패키지 4개(A2~A5)의 머지: 합본 <code>app_ko.arb</code>·<code>app_en.arb</code>와 거기서 생성한 Dart 파일 3개. CI 검사가 "합본이 조각과 다르면 병합 도구를 돌리고 커밋하라"고 요구해서, 브랜치마다 합본을 다시 만들어 커밋했습니다. 조각 파일 <code>parts/</code>는 13개 머지 어디에도 나오지 않았습니다.</li>
+        <li>미디어 패키지(M1) 머지: 함수 <code>index.ts</code>와 <code>errors.ts</code>. M1은 W0의 예정 export 16개에 없던 <code>confirmAssetUpload</code>를 추가했고, 오류 코드 목록 한 줄을 계정 패키지(F1)와 M1이 각자 고쳤습니다.</li>
+        <li>A1·A2 머지: R1이 주인인 <code>firestore.indexes.json</code>.</li>
+      </ul>
+      <p>나머지는 테스트 파일이었습니다. 머지 기준점과 각 브랜치를 <code>git diff --name-only</code>로 비교해 표와 맞춰 보면, 13개 중 8개 브랜치가 다른 칸의 파일을 고쳤습니다. 합본 번역 파일과 계획서가 각 패키지에 맡긴 fixture 파일은 뺀 수이고, B1의 공유 벡터 파일까지 넣으면 9개입니다. 계획서의 "Wave 1 이후 아무도 고치지 않는다"는 지켜지지 않았습니다. 의존성 파일에 두 줄, Gradle 파일에 두 줄, 매니페스트에 네 줄 같은 수정은 git이 조용히 합쳤고, 손 머지로 드러난 것은 같은 줄을 두 브랜치가 고친 경우뿐입니다. 8개 가운데 일부(M1, F1)는 stub 목록에 없던 엔드포인트(confirmAssetUpload)와 W0가 errors.ts에 미리 넣지 않은 오류 코드 때문이었습니다.</p>
+      <figure class="ax-fig"><img src="/assets/ax/file-owner-table-2-ko.webp" width="1200" height="801" alt="비교 그림: 주인 표가 막은 것은 번역 조각 파일 손 머지 0번, 계획서가 맡긴 fixture·공유 벡터 파일을 빼고 세면 F2·B1·A3·UX0의 다른 칸 파일 수정 0, stub 엔드포인트의 구현은 자기 handler 파일. 못 막은 것은 합본 번역 파일 손 머지 4개, stub 밖 엔드포인트와 W0가 미리 넣지 않은 오류 코드, 다른 칸을 고친 브랜치 8개, 계약 어긋남 6쌍과 결함 12건." loading="lazy"><figcaption>번역 조각 파일 손 머지는 0번, 다른 칸을 고친 브랜치는 13개 중 8개였습니다.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="contract-drift">
+      <h2 id="contract-drift">git이 조용했던 6쌍과 통합 리뷰의 12건은 파일 주인 표 밖의 문제였습니다</h2>
+      <p>머지 16분 뒤인 2시 9분, a0351cf "Wave 1 통합 깨짐 최소 수정"이 패키지 쌍 6개를 고쳤습니다. 앱의 유료 이용권 판정(A4)이 결제 서버(B1)의 구독 상태 규칙과 달랐고, 광고 동의 타입을 A4와 설정 패키지(A5)가 따로 선언했고, 오류 문구가 미디어 쪽 새 오류 코드를 몰랐습니다. 여섯 쌍 모두 서로 다른 파일이라 git 충돌은 없었습니다. 5시 28분의 5d51b5b는 통합 리뷰가 확정한 결함 12건과 minor 수정, 계약 문서 재고정을 함께 담은 커밋으로, 115파일에 2,088줄을 더했습니다. 보호자 판정을 함수 하나(<code>isGuardianOf</code>)로 모았고, 지금 보고 있는 가족이 누구인지는 화면 패키지 세 곳(A2·A3·A4)이 모두 <code>AppSession.currentHouseholdId</code> 한 값을 쓰게 했습니다. 빠진 색인 2개를 넣으면서 "앱의 orderBy 쿼리와 색인 표"를 대조하는 검사도 추가했습니다.</p>
+      <p>표에는 파일의 주인은 있었지만 "보호자"나 "현재 가족" 같은 개념의 주인은 없었습니다. 같은 개념을 두 번 정의한 것은 5d51b5b의 통합 리뷰에서야 보였습니다. 파일 주인 표는 텍스트 충돌을 줄이는 도구로 쓰고, 계약 어긋남은 통합 리뷰와 그 결과로 만든 검사에 맡기십시오. 한 기능을 여러 폴더에 걸쳐 바꾸는 리팩터링처럼 칸을 나눌 수 없는 작업에는 이 표를 써 보지 않았습니다.</p>
+    </section>
+
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">나누기 전에 적는 표 한 장과 머지 뒤에 돌리는 명령 두 개</h2>
+      <p>에이전트 수를 정하기 전에 공유 파일 목록과 주인부터 적으십시오. 같은 작업 트리를 쓰는 세션에는 커밋 권한을 주지 않습니다.</p>
+      <ol>
+        <li>여러 작업이 한 줄씩 보태야 하는 파일을 찾습니다. DI 컨테이너, 라우터, 엔드포인트 목록, 의존성 파일, 번역 합본, CI 설정, DB 색인이 후보입니다.</li>
+        <li>파일마다 주인을 한 명 정하고, 같은 행에 다른 작업이 대신 쓸 길(조각 파일, 레지스트리에 등록되는 자기 파일)을 적습니다. 빌드와 기기처럼 파일이 아닌 공유물에도 행을 하나 만듭니다.</li>
+        <li>주인 한 명이 연결 파일을 먼저 깝니다. 예정된 이름은 전부 stub로 등록합니다.</li>
+        <li>합본처럼 도구가 만드는 파일은 머지 뒤에 통합 담당이 다시 만듭니다. 이 사이트의 AGENTS.md도 같은 원칙입니다. 글 작성자는 <code>&lt;main&gt;</code>과 제목·설명만 고치고 <code>tools/build.py</code>를 돌리지 않으며, 생성 파일과 <code>&lt;main&gt;</code> 밖은 통합 빌드를 하는 빌드 주인 한 명이 맡습니다. 이 노트의 초안을 쓰는 에이전트들도 2026년 10월 26일 사이트 사본 하나를 함께 써서 서로의 글이 섞이고 지워진 뒤로 작성자마다 사본을 따로 받습니다.</li>
+        <li>같은 작업 트리를 쓸 수밖에 없다면: 편집 직전에 다시 읽기, 부분 Edit, commit·stash·reset·<code>--stop</code> 금지, Gradle은 <code>--no-daemon</code>, 성공 여부는 테스트 결과 XML의 시각으로 확인.</li>
+        <li>머지 뒤에 표가 샌 곳을 셉니다.<pre><code># 머지에서 양쪽을 섞어 합친 구간이 남은 파일
+git show --cc --format= &lt;merge&gt; | grep '^diff --cc'
+# 브랜치가 고친 파일을 표와 대조
+git diff --name-only $(git merge-base &lt;base&gt; &lt;branch&gt;) &lt;branch&gt;</code></pre>AXFamily에서는 첫 명령이 손 머지가 있는 머지 7개를 찾았고, 둘째 명령의 결과를 표와 대조하니 다른 칸을 고친 브랜치 8개가 나왔습니다.</li>
+      </ol>
+      <p>지침 파일에 이런 규칙을 어떻게 적는지는 <a href="/ax/agents-md/">AGENTS.md 작성법: AI 코딩 에이전트가 틀리기 쉬운 규칙만 적는다</a>에 따로 정리했습니다.</p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">아직 커밋되고 있는 합본 번역 파일과 개념 주인 칸</h2>
+      <p>AXFamily의 develop 브랜치에는 지금도 합본 <code>app_ko.arb</code>와 생성된 Dart 파일 3개가 git에 들어 있고, CI가 그 최신 여부를 검사합니다. 이 파일들을 머지 뒤 통합 담당만 다시 만들게 바꾸는 일은 아직 하지 않았습니다. 주인 표에 "개념" 행(보호자 판정, 현재 가족)을 더하면 5d51b5b 같은 통합 결함이 줄어드는지는 아직 시험하지 않았습니다.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20Claude%20%EC%84%B8%EC%85%98%20%EC%97%AC%EB%9F%AC%20%EA%B0%9C%EA%B0%80%20%ED%95%9C%20%EC%A0%80%EC%9E%A5%EC%86%8C%EB%A5%BC%20%EA%B3%A0%EC%B9%A0%20%EB%95%8C%3A%20%EB%A8%B8%EC%A7%80%2013%EA%B0%9C%EB%A1%9C%20%ED%99%95%EC%9D%B8%ED%95%9C%20%ED%8C%8C%EC%9D%BC%20%EC%A3%BC%EC%9D%B8%20%ED%91%9C">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>Claude Code 세션 두 개를 같은 작업 트리에서 돌려도 되나요?</summary><div><p>돌릴 수는 있지만, 운영자가 요청하지 않으면 어느 세션도 커밋하지 않게 하십시오. sugar-utils에서는 한 세션의 커밋 32fca47이 다른 세션이 만들던 파일 50개를 함께 담았습니다. 그 뒤로 같은 트리의 세션은 commit, stash, reset, <code>gradlew --stop</code>을 하지 않습니다.</p></div></details>
+        <details><summary>git worktree를 쓰면 병렬 에이전트 충돌이 없어지나요?</summary><div><p>작업 중 파일이 섞이는 문제는 없어지지만, 여러 작업이 함께 고치는 연결 파일의 충돌은 머지 때 그대로 나옵니다. 9월 20일 머지 4개 중 3개에서 AppContainer.kt를 손으로 합쳤습니다.</p></div></details>
+        <details><summary>gradlew --stop이 다른 프로젝트 빌드까지 멈추나요?</summary><div><p>같은 Gradle 버전으로 뜬 데몬이면 함께 끝납니다. Gradle 문서가 그렇게 적고 있고, 같은 PC에서 Gradle 9.6.0을 쓰던 다른 저장소의 clean 빌드 두 번이 "stop command received"로 끊겼습니다. 긴 빌드는 <code>--no-daemon</code>으로 돌리십시오.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
+        <li><a href="/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
+        <li><a href="/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
+        <li><a href="/ax/agent-review-refutation/">에이전트 84개가 돈 릴리스 전 검토: 발견마다 3명이 반박하고, 버틴 20건만 고쳤다</a></li>
+        <li><a href="/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
+        <li><a href="/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+      </ul>
+      <p><a href="/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="/ax/">AX 노트 전체 보기</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>한 가지 일을 간단하게 하는 Android 앱</p>
+        <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">앱</p>
+        <ul><li><a href="/apps/sugaralbum/">슈가앨범</a></li><li><a href="/apps/image-compress/">사진 용량 줄이기</a></li><li><a href="/apps/image-flip/">사진 반전·회전</a></li><li><a href="/apps/image-convert/">이미지 변환 JPG·PNG·WebP</a></li><li><a href="/apps/sugarspeller/">한글 띄어쓰기</a></li><li><a href="/apps/sugarclip/">SugarClip</a></li><li><a href="/apps/doc-viewer/">한글뷰어 슈가독</a></li><li><a href="/apps/sugarcard/">생생카드</a></li><li><a href="/apps/arrow-knots/">화살표 매듭풀기</a></li><li><a href="/apps/blocks/">한판블록</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">사이트</p>
+        <ul><li><a href="/apps/">모든 앱</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li><li><a href="/sitemap/">사이트맵</a></li><li><a href="/rss.xml">RSS 피드</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play 개발자 페이지</a></div>
+    </div>
+  </footer>
+</body>
+</html>

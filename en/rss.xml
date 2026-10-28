@@ -6,7 +6,343 @@
   <description>Small Android apps that each do one thing simply, from shrinking photos and opening Korean HWP documents to checking Korean spelling and playing puzzle games.</description>
   <language>en</language>
   <atom:link href="https://mvgood21.github.io/en/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Wed, 28 Oct 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Thu, 29 Oct 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Claude Code sessions in one repo: file owner table – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/file-owner-table/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/file-owner-table/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/file-owner-table-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · How-to</span>
+      <h1>Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</h1>
+      <p class="lead">After one commit carried off 50 files another session was still writing, we started splitting parallel work with a table that gives every shared file exactly one owner.</p>
+      <p>Commit 32fca47 was supposed to fix a launch crash in release 1.0.3. It changed 74 files, and 50 of them belonged to the next app, which a second Claude Code session was building in the same working tree. That was September 23, 2026, in SugarMount's utility app repository (sugar-utils). Sixteen days later the family calendar app AXFamily wrote a plan around a shared-file owner table, and the next day merged 13 feature branches in 2 minutes 11 seconds. Seven of those merges needed hand-merged hunks. None were in the per-feature translation files; they came from committed translation output (four merges), names and error codes missing from the stub list (M1), an index file in R1's row (A1, A2), and test files (F2).</p>
+      <p class="note">Sources: git history of both repositories (32fca47, ca1ade4, merges 3e9d0cb to e5f9798 and 58920b9 to ff0c975, a0351cf, 5d51b5b), AXFamily's release plan of 2026-10-09, memory notes the sessions left at the time, and this site's AGENTS.md. Hand-merge counts were redone with <code>git show --cc</code> on 2026-10-28.</p>
+    </section>
+    <section aria-labelledby="swept-commit">
+      <h2 id="swept-commit">A release fix shipped 50 files from a session next door</h2>
+      <p>On the evening of September 23 two sessions shared the sugar-utils working tree. One was finishing the 1.0.3 release of the image compressor (U01); the other was building the next app, <a href="https://mvgood21.github.io/en/apps/image-flip/">Flip &amp; Rotate Image</a> (U02). At 22:24 the U01 session committed 32fca47. Its message lists a fix for a constructor R8 had stripped, a release launch script, and analytics defaults. The diff added 3,946 lines across 74 files, including 50 files (3,313 lines) under <code>apps/sugarflip/</code> and <code>docs/store/sugarflip/</code> and 5 files (428 lines) in the shared image engine <code>core/images</code>, all of it U02 work in progress. The U02 session's memory note calls it a sweep "in <code>git add -A</code> style". U02's engine and screens got a commit with a real description the next afternoon, in 7821dbd.</p>
+      <p>The same commit added <code>scripts/qa/release_launch.sh</code>, and line 13 of that script was <code>./gradlew --stop</code>. Per the Gradle docs, <code>--stop</code> terminates every daemon started with the same Gradle version. A session on the same PC was building the Korean spacing app, also on Gradle 9.6.0, and its memory note records two clean builds that day dying with <code>Gradle build daemon has been stopped: stop command received</code>.</p>
+      <p>Each session blamed the neighbour. The U02 session wrote that the stops came from the spacing app's build; the spacing app's session pointed at sugar-utils. Across the full history of both repositories, the only <code>--stop</code> is that line in 32fca47's script. Nothing records who ran it or when. The line stayed for 15 days, until ca1ade4 replaced it with <code>--no-daemon</code> on October 8.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/file-owner-table-1-en.webp" width="1200" height="970" alt="Step diagram: on Sep 20 AppContainer.kt is hand-merged in 3 of 4 worktree merges; on Sep 23 commit 32fca47 carries 50 files from another session and a --stop line; a no-commit rule for shared trees and, on Oct 8, --no-daemon; on Oct 9 an owner table and 16 registered exports (9 stubs); on Oct 10, 7 of 13 merges need hand merging and per-feature translation files none." loading="lazy"><figcaption>Conflicts landed on wiring files with no owner; after the owner table and stubs, hand merges came from committed translation output, names outside the stubs, an index file in another row, and test files.</figcaption></figure>
+    </section>
+    <section aria-labelledby="why-git-missed">
+      <h2 id="why-git-missed">In a shared working tree, git cannot tell your change from theirs</h2>
+      <p>In one working tree git has no conflict to flag: both sessions' edits sit in the same index, and whichever session commits first becomes the owner of every file in the tree at that moment. With no per-file owner written down, an agent has no basis for deciding which changes are its own. The Gradle daemon had the same shape: not a file, but something every session on the PC used, and any session could stop it.</p>
+      <p>The U02 session wrote rules into its memory note that night. Re-read a shared file (AGENTS.md, the backlog, CHANGELOG, templates) right before editing it, and use a targeted Edit, not a full Write. Never commit, stash, reset or run <code>gradlew --stop</code>. Expect another session to kill a build, so check the timestamps on the test-result XML and rerun instead of trusting an exit code. The same rules now sit in the operator's global instructions, which apply to every project, next to a line saying long Gradle builds run with <code>--no-daemon</code>.</p>
+    </section>
+    <section aria-labelledby="worktree-wiring">
+      <h2 id="worktree-wiring">Separate worktrees still hand-merged AppContainer.kt in 3 of 4 merges</h2>
+      <p>We had already tried separate working trees. On September 20 the repository was created at 23:10, and four foundation tasks (file handling, image engine, ads and billing, analytics) went to subagents, each in its own git worktree. Four branches merged between 23:28 and 23:40, two more by 00:26, six in all. <code>git show --cc</code> shows <code>AppContainer.kt</code> hand-merged in 3 of the 4 foundation merges. The repo's first ADR says "No DI framework; a manual AppContainer per app", so every foundation task had to add its own lines to that one file.</p>
+      <p>Worktrees keep work-in-progress files apart. A wiring file that every task appends to is still shared, and the conflict moves to merge time. The game repository gave each workstream an "exclusive files" column, described in <a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">"Use hundreds of agents" in practice: 10 workstreams, 59 commits in a day, three running at once</a>. AXFamily wrote a separate table for the shared wiring files that column left out.</p>
+    </section>
+    <section aria-labelledby="owner-table">
+      <h2 id="owner-table">AXFamily's plan gave each shared file an owner and a route for everyone else</h2>
+      <p>The October 9 release plan put this first in its conclusions: one Wave 0 agent lays down every shared file up front, and nobody edits those files from Wave 1 on. Section 2, "rules for parallel work conflicts", is a three-column table. Condensed:</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Shared file</th><th>Owner</th><th>How other packages work</th></tr></thead>
+        <tbody>
+          <tr><td>Contract schema and generated code</td><td>W0 contract lane</td><td>Don't touch; queue new contracts as follow-up PRs to W0</td></tr>
+          <tr><td><code>firestore.rules</code>, index file</td><td>R1</td><td>Put test JSON in <code>rules-tests/fixtures/&lt;pkg&gt;/</code> only</td></tr>
+          <tr><td>Functions <code>index.ts</code>, <code>errors.ts</code>, etc.</td><td>W0</td><td>W0 registers every planned export as a stub (<code>NOT_IMPLEMENTED</code>); each package fills only its own handler file</td></tr>
+          <tr><td>App shell (pubspec, router, service registry, manifest, Gradle files)</td><td>W0</td><td>Routes, ad rules and channels ship as files in the feature folder; W0's registries collect them</td></tr>
+          <tr><td>Merged translations <code>app_ko.arb</code></td><td>W0's merge tool</td><td>Each feature writes only <code>parts/&lt;f&gt;_ko.arb</code>; the tool merges</td></tr>
+          <tr><td>CI workflow</td><td>W0</td><td>Add one check file; it is auto-discovered</td></tr>
+          <tr><td>Gradle builds, devices</td><td>none</td><td>One at a time regardless of worktree, <code>--no-daemon</code></td></tr>
+        </tbody>
+      </table></div>
+      <p>W0 laid these files down serially (merged at 19:54 on October 9). Then the 12 packages in the Wave 1 table worked in parallel inside the folders listed in its "main files (exclusive)" column. Talking it out between sessions in one tree had produced 32fca47 and its 50 swept files; worktrees alone had hand-merged AppContainer.kt in 3 of 4 merges. One session doing all 12 packages in sequence would avoid conflicts; we never measured how long that would take.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Several%20Claude%20Code%20sessions%2C%20one%20repo%3A%20the%20file%20owner%20table%2C%20checked%20against%2013%20merges">Email us</a></p></aside>
+    <section aria-labelledby="merge-count">
+      <h2 id="merge-count">Seven of 13 merges needed hand merging; the per-feature translation files never did</h2>
+      <p>Between 01:51:06 and 01:53:17 on October 10, 13 feature branches went into the integration branch: the plan's 12 plus a design-system branch (UX0) that had no row in the plan. Listing, per merge, the files that still have combined hunks in <code>git show --cc</code> gives seven merges:</p>
+      <ul>
+        <li>Four app-screen packages (A2 to A5): the merged <code>app_ko.arb</code> and <code>app_en.arb</code> plus three Dart files generated from them. A CI check fails when the merged file differs from the parts and says to run the merge tool and commit, so every branch regenerated and committed it. The <code>parts/</code> files appear in none of the 13 merges.</li>
+        <li>The media package (M1): functions <code>index.ts</code> and <code>errors.ts</code>. M1 added <code>confirmAssetUpload</code>, which was not among W0's 16 planned exports, and both the account package (F1) and M1 edited the same error-code line.</li>
+        <li>A1 and A2: <code>firestore.indexes.json</code>, which R1 owns.</li>
+      </ul>
+      <p>The rest were test files. Diffing each branch against its merge base with <code>git diff --name-only</code> and checking the table, 8 of 13 branches edited a file in someone else's row. That count leaves out the merged translations and the fixture files the plan assigned to each package; with B1's shared vector file it would be 9. Git merged two lines in the dependency file, two in a Gradle file and four in the manifest with no conflict; hand merges only exposed cases where two branches touched the same line. The plan's "nobody edits from Wave 1 on" did not hold; for some of the 8 (M1, F1), the reason was an endpoint the stub list did not name and error codes W0 had not put in errors.ts.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/file-owner-table-2-en.webp" width="1200" height="871" alt="Comparison: the owner table stopped hand merges on per-feature translation files (0), kept F2, B1, A3 and UX0 out of other rows (not counting fixture/shared-vector files the plan assigned to them), and kept stubbed implementations in handler files; it did not stop 4 hand merges of committed translation output, the endpoint outside the stubs and error codes W0 had not added, 8 of 13 branches editing another row&#x27;s file, or 6 contract mismatches and 12 review defects." loading="lazy"><figcaption>Per-feature translation files needed 0 hand merges; 8 of 13 branches edited a file in another row.</figcaption></figure>
+    </section>
+    <section aria-labelledby="contract-drift">
+      <h2 id="contract-drift">Six mismatches git never saw, and 12 review defects, sat outside the table</h2>
+      <p>At 02:09, sixteen minutes after the merges, a0351cf ("minimal fix for Wave 1 integration breakage") repaired six package pairs. The app's paid-plan check (A4) disagreed with the billing server's (B1) subscription states, A4 and the settings package (A5) each declared their own ad-consent type, and the error copy didn't know the media package's new error codes. All six pairs lived in different files, so git raised no conflict. At 05:28, 5d51b5b fixed the 12 defects the integration review confirmed plus minor issues and a contract re-baseline, adding 2,088 lines across 115 files. Guardian checks were pulled into one function (<code>isGuardianOf</code>), and the three screen packages A2, A3 and A4 were made to read which family is being viewed from a single value, <code>AppSession.currentHouseholdId</code>. Two missing indexes went in with a new check that compares the app's orderBy queries with the index table.</p>
+      <p>The table named an owner for every shared file and none for concepts such as "guardian" or "current family". The double definitions showed up only in the integration review behind 5d51b5b. Use the owner table to cut text conflicts, and leave contract drift to an integration review plus the checks that review produces. We have not tried the table on work that cannot be split into rows, such as a refactor that cuts across many folders.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">One table before splitting, two commands after merging</h2>
+      <p>Write the shared-file list and its owners before you decide how many agents to run. Sessions that share a working tree get no commit rights.</p>
+      <ol>
+        <li>Find the files every task has to add a line to: DI container, router, endpoint list, dependency file, merged translations, CI config, database indexes.</li>
+        <li>Give each one owner, and on the same row write the route others use instead (a parts file, a file of their own that a registry picks up). Shared things that are not files, like builds and devices, get a row too.</li>
+        <li>The owner lays the wiring files down first and registers every planned name as a stub.</li>
+        <li>Files a tool generates, like a merged bundle, are regenerated after the merge by whoever integrates. This site's AGENTS.md works the same way: content authors edit only <code>&lt;main&gt;</code>, the title and the description, never run <code>tools/build.py</code>, and leave generated files and everything outside <code>&lt;main&gt;</code> to the one build owner who runs the integration build. The agents drafting these notes each get their own copy of the site since October 26, 2026, when three of them shared one copy and mixed up and deleted each other's drafts.</li>
+        <li>If sessions must share a working tree: re-read before editing, targeted Edits, no commit, stash, reset or <code>--stop</code>, Gradle with <code>--no-daemon</code>, and judge success by the test-result XML timestamps.</li>
+        <li>After merging, count where the table leaked.<pre><code># files that still have combined hunks in a merge
+git show --cc --format= &lt;merge&gt; | grep '^diff --cc'
+# files a branch changed, to check against the table
+git diff --name-only $(git merge-base &lt;base&gt; &lt;branch&gt;) &lt;branch&gt;</code></pre>In AXFamily the first command found the 7 hand-merged merges; checking the second command's output against the table gave the 8 branches outside their rows.</li>
+      </ol>
+      <p>How to phrase rules like these in an instruction file is covered in <a href="https://mvgood21.github.io/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a>.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Still committed: the merged translation files, and no row for concepts</h2>
+      <p>AXFamily's develop branch still tracks the merged <code>app_ko.arb</code> and the three generated Dart files, and CI checks that they are current. Moving their regeneration to the integrator after each merge has not been done yet. Whether adding "concept" rows (guardian check, current family) to the owner table would cut defects like those in 5d51b5b is untested.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Several%20Claude%20Code%20sessions%2C%20one%20repo%3A%20the%20file%20owner%20table%2C%20checked%20against%2013%20merges">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Can two Claude Code sessions work in the same working tree?</summary><div><p>They can, as long as neither commits unless the operator asks. In sugar-utils one session's commit, 32fca47, carried 50 files another session was still writing. Since then, sessions in a shared tree do not commit, stash, reset or run <code>gradlew --stop</code>.</p></div></details>
+        <details><summary>Do git worktrees remove conflicts between parallel agents?</summary><div><p>They stop work-in-progress files from mixing, but wiring files that several tasks edit still conflict at merge time. On September 20, AppContainer.kt was hand-merged in 3 of 4 merges.</p></div></details>
+        <details><summary>Does gradlew --stop stop builds in other projects?</summary><div><p>It does when their daemons run the same Gradle version. The Gradle docs say so, and two clean builds of another repository on the same PC, also on Gradle 9.6.0, died with "stop command received". Run long builds with <code>--no-daemon</code>.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Thu, 29 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Why R8 kept 5 AdMob test IDs in a release AAB – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/release-ad-id-grep/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/release-ad-id-grep/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/release-ad-id-grep-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Measurement</span>
+      <h1>R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</h1>
+      <p class="lead">Four ad unit checks wrapped in listOf(...).any were something R8 could not fold, so 5 test ad strings stayed in the release dex. A plain || over the same constants left none.</p>
+      <p>The first real-ID bundle for <a href="https://mvgood21.github.io/en/apps/blocks/">Block Turn</a> version code 2, built before upload at 17:16 on October 4, 2026, held 4 real ad unit strings and 5 Google test ad strings in its dex. It had passed the Gradle guard. A rebuild two minutes later overwrote it, so it was never uploaded, and the version code 2 we did upload has no test strings. With all real IDs present, either version of the code picks the real units at runtime.</p>
+      <p class="note">Sources: git history of our game repository (575aaa1, 1aecbc2, 301bc9e), the launch rehearsal checklist and that day's agent session log. On 2026-10-28 we recounted three bundles and two APKs and built a small R8 reproduction. No ID value was printed.</p>
+    </section>
+    <section aria-labelledby="gate-passed">
+      <h2 id="gate-passed">The bundle passed the Gradle guard with 5 test strings inside</h2>
+      <p>Money.kt gives a debug build, or a build with any empty ad unit field in BuildConfig, <code>AdUnits.TEST</code>, the set of Google test units; anything else gets the real ones. Version code 1, built at 12:25 that day, only checked the banner field, and when we counted that bundle on October 28 it had 4 real ad units and 0 test strings.</p>
+      <p>At 16:14 Claude Code widened the check to all four units, so that a build missing any one unit would treat itself as having no real IDs and use test units for all four. The comment it left says "never a half-real mix". This is the line:</p>
+      <pre><code>units = if (BuildConfig.DEBUG || listOf(BuildConfig.AD_BANNER, BuildConfig.AD_INTERSTITIAL,
+        BuildConfig.AD_REWARDED, BuildConfig.AD_APP_OPEN).any { it.isEmpty() }) AdUnits.TEST
+    else AdUnits(BuildConfig.AD_BANNER, BuildConfig.AD_INTERSTITIAL, BuildConfig.AD_REWARDED, BuildConfig.AD_APP_OPEN)</code></pre>
+      <p>In the same hour a review agent showed that the old Gradle guard, which decided by task name, could be bypassed. The agent moved the check into a <code>checkReleaseAdIds</code> task hooked to <code>preReleaseBuild</code>, which every release variant runs. That guard only looks at its input, ads.properties.</p>
+      <p>The agent committed at 17:14 (575aaa1) and built the bundle with the real IDs; the guard passed. The checklist's build step asked for the guard and the signature. The agent also ran <code>grep -c</code> over the dex strings, printing no values: 4 for our publisher number, 5 for the test publisher number. All 5 strings of <code>AdUnits.TEST</code> (banner, interstitial, rewarded, rewarded interstitial, app open) were in the dex.</p>
+      <p>The 16:14 comment and the review brief covered runtime behavior only; nobody checked whether R8 removed the branch until the dex of a build was counted.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/release-ad-id-grep-1-en.webp" width="1200" height="894" alt="Step diagram: at 12:25 vc1 has 4 real ad units and 0 test strings; at 16:14 the check is widened with listOf any; at 16:49 a code review makes 19 findings but misses the test strings; at 17:16 the first real-ID bundle, before upload, passes the Gradle guard but carries 5 test strings; at 17:18 a plain or over the constants brings it to 0." loading="lazy"><figcaption>The first real-ID bundle passed the Gradle guard, and the code review had not flagged the line; a dex count found the 5 test IDs.</figcaption></figure>
+    </section>
+    <section aria-labelledby="why-r8">
+      <h2 id="why-r8">R8 could not evaluate the listOf condition at build time</h2>
+      <p>In a real-ID build the condition is always false, yet R8 could not work that out at build time and kept the branch that returns <code>AdUnits.TEST</code>. On October 28 we reproduced it in a small project: a BuildConfig of the same shape and a 5-string test set, all dummy strings, and both versions of the condition. We compiled it with Kotlin 2.3.21 and shrank it with R8 9.4.24, the version bundled with Android Gradle Plugin 9.4.1, using that plugin's proguard-android-optimize.txt unchanged. The listOf version left 5 test strings and 4 real ones in the dex. The <code>||</code> version left only the 4 real ones.</p>
+      <p>In javap output, kotlinc has already inlined the BuildConfig constants as string literals in both versions. The listOf version puts the four into an array, builds a list with <code>listOf</code>, and walks it with an Iterator, calling <code>length()</code> on each element. In R8's output dex the <code>listOf</code> call has become <code>Arrays.asList</code>, and the Iterator loop is still there. The <code>||</code> version calls <code>length()</code> directly on each literal; R8 computed those, folded the whole condition to false and dropped the test branch. Version code 1, which checked the banner alone, had the same shape and 0 test strings.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/release-ad-id-grep-2-en.webp" width="1200" height="655" alt="Comparison: the listOf any form goes through a list and an Iterator loop, R8 cannot evaluate it and 5 test strings remain; the plain or form lets R8 evaluate the condition to false and 0 test strings remain." loading="lazy"><figcaption>Two conditions that mean the same thing: the listOf form left 5 test strings, the || form left none.</figcaption></figure>
+      <p>Write test-unit fallbacks as a plain <code>||</code> over BuildConfig constants, and don't wrap them in collection functions (we only measured <code>any</code>). Another case where we read R8's output by the numbers: <a href="https://mvgood21.github.io/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized</a>.</p>
+    </section>
+    <section aria-labelledby="missed">
+      <h2 id="missed">The review agent made 19 findings and missed the test strings</h2>
+      <p>The 16:49 review agent read the whole change without building it. Its brief listed "if any ad unit is empty, use TEST for all" and "what could break under R8 (keep rules for the Review API)". It came back with 2 high, 6 medium and 11 low findings, and none of them said the release would keep the test strings.</p>
+      <p>The Gradle guard only sees inputs, so it could not catch this. At 16:55 the agent had counted the dex of the measurement build (<code>-PallowTestAds</code>) the same way and logged "0 real, 5 test" in row 0-4 of the rehearsal checklist; at 17:16 it ran the same check on the real-ID build. The top of the checklist says not to write secrets down. Our full pre-upload checks are in <a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>.</p>
+      <p>The fix landed at 17:18 (1aecbc2). The agent described it as a change that removes the test ID strings from a real-ID build. The 17:42 commit (301bc9e) records the check that followed: 4 real, 0 test.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20R8%20kept%205%20AdMob%20test%20IDs%20in%20our%20release%20build%3A%20one%20listOf%28%29.any%20line%20and%20a%20dex%20count">Email us</a></p></aside>
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">Why the debug source set is a poor home for the test units here</h2>
+      <p>Moving the test units into the debug source set would keep them out of release builds entirely. It does not fit Block Turn. The <code>-PallowTestAds</code> build we use for device measurements and monkey runs is a release variant, and it has to ignore ads.properties and run on test units, because automated taps on real ads count as invalid clicks.</p>
+      <p>Left alone, every real-ID build would carry 5 test strings, "0 test strings" could no longer be the pass condition, and each time someone would have to work out whether those strings are dead code. So the condition was rewritten into a shape R8 folds. Today the input guard runs before the build, and the dex count is still run by hand after it.</p>
+    </section>
+    <section aria-labelledby="count-steps">
+      <h2 id="count-steps">Counting ad IDs in the dex without printing them</h2>
+      <p>Don't decide what went into a release by reading code. Count it in the build output. These are the Git Bash commands we used for the October 28 recount; the publisher number is read into a variable and never echoed.</p>
+      <pre><code># 1. Read your publisher number into a variable (not printed)
+MY_PUB=$(sed -n 's/^admob\.banner=[^0-9]*\([0-9]*\)\/.*/\1/p' app/ads.properties)
+TEST_PUB=...   # the 16-digit test publisher number from Google's test ads page
+A=app/build/outputs/bundle/release/app-release.aab   # for an APK use 'classes*.dex'
+# 2. Your ad units: must equal the number of units the app uses
+unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$MY_PUB/[0-9]*" | sort -u | wc -l
+# 3. Test strings: must be 0 in a real-ID build
+unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$TEST_PUB[~/][0-9]*" | sort -u | wc -l</code></pre>
+      <p>These commands give 4 and 0 for the vc1, vc2 and October 25 bundles, and 0 and 5 for the <code>-PallowTestAds</code> APK from October 25. For the check before the build, hook it to <code>preReleaseBuild</code> instead of guessing from task names:</p>
+      <pre><code>tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    if (!allowTestAds) dependsOn(checkReleaseAdIds)
+}</code></pre>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">Counting by prefix alone picks up one string from UMP</h2>
+      <p>Counted by the ad ID prefix alone on October 28, each of the three bundles showed 5. Four were our ad units (the '/' form). The fifth was an app ID-shaped string ('~' form) under a different publisher. Searching 135 Google Play services, consent library (UMP, user-messaging-platform) and Firebase library files in the Gradle cache found the same string in UMP 4.0.0. Count with your own publisher number and the '/' to get 4.</p>
+      <p>A <code>-PallowTestAds</code> build is supposed to carry the 5 test strings, so the check only applies to real-ID builds. Because it runs after the build, all it can stop is the upload. The R8 reproduction covers one version (9.4.24) and one shape, a BuildConfig string constant; we did not test IDs read from resources or remote config. The manifest app ID is not in the dex; checklist row 1-7 covers it.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Arrow Knots still guesses from task names</h2>
+      <p>Arrow Knots, the other game in the same repository, still checks only the banner field as of the October 27 commit, and its release guard still looks for "release" in task names. Moving it to the <code>checkReleaseAdIds</code> setup and turning the hand-run dex count into a script in the repository are the next jobs.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20R8%20kept%205%20AdMob%20test%20IDs%20in%20our%20release%20build%3A%20one%20listOf%28%29.any%20line%20and%20a%20dex%20count">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Does listOf().any change how the app behaves?</summary><div><p>It doesn't. With all real IDs present, both versions pick the real units.</p></div></details>
+        <details><summary>Would all or none instead of any also keep the branch?</summary><div><p>We haven't measured those. Until we do, we write the fallback as a plain || over the constants.</p></div></details>
+        <details><summary>Do these commands work on Windows?</summary><div><p>Git Bash ships unzip, grep, sort and wc, so they run as written there.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Thu, 29 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Play Billing subscription screen &#x27;temporary error&#x27; – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/subscription-details-94-percent/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/subscription-details-94-percent/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/subscription-details-94-percent-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>A month of 'temporary error': our subscription details screen never waited for products, and 1 of 16 users started checkout</h1>
+      <p class="lead">The details screen asked Play Billing for products, then checked on the very next line whether the list was empty, and sent anyone without cached products back to the main screen.</p>
+      <p>Over 90 days, 16 users opened the subscription details screen in our Korean spell checker app, and 1 started checkout. We pulled that funnel from GA4 on September 26, 2026, because of one Play review with 18 "helpful" votes: trying to subscribe to the premium plan gave a "temporary error", and had for a month. Commit 9290f91 that day made the screen wait up to 8 seconds for products. Version 1.6.025 shipped on October 1, and at the interim check on October 17, 4 of the 13 users who opened the details screen had started checkout (31%).</p>
+      <p class="note">Sources: the app repository's git history (9290f91, 023dd3c, a839c87, 6eb49a1, plus commits from 2023 and 2024), the CHANGELOG entries for Sep 26 and Sep 30, the WATCH.md monitoring log, and the work session logs for Sep 26 to 30, 2026. User counts are GA4 users.</p>
+    </section>
+    <section aria-labelledby="funnel">
+      <h2 id="funnel">The 90-day funnel: 45 on the plans screen, 16 on details, 1 at checkout</h2>
+      <p>On September 26 we pulled the subscription events for our Korean spell checker, <a href="https://mvgood21.github.io/en/apps/sugarspeller/">SugarSpeller</a>, counted by user, over 90 days. 45 users saw the plans screen, 16 went on to the details screen where you pick a billing period, and 1 started checkout. Fifteen of the sixteen (94%) left the details screen without starting a purchase. The details-screen events split 18 premium and 2 basic, spread across seven versions between 1.6.016 and 1.6.024.</p>
+      <p>The "temporary error" in the review is the app's generic retry toast, which in Korean reads roughly "A temporary error occurred. Please try again."</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/subscription-details-94-percent-1-en.webp" width="1200" height="592" alt="Bar chart: over the 90 days before the fix, 16 users reached the subscription details screen and 1 started checkout; after version 1.6.025, 4 of 13 (31%) started checkout." loading="lazy"><figcaption>Checkout starts from the details screen went from 1 in 16 users to 4 in 13.</figcaption></figure>
+    </section>
+    <section aria-labelledby="same-function">
+      <h2 id="same-function">The function that requested products judged an empty list one line later</h2>
+      <p><code>addSubsItems()</code> on the details screen launched a coroutine in <code>lifecycleScope</code> that waited on the product flow with <code>firstOrNull()</code>, and then, further down the same function, checked the list size straight away. Trimmed, the old code looked like this:</p>
+      <pre><code>getProductDetails(repo.premiumProductDetails)   // inside: launch { flow.firstOrNull() }
+if (recyclerAdapterSubscription!!.mItemList!!.size &lt;= 0) {
+    Toast.makeText(..., R.string.string_common_error_retry, ...).show()
+    startActivity(main screen)
+}</code></pre>
+      <p>If the billing manager's StateFlow already held the product, <code>firstOrNull()</code> returned on the spot and the list filled. If not, the coroutine suspended, the function moved on, and the size check saw an empty list. Every user whose products were not already cached got the toast and landed back on the main screen. The size check came in with a commit on January 4, 2024; the <code>firstOrNull()</code> call with one on October 3, 2024.</p>
+      <p>9290f91 turned the check into a wait. The screen now shows a progress dialog and waits inside <code>withTimeoutOrNull(8_000)</code>; only if nothing arrives in 8 seconds does it show the toast and go back. The code comment gives the reasoning: connecting to billing and querying products usually takes 1 to 2 seconds, so wait several times that. We did not measure a latency distribution to pick 8 seconds.</p>
+    </section>
+    <section aria-labelledby="size-two">
+      <h2 id="size-two">The 2024 belief that Play 'sometimes splits the response' came from our own for loop</h2>
+      <p><code>BillingClientManager</code> stored the products Play returned only <code>if(newMap.size &gt;= 2)</code>, that is, only when basic and premium arrived in the same response. The commit that added the line, on October 4, 2024, says the product details response "intermittently comes in separately or together", so only store it when both arrive at once.</p>
+      <p>The split came from the app. Since December 30, 2023, <code>queryProductDetails()</code> had called <code>queryProductDetailsAsync</code> inside the loop that built the product list, once per iteration. With two products, that sent a one-product query and then a two-product query, and the responses came back as a one-item list and a two-item list. The 2024 fix hid the symptom by throwing away the one-item response. In exchange, whenever Play returned only one product (for example when one product's base plan is turned off), the map stayed empty for good.</p>
+      <p>9290f91 queries once and merges whatever arrives into the existing map. In Play Billing Library 9.1.0, <code>QueryProductDetailsResult</code> reports products Play could not return in <code>unfetchedProductList</code>; we now log it, which separates Play Console setup problems from app problems.</p>
+    </section>
+    <section aria-labelledby="test-product-details">
+      <h2 id="test-product-details">Three of the agent's first five tests stopped at Mockito</h2>
+      <p>The fix was made with an AI coding agent (Claude Code), tests first: three Robolectric screen tests (waits while products are missing, lists plans when they arrive late, errors only when they never arrive) and two billing manager tests (single-product response, split responses merged). All five failed on the first run, but three of them were not reproducing the bug:</p>
+      <pre><code>java.lang.NullPointerException: Cannot invoke "org.mockito.plugins.MockMaker$TypeMockability.mockable()" because "typeMockability" is null</code></pre>
+      <p>The agent had mocked <code>ProductDetails</code> with Mockito. The class is final, and this project's test classpath mixes in <code>mockito-android</code>, so final mocks could not be created, and we dropped the mock. <code>ProductDetails</code> has a package-private constructor that takes a JSON string, so a test helper, <code>TestProductDetails</code>, lives under the same package name, <code>com.android.billingclient.api</code>, and builds real objects from the JSON shape Play sends (productId, type, subscriptionOfferDetails, pricingPhases). On the next run all five failed for the intended reasons: the screen test with "sent the user to main even though products simply had not arrived yet", the merge test expecting basic and premium and getting an empty set. After the fix they passed. A trimmed version of the helper, with product IDs and price replaced by placeholders:</p>
+      <pre><code>package com.android.billingclient.api   // test sources; the constructor is package-private
+fun subscriptionMonthly(productId: String, basePlanId: String): ProductDetails {
+    val phase = JSONObject().put("priceAmountMicros", 1_000_000_000).put("priceCurrencyCode", "KRW")
+        .put("formattedPrice", "KRW 1,000").put("billingPeriod", "P1M").put("recurrenceMode", 1)
+    val offer = JSONObject().put("basePlanId", basePlanId).put("offerIdToken", "token-$basePlanId")
+        .put("offerTags", JSONArray()).put("pricingPhases", JSONArray().put(phase))
+    val json = JSONObject().put("productId", productId).put("type", "subs")
+        .put("title", productId).put("name", productId).put("description", "test")
+        .put("subscriptionOfferDetails", JSONArray().put(offer))
+    return ProductDetails(json.toString())     // a real object, not a mock
+}
+// usage: subscriptionMonthly("premium", "premium-monthly")</code></pre>
+    </section>
+    <section aria-labelledby="s21-billing">
+      <h2 id="s21-billing">On a Galaxy S21 the screen still bounced, and a rebuild from the Sep 26 evening code did the same</h2>
+      <p>On September 28 we opened the details screen on a Galaxy S21. The progress indicator spun, the screen closed, and the app went back to main. The first suspect was the changes from the past two days, so we built a release APK from the Sep 26 evening code (which already had 9290f91) and installed it on the same phone. It failed the same way, after 8 seconds. The billing connection's error was <code>In-app billing API version 3 is not supported</code>, and the phone's Google Play services build was from December 2024.</p>
+      <p>The phone was the cause, but two app defects showed up with it. When billing setup ended in failure, no disconnect callback followed, so nothing ever reconnected; until the app was restarted, the screen waited the full 8 seconds every time and then showed a "please try again" that had nothing to do with the cause. Commit 023dd3c the same day made the billing manager expose a connection state (connecting, ready, or unavailable with a response code). In 1.6.025 the wait looks like this:</p>
+      <pre><code>repo.ensureConnected()                       // reconnect if an earlier attempt failed
+popupDialog.showDialog(POPUP_TYPE.PROGRESS, true)
+lifecycleScope.launch {
+    val outcome: Any? = try {
+        withTimeoutOrNull(PRODUCT_LOAD_TIMEOUT_MS) {   // 8_000L
+            merge(source, repo.connectionState.filterIsInstance&lt;BillingConnectionState.Unavailable&gt;())
+                .firstOrNull()                        // products or a failed connection, whichever comes first
+        }
+    } finally { popupDialog.stopDialog() }
+    // Unavailable: (on BILLING/SERVICE_UNAVAILABLE) "check the Play Store" + subscription_unavailable / null (over 8 s): retry toast / else: list the plans
+}</code></pre>
+      <p>On <code>BILLING_UNAVAILABLE</code> it skips the wait, tells the user to check the Play Store, and sends a <code>subscription_unavailable</code> event to GA4.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20month%20of%20%27temporary%20error%27%3A%20our%20subscription%20details%20screen%20never%20waited%20for%20products%2C%20and%201%20of%2016%20users%20started%20checkout">Email us</a></p></aside>
+    <section aria-labelledby="seven-defects">
+      <h2 id="seven-defects">The day after 'ready to ship', the operator's own test on an S23 led to seven more billing defects</h2>
+      <p>On September 29, version 1.6.025 was logged as ready to ship (the review process that day is in <a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release</a>). The next morning the operator installed the latest build on a Galaxy S23, tried subscribing, reported that it was not working, and said the release could not go out like this. That prompted another round on the S21 with agent cross-checking: three analysis agents, two refutation passes, three fix agents and two adversarial reviews. It found seven billing defects that had been in the app since 1.6.024 or earlier:</p>
+      <ol>
+        <li>When the purchase sheet failed immediately, the progress indicator never went away, and a background thread kept one CPU core busy.</li>
+        <li>The billing setup callback wrote OK into the same global value as purchase results, which read as "subscription complete".</li>
+        <li>A PENDING purchase was treated as a success.</li>
+        <li>Every return to the app created a new BillingClient (a leak), and the Classic screen saw an empty purchase list before the query finished and saved subscribers as free users.</li>
+        <li>The Chat screen did not apply benefits after a purchase.</li>
+        <li>Starting checkout without knowing the current purchases let an existing subscriber buy a second subscription.</li>
+        <li>A screen's onDestroy closed the billing connection the whole app shared.</li>
+      </ol>
+      <p>a839c87 moved purchase results into their own flow, separate from connection state, and read purchases from a signal that fills only after a successful query, so a user is downgraded only when the query succeeded and found no active subscription. 6eb49a1 re-queries purchases right before checkout and does not open the purchase sheet when they are unknown. Counting every fix that day, unit tests went from 250 to 292.</p>
+      <p>We never read the S23's logs, but the same test on the S21 showed the problem was how we were testing. A sideloaded release build that was never uploaded to Play gets Play's "Google Play billing is not available for this version" message, and the debug build, whose package name ends in <code>.debug</code>, has no products registered in Play. The only way to run a real purchase end to end is to upload to the internal testing track and install from Play with a license tester account, so that check became a step in the release procedure (b88e9bf).</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/subscription-details-94-percent-2-en.webp" width="1200" height="934" alt="Step diagram: Sep 26 the screen waits for products, Sep 28 a failed billing connection is handled on its own, Sep 30 seven billing defects are fixed, Oct 1 version 1.6.025 ships, Oct 17 four of thirteen users start checkout." loading="lazy"><figcaption>After the first fix, a device check and a pre-release review turned up the connection case and seven more defects.</figcaption></figure>
+    </section>
+    <section aria-labelledby="eight-seconds">
+      <h2 id="eight-seconds">Judge now, wait forever, or wait 8 seconds</h2>
+      <p>Judging right away, the old behavior, treats "the list is empty the moment the screen opens" as an error, so it went. Waiting forever was already half there in the old code: <code>firstOrNull()</code> never returns if the product never comes, so deleting only the size check would have left users staring at an empty screen. We also wrote down the next move in case the 8-second wait was the wrong fix: if checkout starts from details were still 0 to 10% 30 days after release, the product query itself is failing, and the next step is retrying the billing connection.</p>
+      <p>Do not judge asynchronously loaded product details the moment the screen opens. Set a ceiling on the wait, and when the failure already has a known cause, such as an unavailable billing connection, report it right away instead of waiting. The same two rules now sit in the subscription section of the agent instructions (CLAUDE.md) in this app's repository.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">4 of 13 is an interim number, and device-side billing failures stay</h2>
+      <p>The other half of the September 26 rule: 30 days after release, if more than 30% of details-screen users start checkout, the cause is confirmed. The interim 31% on October 17 clears the bar, and two purchases went through, but it rests on 13 users. A log entry on October 18 found that Play's pre-launch robots had inflated version 1.6.030's subscription screen numbers; whether any of these 13 were robots is not recorded. (How we filter those devices in GA4 is in <a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real</a>.)</p>
+      <p>On the same day, <code>subscription_unavailable</code> fired for 2 of the 13 (15%). Users whose device cannot bill, through outdated Play services or a sign-in problem, are still there after the fix, and the most the app can do is say so clearly. We have only used <code>TestProductDetails</code> with Play Billing Library 9.1.0, and the Robolectric tests never see a real purchase or Play's signature check.</p>
+    </section>
+    <section aria-labelledby="checklist">
+      <h2 id="checklist">Checking whether your own subscription screen turns users away</h2>
+      <ol>
+        <li>Put the plans-screen, details-screen and checkout-start events side by side in GA4, counted by user. If checkout starts from details are in single-digit percent, open the details screen code first.</li>
+        <li>In any function that launches a collector on the product flow, look for a list-size check further down the same function.</li>
+        <li>Check whether <code>queryProductDetailsAsync</code> runs inside a loop and whether the response handler stores products only when all of them arrive. Merge what arrives, and log <code>unfetchedProductList</code>.</li>
+        <li>Have the details screen wait with a progress indicator and a ceiling, and end immediately with a "update Play" message when billing setup finishes with <code>BILLING_UNAVAILABLE</code> or <code>SERVICE_UNAVAILABLE</code>.</li>
+        <li>Create a <code>com.android.billingclient.api</code> package in your test sources with a helper that builds <code>ProductDetails</code> from JSON. Make the three screen cases (waiting, late arrival, never arrives) and the two manager cases (single and split responses) fail first, then fix.</li>
+        <li>Verify real purchases through the internal testing track and a license tester.</li>
+        <li>Before release, write down the decision rule with a date: above what rate the cause is confirmed, below what rate it is something else.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">What the October 31 check has to answer</h2>
+      <p>The final check is due on October 31, 30 days after 1.6.025 shipped. First we check for pre-launch robots among the details-screen users. Then we look at two numbers: checkout starts against the 30% line, and <code>subscription_unavailable</code> against 5%, above which a button that goes straight to the Play Store is on the table. The records do not show whether the internal-track real purchase check we added to the release procedure was done before 1.6.025 shipped.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20month%20of%20%27temporary%20error%27%3A%20our%20subscription%20details%20screen%20never%20waited%20for%20products%2C%20and%201%20of%2016%20users%20started%20checkout">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">Frequently asked questions</h2>
+      <div class="faq">
+        <details><summary>My subscription screen keeps showing a "temporary error". Is Google Play down?</summary><div><p>Check your own code first. Our details screen decided the product list was empty before the asynchronous product details arrived, and sent every user without cached products away. If retrying always gives the same result, it is not a temporary outage.</p></div></details>
+        <details><summary>How do I test with ProductDetails when Mockito cannot mock it?</summary><div><p>Create the com.android.billingclient.api package in your test sources and call the package-private constructor with JSON shaped like Play's response, which gives you a real object. We ran five tests this way on Play Billing Library 9.1.0.</p></div></details>
+        <details><summary>Is "Google Play billing is not available for this version" on a sideloaded APK a bug?</summary><div><p>No. Builds that were never uploaded to Play, and debug packages, cannot bill. Upload to the internal testing track and install from Play with a license tester account to check a real purchase.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Thu, 29 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>Android 16 KB page size, NDK 27 and a blue tint – SugarMount</title>
     <link>https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/</link>
@@ -111,12 +447,12 @@
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -217,10 +553,10 @@ three_star = cleared and time &lt;= par(base, scale, floor) and mistakes &lt;= a
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/games/">All notes on Game development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -335,9 +671,9 @@ print(pages.most_common(), "FAQ questions:", questions)</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -450,12 +786,12 @@ NOT_TEST = {"notExpression": {"orGroup": {"expressions": [
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -560,8 +896,8 @@ export function cacheKey(api, group, original, corrected, model) {
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -687,12 +1023,12 @@ const gaps = await agent(CTX + CHECKLIST + final + dossier, { schema: CRIT })</c
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -803,12 +1139,12 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(":core
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -927,12 +1263,12 @@ git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --gre
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1072,8 +1408,8 @@ adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1203,10 +1539,10 @@ print("my app in results:", MY_APP in ids)</code></pre>
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1332,9 +1668,9 @@ out of date:
         <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1452,8 +1788,8 @@ grep -rL --include='*Test.kt' -e 'assert' -e 'check(matches' app/src/</code></pr
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1592,10 +1928,10 @@ git log --until=2026-10-20 --format='%(trailers:key=Co-authored-by,valueonly)' \
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1701,8 +2037,8 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1866,10 +2202,10 @@ after_hint = win(board after the correct first move, 2 pieces left, lines it cle
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/games/">All notes on Game development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1983,12 +2319,12 @@ Schedule expires: YYYY-MM-DD / register again on: YYYY-MM-DD
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2128,9 +2464,9 @@ curl -s "$POLICY_URL" | grep -o 'data-policy-version="[0-9-]*"'</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2275,12 +2611,12 @@ font.save(dst)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2368,12 +2704,12 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">&quot;Use hundreds of agents&quot; in practice: 10 workstreams, 59 commits in a day, three running at once</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2458,12 +2794,12 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2583,8 +2919,8 @@ flutter test test/theme_matrix/ --dart-define=Y2_NO_SETTLE=true
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2703,12 +3039,12 @@ FlowRow(
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2787,12 +3123,12 @@ Mem:              13           8           2           0           2           4
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2916,12 +3252,12 @@ if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFract
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3045,8 +3381,8 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3144,12 +3480,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3213,9 +3549,9 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3606,10 +3942,10 @@ room  = is there space for a 3×3 square, a 1×4 bar, a 4×1 bar (0–3)</code><
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/games/">All notes on Game development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3719,8 +4055,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3826,12 +4162,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5175,10 +5511,10 @@ done</code></pre>
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5276,12 +5612,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5305,11 +5641,11 @@ done</code></pre>
     <section aria-labelledby="topics">
       <h2 id="topics">Browse by topic</h2>
       <ul class="card-list">
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/workflow/">Working with agents</a></h3><p class="sub">How work is split between an AI coding agent and a person, how rules reach the agent, and what we changed after several sessions collided in one repository.</p><p class="meta">6 notes</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/workflow/">Working with agents</a></h3><p class="sub">How work is split between an AI coding agent and a person, how rules reach the agent, and what we changed after several sessions collided in one repository.</p><p class="meta">7 notes</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/quality/">Testing and release</a></h3><p class="sub">Unit tests, release gates and on-device checks that AI-written code goes through before each release, with the real defects those checks caught along the way.</p><p class="meta">8 notes</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/android/">Android development</a></h3><p class="sub">Gradle builds, library upgrades, UI and performance problems we ran into while building Android apps with a coding agent, and how each one was solved.</p><p class="meta">7 notes</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/android/">Android development</a></h3><p class="sub">Gradle builds, library upgrades, UI and performance problems we ran into while building Android apps with a coding agent, and how each one was solved.</p><p class="meta">8 notes</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/games/">Game development</a></h3><p class="sub">Generating puzzle game levels with an agent, proving every level can be solved, and tuning difficulty: the rules we settled on and the numbers we measured.</p><p class="meta">3 notes</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/store/">Play Store and monetization</a></h3><p class="sub">Google Play listings and review, store screenshots and descriptions, and ad setup: the work of shipping and running apps, shared with an AI coding agent.</p><p class="meta">2 notes</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/store/">Play Store and monetization</a></h3><p class="sub">Google Play listings and review, store screenshots and descriptions, and ad setup: the work of shipping and running apps, shared with an AI coding agent.</p><p class="meta">3 notes</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/web/">Website and search</a></h3><p class="sub">The page structure, Google and Naver search optimization, structured data and design system of this site, built with an agent and explained from the actual code.</p><p class="meta">4 notes</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/retro/">Retrospectives and numbers</a></h3><p class="sub">Looking back over a period of work: what went fast and what went wrong, with numbers we counted ourselves from the git history and QA reports.</p><p class="meta">3 notes</p></li>
       </ul>
@@ -5325,12 +5661,12 @@ done</code></pre>
     <section aria-labelledby="notes">
       <h2 id="notes">Latest notes</h2>
       <ul class="card-list">
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></h3><p class="sub">One commit swept 50 files from another Claude session into a release fix. We built an owner table next; 7 of 13 merges still needed hand merging.</p><p class="meta">Working with agents · How-to · October 29, 2026</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></h3><p class="sub">A real-ID Block Turn build kept 5 Google test ad strings in its dex. A plain || in place of listOf().any took it to 0. We count IDs and never print them.</p><p class="meta">Android development · Measurement · October 29, 2026</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></h3><p class="sub">A Play review said the premium plan showed a &#x27;temporary error&#x27; for a month. The details screen never waited for products: 1 of 16 users reached checkout.</p><p class="meta">Play Store and monetization · Incident · October 29, 2026</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></h3><p class="sub">Six .so files rebuilt for Google Play&#x27;s 16 KB page rule; NDK 27 and 29 tinted photo transitions blue. Rechecked: NDK 25 aligns to 16 KB with one linker flag.</p><p class="meta">Android development · Incident · October 28, 2026</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></h3><p class="sub">Testers said our puzzle game gave too much time. A 158-level simulation set the cut at 30%; a 45% cut left casual players a 1% three-star rate past level 500.</p><p class="meta">Game development · Measurement · October 28, 2026</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></h3><p class="sub">Google ended FAQ rich results on May 7, 2026 and Naver on July 9. Why our 106 FAQPage pages stay untouched, and the feed, date and app markup we fixed instead.</p><p class="meta">Website and search · How-to · October 28, 2026</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></h3><p class="sub">GA4 counted 19 installs in a day; 11 were our test phones and Play review devices. Per the docs, setprop alone does not keep test events out of reports.</p><p class="meta">Play Store and monetization · Incident · October 27, 2026</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></h3><p class="sub">A shared LLM cache keyed without the context could serve one injected answer to every user. A blind A/B showed the context added nothing: 96.0% vs 96.6%.</p><p class="meta">Testing and release · Measurement · October 27, 2026</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></h3><p class="sub">Before coding a document viewer, 3 agent designs competed and 3 judges scored them. A crash on every KakaoTalk file and 23 plan gaps surfaced before code.</p><p class="meta">Working with agents · How-to · October 27, 2026</p></li>
       </ul>
     </section>
     <section aria-labelledby="by-the-numbers">
@@ -5465,8 +5801,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5583,9 +5919,9 @@ done</code></pre>
     <section aria-labelledby="ax-app-heading">
       <h2 id="ax-app-heading">AX notes on this app</h2>
       <ul class="related-links">
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
       </ul>
     </section>
     <section aria-labelledby="releases-heading">
@@ -6136,9 +6472,9 @@ done</code></pre>
     <section aria-labelledby="ax-app-heading">
       <h2 id="ax-app-heading">AX notes on this app</h2>
       <ul class="related-links">
+        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
       </ul>
     </section>
     <section aria-labelledby="releases-heading">
@@ -6480,341 +6816,6 @@ done</code></pre>
     </section>
     <p class="meta updated">Last updated <time datetime="2026-10-18">October 18, 2026</time></p>]]></description>
     <pubDate>Thu, 24 Sep 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Flip &amp; Rotate Image: unmirror selfies for Android – SugarMount</title>
-    <link>https://mvgood21.github.io/en/apps/image-flip/</link>
-    <guid isPermaLink="true">https://mvgood21.github.io/en/apps/image-flip/</guid>
-    <description><![CDATA[<section class="hero" aria-labelledby="app-name">
-      <img class="app-icon app-icon--lg" src="https://mvgood21.github.io/assets/apps/sugarflip/icon.webp" width="88" height="88" fetchpriority="high" alt="">
-      <p class="eyebrow">Photo app</p>
-      <h1 id="app-name">Flip &amp; Rotate Image</h1>
-      <p class="lead">Flip &amp; Rotate Image is an Android app that fixes mirrored selfies and sideways photos: it flips them left-right or top-bottom, turns them 90° at a time and saves the result as a new file on your device.</p>
-      <p class="status"><span class="badge badge--live">Google Play</span> <span class="brandline">SugarFlip</span></p>
-      <ul class="trust" aria-label="Data handling">
-        <li>No upload</li>
-        <li>Originals kept</li>
-        <li>No sign-up</li>
-      </ul>
-      <div class="actions">
-        <a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugarflip&amp;referrer=utm_source%3Dmvgood21.github.io%26utm_medium%3Dapp_page%26utm_campaign%3Dsugarflip&amp;hl=en" rel="noopener">Get it on Google Play</a>
-        <a class="button button--outline" href="https://mvgood21.github.io/en/privacy/image-flip/">Flip &amp; Rotate Image privacy policy</a>
-      </div>
-    </section>
-    <ul class="shots" tabindex="0" aria-label="Screenshots">
-      <li><img src="https://mvgood21.github.io/assets/apps/sugarflip/shot1-en.webp" width="360" height="640" loading="lazy" alt="Home screen with a Select photos button and four quick-start presets such as Selfie as others see it and Transfer print"></li>
-      <li><img src="https://mvgood21.github.io/assets/apps/sugarflip/shot2-en.webp" width="360" height="640" loading="lazy" alt="Edit screen showing the original and a preview side by side, with flip and 90° turn buttons, the steps in order and the output format"></li>
-      <li><img src="https://mvgood21.github.io/assets/apps/sugarflip/shot3-en.webp" width="360" height="640" loading="lazy" alt="Results screen after mirroring three photos, showing original and result side by side with resolution and file size"></li>
-    </ul>
-    <section aria-labelledby="tasks">
-      <h2 id="tasks">Use it to</h2>
-      <ul>
-        <li><a href="https://mvgood21.github.io/en/apps/image-flip/unmirror-selfie/">Unmirror a selfie with backwards text</a></li>
-        <li>Straighten a sideways photo or scan and save it</li>
-        <li>Mirror a photo for an iron-on transfer print</li>
-      </ul>
-    </section>
-    <section aria-labelledby="features">
-      <h2 id="features">What it does</h2>
-      <ol class="steps">
-        <li><strong>Pick photos</strong> — choose photos with the Android photo picker. The app does not ask for a storage permission.</li>
-        <li><strong>Choose the steps</strong> — pick a preset, or tap flip left-right, flip top-bottom, turn left 90° or turn right 90° yourself. Steps apply in the order you tap, and a preview shows the result first. If you picked several photos, they all get the same steps.</li>
-        <li><strong>Save and share</strong> — compare the original and the result side by side, then save. Results go to the <code>Pictures/SugarFlip</code> folder as new files, and saved photos can be shared right away.</li>
-      </ol>
-      <h3>Quick-start presets</h3>
-      <dl>
-        <dt>Selfie as others see it</dt>
-        <dd>Mirrors a front-camera selfie left-right so it looks the way others see you.</dd>
-        <dt>Transfer print</dt>
-        <dd>Mirrors left-right for iron-on paper and stencils.</dd>
-        <dt>Turn right 90°</dt>
-        <dd>For photos that came out sideways.</dd>
-        <dt>Upside down</dt>
-        <dd>Turns a photo that came in upside down by 180°.</dd>
-      </dl>
-      <p>The orientation your phone recorded (EXIF) is applied first, so photos are flipped as your gallery shows them. If the steps add up to no change (for example two left-right flips), the app tells you and does not create a result.</p>
-    </section>
-    <section class="facts" aria-labelledby="facts-h">
-      <h2 id="facts-h">At a glance</h2>
-      <div class="table-wrap">
-        <table>
-          <tbody>
-            <tr><th scope="row">Price</th><td>Free with ads. Pro is a one-time purchase that removes ads.</td></tr>
-            <tr><th scope="row">Opens</th><td>JPEG, PNG and WebP. HEIC works when your device can decode it.</td></tr>
-            <tr><th scope="row">Saves as</th><td>The source's own format by default. You can switch to JPEG, PNG or WebP; HEIC is saved as JPEG.</td></tr>
-            <tr><th scope="row">Transparency</th><td>Kept in PNG and WebP, filled with white in JPEG.</td></tr>
-            <tr><th scope="row">Photos per batch</th><td>Free 20, Pro 100</td></tr>
-            <tr><th scope="row">Per photo</th><td>Up to 50 MB and 50 MP</td></tr>
-            <tr><th scope="row">Resolution</th><td>Kept. Reduced only when the device runs short of memory, and the result screen says so.</td></tr>
-            <tr><th scope="row">Photo upload</th><td>None. Processed on your device.</td></tr>
-            <tr><th scope="row">Permissions</th><td>No permission prompts (uses the photo picker)</td></tr>
-            <tr><th scope="row">Saved to</th><td><code>Pictures/SugarFlip</code></td></tr>
-            <tr><th scope="row">Android</th><td>Android 10 or later</td></tr>
-            <tr><th scope="row">Languages</th><td>English, Korean</td></tr>
-            <tr><th scope="row">Package name</th><td><code>com.sugarmount.sugarflip</code></td></tr>
-            <tr><th scope="row">Developer</th><td>simpest (SugarMount)</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-    <section aria-labelledby="data">
-      <h2 id="data">Data and permissions</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Item</th><th scope="col">How it is handled</th></tr></thead>
-          <tbody>
-            <tr><th scope="row">Photos and results</th><td>Processed on your device and never uploaded. File names and photo content are not sent anywhere either.</td></tr>
-            <tr><th scope="row">Photo access</th><td>Only the photos you choose in the photo picker reach the app. It does not ask to read your whole storage.</td></tr>
-            <tr><th scope="row">Ads</th><td>The free version shows Google AdMob ads. The ads SDK may process data such as the advertising ID under Google's policies; you can change your consent under “Ad privacy options” in Settings.</td></tr>
-            <tr><th scope="row">Usage stats and crash reports</th><td>Anonymous usage stats and crash reports (Firebase) are on by default and can each be turned off in Settings. Neither includes your photos or file names.</td></tr>
-            <tr><th scope="row">Pro purchase</th><td>Payment is handled by Google Play. We never receive your payment details.</td></tr>
-            <tr><th scope="row">Account</th><td>None. No sign-in.</td></tr>
-            <tr><th scope="row">Internet</th><td>Not needed to process photos. Only ads and the Pro purchase need a connection.</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>See the <a href="https://mvgood21.github.io/en/privacy/image-flip/">Flip &amp; Rotate Image privacy policy</a> for details.</p>
-    </section>
-    <section aria-labelledby="plans">
-      <h2 id="plans">Free and Pro</h2>
-      <div class="two-col">
-        <div>
-          <h3>Free</h3>
-          <ul>
-            <li>Every step and preset</li>
-            <li>Up to 20 photos per batch</li>
-            <li>Shows ads</li>
-          </ul>
-        </div>
-        <div>
-          <h3>Pro</h3>
-          <ul>
-            <li>Removes ads</li>
-            <li>Up to 100 photos per batch</li>
-            <li>One-time Google Play purchase, not a subscription</li>
-          </ul>
-        </div>
-      </div>
-      <p>The price is shown on the Pro button in the app and on the Google Play payment screen. If you change devices, use “Restore purchase” in Settings to apply a purchase made with the same Google account. Refunds follow Google Play's policies.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">What it cannot do</h2>
-      <ul>
-        <li>It turns in 90° steps only. It cannot straighten a photo by a custom angle, crop or adjust colours.</li>
-        <li>It handles still photos only: no videos, GIF or BMP files, or animated images such as animated WebP.</li>
-        <li>It is not lossless. JPEG is re-encoded at quality 95, so the file is not bit-for-bit identical, and results do not keep the original's EXIF metadata.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">Frequently asked questions</h2>
-      <div class="faq">
-        <details><summary>How do I unmirror a selfie that was saved flipped?</summary><div><p>Choose the “Selfie as others see it” preset on the home screen and pick the photo; the app saves a new copy flipped back left-right. It fixes photos you already took and does not change your camera settings.</p></div></details>
-        <details><summary>Does the app change or delete my original photos?</summary><div><p>No. Originals stay as they are, and results are saved as new files in the <code>Pictures/SugarFlip</code> folder. Delete the original in your gallery if you no longer need it.</p></div></details>
-        <details><summary>Can I flip or rotate several photos at once?</summary><div><p>Yes. Pick up to 20 photos at a time on the free version or 100 with Pro, and they all get the same steps in the same order.</p></div></details>
-        <details><summary>Does flipping or rotating lower the quality?</summary><div><p>The resolution stays the same. JPEG is re-encoded at quality 95, so the file is not identical to the original and may even be larger; the result screen shows both sizes.</p></div></details>
-        <details><summary>Does it work offline?</summary><div><p>Yes. Flipping, rotating and saving work without an internet connection. Only ads and the Pro purchase need one.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="contact">
-      <h2 id="contact">Contact</h2>
-      <p>If the app does not work as expected or you have a question, please email us. Including your device model and Android version helps us look into it.</p>
-      <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a> · Package name: <code>com.sugarmount.sugarflip</code></p>
-    </section>
-    <section aria-labelledby="guides-heading">
-      <h2 id="guides-heading">Help articles</h2>
-      <ul class="related-links">
-        <li><a href="https://mvgood21.github.io/en/apps/image-flip/unmirror-selfie/">Unmirror a selfie on a Samsung Galaxy phone</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="ax-app-heading">
-      <h2 id="ax-app-heading">AX notes on this app</h2>
-      <ul class="related-links">
-        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="releases-heading">
-      <h2 id="releases-heading">Recent updates</h2>
-      <ul>
-        <li><strong>1.0.3</strong> · <time datetime="2026-10-04">October 4, 2026</time> · Double-tapping Create results no longer cancels the job, and unsaved results ask before you leave.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="related-heading">
-      <h2 id="related-heading">Related apps</h2>
-      <ul class="related">
-        <li><a href="https://mvgood21.github.io/en/apps/sugaralbum/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugaralbum/icon.webp" width="56" height="56" alt=""><span>SugarAlbum</span></a></li>
-        <li><a href="https://mvgood21.github.io/en/apps/image-compress/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarcompress/icon.webp" width="56" height="56" alt=""><span>Compress Image</span></a></li>
-        <li><a href="https://mvgood21.github.io/en/apps/image-convert/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarconvert/icon.webp" width="56" height="56" alt=""><span>Convert Image JPG PNG WEBP</span></a></li>
-      </ul>
-    </section>
-    <p class="meta updated">Last updated <time datetime="2026-10-18">October 18, 2026</time></p>]]></description>
-    <pubDate>Thu, 24 Sep 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Compress Image: photo size reducer for Android – SugarMount</title>
-    <link>https://mvgood21.github.io/en/apps/image-compress/</link>
-    <guid isPermaLink="true">https://mvgood21.github.io/en/apps/image-compress/</guid>
-    <description><![CDATA[<header class="hero">
-      <img class="app-icon app-icon--lg" src="https://mvgood21.github.io/assets/apps/sugarcompress/icon.webp" width="96" height="96" fetchpriority="high" alt="">
-      <p class="eyebrow">Photo app</p>
-      <h1>Compress Image</h1>
-      <p class="lead">Compress Image is an Android app that shrinks photos under a size limit you set, such as 100 KB or 500 KB, so they fit form, upload and email limits.</p>
-      <p class="status"><span class="badge badge--live">Google Play</span> <span class="brandline">SugarCompress</span></p>
-      <ul class="trust" aria-label="Data handling">
-        <li>No uploads</li>
-        <li>Originals kept</li>
-        <li>No sign-up</li>
-      </ul>
-      <div class="actions">
-        <a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugarcompress&amp;referrer=utm_source%3Dmvgood21.github.io%26utm_medium%3Dapp_page%26utm_campaign%3Dsugarcompress&amp;hl=en" rel="noopener">Get it on Google Play</a>
-        <a class="button button--outline" href="https://mvgood21.github.io/en/privacy/image-compress/">Compress Image privacy policy</a>
-      </div>
-    </header>
-    <ul class="shots" tabindex="0" role="region" aria-label="Screenshots">
-      <li><img src="https://mvgood21.github.io/assets/apps/sugarcompress/shot1-en.webp" width="360" height="640" loading="lazy" alt="Home screen with size presets from 100 KB to 1 MB"></li>
-      <li><img src="https://mvgood21.github.io/assets/apps/sugarcompress/shot2-en.webp" width="360" height="640" loading="lazy" alt="Choosing a mode and its options"></li>
-      <li><img src="https://mvgood21.github.io/assets/apps/sugarcompress/shot3-en.webp" width="360" height="640" loading="lazy" alt="Result screen showing the real size of each compressed photo"></li>
-    </ul>
-    <section aria-labelledby="tasks">
-      <h2 id="tasks">Use it to</h2>
-      <ul>
-        <li><a href="https://mvgood21.github.io/en/apps/image-compress/photo-under-100kb/">Get a photo under 100 KB</a></li>
-        <li><a href="https://mvgood21.github.io/en/apps/image-compress/id-photo-size/">Meet the file size limit for an ID or application photo</a></li>
-        <li>Shrink many photos to the same size at once</li>
-        <li>Fit photos under an email attachment limit</li>
-      </ul>
-    </section>
-    <section aria-labelledby="features">
-      <h2 id="features">What it does</h2>
-      <ul class="features">
-        <li><h3>Fit to size</h3><p>Set a limit each photo must stay under: 100 KB, 200 KB, 500 KB, 1 MB, or your own value in KB.</p></li>
-        <li><h3>Quick compress</h3><p>Pick a quality of 90, 80 or 65 and save again in one step.</p></li>
-        <li><h3>Reduce pixels</h3><p>Set the long edge to 1280, 1920 or 2560 pixels, or enter your own. The aspect ratio is kept.</p></li>
-        <li><h3>Real sizes, honest results</h3><p>The numbers on the result screen are the actual file sizes. A photo that cannot reach the limit is reported, not marked as a success.</p></li>
-      </ul>
-      <ol class="steps">
-        <li><strong>Pick photos</strong> with the Android photo picker.</li>
-        <li><strong>Choose a mode</strong>, set its options and tap “Create results”.</li>
-        <li><strong>Save or share</strong> the results. Saved photos go to the <code>Pictures/SugarCompress</code> folder as new files.</li>
-      </ol>
-    </section>
-    <section class="facts" aria-labelledby="facts-h">
-      <h2 id="facts-h">At a glance</h2>
-      <table>
-        <tbody>
-          <tr><th scope="row">Price</th><td>Free with ads. Pro is a one-time purchase that removes ads and raises the batch to 100 photos</td></tr>
-          <tr><th scope="row">Input formats</th><td>JPEG, PNG, WebP. HEIC when your device can decode it</td></tr>
-          <tr><th scope="row">Output format</th><td>JPEG</td></tr>
-          <tr><th scope="row">Limits</th><td>Free 20 photos per batch, Pro 100. Up to 50 MB and 50 megapixels per photo</td></tr>
-          <tr><th scope="row">Sent to a server</th><td>Photos and file names are never sent</td></tr>
-          <tr><th scope="row">Permissions</th><td>None for you to grant (no storage permission)</td></tr>
-          <tr><th scope="row">Android version</th><td>Android 10 or later</td></tr>
-          <tr><th scope="row">Languages</th><td>English, Korean</td></tr>
-          <tr><th scope="row">Package name</th><td><code>com.sugarmount.sugarcompress</code></td></tr>
-          <tr><th scope="row">Developer</th><td>simpest (SugarMount)</td></tr>
-        </tbody>
-      </table>
-    </section>
-    <section aria-labelledby="data">
-      <h2 id="data">Data and permissions</h2>
-      <ul>
-        <li>The app receives only the photos you pick in the Android photo picker. It does not ask for access to all your storage.</li>
-        <li>Compression, resizing, previews and saving all happen on your device. Photos, results and file names are never sent to a server or third party. Processing needs no internet connection.</li>
-        <li>Originals are never modified or deleted. Results become new files when you save them.</li>
-        <li>Anonymous usage stats (Firebase / Google Analytics) and crash reports (Firebase Crashlytics) are on by default. Turn each off in Settings under “Send anonymous usage stats” and “Send crash reports”. Neither includes photos or file names.</li>
-        <li>The free version shows Google AdMob ads. The ads SDK may process data such as the advertising ID under Google’s policies; change your consent in Settings under “Ad privacy options”.</li>
-        <li>Internet access is used for ads, the Pro purchase, and sending stats and crash reports. There is no account or sign-in.</li>
-      </ul>
-      <p>Details are in the <a href="https://mvgood21.github.io/en/privacy/image-compress/">Compress Image privacy policy</a>.</p>
-    </section>
-    <section aria-labelledby="plans">
-      <h2 id="plans">Free and Pro</h2>
-      <div class="two-col">
-        <div>
-          <h3>Free</h3>
-          <ul>
-            <li>All three modes</li>
-            <li>Up to 20 photos per batch</li>
-            <li>Shows ads</li>
-          </ul>
-        </div>
-        <div>
-          <h3>Pro</h3>
-          <ul>
-            <li>One-time purchase, not a subscription</li>
-            <li>No ads</li>
-            <li>Up to 100 photos per batch</li>
-          </ul>
-        </div>
-      </div>
-      <p class="muted">The price is shown on the Google Play purchase screen. On a new device, use “Restore purchase” in Settings to apply a purchase made with the same Google account.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">What it cannot do</h2>
-      <ul>
-        <li>Results are saved as JPEG only. Transparent areas in PNG or WebP are filled with white, and animated images are not supported.</li>
-        <li>Photos are never enlarged. A very low limit may be out of reach; the app tells you when it is.</li>
-        <li>PNG, WebP and HEIC photos can grow when converted to JPEG. The app then marks them “larger than the original”.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details>
-          <summary>How do I get a photo under 500 KB?</summary>
-          <p>Pick the photo, choose 500 KB under “Fit to size” and tap “Create results”. The limit applies to each photo, and 1 KB is counted as 1000 bytes.</p>
-        </details>
-        <details>
-          <summary>Does the app change or delete my original photos?</summary>
-          <p>No. Originals stay as they are; results are saved as new files in the <code>Pictures/SugarCompress</code> folder.</p>
-        </details>
-        <details>
-          <summary>What happens to a JPEG that is already small?</summary>
-          <p>A JPEG result is never larger than the original. If the photo is already small enough, it is kept at original quality without recompressing, with only location and camera info removed.</p>
-        </details>
-        <details>
-          <summary>Does it work offline?</summary>
-          <p>Yes. Photos are processed on your device, so no connection is needed. Only ads and the Pro purchase need the internet.</p>
-        </details>
-      </div>
-    </section>
-    <section aria-labelledby="contact">
-      <h2 id="contact">Contact</h2>
-      <p>If the app does not work as expected or you have a question, email us. Including your device model and Android version helps us look into it.</p>
-      <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a> · Package name: <code>com.sugarmount.sugarcompress</code></p>
-    </section>
-    <section aria-labelledby="guides-heading">
-      <h2 id="guides-heading">Help articles</h2>
-      <ul class="related-links">
-        <li><a href="https://mvgood21.github.io/en/apps/image-compress/id-photo-size/">Resize an ID photo for Korean application uploads</a></li>
-        <li><a href="https://mvgood21.github.io/en/apps/image-compress/photo-under-100kb/">Compress a photo to under 100 KB on Android</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="ax-app-heading">
-      <h2 id="ax-app-heading">AX notes on this app</h2>
-      <ul class="related-links">
-        <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="releases-heading">
-      <h2 id="releases-heading">Recent updates</h2>
-      <ul>
-        <li><strong>1.0.6</strong> · <time datetime="2026-10-04">October 4, 2026</time> · JPEG results are never larger than the original, and custom size and long edge carry over to the next job.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="related-heading">
-      <h2 id="related-heading">Related apps</h2>
-      <ul class="related">
-        <li><a href="https://mvgood21.github.io/en/apps/sugaralbum/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugaralbum/icon.webp" width="56" height="56" alt=""><span>SugarAlbum</span></a></li>
-        <li><a href="https://mvgood21.github.io/en/apps/image-flip/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarflip/icon.webp" width="56" height="56" alt=""><span>Flip &amp; Rotate Image</span></a></li>
-        <li><a href="https://mvgood21.github.io/en/apps/image-convert/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarconvert/icon.webp" width="56" height="56" alt=""><span>Convert Image JPG PNG WEBP</span></a></li>
-      </ul>
-    </section>
-    <p class="meta updated">Last updated <time datetime="2026-10-18">October 18, 2026</time></p>]]></description>
-    <pubDate>Sun, 20 Sep 2026 09:00:00 +0900</pubDate>
   </item>
 </channel>
 </rss>

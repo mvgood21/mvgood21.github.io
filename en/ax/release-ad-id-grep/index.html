@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Why R8 kept 5 AdMob test IDs in a release AAB – SugarMount</title>
+  <meta name="description" content="A real-ID Block Turn build kept 5 Google test ad strings in its dex. A plain || in place of listOf().any took it to 0. We count IDs and never print them.">
+  <link rel="canonical" href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/release-ad-id-grep/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/release-ad-id-grep/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Why R8 kept 5 AdMob test IDs in a release AAB – SugarMount">
+  <meta property="og:description" content="A real-ID Block Turn build kept 5 Google test ad strings in its dex. A plain || in place of listOf().any took it to 0. We count IDs and never print them.">
+  <meta property="og:url" content="https://mvgood21.github.io/en/ax/release-ad-id-grep/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-release-ad-id-grep-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/en/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=51d09451">
+  <link rel="stylesheet" href="/assets/site.css?v=51d09451">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=51d09451">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/en/ax/release-ad-id-grep/#article","headline":"R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count","description":"A real-ID Block Turn build kept 5 Google test ad strings in its dex. A plain || in place of listOf().any took it to 0. We count IDs and never print them.","url":"https://mvgood21.github.io/en/ax/release-ad-id-grep/","mainEntityOfPage":"https://mvgood21.github.io/en/ax/release-ad-id-grep/","inLanguage":"en","articleSection":"Android development","datePublished":"2026-10-29T09:00:00+09:00","dateModified":"2026-10-29T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-release-ad-id-grep-en.png","https://mvgood21.github.io/assets/ax/cover/release-ad-id-grep-en.webp","https://mvgood21.github.io/assets/ax/release-ad-id-grep-1-en.webp","https://mvgood21.github.io/assets/ax/release-ad-id-grep-2-en.webp"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does listOf().any change how the app behaves?","acceptedAnswer":{"@type":"Answer","text":"It doesn't. With all real IDs present, both versions pick the real units."}},{"@type":"Question","name":"Would all or none instead of any also keep the branch?","acceptedAnswer":{"@type":"Answer","text":"We haven't measured those. Until we do, we write the fallback as a plain || over the constants."}},{"@type":"Question","name":"Do these commands work on Windows?","acceptedAnswer":{"@type":"Answer","text":"Git Bash ships unzip, grep, sort and wc, so they run as written there."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://mvgood21.github.io/en/ax/"},{"@type":"ListItem","position":3,"name":"Android development","item":"https://mvgood21.github.io/en/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=51d09451">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/release-ad-id-grep/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-android">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/android/">Android development</a></li><li><span aria-current="page">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/release-ad-id-grep-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX notes · Measurement</span>
+      <h1>R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</h1>
+      <p class="lead">Four ad unit checks wrapped in listOf(...).any were something R8 could not fold, so 5 test ad strings stayed in the release dex. A plain || over the same constants left none.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Android development</span> <span aria-hidden="true">·</span> <span>7 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-10-29">October 29, 2026</time></p><!-- /build:meta -->
+      <p>The first real-ID bundle for <a href="/en/apps/blocks/">Block Turn</a> version code 2, built before upload at 17:16 on October 4, 2026, held 4 real ad unit strings and 5 Google test ad strings in its dex. It had passed the Gradle guard. A rebuild two minutes later overwrote it, so it was never uploaded, and the version code 2 we did upload has no test strings. With all real IDs present, either version of the code picks the real units at runtime.</p>
+      <p class="note">Sources: git history of our game repository (575aaa1, 1aecbc2, 301bc9e), the launch rehearsal checklist and that day's agent session log. On 2026-10-28 we recounted three bundles and two APKs and built a small R8 reproduction. No ID value was printed.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (8)</summary><ol><li><a href="#gate-passed">The bundle passed the Gradle guard with 5 test strings inside</a></li><li><a href="#why-r8">R8 could not evaluate the listOf condition at build time</a></li><li><a href="#missed">The review agent made 19 findings and missed the test strings</a></li><li><a href="#alternatives">Why the debug source set is a poor home for the test units here</a></li><li><a href="#count-steps">Counting ad IDs in the dex without printing them</a></li><li><a href="#limits">Counting by prefix alone picks up one string from UMP</a></li><li><a href="#next">Arrow Knots still guesses from task names</a></li><li><a href="#faq">FAQ</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#gate-passed">The bundle passed the Gradle guard with 5 test strings inside</a></li><li><a href="#why-r8">R8 could not evaluate the listOf condition at build time</a></li><li><a href="#missed">The review agent made 19 findings and missed the test strings</a></li><li><a href="#alternatives">Why the debug source set is a poor home for the test units here</a></li><li><a href="#count-steps">Counting ad IDs in the dex without printing them</a></li><li><a href="#limits">Counting by prefix alone picks up one string from UMP</a></li><li><a href="#next">Arrow Knots still guesses from task names</a></li><li><a href="#faq">FAQ</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="gate-passed">
+      <h2 id="gate-passed">The bundle passed the Gradle guard with 5 test strings inside</h2>
+      <p>Money.kt gives a debug build, or a build with any empty ad unit field in BuildConfig, <code>AdUnits.TEST</code>, the set of Google test units; anything else gets the real ones. Version code 1, built at 12:25 that day, only checked the banner field, and when we counted that bundle on October 28 it had 4 real ad units and 0 test strings.</p>
+      <p>At 16:14 Claude Code widened the check to all four units, so that a build missing any one unit would treat itself as having no real IDs and use test units for all four. The comment it left says "never a half-real mix". This is the line:</p>
+      <pre><code>units = if (BuildConfig.DEBUG || listOf(BuildConfig.AD_BANNER, BuildConfig.AD_INTERSTITIAL,
+        BuildConfig.AD_REWARDED, BuildConfig.AD_APP_OPEN).any { it.isEmpty() }) AdUnits.TEST
+    else AdUnits(BuildConfig.AD_BANNER, BuildConfig.AD_INTERSTITIAL, BuildConfig.AD_REWARDED, BuildConfig.AD_APP_OPEN)</code></pre>
+      <p>In the same hour a review agent showed that the old Gradle guard, which decided by task name, could be bypassed. The agent moved the check into a <code>checkReleaseAdIds</code> task hooked to <code>preReleaseBuild</code>, which every release variant runs. That guard only looks at its input, ads.properties.</p>
+      <p>The agent committed at 17:14 (575aaa1) and built the bundle with the real IDs; the guard passed. The checklist's build step asked for the guard and the signature. The agent also ran <code>grep -c</code> over the dex strings, printing no values: 4 for our publisher number, 5 for the test publisher number. All 5 strings of <code>AdUnits.TEST</code> (banner, interstitial, rewarded, rewarded interstitial, app open) were in the dex.</p>
+      <p>The 16:14 comment and the review brief covered runtime behavior only; nobody checked whether R8 removed the branch until the dex of a build was counted.</p>
+      <figure class="ax-fig"><img src="/assets/ax/release-ad-id-grep-1-en.webp" width="1200" height="894" alt="Step diagram: at 12:25 vc1 has 4 real ad units and 0 test strings; at 16:14 the check is widened with listOf any; at 16:49 a code review makes 19 findings but misses the test strings; at 17:16 the first real-ID bundle, before upload, passes the Gradle guard but carries 5 test strings; at 17:18 a plain or over the constants brings it to 0." loading="lazy"><figcaption>The first real-ID bundle passed the Gradle guard, and the code review had not flagged the line; a dex count found the 5 test IDs.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="why-r8">
+      <h2 id="why-r8">R8 could not evaluate the listOf condition at build time</h2>
+      <p>In a real-ID build the condition is always false, yet R8 could not work that out at build time and kept the branch that returns <code>AdUnits.TEST</code>. On October 28 we reproduced it in a small project: a BuildConfig of the same shape and a 5-string test set, all dummy strings, and both versions of the condition. We compiled it with Kotlin 2.3.21 and shrank it with R8 9.4.24, the version bundled with Android Gradle Plugin 9.4.1, using that plugin's proguard-android-optimize.txt unchanged. The listOf version left 5 test strings and 4 real ones in the dex. The <code>||</code> version left only the 4 real ones.</p>
+      <p>In javap output, kotlinc has already inlined the BuildConfig constants as string literals in both versions. The listOf version puts the four into an array, builds a list with <code>listOf</code>, and walks it with an Iterator, calling <code>length()</code> on each element. In R8's output dex the <code>listOf</code> call has become <code>Arrays.asList</code>, and the Iterator loop is still there. The <code>||</code> version calls <code>length()</code> directly on each literal; R8 computed those, folded the whole condition to false and dropped the test branch. Version code 1, which checked the banner alone, had the same shape and 0 test strings.</p>
+      <figure class="ax-fig"><img src="/assets/ax/release-ad-id-grep-2-en.webp" width="1200" height="655" alt="Comparison: the listOf any form goes through a list and an Iterator loop, R8 cannot evaluate it and 5 test strings remain; the plain or form lets R8 evaluate the condition to false and 0 test strings remain." loading="lazy"><figcaption>Two conditions that mean the same thing: the listOf form left 5 test strings, the || form left none.</figcaption></figure>
+      <p>Write test-unit fallbacks as a plain <code>||</code> over BuildConfig constants, and don't wrap them in collection functions (we only measured <code>any</code>). Another case where we read R8's output by the numbers: <a href="/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized</a>.</p>
+    </section>
+
+    <section aria-labelledby="missed">
+      <h2 id="missed">The review agent made 19 findings and missed the test strings</h2>
+      <p>The 16:49 review agent read the whole change without building it. Its brief listed "if any ad unit is empty, use TEST for all" and "what could break under R8 (keep rules for the Review API)". It came back with 2 high, 6 medium and 11 low findings, and none of them said the release would keep the test strings.</p>
+      <p>The Gradle guard only sees inputs, so it could not catch this. At 16:55 the agent had counted the dex of the measurement build (<code>-PallowTestAds</code>) the same way and logged "0 real, 5 test" in row 0-4 of the rehearsal checklist; at 17:16 it ran the same check on the real-ID build. The top of the checklist says not to write secrets down. Our full pre-upload checks are in <a href="/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>.</p>
+      <p>The fix landed at 17:18 (1aecbc2). The agent described it as a change that removes the test ID strings from a real-ID build. The 17:42 commit (301bc9e) records the check that followed: 4 real, 0 test.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20R8%20kept%205%20AdMob%20test%20IDs%20in%20our%20release%20build%3A%20one%20listOf%28%29.any%20line%20and%20a%20dex%20count">Email us</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">Why the debug source set is a poor home for the test units here</h2>
+      <p>Moving the test units into the debug source set would keep them out of release builds entirely. It does not fit Block Turn. The <code>-PallowTestAds</code> build we use for device measurements and monkey runs is a release variant, and it has to ignore ads.properties and run on test units, because automated taps on real ads count as invalid clicks.</p>
+      <p>Left alone, every real-ID build would carry 5 test strings, "0 test strings" could no longer be the pass condition, and each time someone would have to work out whether those strings are dead code. So the condition was rewritten into a shape R8 folds. Today the input guard runs before the build, and the dex count is still run by hand after it.</p>
+    </section>
+
+    <section aria-labelledby="count-steps">
+      <h2 id="count-steps">Counting ad IDs in the dex without printing them</h2>
+      <p>Don't decide what went into a release by reading code. Count it in the build output. These are the Git Bash commands we used for the October 28 recount; the publisher number is read into a variable and never echoed.</p>
+      <pre><code># 1. Read your publisher number into a variable (not printed)
+MY_PUB=$(sed -n 's/^admob\.banner=[^0-9]*\([0-9]*\)\/.*/\1/p' app/ads.properties)
+TEST_PUB=...   # the 16-digit test publisher number from Google's test ads page
+A=app/build/outputs/bundle/release/app-release.aab   # for an APK use 'classes*.dex'
+
+# 2. Your ad units: must equal the number of units the app uses
+unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$MY_PUB/[0-9]*" | sort -u | wc -l
+# 3. Test strings: must be 0 in a real-ID build
+unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$TEST_PUB[~/][0-9]*" | sort -u | wc -l</code></pre>
+      <p>These commands give 4 and 0 for the vc1, vc2 and October 25 bundles, and 0 and 5 for the <code>-PallowTestAds</code> APK from October 25. For the check before the build, hook it to <code>preReleaseBuild</code> instead of guessing from task names:</p>
+      <pre><code>tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    if (!allowTestAds) dependsOn(checkReleaseAdIds)
+}</code></pre>
+    </section>
+
+    <section aria-labelledby="limits">
+      <h2 id="limits">Counting by prefix alone picks up one string from UMP</h2>
+      <p>Counted by the ad ID prefix alone on October 28, each of the three bundles showed 5. Four were our ad units (the '/' form). The fifth was an app ID-shaped string ('~' form) under a different publisher. Searching 135 Google Play services, consent library (UMP, user-messaging-platform) and Firebase library files in the Gradle cache found the same string in UMP 4.0.0. Count with your own publisher number and the '/' to get 4.</p>
+      <p>A <code>-PallowTestAds</code> build is supposed to carry the 5 test strings, so the check only applies to real-ID builds. Because it runs after the build, all it can stop is the upload. The R8 reproduction covers one version (9.4.24) and one shape, a BuildConfig string constant; we did not test IDs read from resources or remote config. The manifest app ID is not in the dex; checklist row 1-7 covers it.</p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">Arrow Knots still guesses from task names</h2>
+      <p>Arrow Knots, the other game in the same repository, still checks only the banner field as of the October 27 commit, and its release guard still looks for "release" in task names. Moving it to the <code>checkReleaseAdIds</code> setup and turning the hand-run dex count into a script in the repository are the next jobs.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20R8%20kept%205%20AdMob%20test%20IDs%20in%20our%20release%20build%3A%20one%20listOf%28%29.any%20line%20and%20a%20dex%20count">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Does listOf().any change how the app behaves?</summary><div><p>It doesn't. With all real IDs present, both versions pick the real units.</p></div></details>
+        <details><summary>Would all or none instead of any also keep the branch?</summary><div><p>We haven't measured those. Until we do, we write the fallback as a plain || over the constants.</p></div></details>
+        <details><summary>Do these commands work on Windows?</summary><div><p>Git Bash ships unzip, grep, sort and wc, so they run as written there.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
+        <li><a href="/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
+        <li><a href="/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+      </ul>
+      <p><a href="/en/ax/topic/android/">All notes on Android development</a> · <a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/sitemap/">Site map</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>
