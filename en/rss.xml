@@ -6,7 +6,378 @@
   <description>Small Android apps that each do one thing simply, from shrinking photos and opening Korean HWP documents to checking Korean spelling and playing puzzle games.</description>
   <language>en</language>
   <atom:link href="https://mvgood21.github.io/en/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Thu, 29 Oct 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Fri, 30 Oct 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Arrow puzzle level generator: 1,100 levels gated – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/arrow-puzzle-level-generator-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX note · Method</span>
+      <h1>A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</h1>
+      <p class="lead">Once the move rule is written down and removal can only open paths, a board built in reverse is solvable without ever being played. Per-level gates then reject dull or unfair boards, and G2 checks the difficulty curve of the whole pack.</p>
+      <p>The generator built all 1,100 levels in <a href="https://mvgood21.github.io/en/apps/arrow-knots/">Arrow Knots</a> (the main game, 1 to 1000, plus an endless-mode fallback pack, 1001 to 1100), tutorials included; for the three tutorials the code fixes only the size and target windows. The pack first passed the G2 pack gate in commit e3c7781 at 18:32 on October 3, 2026, and in the current report all 1,100 levels pass the six structural gates checked per level. Two days earlier, generator v2 (6249b11) cut F0, the share of arrows you can remove the moment a board opens, from 0.50 to 0.11 in the hardest band of the generator benchmark.</p>
+      <p class="note">Sources: the game repository's git history (ecedf0b, 6249b11, e3c7781, 9de89eb), ADR-0001, the level reports report-v2 and report-v3 (.md and .csv), the kickoff cross-check document, and session logs from October 1 and 3, 2026. Report numbers were re-read at HEAD on October 28, 2026.</p>
+    </section>
+    <section aria-labelledby="random-boards">
+      <h2 id="random-boards">Randomly placed boards were all stuck from 10×10 up</h2>
+      <p>In Arrow Knots you tap arrows to slide them off the board. An arrow leaves along the line in front of its head (the code calls it the escape ray; below, just the ray). If another arrow sits on that ray, the tap bounces and costs a heart. The kickoff report of September 30, 2026 said boards would be generated and then checked with "an actual removal simulation" to see whether they could be cleared.</p>
+      <p>A cross-check simulation run the same day ruled that out. With arrows placed at random, 64% of 8×8 boards with 10 arrows could not be cleared, 92% with 16 arrows, and 100% from 10×10 with 25 arrows. Levels 861 to 1000 ship on 24×44 boards with a median of 73 arrows, a size a discard-and-retry loop would never reach.</p>
+      <p>The alternative is reverse construction. Start from an empty board and add arrows so that the k-th arrow placed is the k-th from last to leave. Accept an arrow only if its ray crosses no arrow already on the board, and the placement order, reversed, is a solution. A later arrow may sit on an earlier arrow's ray; that blocking is where difficulty comes from. In the same simulation, 200 of 200 boards built this way were solvable.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/arrow-puzzle-level-generator-1-en.webp" width="1200" height="806" alt="Comparison: random placement then verify leaves 100% of boards unsolvable from 10×10 with 25 arrows; reverse construction checks only that each new arrow&#x27;s ray is empty, and all 1,100 shipped levels are solvable." loading="lazy"><figcaption>Generate-then-verify stalls as boards grow; building in reverse makes the build order the solution.</figcaption></figure>
+    </section>
+    <section aria-labelledby="adr-first">
+      <h2 id="adr-first">The move rule was fixed in an ADR before any generator work</h2>
+      <p>Reverse construction depends on monotonicity: once an arrow can leave, it stays able to leave. The kickoff report never said how an arrow moves. A bent arrow could slide out snake-style behind its head, or the whole body could translate in one direction, and the two models block different cells. In the cross-check, 400 boards built for the head-following model were replayed under whole-body translation, and only 52 of them (13%) could be cleared.</p>
+      <p>ADR-0001 (an architecture decision record), accepted with the first commit (ecedf0b) on September 30, closed that gap. The ADR has the generator, the removal check, the hint and the animation share that one ray computation (the check and animation call <code>Board.escapeRay</code>; the generator calls the same computation inside it, <code>size.ray</code>). A blocked tap costs a heart and leaves the board unchanged. Together these make removal monotone, so a board is solvable exactly when its blocking graph (arrow i waits on j when j sits on i's ray) has no cycle.</p>
+      <p>Solvability then needs no search, only a peel: remove every arrow that can leave right now, repeat, and count the rounds, which gives the depth (layers). The release gate's solvability check asks for both a successful peel and a separate cycle search (DFS). Property tests, run before every commit, guard monotonicity with 300 generated boards and 1,000 runs that clear boards in random order.</p>
+      <p>Pin the move rule down in an ADR before you write a puzzle generator. Only 52 of those 400 boards were solvable under both models.</p>
+    </section>
+    <section aria-labelledby="shallow-v1">
+      <h2 id="shallow-v1">Half the arrows in v1 were free from the start</h2>
+      <p>The v1 generator in ecedf0b, written with Claude, produced 300 solvable levels that were shallow. Even the hardest band in the v1 report, expert, had F0 at 0.494 and a depth of 5.6. Half the arrows could be removed from the start, and about five peels cleared the board.</p>
+      <p>At 22:32 on October 1, the main agent handed generator research to a sub-agent with a list of things to try: score candidates by how many existing rays they block, and add a final pass that turns free arrows into blocked ones. A ray-cover score was already in v1. The sub-agent worked out the direction: the last arrow placed leaves first, so new bodies should land on the rays of arrows that are still free. On 60 boards from the hard band (11×13), that score alone (<code>freeWeight</code>) gave F0 0.51, no better than v1 as it was (0.48). Late in a build there are almost no candidates in those spots, and the very last arrow is free no matter what. The final pass (<code>blockerPlacements</code>, which adds an arrow only if it blocks two or more free arrows) changed nothing.</p>
+      <p>What held F0 at 0.5 was empty rays. An arrow whose head sits on the rim pointing outward has a ray of zero cells, and nothing can ever block it. Rejecting arrows whose ray crosses no usable cell (<code>minRay=1</code>) brought F0 to 0.38 on its own. Adding tail growth took F0 to 0.30. If heads stay put and only tails extend into neighbouring empty cells, no ray changes and blocking edges are only added, so F0 can only fall and depth can only rise. Each extension runs a DFS to check that no cycle forms. Tails first grow only into the rays of free arrows, then into any empty cell to raise density (fill growth). Leftover holes get new arrows only when the blocking graph stays acyclic.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/arrow-puzzle-level-generator-2-en.webp" width="1200" height="808" alt="Bar chart: F0 over 60 hard-band boards is 0.48 for v1, 0.38 with minRay, 0.51 with the freeWeight score alone, 0.30 with tail growth, 0.27 with fill growth and 0.16 with hole fill." loading="lazy"><figcaption>The freeWeight score alone did not lower F0 (0.48 vs 0.51); rejecting empty rays, tail growth and hole fill brought it down to 0.16.</figcaption></figure>
+      <p>The research report came back 17 minutes later, and this combination is v2, committed as 6249b11 at 22:53. The commit message compares the expert band of the benchmark: F0 0.50 to 0.11, depth 5.8 to 14.6, density 0.74 to 0.97. Drawing long random paths up front, without growth, gave density 0.65 and F0 0.44, so it was dropped.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20reverse-construction%20generator%20and%20the%20gate%20behind%201%2C100%20arrow-puzzle%20levels">Email us</a></p></aside>
+    <section aria-labelledby="g2-from-defects">
+      <h2 id="g2-from-defects">Defects found in 300 levels became G2 checks</h2>
+      <p>At 15:48 on October 3 the operator asked whether the app simply ended after level 300, and seven minutes later asked for 1,000 levels. The agent re-analysed all 300 v2 levels. Boards were squeezed onto one screen as they grew, so the average cell size in levels 276 to 300 was 13.6 dp, and the smallest boards were down to 11.7 dp; after level 150 depth stayed between 16 and 21 while only the arrow count climbed. Counting again from the report CSV: level 293 had 94 arrows after 34 on level 292 (2.8×), and level 243 had 76 after 30. Even level 300, a regular level, had 109 arrows after 77.</p>
+      <p>The agent laid out two options, a board-size cap or large boards with zoom and scroll as competing games use, and recommended the cap. The operator chose large boards and set the ranges: one size cap for levels 1 to 200, then boards growing through 201 to 500, 501 to 700 and 701 to 1000. The agent turned that into keeping cell size fixed and letting the board outgrow the screen, and added the number: cells of at least 27 dp in Part 1.</p>
+      <p>The spec then turned each defect into a gate. Levels have roles: a ramp is a regular level on the difficulty curve, a spike is the one hard level in each cycle, and a breather is an easier level. T is an estimated solve time computed from arrow count and F0. The table shows the G2 results in the current report-v3.md.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Defect in the 300 levels, or new structure</th><th>G2 check</th><th>Result (1,100 levels)</th></tr></thead>
+        <tbody>
+          <tr><td>Cells averaged 13.6 dp, min 11.7 dp</td><td>Part 1 cells ≥ 27 dp at 360 dp width</td><td>min 27.3 dp</td></tr>
+          <tr><td>One hard level at 2.8× the level before</td><td>Spike T over the preceding ramps' median: median 1.10 to 1.25, p90 ≤ 1.30</td><td>101 spikes, median 1.12, p90 1.18</td></tr>
+          <tr><td>Arrow count flat for 50 levels (201 to 250), then up 40% in the 251s</td><td>Non-spike, non-silhouette levels ≤ 1.15× the arrows of the previous regular level; breather T 0.60 to 0.90× the preceding ramps' median</td><td>0 neighbour violations; 112 breathers, 0.61 to 0.88</td></tr>
+          <tr><td>Harder only by getting bigger</td><td>Median depth of 941 to 1000 ≥ 1.6× that of 101 to 200</td><td>29 vs 14, 2.07×</td></tr>
+          <tr><td>Four parts with growing boards (ranges set by the operator)</td><td>First 10 levels of a new part: arrows ≤ 1.10×, depth ≤ 0.85×</td><td>All four transitions pass (201: 1.05×, 0.75×)</td></tr>
+        </tbody>
+      </table></div>
+      <p>All 1,100 levels pass the six structural gates checked per level: L/A (depth per arrow, at most 0.60 on ramps), single-wave runs (no more than four rounds in a row that free only one arrow), F0, random-tap win rate, size caps and solvability. The random-tap win rate comes from 100 runs per level of tapping any arrow with three hearts. Counting in report-v3.csv, 1,071 of the 1,095 levels from level 6 on score 0, and every level from Part 2 on scores 0.</p>
+      <p>Random numbers come from the project's own SplitMix64 instead of Kotlin's <code>Random(seed)</code>, which the cross-check flagged as unstable across versions, and e3c7781 records that two builds produced byte-identical packs.</p>
+    </section>
+    <section aria-labelledby="what-g2-missed">
+      <h2 id="what-g2-missed">What G2 missed: a repeating mask and per-level failures</h2>
+      <p>Thirty minutes after the pack passed G2, at 19:02, commit 9de89eb fixed G2 itself. Endless-mode silhouettes reused the same mask a few levels apart on every 140-level cycle (castle at 1000 and 1005, fish at 985 and 1015, trophy at 995 and 1025). G2 grouped masks by the pair (name, mirrored), so a mirrored copy counted as a different picture.</p>
+      <p>128 levels missed their target window and shipped the closest candidate, and fallback level 1060 shipped while failing the per-level sawtooth check, because G2's sawtooth row looks only at the median and p90 of the 101 spikes. The random-tap cap of 0.5 is loose as well: level 7 sits at exactly 0.50.</p>
+      <p>G2 reads pack files on the JVM, so it could not see a packaging problem (aapt stripping <code>.gz</code>, which crashed the app on launch); that story is in <a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">"Use hundreds of agents" in practice</a>. The pipeline also keeps going when G2 fails: it writes every pack, then prints "G2 FAILS" to standard error. What catches a G2 failure is <code>CurveGateTest</code>, which recomputes every level's stats from the committed pack, runs G2, and fails unless the recomputed CSV matches the committed report-v3.csv; the repository rule is that it passes before every commit.</p>
+      <p>ADR-0001 says that rotating arrows, arrows that stop on collision, keys and locks, or moving tiles break monotonicity and require a new ADR and a search-based verifier (BFS or SAT) first. T and random-tap win rate are model values; real play time was tuned separately in <a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">the par-time simulation that cut targets by 30%</a>.</p>
+    </section>
+    <section aria-labelledby="steps">
+      <h2 id="steps">Seven steps, from a monotonicity test to a byte comparison</h2>
+      <p>Any puzzle where removing a piece can only open paths can follow the same order.</p>
+      <ol>
+        <li>Write the move and removal rule as an ADR, and have the check, the hint and the animation share one ray computation.</li>
+        <li>Test "removable stays removable" as a property: clear boards in random order, around 1,000 runs.</li>
+        <li>If the rule is monotone, build in reverse. Accept the k-th piece only if its ray misses every piece already placed, and reject pieces with an empty ray.</li>
+        <li>Raise difficulty by growing tails with heads fixed, checking for a cycle with a DFS on every step.</li>
+        <li>Write F0, depth, L/A, single-wave runs and random-tap win rate for every level to a CSV.</li>
+        <li>Enforce the pack gate as a test that recomputes the metrics from the boards and fails if they differ from the committed report.</li>
+        <li>Derive seeds from the level number and a generator version, and bump the version when output changes. Build twice and compare bytes, then open the packaged app on a device.</li>
+      </ol>
+      <p>Steps 3 and 4 and the depth count, as pseudocode:</p>
+      <pre><code>place(a):                       # reverse construction
+  if usable(ray(a)) == 0: reject  # an empty ray can never be blocked
+  if ray(a) hits occupied: reject   # ray must miss every placed arrow
+  accept(a)
+growTail(a, cell):              # head fixed, ray unchanged
+  waiting = arrows whose ray crosses cell
+  if cell not empty or not next to a's tail end: skip
+  if a at max length or cell on ray(a): skip   # never block its own ray
+  if reaches(a, waiting): skip    # DFS: growing would close a cycle
+  extend a's tail into cell
+depth(board):                   # peel
+  layers = 0
+  while board not empty:
+    if nothing removable: return unsolvable
+    remove every removable arrow; layers += 1
+  return layers</code></pre>
+      <p>In this repository <code>./gradlew :arrow-engine:test :level-pipeline:test</code> runs the property tests of step 2, the G2 test of step 6 and the determinism tests of step 7.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">F0 and depth have not been checked against real play</h2>
+      <p>The F0 and depth numbers here come from the generator and its reports; they have not been compared with where real players get stuck. With simulated players, the check that spikes clear at least 5 points less often than ramps in the same band failed in retune commit ab3f78c. At 22:28 the same day, spec commit 91d3c8c replaced it with a solve-time ratio of 1.10 to 1.25 and a rule that spikes clear no more than 3 points above ramps. Simulated clear rates are model values too, so how they match real play is still unknown.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20reverse-construction%20generator%20and%20the%20gate%20behind%201%2C100%20arrow-puzzle%20levels">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Can generated puzzle levels be guaranteed solvable?</summary><div><p>They can if the rules are monotone. In Arrow Knots the reversed build order is a solution, and the release gate re-checks all 1,100 levels with a peel and a DFS cycle search.</p></div></details>
+        <details><summary>What is F0 and why lower it?</summary><div><p>F0 is the share of arrows that can be removed the moment a board opens. In v1's expert band it was 0.494: half the arrows could be removed from the start. The shipped pack sets a target window per level role (ramp, spike, breather); in report-v3.csv the median for Part 4 (levels 701 to 1000) is 0.11.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/games/">All notes on Game development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Fri, 30 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>App retention drop: five years of GA4 cohorts – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/retention-cohort-break/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/retention-cohort-break/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/retention-cohort-break-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Measurement</span>
+      <h1>Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</h1>
+      <p class="lead">Day-1 retention of our spelling app's organic cohorts fell from 15.2% to 11.2% after an August 2025 redesign and has not come back in over a year. We have not pinned down the cause.</p>
+      <p><a href="https://mvgood21.github.io/en/apps/sugarspeller/">SugarSpeller</a>, our Korean spell-checking app, averaged 780 daily active users in September 2025, the month after its redesign and its highest month of 2025. The release branch for version 1.6.007, which made a chat-style screen the default, was merged on August 18, and 3,053 new users arrived in September, close to twice the June and July numbers. We only saw that they were staying less on October 18, 2026, when we pulled five years of GA4 data. Organic monthly cohorts had gone from 15.2% to 11.2% on D1 (opened again the day after install) and from 4.2% to 2.6% on D30. The timing lines up with the redesign, but this data cannot separate the chat default, the ad changes and the surge of new users as causes.</p>
+      <p class="note">Sources: the app repository's git history (02cbb15 to 61d6f15, a88ee55, eab1837, cb33385), the GA4 Data API scripts and output files committed with the October 18, 2026 strategy document (data through October 17, 2026), and the app's operations log. Cohort averages were recomputed from those output files on October 29, 2026.</p>
+    </section>
+    <section aria-labelledby="cohort-step">
+      <h2 id="cohort-step">26 months of organic cohorts: D1 from 15.2% to 11.2%</h2>
+      <p>We built monthly cohorts by first session date with the GA4 Data API cohort request and kept only users whose first channel was Organic Search. Devices with no brand, OnePlus8 models and <code>sdk_gphone</code> emulators (Play's pre-launch test bots) were filtered out. Plain averages for the 14 months before the redesign and the 12 months after:</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Organic monthly cohorts</th><th>Avg size</th><th>D1</th><th>D7 (days 6-8)</th><th>D30 (days 28-30)</th></tr></thead>
+        <tbody>
+          <tr><td>Jul 2024 to Aug 2025 (14)</td><td>1,066</td><td>15.2%</td><td>7.0%</td><td>4.2%</td></tr>
+          <tr><td>Sep 2025 to Aug 2026 (12)</td><td>900</td><td>11.2%</td><td>4.9%</td><td>2.6%</td></tr>
+        </tbody>
+      </table></div>
+      <p>Weighting by cohort size gives 15.4% to 11.2% on D1 and 4.3% to 2.6% on D30, so the picture holds. We also checked for a seasonal dip. In 2024 the September cohort's D1 fell to 14.7% and the October cohort was back at 16.3%. In 2025 the numbers were 13.6% in September, 12.3% in October and 12.3% in November, and every cohort through August 2026 stayed between 7.7% and 12.6%.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/retention-cohort-break-1-en.webp" width="1200" height="780" alt="Bar chart: the average organic monthly cohort fell from 15.2% to 11.2% on D1, 7.0% to 4.9% on D7, and 4.2% to 2.6% on D30." loading="lazy"><figcaption>From the September 2025 cohort on, D1, D7 and D30 all dropped a step and stayed there.</figcaption></figure>
+      <p>Weekly cohorts show where the step is. The 11 organic weekly cohorts from the week of June 2 to the week of August 11, 2025 averaged 16.4% on D1 (range 13.4% to 21.7%); the 13 from the week of September 1 to the week of November 24 averaged 12.6% (9.1% to 16.6%). A weekly cohort here is 176 to 423 people, so single weeks swing widely, and we made the call on monthly averages.</p>
+    </section>
+    <section aria-labelledby="dau-masked">
+      <h2 id="dau-masked">New users nearly doubled in September, and DAU went up</h2>
+      <p>For months after the redesign, rising DAU kept the break out of sight; the repository has no record of the post-redesign cohorts being cut separately before October 2026. New users across all channels were 2,304 in August 2025 and 3,053 in September, against 1,381 in June and 1,596 in July. Monthly average DAU rose to 765 in August and 780 in September. It then dropped to 654 in October and kept sliding, from 582 in January 2026 to 408 in September.</p>
+      <p>Splitting DAU by first session date shows which users went missing. These are daily averages over the same calendar window, September 20 to October 17, in each year.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Time since first session</th><th>2024</th><th>2025</th><th>2026</th></tr></thead>
+        <tbody>
+          <tr><td>Same day (new)</td><td>43</td><td>64</td><td>34</td></tr>
+          <tr><td>1-7 days</td><td>24</td><td>26</td><td>12</td></tr>
+          <tr><td>8-30 days</td><td>43</td><td>41</td><td>15</td></tr>
+          <tr><td>31-90 days</td><td>87</td><td>95</td><td>33</td></tr>
+          <tr><td>91-365 days</td><td>253</td><td>169</td><td>97</td></tr>
+          <tr><td>Over a year (1-2 years + over 2)</td><td>293</td><td>292</td><td>251</td></tr>
+          <tr><td>Total DAU</td><td>744</td><td>688</td><td>442</td></tr>
+        </tbody>
+      </table></div>
+      <p>Each cell is rounded to the nearest user, so a column can be one off from its total. Of the 302 daily users lost between 2024 and 2026, 211 (70%) were people 31 to 365 days past their first session. Same-day new users fell by 9. Users older than a year went from 39% of DAU to 57%, yet their count fell from 293 to 251; the share rose because the younger group emptied out.</p>
+      <p>In the 2026 window, the 31-365 day group is made up only of people who first opened the app between late September 2025 and mid-September 2026, all of them post-break cohorts. That group fell 62%, from 340 to 130. New users across all channels in the two periods when this group first opened the app fell about 25%, from roughly 20,000 to roughly 15,100 (monthly new users prorated by day). Fewer arrivals cannot account for a 62% drop; the rest is people who came in and stayed less. We did not measure how much retention fell further after day 30.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/retention-cohort-break-2-en.webp" width="1200" height="530" alt="Bar chart: DAU fell by 302, from 744 to 442; users 31 to 365 days old account for 211 of it, users in their first 30 days for 49, and users over a year old for 42." loading="lazy"><figcaption>70% of the lost daily users were people who had first opened the app 31 to 365 days earlier.</figcaption></figure>
+    </section>
+    <section aria-labelledby="same-weeks">
+      <h2 id="same-weeks">Ad changes and a wave of new users landed in the same weeks</h2>
+      <p>Version 1.6.007 was built from 27 commits (merges included) between August 7 and 18, 2025, touching 129 files with 6,864 lines added and 2,476 removed. Its first commit, 02cbb15, "ChatGPT-style UI, complete overhaul", is the first commit in this repository with a Claude <code>Co-Authored-By</code> trailer; six commits in the range carry one. One of their subject lines reads "UI/UX perfectly identical to ChatGPT, complete". How this app's commit messages changed over the following year is in <a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits</a>. Neither the commit messages in the range nor the working notes (progress.md) at the release say anything about watching retention or cohorts after shipping.</p>
+      <p>The screen was not the only change in that release. Three changes are worth setting against the retention data.</p>
+      <ul>
+        <li>Default screen: <code>getBoolean("opt.uiMode", true)</code> made chat the default. Earlier versions had no such setting at all, so existing users who updated also opened into the chat screen.</li>
+        <li>An ad shown when the user exits the app with the back button (83bc49f).</li>
+        <li>Chunking, which splits long text into pieces before sending it to the checker (eb5aadc).</li>
+      </ul>
+      <p>A separate hotfix for the app-open ad (a88ee55, version 1.6.008) shipped on August 26, and the surge in new users above fell in the same August and September. Weekly engagement time per user dropped from 377 seconds in the week of August 18 to 297 the next week and 253 by the week of September 8. Active users in those weeks rose from 3,072 to 3,400, though, so that metric mixes the screen change with a different set of users.</p>
+    </section>
+    <section aria-labelledby="recheck">
+      <h2 id="recheck">Four things we corrected in the AI-assisted strategy document</h2>
+      <p>The break was first written up in a strategy document in commit eab1837 on October 18, 2026. The commit carries a Claude co-author trailer and includes the GA4 analysis scripts and their output files alongside the document. Recomputing from the same output files for this note turned up several things to fix; these are the four largest.</p>
+      <ol>
+        <li>The document labeled D30 as the day 28-30 average and gave 2.4%. That 2.4% was the average of the single day-30 values; the day 28-30 average is 2.5%. Its range also included the September 2026 cohort. The data ended on October 17, so anyone who joined after September 17 had not reached day 30, and that cohort showed a D30 of 1.0%. Without it the figure is 2.6%.</li>
+        <li>The document listed 1.6.007's three changes and the August 26 hotfix, then called them "the only change that coincides with the break." It left out the surge in new users in the same weeks, and it reads as if the bundle were a single candidate cause.</li>
+        <li>The document used engagement time per user, 377 to 253 seconds, as evidence of the break. The denominator changed under that metric; the organic cohorts are the cleaner evidence.</li>
+        <li>The document said 80 to 97 users a day opened the quiz from a notification between October 9 and 17. The daily values were 70 to 97 (70 on October 13).</li>
+      </ol>
+      <p>None of the four reverses the finding, but item 2 narrowed the candidates to one release when three changes and a wave of new users had landed in the same weeks. The document itself concluded that causation could not be established and left the decision to start a default-screen test to the operator.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Daily%20users%20rose%20after%20the%20redesign%20while%20organic%20D1%20retention%20fell%20from%2015.2%25%20to%2011.2%25">Email us</a></p></aside>
+    <section aria-labelledby="hold-rollback">
+      <h2 id="hold-rollback">We are not switching the default back yet; a new-install A/B test comes first</h2>
+      <p>The fastest response would be to make the older Classic screen the default again. On September 24, 2026 the operations log held the opposite proposal: remove Classic and move everyone to chat. That day's 28-day numbers showed Classic users running 7.6 checks per user against 4.5 for chat, and a return rate of 76% against 64%. In an app whose default is chat, though, Classic users are people who went looking for the switch, so the gap cannot be read as the effect of the screen. Moving existing users, who have had over a year on chat, back again has its own cost.</p>
+      <p>Comparing before and after on all-channel cohorts was also dropped. All-channel D1 fell as low as 8.0% in August 2023 and recovered to 12.5% to 15.1% in October to December of that year. Paid search brought 77% of new users in 2022 and 42% in 2023, and D1 moved along with that shift in channel mix. Paid (Cross-network) share was similar in 2025 and 2026, at 22% and 23%, but we compared organic users only.</p>
+      <p>What can separate the causes is an A/B test that gives half of new installs a different default screen. New installs run at about 185 a week, so detecting a 10-point difference needs about 350 per group, and two first-run experiments (judged on November 8 and around November 15) are already splitting those installs. Running three at once would leave all three unreadable, so the plan is to start after November 16. The bar is D7 up 2 points after four weeks.</p>
+      <p>When you ship a large redesign, cut out the D1 of the cohorts that install from that week on and track it for four weeks. In a month when installs jump, DAU will not show you the regression.</p>
+    </section>
+    <section aria-labelledby="quiz-loop">
+      <h2 id="quiz-loop">What we added while waiting: a morning quiz notification</h2>
+      <p>Version 1.6.024 started sending a morning spelling-quiz notification on September 26, 2026. Before that, zero users a day opened the quiz from a notification; between October 9 and 17 it was 70 to 97 a day. Returning users per day, with bots excluded, went from 365 in the week of September 7 to 447 in the week of October 12, up 82 or 22%. How much of the 82 the notification caused is not measured yet; an experiment that sends more notifications to one group (<code>qr_extra</code>) reads that out in active days per user on October 31.</p>
+      <p>The notifications skewed another number. From version 1.6.030, events sent by a background alarm pushed GA4 <code>totalUsers</code> from 1,500 on October 17 to 2,400-2,900 on October 19-22, while <code>activeUsers</code> stayed near 500 (found on October 23). Every DAU figure in this note uses <code>activeUsers</code>. How we filter out test phones and bots is in <a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real</a>.</p>
+    </section>
+    <section aria-labelledby="cohort-steps">
+      <h2 id="cohort-steps">A GA4 cohortSpec and filter JSON for organic cohorts</h2>
+      <ol>
+        <li>Send a <code>runReport</code> with a <code>cohortSpec</code>. Give each cohort <code>dimension: "firstSessionDate"</code> and a one-month <code>dateRange</code>; set <code>cohortsRange</code> to <code>DAILY</code>, days 0 to 30, <code>accumulate: false</code>. Dimensions are <code>cohort</code> and <code>cohortNthDay</code>; metrics are <code>cohortActiveUsers</code> and <code>cohortTotalUsers</code>. We sent six months per request.</li>
+        <li>Filter on first channel and bots with <code>dimensionFilter</code>.<pre><code>{"andGroup": {"expressions": [
+  {"filter": {"fieldName": "firstUserDefaultChannelGroup", "stringFilter": {"value": "Organic Search"}}},
+  {"notExpression": {"filter": {"fieldName": "mobileDeviceBranding", "stringFilter": {"value": "(not set)"}}}},
+  {"notExpression": {"filter": {"fieldName": "deviceModel", "stringFilter": {"matchType": "CONTAINS", "value": "OnePlus8"}}}},
+  {"notExpression": {"filter": {"fieldName": "deviceModel", "stringFilter": {"matchType": "BEGINS_WITH", "value": "sdk_gphone"}}}}
+]}}</code></pre></li>
+        <li>Use day 1 for D1, and the day 6-8 and day 28-30 averages for D7 and D30. Say in the table header which one you used.</li>
+        <li>If a cohort's last day plus 30 days falls after the end of your data, leave it out of the D30 average.</li>
+        <li>Put each month next to the same month a year earlier, to see whether a September dip happens every year and whether the next month recovers.</li>
+        <li>Line up weekly cohort D1 around the date of a large release to see when a break starts. Use the same filter as the monthly cohorts (our weekly script only had the brand filter).</li>
+        <li>Pull DAU with both <code>date</code> and <code>firstSessionDate</code>, bucket the gap (same day, 1-7 days, 8-30, 31-90, 91-365, 1-2 years, over 2 years), and compare the same calendar window across years. A request like this is enough:<pre><code>{"dateRanges": [{"startDate": "2026-09-20", "endDate": "2026-10-17"}],
+ "dimensions": [{"name": "date"}, {"name": "firstSessionDate"}],
+ "metrics": [{"name": "activeUsers"}],
+ "limit": 250000}</code></pre>For each row, bucket (date minus firstSessionDate), sum, and divide by the number of days in the window.</li>
+        <li>Count users with <code>activeUsers</code>. If any feature sends events in the background, <code>totalUsers</code> will run high.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="organic-only">
+      <h2 id="organic-only">Organic users only, and it needs cohorts in the hundreds</h2>
+      <p>Paid cohorts are not in this comparison. Monthly cohorts need a few hundred users before the averages settle. The staged rollout percentage and dates for 1.6.007 are not on record, so we could not confirm why the weekly break shows up in the week of September 1 rather than August 18. The script that split DAU by first session date had no bot filter, so the 34 same-day new users in 2026 may include pre-launch bots. That barely touches the conclusion about the 31-365 day group.</p>
+      <p>Search interest fell too. On Google Trends (South Korea), the 2026 average for "맞춤법 검사기" (spelling checker) was 38% below the 2025 average (checked October 18, 2026). That is a 2026 trend and cannot explain a step that starts with the September 2025 cohort, and we could not separate how much of it went into later drops such as the July 2026 cohort's D1 of 7.7%.</p>
+    </section>
+    <section aria-labelledby="after-oct31">
+      <h2 id="after-oct31">Numbers the notification readout and the default-screen test will log</h2>
+      <p>At the October 31 <code>qr_extra</code> readout we will look at whether the group with more notifications gains at least 10% in active days per user while uninstalls and notification blocks stay within 2 points. Once the default-screen test starts after November 16, we will log D1, D7, checks in the first seven days, and uninstall rate per group for four weeks. Until those results are in, we will not call the chat screen the cause of the break.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Daily%20users%20rose%20after%20the%20redesign%20while%20organic%20D1%20retention%20fell%20from%2015.2%25%20to%2011.2%25">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">Frequently asked questions</h2>
+      <div class="faq">
+        <details><summary>How do I see retention for organic users only in GA4?</summary><div><p>Add <code>firstUserDefaultChannelGroup = "Organic Search"</code> to the <code>dimensionFilter</code> of a Data API cohort request. It is based on the first channel, so a user who later returns through an ad still counts as organic.</p></div></details>
+        <details><summary>Why use the day 28-30 average for D30 instead of the day-30 value?</summary><div><p>Single days swing with the weekday and small samples. This app's September 2024 organic cohort had a day-30 value of 2.8% and a day 28-30 average of 3.2%. Pick one, name it in the table header, and do not mix them.</p></div></details>
+        <details><summary>Can DAU go up while retention goes down?</summary><div><p>Yes. In September 2025 this app took in 3,053 new users and DAU rose to 780, while that month's organic cohort had a D1 of 13.6%, below the year before, and later cohorts did not recover.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Fri, 30 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>&quot;6.7&quot; &lt; &quot;6.11&quot; is false: a version string bug – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/string-version-compare/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/string-version-compare/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/string-version-compare-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX note · Incident</span>
+      <h1>"6.7" &lt; "6.11" is false: comparing Remote Config versions as strings froze content updates</h1>
+      <p class="lead">Kotlin's string &lt; says "6.7" is greater than "6.11". Once the content version in Remote Config reached 6.10, that comparison stopped updates on every device with 6.2 to 6.9 stored.</p>
+      <p>The drawer of <a href="https://mvgood21.github.io/en/apps/sugarspeller/">SugarSpeller</a>, our Korean spelling app, showed content version (6.7/2.2) while production Remote Config held 6.11/2.3. The operator read both numbers off a device on September 25, 2026. The app compared the two versions as strings, so devices with 6.2 to 6.9 stored never received the quiz bank and notice updates sent through <code>info_version</code> after that. A commit at 12:14 the same day (7b997f8) added <code>VersionCompare</code>, which compares each dot-separated part as an integer, plus four unit tests.</p>
+      <p class="note">Sources: the app repository's git history (d5ac5e2, 6d0f4f1, 5f082f8, 71c31ae, a4d5b9a, e9d6b9c, 079feab, 7b997f8, 31c082d, 844c828), CHANGELOG entries 1.6.019 and 1.6.023, the quiz bank review document and the monitoring script, rechecked on 2026-10-29. Remote Config template numbers and project identifiers are left out.</p>
+    </section>
+    <section aria-labelledby="symptom">
+      <h2 id="symptom">The drawer said 6.7; Remote Config said 6.11</h2>
+      <p>The app ships its quiz bank, notices and FAQ as one JSON value in Firebase Remote Config (RC below). On the splash screen, <code>ActivityEmpty</code> compares RC's <code>info_version</code> and <code>clip_version</code> with the version stored in the device's Room database. If RC is newer, it deletes the local content and inserts the new set. The (6.7/2.2) at the bottom of the drawer is that stored version.</p>
+      <p>One suspect was the build. Debug builds of this app read the RC of a separate development Firebase project, so a debug build on the device could show numbers that differ from production. Production RC really was 6.11/2.3, which ruled that out and left the comparison code.</p>
+      <pre><code>// ActivityEmpty, just before 7b997f8
+if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
+    repo.setVersion(VersionT(infoVer, clipVer))
+    // delete and re-insert content
+}</code></pre>
+      <p><code>infoVersion</code> is a String field. Kotlin compares strings lexicographically, character by character, so "6.7" and "6.11" first differ at the third character: '7' against '1'. '7' is larger, "6.7" &lt; "6.11" evaluates to false, and the app concluded that RC held the older version.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/string-version-compare-1-en.webp" width="1200" height="582" alt="Comparison: the string comparison looks at the third characters 7 and 1, decides 6.7 is larger and skips the update; the per-part integer comparison looks at 7 and 11, treats 6.11 as newer and downloads again." loading="lazy"><figcaption>Compared as strings, 6.7 wins; compared part by part as integers, 6.11 is the newer version.</figcaption></figure>
+    </section>
+    <section aria-labelledby="why-silent">
+      <h2 id="why-silent">With one digit after the dot, both orders agree</h2>
+      <p>String comparison has been there since the app first connected to Remote Config in 2020. The current form, <code>infoVersion &lt; infoVer</code>, appeared on May 6, 2023 (6d0f4f1), when a commit flipped the comparison to the right direction; the clip condition was added two days later. While the minor part ran from 6.1 to 6.9, lexicographic order and numeric order were the same, and the check always gave the right answer. It broke when RC moved to 6.10. We recomputed what the old expression returns for each stored value:</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Stored on the device</th><th>RC at 6.10</th><th>RC at 6.11</th></tr></thead>
+        <tbody>
+          <tr><td>6.1</td><td>updates</td><td>updates</td></tr>
+          <tr><td>6.2 to 6.9</td><td>skips</td><td>skips</td></tr>
+          <tr><td>6.10</td><td>equal</td><td>updates</td></tr>
+        </tbody>
+      </table></div>
+      <p>"6.1" is a prefix of "6.10", so the shorter string sorts first; 6.2 through 6.9 all win at the third character. From the day RC reached 6.10, a device stuck in that range ignored every <code>info_version</code> bump (unless <code>clip_version</code> also went up). The quiz bank review document also records that notices changed on September 13, 20 and 22 without any change to <code>info_version</code>, which stayed at 6.10. Those three notices reached no existing user, string comparison or not.</p>
+      <p>Fresh installs never showed the bug. On first run there is no stored version row, so the app inserts the RC content without comparing anything and starts on the latest set.</p>
+    </section>
+    <section aria-labelledby="agents">
+      <h2 id="agents">Three agent commits, none of them fixed the content check</h2>
+      <p>Counting only the times an agent touched or reasoned about the version check itself, the git history shows three. On August 9, 2025 at 15:32, a commit generated with Claude Code (5f082f8) blamed a "persistent update notice" on the string comparison of <code>app_version</code> and switched major, minor and patch to integer comparison. The app was at 1.5.031, so major and minor were one character each and the string comparison gave the same answer anyway. At 17:51 that day a commit whose message just says "fix" (71c31ae) put the string comparison back. No reason was recorded. Neither commit touched the content version check.</p>
+      <p>On December 11, 2025, an RC sync refactor (a4d5b9a, co-authored by Claude Opus 4.5) added 11 tests (its message says 13). One of them, <code>versionComparison_isCorrect</code>, asserts that "5.0" &lt; "5.1". It uses single-digit values and calls no app code, only Kotlin's String operator, so it passes whatever the production check does. How we find tests that stay green when the guarded code is deleted is in <a href="https://mvgood21.github.io/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database</a>.</p>
+      <p>On the morning of September 25, 2026, the agent reviewing all 124 quiz items (Claude Opus 5.5) wrote into the publishing steps of its 11:08 commit (e9d6b9c): the splash screen compares versions as strings, so bump <code>info_version</code> to 7.0. Fifteen minutes later the value that went up was 6.11, and the document now said that 6.10 to 6.11 is larger even as a string, so 6.10 users would update. The document still said a 6.9 to 6.10 bump is not recognized, but said nothing about what to do for devices stuck below 6.10. The 11:23 commit (079feab) also added a rule to the project's CLAUDE.md, that a bump which changes the number of digits is not seen as an update, and left the comparison code as it was.</p>
+      <p>Devices below 6.10 surfaced only when the operator put the drawer's 6.7/2.2 next to production RC. The 12:14 fix (7b997f8) was also written by an agent (Claude Fable 5.1), this time after the operator had pointed out that the device and RC values differed. How this incident shows up in the commit messages is covered, along with other cases, in <a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits</a>.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/string-version-compare-2-en.webp" width="1200" height="960" alt="Step diagram: May 2023 the current string comparison lands; Aug 9, 2025 an agent's numeric fix is reverted 2 hours 19 minutes later; Dec 11, 2025 a test with single-digit values only; Sep 25, 2026 at 11:08 a plan to bump to 7.0; at 11:23 6.11 is published instead; at 12:14 VersionCompare and 4 tests." loading="lazy"><figcaption>The current string comparison stayed from May 2023 until 12:14 on September 25, 2026.</figcaption></figure>
+    </section>
+    <section aria-labelledby="fix">
+      <h2 id="fix">One VersionCompare for both content and app versions</h2>
+      <p>Setting RC to 7.0 would have unblocked 6.x devices for now, since "6.x" &lt; "7.0" is true. It would break again at 7.10, and everyone editing content would have to remember never to make a bump that adds a digit, so we dropped it as a permanent rule.</p>
+      <p>Comparing all three parts as integers, as in August 2025, did not fit either. This app looks only at the major and minor parts of <code>app_version</code> and ignores the patch on purpose; comparing the patch would send every user on an older patch to the store after each patch release. 7b997f8 keeps one function and routes both the content version check and the major/minor checks of <code>app_version</code> through it.</p>
+      <pre><code>object VersionCompare {
+    fun compare(a: String, b: String): Int {
+        val pa = parts(a); val pb = parts(b)
+        for (i in 0 until maxOf(pa.size, pb.size)) {
+            val x = pa.getOrElse(i) { 0 }; val y = pb.getOrElse(i) { 0 }
+            if (x != y) return x.compareTo(y)
+        }
+        return 0
+    }
+    fun isNewer(remote: String, local: String) = compare(remote, local) &gt; 0
+    private fun parts(v: String) = v.trim().split('.').map { it.trim().toIntOrNull() ?: 0 }
+}</code></pre>
+      <p>The four tests in <code>VersionCompareTest</code> cover the values that failed ("6.11" against "6.7"), equal values, parts of different lengths or counts ("1.10.0" against "1.9.9", "6.11" against "6.11.0") and non-numeric input. The first test also asserts that "6.7" &lt; "6.11" is false. 112 unit tests passed at that commit. Do not write a new version check with a string &lt;; that rule is in CLAUDE.md now.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20%226.7%22%20%3C%20%226.11%22%20is%20false%3A%20comparing%20Remote%20Config%20versions%20as%20strings%20froze%20content%20updates">Email us</a></p></aside>
+    <section aria-labelledby="force">
+      <h2 id="force">The force flag in the same JSON went on before adoption</h2>
+      <p>The RC <code>version</code> JSON that holds the content versions also holds <code>app_version</code> and <code>force</code>, and since 7b997f8 the major/minor check of <code>app_version</code> goes through <code>VersionCompare</code> too. The splash screen decides in this order: if the installed version matches <code>app_version</code> character for character, let the user in; otherwise compare major and minor only; finally, if <code>force</code> is true, override the result and show the update dialog.</p>
+      <p>A September 18 commit (31c082d) records that a device with 1.6.017 showed "A new version has been released!", and the code was the first suspect. The real cause was an RC <code>app_version</code> that did not match the shipped version. A patch bump (1.6.017 to 1.6.018) is not rescued by the major/minor check, so the dialog goes away only when the RC value matches the shipped version exactly.</p>
+      <p>On that same September 18, <code>force</code> went on while few users had the new version, and sessions for the day were down 25% five hours later. A September 13 case is left out here: a note written that day corrected an earlier reading as GA4 standard-report lag rather than a lockout, while later documents list it as a lockout again. Since 1.6.019 (September 19), <code>monitor.py --only rc</code> reads the RC <code>version</code> JSON and prints, from GA4 for yesterday and today, the share of active users on exactly the <code>app_version</code> string. If <code>force</code> is true and that share is under 90%, it warns that the rest are stuck behind the splash dialog right now. A separate rollout incident, where a staged percentage went out wrong, is in <a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%</a>.</p>
+    </section>
+    <section aria-labelledby="steps">
+      <h2 id="steps">One git grep, a test with the failing values, a check on an old install</h2>
+      <ol>
+        <li>Find lines that compare version-like names with &lt; or &gt;. In your own repository, drop the revision. In ours, with the revision just before 7b997f8 as below, the command finds the two lines in <code>ActivityEmpty</code> (248 and 270) and three lines in the a4d5b9a test (run on 2026-10-29).
+          <pre><code>git grep -nE '[Vv]er[A-Za-z]*(\[[0-9]\])?\s*[&lt;&gt;]=?\s*[A-Za-z.\[]*[Vv]er' 7b997f8^ -- '*.kt' '*.java'</code></pre></li>
+        <li>Move every hit into one function and test it with the values that failed. At minimum: "6.11" against "6.7" and "1.10.0" against "1.9.9".</li>
+        <li>Do not verify on a fresh install. Install the build from before the fix and run it once with RC at 6.9 so the stored version is 6.9. Install the fixed build over it without clearing data, raise RC to 6.10, and check that the stored version shown on screen becomes 6.10. A bump that keeps the digit count, such as 6.15 to 6.16, passes under the old comparison too and proves nothing.</li>
+        <li>When content changes, bump <code>info_version</code>.</li>
+        <li>Before turning <code>force</code> on, check in GA4 the share of active users whose appVersion equals the RC <code>app_version</code>. Under 90%, leave it off.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">Builds already installed still compare strings</h2>
+      <p>The comparison runs on the device, so a device that has not updated to the fixed build keeps comparing strings. RC has since gone to 6.12 (October 1), 6.13 (October 9), 6.14 (October 10) and 6.15 (October 24), but on an old build with 6.2 to 6.9 stored, "6.7" &lt; "6.15" is still false.</p>
+      <p>One server-side way to reach those devices is a one-time bump of the RC value to 7.0. On old builds "6.7" &lt; "7.0" is true, and on new builds <code>VersionCompare</code> also sees 7.0 as newer than 6.15, so both paths update. We dropped 7.0 as a permanent rule, but as a one-time migration while old builds remain it is the right tool; after it, bumps should stay within 7.1 to 7.9 until old builds are rare enough. As of October 24 the RC value is 6.15, and there is no record of this app moving to 7.0. Because the old condition is an OR, raising <code>clip_version</code> would also make it true, but we do not know why those devices did not update at clip 2.3, so we do not count that path as a confirmed fix.</p>
+      <p><code>VersionCompare</code> reads any non-numeric part as 0. A typo such as "6.l1" in RC would read as 6.0 and the update would be skipped silently; the test only confirms that "6.7" is newer than "abc" and raises no warning. "6.11" and "6.11.0" count as the same version.</p>
+      <p>For 1.6.023 a release APK on an API 34 emulator showed 6.11/2.3 in the drawer, but the record does not say whether that was a fresh install. If it was, the check never ran. <code>clip_version</code> is an open question too: stored 2.2, RC 2.3. "2.2" &lt; "2.3" is true even as strings and the old condition was an OR, so the clip side should have triggered an update. The history does not say when clip became 2.3, so string comparison alone does not fully explain why this device stayed at 6.7/2.2.</p>
+      <p>Writing the version row before the content was another defect on the same update path. On September 28, on a physical S21, a first run while offline left the quiz bank empty until the next <code>info_version</code>; commit ce024cd now refills the bank when it is empty even if the version matches.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">The old rule is still in CLAUDE.md</h2>
+      <p>As of October 29, 2026, lines 206 and 207 of CLAUDE.md at HEAD still say the comparison is a string comparison and a bump that adds a digit is not seen as an update, while line 734 says versions are compared numerically with <code>VersionCompare</code>. An agent reading the first rule could believe the code still compares strings and pick bump values to suit that. The text from "the comparison is a string" on line 206 to the end of line 207 should become the one-time 7.0 migration rule for old builds; the "always bump info_version" rule on lines 205 and 206 stays. <code>versionComparison_isCorrect</code>, which calls no app code, is also still in the test suite; it should either be deleted or call <code>VersionCompare</code>.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20%226.7%22%20%3C%20%226.11%22%20is%20false%3A%20comparing%20Remote%20Config%20versions%20as%20strings%20froze%20content%20updates">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Why is "6.7" &lt; "6.11" false in Kotlin?</summary><div><p>String comparison is lexicographic, character by character. At the third character '7' is greater than '1', so "6.7" sorts after "6.11".</p></div></details>
+        <details><summary>Wouldn't bumping the version to 7.0 work with string comparison?</summary><div><p>For now, yes. It breaks again at 7.10, and everyone editing content has to avoid bumps that add a digit.</p></div></details>
+        <details><summary>When is it safe to turn on Remote Config's force flag?</summary><div><p>Once at least 90% of active users run exactly the app_version string. This app turned it on with low adoption and lost 25% of the day's sessions.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Fri, 30 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>Claude Code sessions in one repo: file owner table – SugarMount</title>
     <link>https://mvgood21.github.io/en/ax/file-owner-table/</link>
@@ -107,8 +478,8 @@ git diff --name-only $(git merge-base &lt;base&gt; &lt;branch&gt;) &lt;branch&gt
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -195,12 +566,12 @@ unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$TEST_PUB[~/][0-9]*" | sort -u | wc
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -334,10 +705,10 @@ lifecycleScope.launch {
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -447,12 +818,12 @@ lifecycleScope.launch {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -551,12 +922,12 @@ three_star = cleared and time &lt;= par(base, scale, floor) and mistakes &lt;= a
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/games/">All notes on Game development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -671,9 +1042,9 @@ print(pages.most_common(), "FAQ questions:", questions)</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -788,10 +1159,10 @@ NOT_TEST = {"notExpression": {"orGroup": {"expressions": [
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -896,8 +1267,8 @@ export function cacheKey(api, group, original, corrected, model) {
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1027,8 +1398,8 @@ const gaps = await agent(CTX + CHECKLIST + final + dossier, { schema: CRIT })</c
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1139,12 +1510,12 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(":core
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1267,8 +1638,8 @@ git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --gre
         <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1408,8 +1779,8 @@ adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1537,12 +1908,12 @@ print("my app in results:", MY_APP in ids)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1668,9 +2039,9 @@ out of date:
         <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1788,8 +2159,8 @@ grep -rL --include='*Test.kt' -e 'assert' -e 'check(matches' app/src/</code></pr
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1926,12 +2297,12 @@ git log --until=2026-10-20 --format='%(trailers:key=Co-authored-by,valueonly)' \
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2037,8 +2408,8 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2200,12 +2571,12 @@ after_hint = win(board after the correct first move, 2 pieces left, lines it cle
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/games/">All notes on Game development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2323,8 +2694,8 @@ Schedule expires: YYYY-MM-DD / register again on: YYYY-MM-DD
         <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2464,9 +2835,9 @@ curl -s "$POLICY_URL" | grep -o 'data-policy-version="[0-9-]*"'</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2611,12 +2982,12 @@ font.save(dst)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2708,8 +3079,8 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2794,12 +3165,12 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2919,8 +3290,8 @@ flutter test test/theme_matrix/ --dart-define=Y2_NO_SETTLE=true
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3039,12 +3410,12 @@ FlowRow(
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3127,8 +3498,8 @@ Mem:              13           8           2           0           2           4
         <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3254,10 +3625,10 @@ if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFract
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3381,8 +3752,8 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3480,12 +3851,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3549,9 +3920,9 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3940,12 +4311,12 @@ room  = is there space for a 3×3 square, a 1×4 bar, a 4×1 bar (0–3)</code><
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/games/">All notes on Game development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4055,8 +4426,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4162,12 +4533,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5509,12 +5880,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5616,8 +5987,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5643,11 +6014,11 @@ done</code></pre>
       <ul class="card-list">
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/workflow/">Working with agents</a></h3><p class="sub">How work is split between an AI coding agent and a person, how rules reach the agent, and what we changed after several sessions collided in one repository.</p><p class="meta">7 notes</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/quality/">Testing and release</a></h3><p class="sub">Unit tests, release gates and on-device checks that AI-written code goes through before each release, with the real defects those checks caught along the way.</p><p class="meta">8 notes</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/android/">Android development</a></h3><p class="sub">Gradle builds, library upgrades, UI and performance problems we ran into while building Android apps with a coding agent, and how each one was solved.</p><p class="meta">8 notes</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/games/">Game development</a></h3><p class="sub">Generating puzzle game levels with an agent, proving every level can be solved, and tuning difficulty: the rules we settled on and the numbers we measured.</p><p class="meta">3 notes</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/android/">Android development</a></h3><p class="sub">Gradle builds, library upgrades, UI and performance problems we ran into while building Android apps with a coding agent, and how each one was solved.</p><p class="meta">9 notes</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/games/">Game development</a></h3><p class="sub">Generating puzzle game levels with an agent, proving every level can be solved, and tuning difficulty: the rules we settled on and the numbers we measured.</p><p class="meta">4 notes</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/store/">Play Store and monetization</a></h3><p class="sub">Google Play listings and review, store screenshots and descriptions, and ad setup: the work of shipping and running apps, shared with an AI coding agent.</p><p class="meta">3 notes</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/web/">Website and search</a></h3><p class="sub">The page structure, Google and Naver search optimization, structured data and design system of this site, built with an agent and explained from the actual code.</p><p class="meta">4 notes</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/retro/">Retrospectives and numbers</a></h3><p class="sub">Looking back over a period of work: what went fast and what went wrong, with numbers we counted ourselves from the git history and QA reports.</p><p class="meta">3 notes</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/retro/">Retrospectives and numbers</a></h3><p class="sub">Looking back over a period of work: what went fast and what went wrong, with numbers we counted ourselves from the git history and QA reports.</p><p class="meta">4 notes</p></li>
       </ul>
     </section>
     <section aria-labelledby="start">
@@ -5661,12 +6032,12 @@ done</code></pre>
     <section aria-labelledby="notes">
       <h2 id="notes">Latest notes</h2>
       <ul class="card-list">
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></h3><p class="sub">All 1,100 Arrow Knots levels come from a reverse-construction generator and pass the G2 pack gate. Fixing the move rule first made each board solvable as built.</p><p class="meta">Game development · Method · October 30, 2026</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></h3><p class="sub">After an August 2025 redesign, D1 retention of our spelling app&#x27;s organic cohorts fell from 15.2% to 11.2%; 70% of lost daily users were 31-365 days old.</p><p class="meta">Retrospectives and numbers · Measurement · October 30, 2026</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></h3><p class="sub">A Korean spelling app compared Remote Config content versions as Kotlin strings, so from 6.10 on, devices stored at 6.2 to 6.9 got no quiz or notice updates.</p><p class="meta">Android development · Incident · October 30, 2026</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></h3><p class="sub">One commit swept 50 files from another Claude session into a release fix. We built an owner table next; 7 of 13 merges still needed hand merging.</p><p class="meta">Working with agents · How-to · October 29, 2026</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></h3><p class="sub">A real-ID Block Turn build kept 5 Google test ad strings in its dex. A plain || in place of listOf().any took it to 0. We count IDs and never print them.</p><p class="meta">Android development · Measurement · October 29, 2026</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></h3><p class="sub">A Play review said the premium plan showed a &#x27;temporary error&#x27; for a month. The details screen never waited for products: 1 of 16 users reached checkout.</p><p class="meta">Play Store and monetization · Incident · October 29, 2026</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></h3><p class="sub">Six .so files rebuilt for Google Play&#x27;s 16 KB page rule; NDK 27 and 29 tinted photo transitions blue. Rechecked: NDK 25 aligns to 16 KB with one linker flag.</p><p class="meta">Android development · Incident · October 28, 2026</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></h3><p class="sub">Testers said our puzzle game gave too much time. A 158-level simulation set the cut at 30%; a 45% cut left casual players a 1% three-star rate past level 500.</p><p class="meta">Game development · Measurement · October 28, 2026</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></h3><p class="sub">Google ended FAQ rich results on May 7, 2026 and Naver on July 9. Why our 106 FAQPage pages stay untouched, and the feed, date and app markup we fixed instead.</p><p class="meta">Website and search · How-to · October 28, 2026</p></li>
       </ul>
     </section>
     <section aria-labelledby="by-the-numbers">
@@ -5801,8 +6172,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6387,435 +6758,6 @@ done</code></pre>
       <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a> · Package name: <code>com.sugarmount.sugarclip</code></p>
     </section>]]></description>
     <pubDate>Mon, 05 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>SugarSpeller: Korean spelling checker for Android – SugarMount</title>
-    <link>https://mvgood21.github.io/en/apps/sugarspeller/</link>
-    <guid isPermaLink="true">https://mvgood21.github.io/en/apps/sugarspeller/</guid>
-    <description><![CDATA[<header class="app-hero">
-      <img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarspeller/icon.webp" width="96" height="96" alt="" fetchpriority="high">
-      <h1>SugarSpeller</h1>
-      <p class="lead">SugarSpeller is an Android app that fixes Korean spelling and word spacing in text you paste or share, using the Naver or Daum spelling checker.</p>
-      <p class="status"><span class="badge badge--live">Google Play</span> <span class="brandline">Hangul Checker · Korean Spelling: Spacing Check</span></p>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugarspeller&amp;referrer=utm_source%3Dmvgood21.github.io%26utm_medium%3Dapp_page%26utm_campaign%3Dsugarspeller&amp;hl=en" rel="noopener">Get it on Google Play</a><a class="button button--outline" href="https://mvgood21.github.io/en/privacy/sugarspeller/">SugarSpeller privacy policy</a></div>
-    </header>
-    <ul class="shots" tabindex="0" aria-label="SugarSpeller screenshots"><li><img src="https://mvgood21.github.io/assets/apps/sugarspeller/shot1.webp" width="360" height="620" loading="lazy" alt="Checking the spelling and spacing of shared text"></li><li><img src="https://mvgood21.github.io/assets/apps/sugarspeller/shot2.webp" width="360" height="620" loading="lazy" alt="Converting a long text in one pass"></li><li><img src="https://mvgood21.github.io/assets/apps/sugarspeller/shot3.webp" width="360" height="620" loading="lazy" alt="Choosing the checking style"></li></ul>
-    <section aria-labelledby="tasks">
-      <h2 id="tasks">Use it to</h2>
-      <ul>
-        <li><a href="https://mvgood21.github.io/en/apps/sugarspeller/long-text-check/">Check a long Korean text, such as a cover letter, in one pass</a></li>
-        <li>Fix a message before you send it on KakaoTalk</li>
-        <li>See why a correction was made and learn the rule</li>
-        <li>Practise tricky spellings with a daily five-question quiz</li>
-      </ul>
-    </section>
-    <section aria-labelledby="features">
-      <h2 id="features">What it does</h2>
-      <ul class="features">
-        <li><h3>Check by sharing</h3><p>Share from KakaoTalk or a notes app and pick Hangul Checker, or select text and pick Spell check from the menu. No copy and paste needed.</p></li>
-        <li><h3>Long text in one go</h3><p>Free 3,000 characters, Basic 4,000, Premium 7,000 per check.</p></li>
-        <li><h3>Choose the checker</h3><p>Use the Naver or Daum (Kakao) spelling checker. In the chat screen and the mini window, if one fails the app retries once with the other.</p></li>
-        <li><h3>Why is it wrong?</h3><p>Tap a correction to get a short AI explanation. Only when you tap, the original and corrected word, the error type and the checker used are sent; surrounding sentences are not.</p></li>
-        <li><h3>History</h3><p>Originals and corrections are kept on your device so you can look back.</p></li>
-        <li><h3>Daily Spelling Quiz</h3><p>Five tricky spelling questions a day, each with an explanation.</p></li>
-      </ul>
-    </section>
-    <section class="facts" aria-labelledby="facts-h">
-      <h2 id="facts-h">At a glance</h2>
-      <div class="table-wrap">
-        <table>
-          <tbody>
-            <tr><th scope="row">Status</th><td>Google Play</td></tr>
-            <tr><th scope="row">Price</th><td>Free with ads. Subscriptions: Basic (4,000 characters, banner ads) and Premium (7,000 characters, no ads)</td></tr>
-            <tr><th scope="row">Characters per check</th><td>Free 3,000 · Basic 4,000 · Premium 7,000</td></tr>
-            <tr><th scope="row">Internet</th><td>Required. Text is sent to the Naver or Daum spelling checker to be checked.</td></tr>
-            <tr><th scope="row">Account</th><td>Not needed.</td></tr>
-            <tr><th scope="row">Language</th><td>Checks Korean text (app screens in Korean and English)</td></tr>
-            <tr><th scope="row">Package name</th><td><code>com.sugarmount.sugarspeller</code></td></tr>
-            <tr><th scope="row">Developer</th><td>simpest (SugarMount)</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-    <section aria-labelledby="data">
-      <h2 id="data">Data and permissions</h2>
-      <ul>
-        <li>Text you check is sent only to the Naver or Daum (Kakao) spelling checker. It is not sent to our servers.</li>
-        <li>Your check history stays on your device.</li>
-        <li>Only when you tap “Why is it wrong?”, the original and corrected word, the error type, the checker used (Naver or Daum) and your subscription status go to our server (Google Firebase). To write the explanation, the server sends only the words and the error type to Google Vertex AI (Gemini). Surrounding sentences are not sent.</li>
-        <li>The app includes ads (Google AdMob with mediation partner Liftoff), usage statistics (Google Analytics), remote config and notifications (Firebase), and Firebase App Check (Google Play Integrity), which checks that requests come from a genuine install.</li>
-        <li>To count daily AI explanations, the app creates an anonymous identifier (Firebase anonymous account). It is not linked to a name, email or phone number.</li>
-      </ul>
-      <p>See <a href="https://mvgood21.github.io/en/privacy/sugarspeller/">SugarSpeller privacy policy</a> for details.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">What it can't do</h2>
-      <ul>
-        <li>Each check has a length limit: 3,000 characters free, 4,000 with Basic and 7,000 with Premium.</li>
-        <li>It needs an internet connection. Text is sent to the Naver or Daum spelling checker.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">Frequently asked questions</h2>
-      <div class="faq">
-        <details><summary>How many characters can I check at once?</summary><div><p>3,000 for free, 4,000 with Basic and 7,000 with Premium.</p></div></details>
-        <details><summary>Is my text stored or uploaded?</summary><div><p>Text is sent only to the Naver or Daum spelling checker to be checked, not to our servers. Your history stays on your device. When you tap “Why is it wrong?”, the corrected word and its explanation may be cached on our server (Google Firebase).</p></div></details>
-        <details><summary>Can I check text from other apps?</summary><div><p>Yes. Pick Hangul Checker from another app&#x27;s share menu, or Spell check from the menu that appears when you select text.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="guides-heading">
-      <h2 id="guides-heading">Help articles</h2>
-      <ul class="related-links">
-        <li><a href="https://mvgood21.github.io/en/apps/sugarspeller/long-text-check/">Spell-check long Korean text on Android</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="ax-app-heading">
-      <h2 id="ax-app-heading">AX notes on this app</h2>
-      <ul class="related-links">
-        <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="releases-heading">
-      <h2 id="releases-heading">Recent updates</h2>
-      <ul>
-        <li><strong>1.6.030</strong> · <time datetime="2026-10-18">October 18, 2026</time> · New mini game, Spelling Shower: type the correct form of falling misspelled words.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="related-heading">
-      <h2 id="related-heading">Related apps</h2>
-      <ul class="related">
-        <li><a href="https://mvgood21.github.io/en/apps/sugarclip/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarclip/icon.webp" width="56" height="56" alt=""><span>SugarClip</span></a></li>
-        <li><a href="https://mvgood21.github.io/en/apps/doc-viewer/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugardoc/icon.webp" width="56" height="56" alt=""><span>HWP Viewer SugarDoc</span></a></li>
-      </ul>
-    </section>
-    <p class="meta updated">Last updated <time datetime="2026-10-23">October 23, 2026</time></p>
-    <section aria-labelledby="contact">
-      <h2 id="contact">Contact</h2>
-      <p>If something isn't working or you have a question, email us.</p>
-      <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a> · Package name: <code>com.sugarmount.sugarspeller</code></p>
-    </section>]]></description>
-    <pubDate>Mon, 05 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Arrow Knots: Untangle Puzzle Game for Android – SugarMount</title>
-    <link>https://mvgood21.github.io/en/apps/arrow-knots/</link>
-    <guid isPermaLink="true">https://mvgood21.github.io/en/apps/arrow-knots/</guid>
-    <description><![CDATA[<section class="hero">
-      <img class="app-icon app-icon--lg" src="https://mvgood21.github.io/assets/apps/arrows/icon.webp" width="72" height="72" alt="">
-      <p class="eyebrow">Android puzzle game</p>
-      <h1>Arrow Knots</h1>
-      <p class="lead">Arrow Knots is an Android puzzle game where you tap tangled arrows out one at a time, in the right order, until the board is empty. No sign-up, and it plays offline.</p>
-      <p class="status"><span class="badge badge--live">Google Play</span> <span class="brandline">Arrow Knots: Untangle Puzzle</span></p>
-      <ul class="trust" aria-label="Key points">
-        <li>No sign-up</li>
-        <li>Plays offline</li>
-        <li>Progress stays on your device</li>
-      </ul>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.arrows&amp;referrer=utm_source%3Dmvgood21.github.io%26utm_medium%3Dapp_page%26utm_campaign%3Darrows&amp;hl=en" rel="noopener">Get it on Google Play</a><a class="button button--outline" href="https://mvgood21.github.io/en/privacy/arrow-knots/">Arrow Knots privacy policy</a></div>
-    </section>
-    <ul class="shots" aria-label="Screenshots">
-      <li><img src="https://mvgood21.github.io/assets/apps/arrows/shot1-en.webp" width="360" height="640" loading="lazy" alt="Game screen with a heart-shaped knot of arrows, hearts and timer"></li>
-      <li><img src="https://mvgood21.github.io/assets/apps/arrows/shot2-en.webp" width="360" height="640" loading="lazy" alt="Fast consecutive taps building a combo"></li>
-      <li><img src="https://mvgood21.github.io/assets/apps/arrows/shot3-en.webp" width="360" height="640" loading="lazy" alt="Clear screen with 3 stars, time, best combo and score"></li>
-    </ul>
-    <section aria-labelledby="tasks">
-      <h2 id="tasks">Use it to</h2>
-      <ul>
-        <li>Learn the rules and a few tips for arrow puzzles</li>
-        <li>Find a puzzle game that works without internet</li>
-        <li>Keep a daily streak with a new board every day</li>
-      </ul>
-    </section>
-    <section aria-labelledby="how-to-play">
-      <h2 id="how-to-play">How to play</h2>
-      <p>Tap an arrow and it slides out along its own body, the way its head points. If another arrow is in the way, it bumps, bounces back and you lose a heart.</p>
-      <ol class="steps">
-        <li><strong>Tap an arrow with a clear path.</strong> If the way ahead of its head is open, it leaves the board.</li>
-        <li><strong>Work out the order.</strong> If an arrow is blocked, remove whatever is in its way first.</li>
-        <li><strong>Empty the board.</strong> Finish inside the target time with hardly any slips for 3 stars.</li>
-      </ol>
-      <p>You start with a three-board tutorial (tapping, getting blocked, finding the order). No hearts are lost while you learn.</p>
-    </section>
-    <section aria-labelledby="features">
-      <h2 id="features">Features</h2>
-      <ul class="features">
-        <li><h3>1,000 levels in four parts</h3><p>In Part 1 (levels 1–200) every board fits on one screen. From level 201 the boards outgrow the screen: tap to zoom in, drag to look around. After level 1,000, new boards keep coming.</p></li>
-        <li><h3>A bonus mini game every 25 levels</h3><p>Each world (25 levels) ends with Neon Rush, Shadow Memory, Number Order or Boss Time Attack. Your stars decide the coins in the reward chest.</p></li>
-        <li><h3>Daily puzzle</h3><p>A new board every day, the same for everyone. Monday is the gentlest, the weekend the toughest. Solve it on the day to grow your streak, and reach 7, 15 or 25 days in a month for a bronze, silver or gold trophy.</p></li>
-        <li><h3>Hints and coins</h3><p>3 hints per level (4 on a few of the biggest boards). A hint lights up the arrow that opens the most of the board and pulls it out for you. First clears earn coins, and 100 coins buy a hint.</p></li>
-        <li><h3>Hearts and continues</h3><p>3 to 5 hearts, depending on how many arrows there are. Clear arrows in a row without a miss and a lost heart comes back. Out of hearts? Watch an ad to continue with 2 hearts, once per try.</p></li>
-        <li><h3>Combos and target time</h3><p>Clear arrows within about a second of each other to build a combo. Going over the target time never fails you, and you can hide the timer from the pause menu.</p></li>
-        <li><h3>Easy colors</h3><p>The six arrow colors were checked in red-green and blue-yellow color blindness simulations.</p></li>
-      </ul>
-    </section>
-    <section class="facts" aria-labelledby="facts">
-      <h2 id="facts">At a glance</h2>
-      <table>
-        <tbody>
-          <tr><th scope="row">Price</th><td>Free. Shows ads; in-app products remove ads or add a pack of 15 hints</td></tr>
-          <tr><th scope="row">Levels</th><td>1,000 in four parts, then new boards keep coming. One daily puzzle every day</td></tr>
-          <tr><th scope="row">Account</th><td>None (no sign-up, no login)</td></tr>
-          <tr><th scope="row">Internet</th><td>Not needed to play. Used for ads, purchases and usage statistics</td></tr>
-          <tr><th scope="row">Data sent</th><td>Progress stays on the device. Ads (AdMob, Liftoff) and usage statistics and crash reports (Firebase) are handled by Google and Liftoff</td></tr>
-          <tr><th scope="row">Permissions</th><td>Vibration, internet and network state, advertising ID, Google Play billing</td></tr>
-          <tr><th scope="row">Android</th><td>7.0 or later, portrait only</td></tr>
-          <tr><th scope="row">Languages</th><td>English, Korean</td></tr>
-          <tr><th scope="row">Latest version</th><td>1.2.3</td></tr>
-          <tr><th scope="row">Package name</th><td><code>com.sugarmount.arrows</code></td></tr>
-          <tr><th scope="row">Developer</th><td>simpest (SugarMount)</td></tr>
-        </tbody>
-      </table>
-    </section>
-    <section aria-labelledby="data">
-      <h2 id="data">Data and permissions</h2>
-      <ul>
-        <li>There is no account. Your progress (levels, stars, coins, hints) is saved only in the app's storage on this device and is never sent to us. We don't run a server for this app.</li>
-        <li>Ads are served by Google AdMob and its partner Liftoff, which may use your advertising ID and device and network information under their own policies.</li>
-        <li>Since version 1.2.1 we receive anonymous usage statistics (such as tutorial completion and the levels you clear for the first time) and crash reports through Google Firebase, to improve the game and measure ad campaigns. Your name, email and contacts are never sent.</li>
-        <li>The app uses four permissions: vibration (in-game haptics, can be turned off in settings); internet and network state (ads, the consent form, purchases); the advertising ID, added by the ads SDK (showing and measuring ads); and Google Play billing, added by the billing library. The app never asks for location, contacts, camera, photos or microphone.</li>
-        <li>Where consent is required, you can change your ad consent choice anytime under Privacy settings in the pause menu.</li>
-      </ul>
-      <p>For details, see the <a href="https://mvgood21.github.io/en/privacy/arrow-knots/">Arrow Knots privacy policy</a>.</p>
-    </section>
-    <section aria-labelledby="pricing">
-      <h2 id="pricing">Free and paid</h2>
-      <ul>
-        <li>Every level and mode is free to play.</li>
-        <li>From level 4 there's a banner at the bottom of the screen. The tutorial and levels 1–3 have none.</li>
-        <li>Full-screen ads start after 15 clears and only show now and then between levels after a win, never after a loss or in the middle of a level.</li>
-        <li>If you leave the app and come back a few minutes later, you may see one ad.</li>
-        <li>Ads for a hint, a continue, double coins or keeping a streak only play when you choose them. The bonus offer between levels can be skipped.</li>
-        <li>A one-time purchase removes the banner, full-screen and comeback ads and adds 10 hints. Ads for a hint or a continue stay available whenever you want them.</li>
-        <li>A pack of 15 hints is also available. Payments go through Google Play billing.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">What it can't do</h2>
-      <ul>
-        <li>There is no account or cloud save, so progress can't move to another device. Clearing the app's data or uninstalling it deletes your progress and hints (the remove-ads purchase is restored from Google Play).</li>
-        <li>No leaderboards or playing against friends.</li>
-        <li>No landscape mode.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Can I play Arrow Knots offline?</summary><div><p>Yes, every level plays without an internet connection. The internet is only used for ads, purchases and usage statistics, and the game carries on even when an ad can't load.</p></div></details>
-        <details><summary>Does my progress move to a new phone?</summary><div><p>No. There is no account and progress is saved only on the device. Only the remove-ads purchase is restored from Google Play.</p></div></details>
-        <details><summary>Can I remove the ads?</summary><div><p>Yes, a one-time purchase removes the banner, full-screen and comeback ads. See <a href="https://mvgood21.github.io/en/apps/arrow-knots/#pricing">Free and paid</a>.</p></div></details>
-        <details><summary>I'm stuck on a level. What can I do?</summary><div><p>Use a hint: it pulls out the arrow that opens the most of the board. And if you lose twice in a row after real progress, the next try gets a little easier.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="contact">
-      <h2 id="contact">Contact</h2>
-      <p>If the game doesn't work as expected or you have a question, email us. Your device model, Android version and the level number help us check. Feedback in the pause menu opens a mail with the app version and device already filled in.</p>
-      <p>Email: sugarmount21@gmail.com · Package name: <code>com.sugarmount.arrows</code></p>
-    </section>
-    <section aria-labelledby="ax-app-heading">
-      <h2 id="ax-app-heading">AX notes on this app</h2>
-      <ul class="related-links">
-        <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="releases-heading">
-      <h2 id="releases-heading">Recent updates</h2>
-      <ul>
-        <li><strong>1.2.3</strong> · <time datetime="2026-10-17">October 17, 2026</time> · Fixed a crash on launch on Android 7, and how-to-play steps 2 and 3 can be skipped.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="related-heading">
-      <h2 id="related-heading">Related apps</h2>
-      <ul class="related">
-        <li><a href="https://mvgood21.github.io/en/apps/blocks/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/blocks/icon.webp" width="56" height="56" alt=""><span>Block Turn</span></a></li>
-        <li><a href="https://mvgood21.github.io/en/apps/sugaralbum/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugaralbum/icon.webp" width="56" height="56" alt=""><span>SugarAlbum</span></a></li>
-        <li><a href="https://mvgood21.github.io/en/apps/image-compress/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarcompress/icon.webp" width="56" height="56" alt=""><span>Compress Image</span></a></li>
-      </ul>
-    </section>
-    <p class="meta updated">Last updated <time datetime="2026-10-18">October 18, 2026</time></p>]]></description>
-    <pubDate>Sat, 03 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Convert Image JPG PNG WEBP for Android – SugarMount</title>
-    <link>https://mvgood21.github.io/en/apps/image-convert/</link>
-    <guid isPermaLink="true">https://mvgood21.github.io/en/apps/image-convert/</guid>
-    <description><![CDATA[<section class="hero" aria-labelledby="app-title">
-      <img class="app-icon app-icon--lg" src="https://mvgood21.github.io/assets/apps/sugarconvert/icon.webp" width="88" height="88" fetchpriority="high" alt="">
-      <p class="eyebrow">Photo app</p>
-      <h1 id="app-title">Convert Image JPG PNG WEBP</h1>
-      <p class="lead">An Android app that turns HEIC, PNG and WebP photos into JPG for forms, transparent PNG or small WebP, saved as new files. It converts whole batches on your device without uploading anything.</p>
-      <p class="status"><span class="badge badge--live">Google Play</span> <span class="brandline">SugarConvert</span></p>
-      <ul class="trust" aria-label="Data handling">
-        <li>No upload</li>
-        <li>Originals kept</li>
-        <li>No storage permission</li>
-        <li>No account</li>
-      </ul>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugarconvert&amp;referrer=utm_source%3Dmvgood21.github.io%26utm_medium%3Dapp_page%26utm_campaign%3Dsugarconvert&amp;hl=en" rel="noopener">Get it on Google Play</a><a class="button button--outline" href="https://mvgood21.github.io/en/privacy/image-convert/">Convert Image privacy policy</a></div>
-    </section>
-    <ul class="shots" tabindex="0" role="region" aria-label="Screenshots">
-      <li><img src="https://mvgood21.github.io/assets/apps/sugarconvert/shot1-en.webp" width="360" height="640" loading="lazy" alt="Home screen with purpose presets and saved profiles"></li>
-      <li><img src="https://mvgood21.github.io/assets/apps/sugarconvert/shot2-en.webp" width="360" height="640" loading="lazy" alt="Convert options: format, quality, transparency and long edge"></li>
-      <li><img src="https://mvgood21.github.io/assets/apps/sugarconvert/shot3-en.webp" width="360" height="640" loading="lazy" alt="Original and result side by side"></li>
-    </ul>
-    <section aria-labelledby="tasks">
-      <h2 id="tasks">Use it to</h2>
-      <ul>
-        <li><a href="https://mvgood21.github.io/en/apps/image-convert/heic-to-jpg/">Convert HEIC photos from a Galaxy phone to JPG</a></li>
-        <li><a href="https://mvgood21.github.io/en/apps/image-convert/png-to-jpg/">Convert PNG to JPG with a white background</a></li>
-        <li>Convert WebP images to JPG</li>
-        <li>Save a logo as a transparent PNG</li>
-      </ul>
-    </section>
-    <section aria-labelledby="features">
-      <h2 id="features">What it does</h2>
-      <p>Use it when a form only accepts JPG, a logo has to be delivered as a transparent PNG, or shop photos need to become small WebP files. Your original photos stay as they are; results are saved as new files.</p>
-      <ol class="steps">
-        <li><strong>Pick photos</strong> — use the Android photo picker or “Pick from files”. Photos picked from files keep their original name with the new extension. Tap a photo if it should be saved in a format of its own.</li>
-        <li><strong>Choose the format and options</strong> — only the options for the chosen format appear: quality and the colour behind transparent areas for JPEG, whether to keep transparency for PNG, lossy or lossless plus quality for WebP. The long edge, black &amp; white and file naming are set here too, with a preview.</li>
-        <li><strong>Check, then save or share</strong> — compare the original and the result side by side, then save or share. Saved photos go to the <code>Pictures/SugarConvert</code> folder as new files.</li>
-      </ol>
-      <h3>Presets</h3>
-      <dl>
-        <dt>JPG for forms</dt>
-        <dd>Quality 90, transparent areas filled with white.</dd>
-        <dt>WebP for the web</dt>
-        <dd>Quality 80, long edge reduced to 1920 px.</dd>
-        <dt>Transparent PNG</dt>
-        <dd>Keeps the transparency of logos and graphics.</dd>
-        <dt>Black &amp; white JPG</dt>
-        <dd>Removes colour for documents and print.</dd>
-      </dl>
-      <h3>Profiles and run history</h3>
-      <p>Save a format, quality, size and naming rule under a name of your choice and reapply it from the home screen in one tap. Up to 8 profiles can be saved. The recent run history (date, counts, format, sizes) stays on the device and never records file names.</p>
-      <p>One failed photo never stops the rest, and you can retry only the failed ones. The result screen shows the real file size before and after, and says so when a file got larger.</p>
-    </section>
-    <section class="facts" aria-labelledby="facts-h">
-      <h2 id="facts-h">At a glance</h2>
-      <div class="table-wrap" tabindex="0" role="region" aria-labelledby="facts-h">
-        <table>
-          <tbody>
-            <tr><th scope="row">Price</th><td>Free with ads. Pro is a one-time in-app purchase that removes ads and raises the batch limit.</td></tr>
-            <tr><th scope="row">Input formats</th><td>JPEG, PNG, WebP, HEIC/HEIF. HEIC is converted when your device can decode it; a photo it cannot read fails on its own.</td></tr>
-            <tr><th scope="row">Output formats</th><td>JPEG, PNG, WebP (lossy or lossless). Any photo can get its own format, and the extension always matches the format actually written.</td></tr>
-            <tr><th scope="row">Quality</th><td>40–100 for JPEG and lossy WebP (default 90). PNG and lossless WebP do not use it.</td></tr>
-            <tr><th scope="row">Transparency</th><td>JPEG fills transparent areas with the colour you pick (white, black or gray). PNG and WebP keep transparency or fill it, your choice.</td></tr>
-            <tr><th scope="row">Resolution</th><td>Kept by default. The long edge can be reduced to 1280, 1920, 2560 px or a value you enter (320–8000 px). Photos are never enlarged.</td></tr>
-            <tr><th scope="row">Metadata</th><td>Location and camera data (EXIF) are not copied into results. The photo’s orientation is applied.</td></tr>
-            <tr><th scope="row">Photos per batch</th><td>Free 20, Pro 100</td></tr>
-            <tr><th scope="row">Per photo</th><td>Up to 50 MB and 50 MP</td></tr>
-            <tr><th scope="row">Originals</th><td>Never modified. Results are saved as new files in <code>Pictures/SugarConvert</code>.</td></tr>
-            <tr><th scope="row">Upload</th><td>None. All conversion happens on your device.</td></tr>
-            <tr><th scope="row">Permissions</th><td>No storage permission. The app reads only the photos you pick in the photo picker or file picker.</td></tr>
-            <tr><th scope="row">Android</th><td>Android 10 or later</td></tr>
-            <tr><th scope="row">Languages</th><td>Korean, English</td></tr>
-            <tr><th scope="row">Package name</th><td><code>com.sugarmount.sugarconvert</code></td></tr>
-            <tr><th scope="row">Developer</th><td>simpest (SugarMount)</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-    <section aria-labelledby="data">
-      <h2 id="data">Data and permissions</h2>
-      <ul>
-        <li>Your photos, file names and results are never sent to our servers or anywhere else. We do not run a server.</li>
-        <li>Converting photos needs no internet connection. Ads and the Pro purchase work only while you are online.</li>
-        <li>No storage permission is requested. The app can read only the photos you pick yourself in the photo picker or file picker.</li>
-        <li>No account is created. Profiles, run history and settings stay on the device and are deleted with the app.</li>
-        <li>In the free version, ads are served by Google AdMob, and the ads SDK may collect data such as the advertising ID and IP address under Google’s policies. Where required, a consent form is shown; you can change your choice under “Ad privacy options” in Settings. Pro shows no ads.</li>
-        <li>Anonymous usage stats (Firebase Analytics) and crash reports (Firebase Crashlytics) are on by default and can each be switched off in Settings. Neither includes your photos or file names.</li>
-      </ul>
-      <p>See the <a href="https://mvgood21.github.io/en/privacy/image-convert/">Convert Image privacy policy</a> for details.</p>
-    </section>
-    <section aria-labelledby="pro">
-      <h2 id="pro">Free and Pro</h2>
-      <div class="two-col">
-        <div class="box">
-          <h3>Free</h3>
-          <ul>
-            <li>Every format, option, preset and profile</li>
-            <li>Up to 20 photos per batch</li>
-            <li>Shows ads (result screen banner, interstitial and app open ads)</li>
-          </ul>
-        </div>
-        <div class="box">
-          <h3>Pro</h3>
-          <ul>
-            <li>One-time purchase on Google Play, not a subscription</li>
-            <li>Removes ads</li>
-            <li>Up to 100 photos per batch</li>
-          </ul>
-        </div>
-      </div>
-      <p class="muted">The price is the one shown on Google Play. On a new device, “Restore purchase” in Settings reapplies a purchase made with the same Google account.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">What it cannot do</h2>
-      <ul>
-        <li>GIF and BMP files and PDFs are not converted; they are left out when you pick. Animated images such as animated WebP are not converted either, and fail on their own.</li>
-        <li>No cropping, rotating or retouching. Size can only be reduced by the long edge, and photos are never enlarged.</li>
-        <li>Saving as PNG or lossless WebP does not restore detail a JPEG source has already lost, and the file can get larger.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">Questions</h2>
-      <div class="faq">
-        <details>
-          <summary>Can I convert HEIC photos from an iPhone to JPG?</summary>
-          <div><p>Yes, when your device can decode HEIC, the app converts it to JPG. The “JPG for forms” preset saves it at quality 90. A HEIC photo the device cannot read fails on its own, and the rest of the batch continues.</p></div>
-        </details>
-        <details>
-          <summary>What are converted files named?</summary>
-          <div><p>Photos picked with “Pick from files” keep their original name with the new extension. The Android photo picker does not tell apps the file name, so photos picked there are saved as SugarConvert plus the save time.</p></div>
-        </details>
-        <details>
-          <summary>What happens to the transparent background when a PNG becomes a JPG?</summary>
-          <div><p>JPG cannot store transparency, so transparent areas are filled with the background colour you pick: white by default, or black or gray. To keep transparency, save as PNG or WebP.</p></div>
-        </details>
-        <details>
-          <summary>Are my photos uploaded?</summary>
-          <div><p>No, photos are never uploaded and are converted on your device only. See <a href="https://mvgood21.github.io/en/apps/image-convert/#data">Data and permissions</a>.</p></div>
-        </details>
-      </div>
-    </section>
-    <section aria-labelledby="contact">
-      <h2 id="contact">Contact</h2>
-      <p>If the app does not work as expected or you have a question, email us. Including your device model and Android version helps us check.</p>
-      <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a><br>Package name: <code>com.sugarmount.sugarconvert</code></p>
-    </section>
-    <section aria-labelledby="guides-heading">
-      <h2 id="guides-heading">Help articles</h2>
-      <ul class="related-links">
-        <li><a href="https://mvgood21.github.io/en/apps/image-convert/heic-to-jpg/">Convert HEIC to JPG on a Samsung Galaxy phone</a></li>
-        <li><a href="https://mvgood21.github.io/en/apps/image-convert/png-to-jpg/">PNG to JPG on Android with a white background</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="ax-app-heading">
-      <h2 id="ax-app-heading">AX notes on this app</h2>
-      <ul class="related-links">
-        <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="releases-heading">
-      <h2 id="releases-heading">Recent updates</h2>
-      <ul>
-        <li><strong>1.0.3</strong> · <time datetime="2026-10-04">October 4, 2026</time> · New: Pick from files. Photos chosen this way keep their original file name.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="related-heading">
-      <h2 id="related-heading">Related apps</h2>
-      <ul class="related">
-        <li><a href="https://mvgood21.github.io/en/apps/sugaralbum/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugaralbum/icon.webp" width="56" height="56" alt=""><span>SugarAlbum</span></a></li>
-        <li><a href="https://mvgood21.github.io/en/apps/image-compress/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarcompress/icon.webp" width="56" height="56" alt=""><span>Compress Image</span></a></li>
-        <li><a href="https://mvgood21.github.io/en/apps/image-flip/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarflip/icon.webp" width="56" height="56" alt=""><span>Flip &amp; Rotate Image</span></a></li>
-      </ul>
-    </section>
-    <p class="meta updated">Last updated <time datetime="2026-10-18">October 18, 2026</time></p>]]></description>
-    <pubDate>Thu, 24 Sep 2026 09:00:00 +0900</pubDate>
   </item>
 </channel>
 </rss>

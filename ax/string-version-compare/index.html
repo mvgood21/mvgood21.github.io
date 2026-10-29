@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>버전 문자열 비교: &quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓 – SugarMount</title>
+  <meta name="description" content="Kotlin 문자열 비교로 콘텐츠 버전을 견주던 맞춤법 앱이 Remote Config 6.10부터 6.2~6.9에 머문 기기에 문제 은행과 공지를 보내지 못했습니다. 원인과 수정, 확인 절차입니다.">
+  <link rel="canonical" href="https://mvgood21.github.io/ax/string-version-compare/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/string-version-compare/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/string-version-compare/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/string-version-compare/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="버전 문자열 비교: &quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓 – SugarMount">
+  <meta property="og:description" content="Kotlin 문자열 비교로 콘텐츠 버전을 견주던 맞춤법 앱이 Remote Config 6.10부터 6.2~6.9에 머문 기기에 문제 은행과 공지를 보내지 못했습니다. 원인과 수정, 확인 절차입니다.">
+  <meta property="og:url" content="https://mvgood21.github.io/ax/string-version-compare/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-string-version-compare-ko.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=51d09451">
+  <link rel="stylesheet" href="/assets/site.css?v=51d09451">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=51d09451">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/ax/string-version-compare/#article","headline":"\"6.7\" < \"6.11\"이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교","description":"Kotlin 문자열 비교로 콘텐츠 버전을 견주던 맞춤법 앱이 Remote Config 6.10부터 6.2~6.9에 머문 기기에 문제 은행과 공지를 보내지 못했습니다. 원인과 수정, 확인 절차입니다.","url":"https://mvgood21.github.io/ax/string-version-compare/","mainEntityOfPage":"https://mvgood21.github.io/ax/string-version-compare/","inLanguage":"ko","articleSection":"Android 개발","datePublished":"2026-10-30T09:00:00+09:00","dateModified":"2026-10-30T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-string-version-compare-ko.png","https://mvgood21.github.io/assets/ax/cover/string-version-compare-ko.webp","https://mvgood21.github.io/assets/ax/string-version-compare-1-ko.webp","https://mvgood21.github.io/assets/ax/string-version-compare-2-ko.webp"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Kotlin에서 \"6.7\" < \"6.11\"은 왜 거짓인가요?","acceptedAnswer":{"@type":"Answer","text":"String 비교가 앞 글자부터 견주는 사전순이기 때문입니다. 셋째 글자 '7'이 '1'보다 커서 \"6.7\"이 더 크다고 나옵니다."}},{"@type":"Question","name":"버전을 7.0으로 올리면 문자열 비교로도 되지 않나요?","acceptedAnswer":{"@type":"Answer","text":"당장은 됩니다. 7.10에서 같은 일이 다시 나고, 콘텐츠를 고치는 사람마다 자릿수가 바뀌는 올림을 피해야 합니다."}},{"@type":"Question","name":"Remote Config의 force는 언제 켜도 되나요?","acceptedAnswer":{"@type":"Answer","text":"app_version과 같은 버전을 쓰는 활성 사용자가 90%를 넘은 뒤입니다. 이 앱은 보급률이 낮을 때 켰다가 그날 세션이 25% 줄었습니다."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/"},{"@type":"ListItem","position":2,"name":"AX 노트","item":"https://mvgood21.github.io/ax/"},{"@type":"ListItem","position":3,"name":"Android 개발","item":"https://mvgood21.github.io/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"\"6.7\" < \"6.11\"이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=51d09451">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a class="nav-apps" href="/apps/">앱</a>
+        <a class="nav-ax" href="/ax/" aria-current="page">AX 노트</a>
+        <a class="nav-about" href="/about/">소개</a>
+        <a class="nav-privacy" href="/privacy/">개인정보처리방침</a>
+      </nav>
+      <a class="lang" href="/en/ax/string-version-compare/" lang="en" hreflang="en">English</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>메뉴</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="전체 메뉴">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">닫기</button>
+      <p class="menu-title" id="m-photo">사진·영상</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>슈가앨범</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 용량 줄이기</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 반전·회전</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>이미지 변환 JPG·PNG·WebP</span></a></li></ul>
+      <p class="menu-title" id="m-document">문서·글</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글 띄어쓰기</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글뷰어 슈가독</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">생활</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>생생카드</span></a></li></ul>
+      <p class="menu-title" id="m-games">게임</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>화살표 매듭풀기</span></a></li><li><a class="app-tile" data-app="blocks" href="/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한판블록</span></a></li></ul>
+      <p><a href="/apps/">모든 앱 보기</a></p>
+      <ul class="menu-links"><li><a href="/ax/" aria-current="page">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-android">
+    <nav class="crumbs" aria-label="이동 경로"><ol><li><a href="/">SugarMount</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/ax/topic/android/">Android 개발</a></li><li><span aria-current="page">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/string-version-compare-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX 노트 · 사고 기록</span>
+      <h1>"6.7" &lt; "6.11"이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</h1>
+      <p class="lead">Kotlin 문자열 &lt;로는 "6.7"이 "6.11"보다 큽니다. 그래서 Remote Config 값이 6.10이 되자 6.2~6.9 기기의 갱신이 멈췄습니다.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/about/">작성 SugarMount</a> <span aria-hidden="true">·</span> <span>Android 개발</span> <span aria-hidden="true">·</span> <span>읽는 시간 14분</span> <span aria-hidden="true">·</span> 최종 업데이트 <time datetime="2026-10-30">2026년 10월 30일</time></p><!-- /build:meta -->
+      <p>서랍에는 (6.7/2.2), 운영 Remote Config에는 6.11/2.3. 맞춤법 앱 <a href="/apps/sugarspeller/">한글 띄어쓰기</a>의 콘텐츠 버전 두 개가 이렇게 달랐습니다. 2026년 9월 25일 운영자가 기기에서 본 값입니다. 앱이 두 버전을 사전순 문자열로 비교했기 때문에, 6.2~6.9에 머문 기기는 그 뒤 <code>info_version</code>을 올려 보낸 문제 은행과 공지를 받지 못했습니다. 같은 날 12시 14분 커밋(7b997f8)에서 자리마다 정수로 비교하는 <code>VersionCompare</code>와 단위 테스트 4개를 넣었습니다.</p>
+      <p class="note">근거: 앱 저장소의 git 기록(d5ac5e2, 6d0f4f1, 5f082f8, 71c31ae, a4d5b9a, e9d6b9c, 079feab, 7b997f8, 31c082d, 844c828), CHANGELOG 1.6.019·1.6.023, 문제 은행 검수 문서, 모니터링 스크립트. 2026-10-29에 다시 확인했습니다. Remote Config 템플릿 번호와 프로젝트 식별값은 적지 않았습니다.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>목차 (9)</summary><ol><li><a href="#symptom">서랍은 6.7, Remote Config는 6.11이었습니다</a></li><li><a href="#why-silent">소수점 뒤가 한 자리일 때는 같은 답이 나왔습니다</a></li><li><a href="#agents">에이전트 커밋 세 번 중 콘텐츠 비교를 고친 것은 없었습니다</a></li><li><a href="#fix">VersionCompare로 콘텐츠·앱 버전 비교를 묶었습니다</a></li><li><a href="#force">같은 JSON의 force는 보급 전에 켜져 사용자를 막았습니다</a></li><li><a href="#steps">git grep 한 줄, 실패 값 테스트, 기존 설치 확인</a></li><li><a href="#limits">이미 깔린 옛 빌드는 앱 수정으로 구하지 못합니다</a></li><li><a href="#next">CLAUDE.md에 옛 규칙이 아직 남아 있습니다</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">목차</p><ol><li><a href="#symptom">서랍은 6.7, Remote Config는 6.11이었습니다</a></li><li><a href="#why-silent">소수점 뒤가 한 자리일 때는 같은 답이 나왔습니다</a></li><li><a href="#agents">에이전트 커밋 세 번 중 콘텐츠 비교를 고친 것은 없었습니다</a></li><li><a href="#fix">VersionCompare로 콘텐츠·앱 버전 비교를 묶었습니다</a></li><li><a href="#force">같은 JSON의 force는 보급 전에 켜져 사용자를 막았습니다</a></li><li><a href="#steps">git grep 한 줄, 실패 값 테스트, 기존 설치 확인</a></li><li><a href="#limits">이미 깔린 옛 빌드는 앱 수정으로 구하지 못합니다</a></li><li><a href="#next">CLAUDE.md에 옛 규칙이 아직 남아 있습니다</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="symptom">
+      <h2 id="symptom">서랍은 6.7, Remote Config는 6.11이었습니다</h2>
+      <p>이 앱은 문제 은행, 공지, FAQ 같은 콘텐츠를 Remote Config(이하 RC)의 JSON 하나로 내려보냅니다. 스플래시 화면인 <code>ActivityEmpty</code>가 RC의 <code>info_version</code>·<code>clip_version</code>을 기기 Room DB에 저장된 버전과 비교해, RC 쪽이 크면 로컬 콘텐츠를 지우고 다시 넣습니다. 서랍 아래에 찍히는 (6.7/2.2)가 그 저장된 버전입니다.</p>
+      <p>먼저 짚어 볼 곳은 빌드였습니다. 이 앱의 디버그 빌드는 개발용 Firebase 프로젝트의 RC를 읽으므로, 기기가 디버그 빌드라면 운영 값과 다른 숫자가 보일 수 있습니다. 운영 RC 값이 실제로 6.11/2.3이어서 이 가설은 맞지 않았고, 비교 코드가 남았습니다.</p>
+      <pre><code>// ActivityEmpty, 7b997f8 직전
+if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
+    repo.setVersion(VersionT(infoVer, clipVer))
+    // 지우고 다시 넣기
+}</code></pre>
+      <p><code>infoVersion</code>은 String 필드입니다. Kotlin의 String 비교는 앞 글자부터 하나씩 견주는 사전순이라, "6.7"과 "6.11"은 셋째 글자 '7'과 '1'에서 갈립니다. '7'이 크므로 "6.7" &lt; "6.11"은 거짓이고, 앱은 RC 쪽이 오래된 버전이라고 판정했습니다.</p>
+      <figure class="ax-fig"><img src="/assets/ax/string-version-compare-1-ko.webp" width="1200" height="542" alt="비교 그림: 문자열 비교는 셋째 글자 7과 1을 견주어 6.7이 더 크다고 판정해 갱신을 건너뛰고, 자리별 정수 비교는 7과 11을 견주어 6.11을 새 버전으로 보고 다시 받는다." loading="lazy"><figcaption>같은 두 값을 문자열로 견주면 6.7이, 자리별 정수로 견주면 6.11이 새 버전입니다.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="why-silent">
+      <h2 id="why-silent">소수점 뒤가 한 자리일 때는 같은 답이 나왔습니다</h2>
+      <p>문자열 비교 자체는 2020년 첫 Remote Config 연결 때부터 있었습니다. 지금 모양의 <code>infoVersion &lt; infoVer</code>는 2023년 5월 6일 커밋(6d0f4f1)에서 비교 방향을 바로잡으며 생겼고, clip 조건은 이틀 뒤에 붙었습니다. 소수점 뒤가 6.1부터 6.9까지 한 자리인 동안은 사전순과 숫자 순이 같아서 늘 맞는 답을 냈습니다. 어긋나기 시작한 것은 RC 값이 6.10이 된 뒤입니다. 로컬 값별로 옛 비교식이 어떤 답을 내는지 다시 계산해 봤습니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>기기에 저장된 값</th><th>RC 6.10일 때</th><th>RC 6.11일 때</th></tr></thead>
+        <tbody>
+          <tr><td>6.1</td><td>갱신</td><td>갱신</td></tr>
+          <tr><td>6.2 ~ 6.9</td><td>갱신 안 함</td><td>갱신 안 함</td></tr>
+          <tr><td>6.10</td><td>같음</td><td>갱신</td></tr>
+        </tbody>
+      </table></div>
+      <p>6.1은 "6.10"의 앞부분과 같아서 더 짧은 쪽이 작다고 나오고, 6.2부터 6.9까지는 셋째 글자에서 모두 큰 쪽으로 판정됩니다. RC를 6.10으로 올린 날부터 그 사이 값에 머문 기기는 <code>info_version</code>을 올려도 갱신을 받지 못했습니다(<code>clip_version</code>이 함께 오르지 않는 한). 문제 은행 검수 문서에는 9월 13일, 20일, 22일에 공지를 바꾸면서 <code>info_version</code>을 6.10 그대로 둔 기록도 있습니다. 그 세 번은 문자열 비교와 상관없이 기존 사용자 누구에게도 가지 않았습니다.</p>
+      <p>새로 설치한 기기에서는 이 결함이 보이지 않았습니다. 버전 행이 비어 있는 첫 실행은 비교 없이 RC 값을 그대로 넣기 때문에, 새 설치는 늘 최신 콘텐츠로 시작합니다.</p>
+    </section>
+
+    <section aria-labelledby="agents">
+      <h2 id="agents">에이전트 커밋 세 번 중 콘텐츠 비교를 고친 것은 없었습니다</h2>
+      <p>git 기록을 따라가 보면, 버전 비교를 직접 건드리거나 판단한 에이전트 커밋만 세어도 세 번입니다. 2025년 8월 9일 15시 32분, Claude Code가 만든 커밋(5f082f8)은 "업데이트 알림이 계속 뜨는" 원인을 <code>app_version</code> 문자열 비교로 보고 Major.Minor.Patch 셋을 정수로 비교하게 바꿨습니다. 당시 앱 버전은 1.5.031이라 비교하는 major·minor가 한 글자씩이었고, 문자열로 비교해도 답이 같았습니다. 같은 날 17시 51분 "fix: 수정"이라는 커밋(71c31ae)이 이 부분을 문자열 비교로 되돌렸고, 되돌린 이유는 남아 있지 않습니다. 콘텐츠 버전 비교는 두 커밋 모두 건드리지 않았습니다.</p>
+      <p>2025년 12월 11일 RC 동기화 리팩터링 커밋(a4d5b9a, Claude Opus 4.5 공동 작성)은 테스트 11개를 추가했습니다(커밋 메시지에는 13개라고 적혀 있습니다). 그중 <code>versionComparison_isCorrect</code>는 "5.0" &lt; "5.1"이 참인지 확인합니다. 한 자리 값만 넣었고, 제품 코드를 부르지 않고 Kotlin의 String 연산자만 확인하므로, 비교문을 어떻게 바꿔도 통과합니다. 지키는 코드를 지웠을 때 빨개지지 않는 테스트를 가려내는 방법은 <a href="/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다</a>에 적었습니다.</p>
+      <p>2026년 9월 25일 오전, 문제 은행 124개를 검수한 에이전트(Claude Opus 5.5)는 11시 8분 커밋(e9d6b9c)의 반영 절차에 "<code>info_version</code>을 "7.0"으로 올린다. <code>ActivityEmpty</code>는 버전을 문자열로 비교한다"고 적었습니다. 15분 뒤 실제로 RC에 올린 값은 6.11이었고, 문서는 "6.10 → 6.11은 문자열로도 커서 6.10 사용자는 갱신된다"로 바뀌었습니다. 문서에는 6.9→6.10 같은 올림이 인식되지 않는다는 문장이 남아 있었지만, 6.10 아래에 머문 기기를 어떻게 할지는 다루지 않았습니다. 11시 23분 커밋(079feab)은 프로젝트의 CLAUDE.md에 "자릿수가 바뀌는 올림은 갱신으로 인식되지 않는다"를 규칙으로 적었고, 비교 코드는 그대로 두었습니다.</p>
+      <p>운영자가 기기 서랍의 6.7/2.2를 운영 RC 값과 나란히 놓고 나서야 6.10 아래 기기가 드러났습니다. 비교문을 고친 12시 14분 커밋(7b997f8)도 에이전트(Claude Fable 5.1)가 썼고, 이번에는 운영자가 기기 값과 RC 값이 다르다는 것을 짚어 준 뒤였습니다. 이 사건이 커밋 메시지에 어떻게 남았는지는 <a href="/ax/commit-messages-701/">커밋 701개로 본 AI 코딩 1년</a>에서 다른 사례와 함께 다뤘습니다.</p>
+      <figure class="ax-fig"><img src="/assets/ax/string-version-compare-2-ko.webp" width="1200" height="836" alt="단계 그림: 2023년 5월 지금 모양의 문자열 비교, 2025년 8월 9일 에이전트의 정수 비교 수정이 2시간 19분 뒤 되돌려짐, 2025년 12월 11일 한 자리 값만 넣은 테스트 추가, 2026년 9월 25일 11시 8분 7.0으로 올리자는 계획, 11시 23분 실제로 6.11을 올림, 12시 14분 VersionCompare와 테스트 4개." loading="lazy"><figcaption>지금 모양의 문자열 비교는 2023년 5월부터 2026년 9월 25일 12시 14분까지 남아 있었습니다.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="fix">
+      <h2 id="fix">VersionCompare로 콘텐츠·앱 버전 비교를 묶었습니다</h2>
+      <p>RC 값을 7.0으로 올리면 6.x 기기는 "6.x" &lt; "7.0"이 참이라 당장은 갱신을 받습니다. 대신 7.10에서 같은 일이 다시 나고, 콘텐츠를 고치는 사람마다 "자릿수가 바뀌는 올림을 하지 말 것"을 기억해야 합니다. 그래서 영구 규칙으로는 버렸습니다.</p>
+      <p>2025년 8월처럼 세 자리를 모두 정수로 비교하는 방식도 맞지 않았습니다. 이 앱은 <code>app_version</code>의 major와 minor만 보고 패치 자리는 보지 않도록 짜여 있어서, 패치까지 비교하면 패치 출시 때마다 이전 패치 사용자에게 마켓 이동 판정이 나갑니다. 7b997f8은 비교 함수 하나를 두고, 콘텐츠 버전 비교와 <code>app_version</code>의 major·minor 비교를 모두 그 함수로 바꿨습니다.</p>
+      <pre><code>object VersionCompare {
+    fun compare(a: String, b: String): Int {
+        val pa = parts(a); val pb = parts(b)
+        for (i in 0 until maxOf(pa.size, pb.size)) {
+            val x = pa.getOrElse(i) { 0 }; val y = pb.getOrElse(i) { 0 }
+            if (x != y) return x.compareTo(y)
+        }
+        return 0
+    }
+    fun isNewer(remote: String, local: String) = compare(remote, local) &gt; 0
+    private fun parts(v: String) = v.trim().split('.').map { it.trim().toIntOrNull() ?: 0 }
+}</code></pre>
+      <p><code>VersionCompareTest</code> 4개는 실패했던 값 그대로("6.11"과 "6.7"), 같은 값, 자리 수가 다른 값("1.10.0"과 "1.9.9", "6.11"과 "6.11.0"), 숫자가 아닌 값을 확인합니다. 첫 테스트에는 "6.7" &lt; "6.11"이 거짓이라는 단언도 넣었습니다. 커밋 시점 단위 테스트는 112개가 통과했습니다. 버전 문자열을 &lt;로 비교하는 코드는 새로 쓰지 마십시오. 이 규칙은 지금 CLAUDE.md에 들어 있습니다.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%226.7%22%20%3C%20%226.11%22%EC%9D%B4%20%EA%B1%B0%EC%A7%93%EC%9D%B4%EB%9D%BC%20%EC%BD%98%ED%85%90%EC%B8%A0%20%EA%B0%B1%EC%8B%A0%EC%9D%B4%20%EB%A9%88%EC%B7%84%EB%8B%A4%3A%206.2~6.9%20%EA%B8%B0%EA%B8%B0%EB%A7%8C%20%EB%A7%89%ED%9E%8C%20Remote%20Config%20%EB%B2%84%EC%A0%84%20%EB%B9%84%EA%B5%90">메일로 문의하기</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="force">
+      <h2 id="force">같은 JSON의 force는 보급 전에 켜져 사용자를 막았습니다</h2>
+      <p>콘텐츠 버전이 들어 있는 RC의 <code>version</code> JSON에는 <code>app_version</code>과 <code>force</code>도 있고, 7b997f8 이후 <code>app_version</code>의 major·minor 판정도 <code>VersionCompare</code>를 거칩니다. 스플래시는 설치된 버전과 <code>app_version</code>이 글자까지 같으면 통과시키고, 다르면 major·minor만 비교하고, 마지막에 <code>force</code>가 true면 그 결과를 덮어써 업데이트 팝업을 보여 줍니다.</p>
+      <p>9월 18일 커밋(31c082d)의 기록을 보면, 1.6.017을 깐 기기에 "A new version has been released!"가 떠서 처음에는 코드를 의심했습니다. 원인은 RC의 <code>app_version</code>이 배포한 버전과 어긋난 것이었습니다. 패치 상향(1.6.017 → 1.6.018)은 major·minor 비교로 구제되지 않아서, RC 값을 배포한 버전과 똑같이 맞춰야 팝업이 사라집니다.</p>
+      <p>같은 9월 18일에는 신버전 보급률이 낮은 상태에서 <code>force</code>를 켰고, 5시간 만에 그날 세션이 25% 줄었습니다. 9월 13일 건은 당일 기록이 GA4 표준 리포트의 집계 지연을 잠금으로 읽었다고 정정했고, 나중 문서는 다시 잠금 사례로 적어 기록끼리 엇갈려 여기서는 세지 않습니다. 1.6.019(9월 19일)부터 <code>monitor.py --only rc</code>가 RC의 <code>version</code> JSON을 읽고, GA4에서 어제와 오늘 활성 사용자 중 <code>app_version</code>과 글자까지 같은 버전의 비율을 찍습니다. <code>force</code>가 true인데 그 비율이 90% 미만이면 "나머지는 지금 스플래시 팝업에 막혀 있다"는 경고를 냅니다. 단계적 출시 비율이 의도와 다르게 나간 사고는 <a href="/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다</a>에 따로 있습니다.</p>
+    </section>
+
+    <section aria-labelledby="steps">
+      <h2 id="steps">git grep 한 줄, 실패 값 테스트, 기존 설치 확인</h2>
+      <ol>
+        <li>버전처럼 생긴 이름끼리 &lt;, &gt;로 비교하는 줄을 찾습니다. 자기 저장소에서는 리비전 자리를 빼고 돌립니다. 이 저장소에서 아래처럼 7b997f8 직전 리비전을 넣으면 <code>ActivityEmpty</code>의 두 줄(248, 270행)과 a4d5b9a 테스트의 세 줄이 나옵니다(2026-10-29 실행).
+          <pre><code>git grep -nE '[Vv]er[A-Za-z]*(\[[0-9]\])?\s*[&lt;&gt;]=?\s*[A-Za-z.\[]*[Vv]er' 7b997f8^ -- '*.kt' '*.java'</code></pre></li>
+        <li>찾은 비교를 함수 하나로 모으고, 실패했던 값 그대로 테스트를 겁니다. 최소한 "6.11"과 "6.7", "1.10.0"과 "1.9.9"를 넣습니다.</li>
+        <li>확인은 새 설치에서 하지 않습니다. 고치기 전 빌드를 깔고 RC 값을 6.9로 둔 채 한 번 실행해 저장 버전을 6.9로 만듭니다. 고친 빌드를 데이터를 지우지 않고 덮어 설치한 뒤 RC 값을 6.10으로 올리고, 화면에 찍히는 저장 버전이 6.10으로 바뀌는지 봅니다. 6.15에서 6.16처럼 자릿수가 그대로인 올림은 옛 비교로도 통과해서 수정 확인이 되지 않습니다.</li>
+        <li>콘텐츠를 고치면 <code>info_version</code>을 올립니다.</li>
+        <li><code>force</code>를 켜기 전에 GA4에서 appVersion별 활성 사용자 중 RC <code>app_version</code>과 같은 버전의 비율을 봅니다. 90%가 안 되면 켜지 않습니다.</li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="limits">
+      <h2 id="limits">이미 깔린 옛 빌드는 앱 수정으로 구하지 못합니다</h2>
+      <p>비교는 기기에서 돌기 때문에, 고친 빌드로 업데이트하기 전의 기기는 계속 문자열로 비교합니다. 그 뒤 RC 값은 10월 1일 6.12, 10월 9일 6.13, 10월 10일 6.14, 10월 24일 6.15로 올라갔지만, 옛 빌드에 6.2~6.9가 저장된 기기에는 "6.7" &lt; "6.15"도 거짓입니다.</p>
+      <p>그 기기를 서버 쪽에서 구할 한 가지 수단은 RC 값을 7.0으로 한 번 올리는 것입니다. 옛 빌드에서는 "6.7" &lt; "7.0"이 참이고, 새 빌드의 <code>VersionCompare</code>에서도 7.0이 6.15보다 크므로 두 경로가 모두 갱신합니다. 영구 규칙으로는 버린 방법이지만, 옛 빌드가 남아 있는 동안 한 번 쓰는 이행 수단으로는 맞습니다. 그 뒤로는 옛 빌드 비율이 충분히 낮아질 때까지 7.1~7.9 안에서만 올려야 합니다. 10월 24일 기준 RC 값은 6.15이고, 이 앱이 7.0으로 올렸다는 기록은 없습니다. 옛 조건이 OR라 <code>clip_version</code>을 올려도 갱신 조건은 참이 되지만, 그 기기들이 clip 2.3에서 왜 갱신되지 않았는지 모르므로 이 경로는 확인된 수단으로 치지 않았습니다.</p>
+      <p><code>VersionCompare</code>는 숫자가 아닌 자리를 0으로 읽습니다. RC에 "6.l1" 같은 오타가 들어가면 6.0으로 읽혀 갱신이 조용히 건너뛰어지고, 테스트도 "abc"보다 "6.7"이 새 버전이라고 확인할 뿐 경고는 내지 않습니다. "6.11"과 "6.11.0"은 같은 버전으로 봅니다.</p>
+      <p>1.6.023에서 릴리스 APK를 API 34 에뮬레이터에 올려 서랍의 6.11/2.3을 확인했지만, 그 설치가 새 설치였는지는 기록에 없습니다. 새 설치였다면 비교문을 거치지 않은 확인입니다. 저장 버전이 2.2, RC가 2.3인 <code>clip_version</code>도 남은 의문입니다. "2.2" &lt; "2.3"은 문자열로도 참이고 옛 조건은 OR였으므로, clip 쪽에서 갱신이 일어났어야 합니다. clip이 언제 2.3이 됐는지 기록이 없어, 이 기기가 6.7/2.2에 머문 이유를 문자열 비교 하나로 다 설명하지는 못합니다.</p>
+      <p>버전 행을 콘텐츠보다 먼저 쓰는 순서도 같은 갱신 경로의 결함이었습니다. 9월 28일 S21 실기기에서 첫 실행이 오프라인이면 문제 은행이 빈 채로 다음 <code>info_version</code>까지 굳는 것을 찾았고, 커밋 ce024cd가 버전이 같아도 은행이 비면 다시 넣게 고쳤습니다.</p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">CLAUDE.md에 옛 규칙이 아직 남아 있습니다</h2>
+      <p>2026년 10월 29일 기준 HEAD의 CLAUDE.md 206~207행은 여전히 "비교가 문자열이라 자릿수가 바뀌는 올림은 갱신으로 인식되지 않는다"고 적고 있고, 734행은 <code>VersionCompare</code>로 숫자 비교한다고 적습니다. 에이전트가 앞쪽 규칙을 읽으면 코드가 아직 문자열로 비교한다고 믿고 그에 맞춰 올림 값을 고를 수 있습니다. 206행 "비교가 문자열이라"부터 207행 끝까지는 옛 빌드를 구하는 7.0 이행 규칙으로 고쳐 쓰고, 205~206행의 "<code>info_version</code>을 반드시 올린다"는 남깁니다. 제품 코드를 부르지 않는 <code>versionComparison_isCorrect</code>도 테스트 목록에 남아 있습니다. 이 테스트를 지우거나 <code>VersionCompare</code>를 부르게 바꾸는 일이 남았습니다.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%226.7%22%20%3C%20%226.11%22%EC%9D%B4%20%EA%B1%B0%EC%A7%93%EC%9D%B4%EB%9D%BC%20%EC%BD%98%ED%85%90%EC%B8%A0%20%EA%B0%B1%EC%8B%A0%EC%9D%B4%20%EB%A9%88%EC%B7%84%EB%8B%A4%3A%206.2~6.9%20%EA%B8%B0%EA%B8%B0%EB%A7%8C%20%EB%A7%89%ED%9E%8C%20Remote%20Config%20%EB%B2%84%EC%A0%84%20%EB%B9%84%EA%B5%90">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>Kotlin에서 "6.7" &lt; "6.11"은 왜 거짓인가요?</summary><div><p>String 비교가 앞 글자부터 견주는 사전순이기 때문입니다. 셋째 글자 '7'이 '1'보다 커서 "6.7"이 더 크다고 나옵니다.</p></div></details>
+        <details><summary>버전을 7.0으로 올리면 문자열 비교로도 되지 않나요?</summary><div><p>당장은 됩니다. 7.10에서 같은 일이 다시 나고, 콘텐츠를 고치는 사람마다 자릿수가 바뀌는 올림을 피해야 합니다.</p></div></details>
+        <details><summary>Remote Config의 force는 언제 켜도 되나요?</summary><div><p>app_version과 같은 버전을 쓰는 활성 사용자가 90%를 넘은 뒤입니다. 이 앱은 보급률이 낮을 때 켰다가 그날 세션이 25% 줄었습니다.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
+        <li><a href="/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
+        <li><a href="/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
+        <li><a href="/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+      </ul>
+      <p><a href="/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="/ax/">AX 노트 전체 보기</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>한 가지 일을 간단하게 하는 Android 앱</p>
+        <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">앱</p>
+        <ul><li><a href="/apps/sugaralbum/">슈가앨범</a></li><li><a href="/apps/image-compress/">사진 용량 줄이기</a></li><li><a href="/apps/image-flip/">사진 반전·회전</a></li><li><a href="/apps/image-convert/">이미지 변환 JPG·PNG·WebP</a></li><li><a href="/apps/sugarspeller/">한글 띄어쓰기</a></li><li><a href="/apps/sugarclip/">SugarClip</a></li><li><a href="/apps/doc-viewer/">한글뷰어 슈가독</a></li><li><a href="/apps/sugarcard/">생생카드</a></li><li><a href="/apps/arrow-knots/">화살표 매듭풀기</a></li><li><a href="/apps/blocks/">한판블록</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">사이트</p>
+        <ul><li><a href="/apps/">모든 앱</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li><li><a href="/sitemap/">사이트맵</a></li><li><a href="/rss.xml">RSS 피드</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play 개발자 페이지</a></div>
+    </div>
+  </footer>
+</body>
+</html>

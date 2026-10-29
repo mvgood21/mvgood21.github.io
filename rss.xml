@@ -6,7 +6,378 @@
   <description>한 가지 일을 간단하게 하는 Android 앱을 만듭니다. 사진 용량 줄이기부터 한글 문서 보기, 한글 맞춤법, 퍼즐 게임까지 앱마다 하는 일은 하나입니다.</description>
   <language>ko</language>
   <atom:link href="https://mvgood21.github.io/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Thu, 29 Oct 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Fri, 30 Oct 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>화살표 퍼즐 레벨 생성기: 1,100판 자동 게이트 – SugarMount</title>
+    <link>https://mvgood21.github.io/ax/arrow-puzzle-level-generator/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/ax/arrow-puzzle-level-generator/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/arrow-puzzle-level-generator-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX 노트 · 방법</span>
+      <h1>화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</h1>
+      <p class="lead">이동 규칙을 문서로 먼저 못 박으면, 거꾸로 쌓아 만든 판은 따로 풀어 보지 않아도 모두 풀립니다. 재미는 게이트가 따로 검사합니다.</p>
+      <p><a href="https://mvgood21.github.io/apps/arrow-knots/">화살표 매듭풀기</a>의 1,100판(본편 1~1000판과 무한 모드 대체 1001~1100판)은 튜토리얼 1~3판까지 모두 생성기가 만들었습니다. 튜토리얼도 코드에 적은 것은 크기와 목표 범위뿐입니다. 2026년 10월 3일 18시 32분 커밋(e3c7781)에서 이 팩이 팩 단위 게이트 G2를 처음 통과했고, 판마다 거는 구조 게이트 6종도 1,100판 모두 통과합니다. 그 이틀 전 생성기 v2(6249b11)는 생성기 벤치의 가장 어려운 구간에서 처음부터 빼낼 수 있는 화살표 비율(F0)을 0.50에서 0.11로 내렸습니다.</p>
+      <p class="note">근거: 게임 저장소의 git 기록(ecedf0b, 6249b11, e3c7781, 9de89eb), ADR-0001, 레벨 보고서 report-v2·report-v3(.md, .csv), 착수 단계 교차검증 문서, 2026년 10월 1일·3일 작업 세션 기록. 보고서 숫자는 2026-10-28 HEAD에서 다시 읽었습니다.</p>
+    </section>
+    <section aria-labelledby="random-boards">
+      <h2 id="random-boards">무작위로 뿌린 판은 10×10에서 전부 막혔습니다</h2>
+      <p>화살표 매듭풀기는 판 위의 화살표를 하나씩 눌러 빼는 퍼즐입니다. 화살표는 머리 방향으로 미끄러져 나가는데, 그 길(코드 이름은 escape ray, 아래에서는 광선) 위에 다른 화살표가 있으면 막혀서 되돌아오고 하트가 하나 줄어듭니다. 2026년 9월 30일 착수 보고서는 판을 만든 뒤 "실제 제거 시뮬레이션으로 완주 여부를 검증한다"고 적었습니다.</p>
+      <p>같은 날 돌린 교차검증 시뮬레이션에서 화살표를 무작위로 놓은 판이 풀리지 않는 비율은 8×8에 10개일 때 64%, 16개일 때 92%, 10×10에 25개부터는 100%였습니다. 출시본의 861~1000판은 24×44 판에 화살표 수 중앙값이 73개라, 버리고 다시 뽑는 루프로는 닿지 못하는 크기입니다.</p>
+      <p>대안은 거꾸로 쌓는 역구성입니다. 빈 판에 화살표를 하나씩 놓되, k번째로 놓는 화살표는 마지막에서 k번째로 빠질 화살표가 되게 합니다. 놓는 순간 그 화살표의 광선이 이미 놓인 화살표와 겹치지 않을 때만 받아들이면, 놓은 순서를 뒤집은 것이 곧 풀이입니다. 나중에 놓는 화살표가 먼저 놓인 화살표의 광선을 막는 것은 허용되고, 그 막힘이 난이도가 됩니다. 같은 시뮬레이션에서 이렇게 만든 판 200개는 모두 풀렸습니다.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/arrow-puzzle-level-generator-1-ko.webp" width="1200" height="699" alt="비교 그림: 무작위 배치 후 검증은 10×10에 화살표 25개부터 판 100%가 풀리지 않고, 역구성은 놓을 때마다 광선이 비었는지만 확인해 1,100판 모두 풀립니다." loading="lazy"><figcaption>판을 만든 뒤 풀어 보는 방식은 크기가 커지면 멈추고, 거꾸로 쌓는 방식은 만드는 순서가 곧 풀이입니다.</figcaption></figure>
+    </section>
+    <section aria-labelledby="adr-first">
+      <h2 id="adr-first">이동 규칙을 ADR로 먼저 고정했습니다</h2>
+      <p>역구성이 성립하려면 "한 번 빼낼 수 있게 된 화살표는 끝까지 빼낼 수 있다"는 단조성이 필요합니다. 그런데 착수 보고서는 화살표가 어떻게 움직이는지 정하지 않았습니다. 굽은 화살표가 뱀처럼 머리를 따라 빠지는지, 몸통 전체가 평행으로 밀려 나가는지에 따라 막는 칸이 달라집니다. 교차검증에서 머리 기준으로 만든 판 400개를 평행 이동 기준으로 다시 풀어 보니 52개(13%)만 풀렸습니다.</p>
+      <p>9월 30일 첫 커밋(ecedf0b)과 함께 채택한 ADR-0001(설계 결정 기록)이 이 빈칸을 메웠습니다. ADR은 이 광선 계산 하나를 생성기, 제거 판정, 힌트, 애니메이션이 함께 쓰도록 정했습니다(판정·애니메이션은 <code>Board.escapeRay</code>, 생성기는 그 안의 같은 계산 <code>size.ray</code>를 부릅니다). 막힌 탭은 하트 1개를 줄일 뿐 판 상태를 바꾸지 않습니다. 이 셋이 모이면 제거는 단조적이고, 판이 풀린다는 것은 막힘 그래프(화살표 i의 광선 위에 j가 있으면 i가 j를 기다리는 관계)에 사이클이 없다는 것과 같아집니다.</p>
+      <p>그래서 풀림 판정에는 탐색 없이 벗겨 내기(peel) 하나면 됩니다. 지금 빼낼 수 있는 화살표를 한 번에 다 빼는 일을 반복하고, 몇 번 만에 끝나는지가 깊이(layers)입니다. 출시 게이트의 풀림 검사는 peel 성공과 별도의 사이클 탐색(DFS)을 둘 다 요구합니다. 단조성 자체는 속성 테스트로 확인합니다. 생성한 판 300개와 무작위 순서로 끝까지 빼는 시행 1,000회가 커밋 전에 돌리는 테스트에 들어 있습니다.</p>
+      <p>퍼즐 생성기를 짜기 전에 이동 규칙부터 ADR로 고정하십시오. 두 모델이 함께 푼 판은 400개 중 52개였습니다.</p>
+    </section>
+    <section aria-labelledby="shallow-v1">
+      <h2 id="shallow-v1">v1 판은 화살표 절반을 처음부터 빼낼 수 있었습니다</h2>
+      <p>ecedf0b의 v1 생성기(Claude와 함께 쓴 코드)는 풀리는 300판을 만들었지만 깊이가 낮았습니다. v1 보고서에서 가장 어려운 expert 구간도 F0가 0.494, 깊이 5.6이었습니다. 판을 열자마자 빼낼 수 있는 화살표가 절반이었고, 다섯 번 남짓 벗겨 내면 판이 끝났습니다.</p>
+      <p>10월 1일 22시 32분, 메인 세션의 에이전트는 생성기 연구를 하위 에이전트에게 맡기며 시도할 목록을 적었습니다. 그중 둘이 광선을 많이 막는 후보에 점수를 주는 것과, 마지막에 자유 화살표를 막힌 화살표로 바꾸는 패스입니다. 광선을 덮는 점수는 v1에 이미 있었고, 하위 에이전트는 자유 화살표의 광선을 막는 점수(<code>freeWeight</code>)를 더했습니다. hard 구간(11×13) 60판으로 재 보니 그 점수만 쓴 판의 F0는 0.51로, v1 그대로(0.48)와 다르지 않았습니다. 빌드 후반에는 그런 자리에 놓을 후보가 거의 없고, 맨 마지막 화살표는 어차피 자유입니다. 자유 화살표를 둘 이상 막을 때만 하나 더 놓는 마지막 패스(<code>blockerPlacements</code>)도 효과가 0이었습니다.</p>
+      <p>F0를 0.5에 묶어 둔 것은 빈 광선이었습니다. 머리가 테두리에 붙어 밖을 향하는 화살표는 광선 칸이 0개라 무엇으로도 막을 수 없습니다. 광선이 지나는 사용 가능한 칸이 하나도 없는 화살표를 거부하는 <code>minRay=1</code> 하나로 F0가 0.38까지 내려갔습니다. 꼬리 성장을 더하자 F0는 0.30까지 내려갔습니다. 머리는 그대로 두고 꼬리만 이웃 빈칸으로 늘리면 광선은 변하지 않고 막힘 관계만 늘어나므로, F0는 내려가기만 하고 깊이는 올라가기만 합니다. 늘릴 때마다 DFS로 사이클이 생기는지 확인합니다. 처음에는 자유 화살표의 광선 쪽으로만 늘리고, 다음에는 아무 빈칸으로나 늘려 밀도를 높입니다(빈칸 성장). 그래도 남은 구멍에는 사이클이 생기지 않을 때만 새 화살표를 넣습니다.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/arrow-puzzle-level-generator-2-ko.webp" width="1200" height="776" alt="막대 그림: hard 구간 60판의 F0는 v1 0.48, minRay 0.38, freeWeight 단독 0.51, 꼬리 성장 0.30, 빈칸 성장 0.27, 구멍 채우기 0.16입니다." loading="lazy"><figcaption>자유 화살표를 막는 점수만으로는 F0가 내려가지 않았고(0.48→0.51), 빈 광선 거부와 꼬리 성장·구멍 채우기가 0.16까지 내렸습니다.</figcaption></figure>
+      <p>연구 보고는 17분 뒤에 돌아왔고, 이 조합이 22시 53분 커밋 6249b11의 v2입니다(벤치 expert 구간 깊이 5.8→14.6, 밀도 0.74→0.97). 성장 없이 처음부터 긴 무작위 경로로 화살표를 그리는 방법은 밀도 0.65, F0 0.44여서 쓰지 않았습니다.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%ED%99%94%EC%82%B4%ED%91%9C%20%ED%8D%BC%EC%A6%90%201%2C100%ED%8C%90%EC%9D%84%20%EB%A7%8C%EB%93%A0%20%EC%97%AD%EA%B5%AC%EC%84%B1%20%EC%83%9D%EC%84%B1%EA%B8%B0%EC%99%80%20G2%20%EA%B2%8C%EC%9D%B4%ED%8A%B8">메일로 문의하기</a></p></aside>
+    <section aria-labelledby="g2-from-defects">
+      <h2 id="g2-from-defects">300판에서 나온 결함이 G2 항목이 됐습니다</h2>
+      <p>10월 3일 15시 48분 운영자가 "300판 끝나면 앱이 끝나는 거야?"라고 묻고 7분 뒤 1,000판을 요구하자, 에이전트가 v2의 300판 전체를 다시 분석했습니다. 판을 한 화면에 다 넣느라 276~300판의 평균 칸이 13.6dp, 가장 작은 판은 11.7dp까지 줄었고, 150판 이후 깊이는 16에서 21 사이에 머문 채 화살표 수만 늘었습니다. 어려운 판 35개 중 4개는 화살표 수가 직전 판의 두 배를 넘었습니다. 보고서 CSV로 다시 세어 보니 293판은 직전 판 34개에서 94개(2.8배), 243판은 30개에서 76개였습니다. 일반 판인 300판(109개)도 299판(77개)보다 40% 많았습니다.</p>
+      <p>에이전트는 '판 크기 상한'과 '경쟁작처럼 큰 판 + 확대·스크롤' 두 안을 묻고 상한을 추천했습니다. 운영자가 고른 것은 큰 판 쪽이고, 구간도 운영자가 냈습니다. 1~200판은 같은 크기 상한을 지키고 201~500, 501~700, 701~1000판으로 갈수록 판을 키우는 안입니다. 에이전트는 칸 크기는 지키고 판을 화면보다 크게 만들어 스크롤하는 쪽으로 정리했고, 1부 칸 27dp 이상이라는 숫자는 에이전트가 붙였습니다.</p>
+      <p>그 뒤 사양서는 이 결함들을 게이트로 옮겼습니다. 표에서 ramp는 난이도 곡선을 따라가는 일반 판, spike는 주기마다 한 번 튀는 어려운 판, breather는 쉬어 가는 판이고, T는 화살표 수와 F0로 계산한 예상 풀이 시간입니다. 결과는 지금 report-v3.md 기준입니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>300판에서 본 결함·바뀐 구조</th><th>G2 항목</th><th>결과(1,100판)</th></tr></thead>
+        <tbody>
+          <tr><td>칸 평균 13.6dp, 최소 11.7dp</td><td>1부 칸 27dp 이상(폭 360dp 기준)</td><td>최소 27.3dp</td></tr>
+          <tr><td>어려운 판 하나가 직전 판의 2.8배</td><td>spike T가 직전 ramp 중앙값의 1.10~1.25배(중앙값), p90 1.30배 이하</td><td>spike 101판, 중앙값 1.12, p90 1.18</td></tr>
+          <tr><td>50판 정체 뒤 화살표 수 40% 급등(201~250판 → 251판대)</td><td>spike·실루엣이 아닌 판은 직전 일반 판 화살표 수의 1.15배 이하, breather T는 직전 ramp 중앙값의 0.60~0.90배</td><td>이웃 위반 0건, breather 112판 0.61~0.88</td></tr>
+          <tr><td>크기로만 어려워짐</td><td>941~1000판 깊이 중앙값이 101~200판의 1.6배 이상</td><td>29 대 14, 2.07배</td></tr>
+          <tr><td>판을 키우는 4부 구조(운영자가 정한 구간)</td><td>새 부 첫 10판 화살표 수 1.10배 이하, 깊이 0.85배 이하</td><td>201판 1.05배·0.75배 등 4곳 모두 통과</td></tr>
+        </tbody>
+      </table></div>
+      <p>판마다 거는 구조 게이트 6종은 1,100판 모두 통과했습니다. L/A(화살표 수 대비 깊이, ramp 0.60 이하), 단일 웨이브 연속(한 번에 화살표 하나만 빠지는 단계가 4번 넘게 이어지지 않기), F0, 무작위 탭 승률, 판 크기 상한, 풀림입니다. 무작위 탭 승률은 하트 3개로 아무 화살표나 누르는 시행을 판마다 100번 돌린 값입니다. report-v3.csv에서 6판 이후 1,095판을 세어 보면 1,071판이 0이고, 2부부터는 전부 0입니다.</p>
+      <p>난수는 Kotlin <code>Random(seed)</code>(교차검증이 버전 간 불안정을 지적) 대신 자체 SplitMix64를 쓰고, e3c7781은 두 번 빌드한 팩이 바이트 단위로 같다고 기록했습니다.</p>
+    </section>
+    <section aria-labelledby="what-g2-missed">
+      <h2 id="what-g2-missed">G2가 놓친 마스크 반복과 판 단위 실패</h2>
+      <p>G2를 통과하고 30분 뒤인 19시 2분, 커밋 9de89eb가 G2 자체를 고쳤습니다. 무한 모드의 실루엣이 140판 주기로 같은 마스크를 몇 판 간격으로 다시 쓰고 있었습니다(성 1000·1005판, 물고기 985·1015판, 트로피 995·1025판). G2가 마스크를 (이름, 좌우 반전) 쌍으로 묶어 세서 반전된 같은 그림을 다른 그림으로 봤습니다.</p>
+      <p>128판은 목표 범위를 못 맞춰 가장 가까운 후보를 썼고, 무한 대체 구간 1060판은 판 단위 톱니(saw) 검사에 걸린 채 실렸습니다. G2의 톱니 항목은 spike 101판의 중앙값과 p90만 봅니다. 무작위 탭 승률 상한 0.5도 느슨해서, 7판은 정확히 0.50입니다.</p>
+      <p>G2는 JVM에서 팩 파일을 읽으므로 패키징 문제(aapt가 <code>.gz</code>를 떼어 낸 실행 직후 크래시)는 볼 수 없었고, 경위는 <a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">'에이전트 수백 개 써도 돼'의 실제</a>에 적어 두었습니다. 파이프라인은 G2가 실패해도 팩을 다 쓰고 표준 오류에 "G2 FAILS" 한 줄을 출력할 뿐입니다. G2 실패는 커밋된 팩에서 통계를 다시 계산해 G2를 돌리고 커밋된 report-v3.csv와 비교하는 <code>CurveGateTest</code>가 잡고, 커밋 전에 이 테스트를 통과시키는 것이 저장소 규칙입니다.</p>
+      <p>ADR-0001은 회전 화살표, 충돌하면 멈추는 화살표, 열쇠와 자물쇠, 움직이는 타일처럼 단조성을 깨는 기믹을 넣으려면 새 ADR과 탐색 기반 검증기(BFS나 SAT)가 먼저 있어야 한다고 적었습니다. T와 무작위 탭 승률은 모델 값이라, 사람이 느끼는 시간은 <a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">목표 시간을 30% 줄인 시뮬레이션 기록</a>에서 따로 조정했습니다.</p>
+    </section>
+    <section aria-labelledby="steps">
+      <h2 id="steps">단조성 테스트부터 바이트 비교까지 7단계</h2>
+      <p>"빼거나 지우면 길이 열리기만 하는" 규칙이면 화살표 퍼즐이 아니어도 이 순서를 따를 수 있습니다.</p>
+      <ol>
+        <li>이동·제거 규칙을 ADR로 쓰고, 판정·힌트·애니메이션이 같은 광선 계산을 쓰게 합니다.</li>
+        <li>"제거 가능한 것은 계속 제거 가능한가"를 무작위 순서 시행 1,000회쯤의 속성 테스트로 확인합니다.</li>
+        <li>단조적이면 역구성으로 만듭니다. k번째 조각은 광선이 이미 놓인 조각과 겹치지 않을 때만 받고, 광선 칸이 0인 조각은 거부합니다.</li>
+        <li>난이도는 머리를 고정한 꼬리 성장으로 올리고, 늘릴 때마다 DFS로 사이클을 확인합니다.</li>
+        <li>판마다 F0, 깊이, L/A, 단일 웨이브 연속, 무작위 탭 승률을 CSV로 기록합니다.</li>
+        <li>팩 게이트는 판에서 지표를 다시 계산해 커밋된 보고서와 비교하는 테스트로 겁니다.</li>
+        <li>시드는 레벨 번호와 생성기 버전으로 만들고, 출력이 바뀌면 버전을 올립니다. 두 번 빌드해 바이트를 비교하고, 패키징된 앱을 기기에서 한 번 엽니다.</li>
+      </ol>
+      <p>3·4단계와 깊이 계산을 의사코드로 줄이면 이렇습니다.</p>
+      <pre><code>place(a):                       # 역구성, 놓는 순서의 역순이 풀이
+  if usable(ray(a)) == 0: reject  # 빈 광선은 영원히 막을 수 없음
+  if ray(a) hits occupied: reject   # 이미 놓인 화살표와 겹치면 거부
+  accept(a)
+growTail(a, cell):              # 머리 고정, 광선 불변
+  waiting = arrows whose ray crosses cell
+  if cell not empty or not next to a's tail end: skip
+  if a at max length or cell on ray(a): skip   # 자기 광선을 막지 않음
+  if reaches(a, waiting): skip    # DFS: 사이클이 생기면 포기
+  extend a's tail into cell
+depth(board):                   # peel
+  layers = 0
+  while board not empty:
+    if nothing removable: return unsolvable
+    remove every removable arrow; layers += 1
+  return layers</code></pre>
+      <p>이 저장소에서는 <code>./gradlew :arrow-engine:test :level-pipeline:test</code>가 2단계 속성 테스트, 6단계 G2 테스트, 7단계 결정성 테스트를 함께 돌립니다.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">F0와 깊이는 실제 플레이 기록과 대조하지 않았습니다</h2>
+      <p>이 글의 F0·깊이 숫자는 생성기와 보고서에서 나온 값이고, 실제 플레이어가 몇 판에서 막히는지와는 대조하지 않았습니다. 시뮬레이션 플레이어 기준으로 spike 판이 같은 구간 ramp보다 클리어율이 5점 이상 낮아야 한다는 검사는 재조정 커밋 ab3f78c에서 실패했습니다. 같은 날 22시 28분 사양서 보완 커밋 91d3c8c가 이 검사를 풀이 시간 비율 1.10~1.25배와 "클리어율이 ramp보다 3점 넘게 높지 않기"로 바꿨습니다. 시뮬레이션 플레이어의 클리어율도 모델 값이라, 실제 플레이와 맞는지는 아직 모릅니다.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%ED%99%94%EC%82%B4%ED%91%9C%20%ED%8D%BC%EC%A6%90%201%2C100%ED%8C%90%EC%9D%84%20%EB%A7%8C%EB%93%A0%20%EC%97%AD%EA%B5%AC%EC%84%B1%20%EC%83%9D%EC%84%B1%EA%B8%B0%EC%99%80%20G2%20%EA%B2%8C%EC%9D%B4%ED%8A%B8">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>퍼즐 레벨을 자동 생성하면 모든 판이 풀린다고 보장할 수 있나요?</summary><div><p>규칙이 단조적이면 역구성으로 보장할 수 있습니다. 화살표 매듭풀기는 놓은 순서를 뒤집으면 풀이가 되고, 출시 게이트가 peel과 사이클 탐색(DFS)으로 1,100판을 다시 확인합니다.</p></div></details>
+        <details><summary>F0는 무엇이고 왜 낮춰야 하나요?</summary><div><p>F0는 판을 열자마자 빼낼 수 있는 화살표의 비율입니다. v1 expert 구간은 0.494여서, 판을 열자마자 화살표 절반을 빼낼 수 있었습니다. 출시본은 판 역할(ramp·spike·breather)별 목표 범위를 두고, report-v3.csv 기준 4부(701~1000판) 중앙값이 0.11입니다.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/puzzle-first-chapter-walls/">퍼즐 게임 첫날 이탈 분석: 기기별 이벤트 순서와 판별 계산으로 찾은 첫 장의 벽 4판</a></li>
+        <li><a href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
+        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Fri, 30 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>앱 리텐션 하락 원인 분석: GA4 코호트 5년치 – SugarMount</title>
+    <link>https://mvgood21.github.io/ax/retention-cohort-break/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/ax/retention-cohort-break/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/retention-cohort-break-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX 노트 · 측정</span>
+      <h1>대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</h1>
+      <p class="lead">맞춤법 앱의 자연 유입 코호트 D1은 2025년 8월 대개편 뒤 15.2%에서 11.2%로 내려가 1년 넘게 돌아오지 않았고, 원인은 아직 가리지 못했습니다.</p>
+      <p>월 평균 DAU(하루 활성 사용자) 780명은 맞춤법 검사 앱 <a href="https://mvgood21.github.io/apps/sugarspeller/">한글 띄어쓰기</a>가 2025년에 기록한 가장 높은 값이었고, 그 달은 대개편 다음 달인 2025년 9월이었습니다. Chat 화면을 기본으로 바꾼 1.6.007의 release 브랜치가 8월 18일 본선에 머지됐고, 9월 신규 사용자는 3,053명으로 6~7월의 두 배 가까이 들어왔습니다. 들어온 사람이 덜 남는다는 사실은 2026년 10월 18일 GA4 데이터를 5년치로 다시 뽑았을 때 숫자로 나왔습니다. 자연 유입 월 코호트의 D1(설치 다음 날 다시 연 비율)은 15.2%에서 11.2%로, D30은 4.2%에서 2.6%로 내려가 있었습니다. 시점은 대개편과 겹치지만, Chat 기본 화면·광고 변경·신규 급증 가운데 무엇이 원인인지는 이 데이터로 가르지 못합니다.</p>
+      <p class="note">근거는 맞춤법 앱 저장소의 git 기록(02cbb15~61d6f15, a88ee55, eab1837, cb33385), 2026-10-18 전략 문서와 함께 커밋된 GA4 Data API 스크립트·결과 파일(데이터 끝 2026-10-17), 운영 기록입니다. 코호트 평균은 2026-10-29에 결과 파일로 다시 계산했습니다.</p>
+    </section>
+    <section aria-labelledby="cohort-step">
+      <h2 id="cohort-step">자연 유입 코호트 26개월: D1 15.2%에서 11.2%로</h2>
+      <p>GA4 Data API의 코호트 요청으로 첫 세션 날짜 기준 월 코호트를 만들고, 첫 유입 채널이 자연 검색(Organic Search)인 사용자만 남겼습니다. Play 사전 출시 로봇처럼 브랜드가 비어 있거나 OnePlus8·sdk_gphone 계열인 기기는 제외했습니다. 대개편 전 14개월(2024-07~2025-08)과 뒤 12개월(2025-09~2026-08)의 코호트를 단순 평균한 값입니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>자연 유입 월 코호트</th><th>평균 크기</th><th>D1</th><th>D7(6~8일 평균)</th><th>D30(28~30일 평균)</th></tr></thead>
+        <tbody>
+          <tr><td>2024-07 ~ 2025-08 (14개)</td><td>1,066명</td><td>15.2%</td><td>7.0%</td><td>4.2%</td></tr>
+          <tr><td>2025-09 ~ 2026-08 (12개)</td><td>900명</td><td>11.2%</td><td>4.9%</td><td>2.6%</td></tr>
+        </tbody>
+      </table></div>
+      <p>코호트 크기로 가중 평균을 내도 D1은 15.4%에서 11.2%, D30은 4.3%에서 2.6%여서 결론은 그대로입니다. 계절 탓인지 보려고 전년과 나란히 놓으면, 2024년에도 9월 코호트 D1이 14.7%로 내려갔지만 10월에 16.3%로 돌아왔습니다. 2025년에는 9월 13.6%, 10월 12.3%, 11월 12.3%였고, 그 뒤 2026년 8월까지는 7.7~12.6% 사이입니다.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/retention-cohort-break-1-ko.webp" width="1200" height="728" alt="막대 그림: 자연 유입 월 코호트 평균 D1이 15.2%에서 11.2%로, D7이 7.0%에서 4.9%로, D30이 4.2%에서 2.6%로 내려감." loading="lazy"><figcaption>2025년 9월 코호트부터 D1, D7, D30이 모두 한 단계 내려가 돌아오지 않았습니다.</figcaption></figure>
+      <p>주 단위로 자르면 경계가 더 또렷합니다. 2025년 6월 2일부터 8월 11일 주까지 11주의 자연 유입 코호트 D1은 평균 16.4%(13.4~21.7%)였고, 9월 1일 주부터 11월 24일 주까지 13주는 평균 12.6%(9.1~16.6%)였습니다. 주 코호트는 176~423명이라 한 주 값은 크게 흔들리고, 판정은 월 평균으로 했습니다.</p>
+    </section>
+    <section aria-labelledby="dau-masked">
+      <h2 id="dau-masked">9월 신규 3,053명, DAU는 780명으로 올랐습니다</h2>
+      <p>대개편 직후 몇 달 동안은 DAU가 올라서 이 단절이 드러나지 않았습니다. 2025년 8월과 9월 신규 사용자(전체 채널)는 2,304명과 3,053명이었고, 6월 1,381명, 7월 1,596명보다 훨씬 많았습니다. 월 평균 DAU도 8월 765명, 9월 780명으로 올랐다가 10월 654명으로 꺾였고, 2026년 1월 582명에서 9월 408명까지 내려갔습니다.</p>
+      <p>DAU가 어느 층에서 빠졌는지는 첫 세션 날짜로 나눠 보면 나옵니다. 같은 달력 창(9월 20일~10월 17일)의 일평균을 2024년과 2026년으로 비교했습니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>첫 세션 뒤 경과</th><th>2024</th><th>2025</th><th>2026</th></tr></thead>
+        <tbody>
+          <tr><td>당일 신규</td><td>43</td><td>64</td><td>34</td></tr>
+          <tr><td>1~7일</td><td>24</td><td>26</td><td>12</td></tr>
+          <tr><td>8~30일</td><td>43</td><td>41</td><td>15</td></tr>
+          <tr><td>31~90일</td><td>87</td><td>95</td><td>33</td></tr>
+          <tr><td>91~365일</td><td>253</td><td>169</td><td>97</td></tr>
+          <tr><td>1년 이상(1~2년 + 2년 이상)</td><td>293</td><td>292</td><td>251</td></tr>
+          <tr><td>합계 DAU</td><td>744</td><td>688</td><td>442</td></tr>
+        </tbody>
+      </table></div>
+      <p>각 칸은 소수 첫째 자리에서 반올림해서, 열을 더하면 합계와 1명까지 차이가 납니다. 744명에서 442명으로 줄어든 302명 가운데 211명(70%)이 가입 31~365일 된 사용자층에서 빠졌습니다. 당일 신규는 9명 줄었습니다. 1년 넘은 사용자 비중은 39%에서 57%로 올랐지만 인원은 293명에서 251명으로 줄었고, 비중이 오른 것은 1년 안쪽 층이 비었기 때문입니다.</p>
+      <p>2026년 창의 31~365일 층은 2025년 9월 하순부터 2026년 9월 중순 사이에 처음 연 사람들, 곧 단절 뒤 코호트로만 이뤄져 있습니다. 이 층은 340명에서 130명으로 62% 줄었습니다. 이 층이 처음 앱을 연 두 기간의 전체 채널 신규는 월별 신규를 일수로 나눠 어림하면 약 20,000명에서 약 15,100명으로 25% 줄었을 뿐이라, 들어오는 사람 수로는 62%를 설명하지 못합니다. 나머지는 들어온 사람이 덜 남아서 생긴 감소입니다. D30 뒤의 잔존이 얼마나 더 떨어졌는지는 따로 재지 않았습니다.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/retention-cohort-break-2-ko.webp" width="1200" height="498" alt="막대 그림: DAU가 744명에서 442명으로 302명 줄었고, 그중 31~365일 된 사용자층이 211명, 첫 30일 이내가 49명, 1년 넘은 사용자가 42명." loading="lazy"><figcaption>줄어든 DAU의 70%는 가입 31~365일 된 사용자층에서 나왔습니다.</figcaption></figure>
+    </section>
+    <section aria-labelledby="same-weeks">
+      <h2 id="same-weeks">같은 몇 주에 광고 변경과 신규 급증이 겹쳤습니다</h2>
+      <p>1.6.007은 2025년 8월 7일부터 18일까지 커밋 27개(머지 포함)로 만든 판입니다. 파일 129개가 바뀌었고 6,864줄이 늘고 2,476줄이 줄었습니다. 첫 커밋 02cbb15 "ChatGPT 스타일 UI로 완전 개편"은 이 저장소에서 Claude 공동 작성 줄(<code>Co-Authored-By</code>)이 처음 붙은 커밋이고, 이 구간에서 그 줄이 붙은 커밋은 6개입니다. 그중 하나의 제목이 "ChatGPT와 완벽히 동일한 UI/UX 완성"이었습니다. 이 앱의 커밋 메시지가 1년 사이 어떻게 바뀌었는지는 <a href="https://mvgood21.github.io/ax/commit-messages-701/">커밋 701개로 본 AI 코딩 1년</a>에 있습니다. 이 구간의 커밋 메시지와 당시 작업 문서(progress.md)에는 배포 뒤 리텐션이나 코호트를 보겠다는 말이 없습니다.</p>
+      <p>이 판에 들어간 변경 가운데 리텐션과 겹쳐 볼 만한 것은 셋입니다.</p>
+      <ul>
+        <li>기본 화면: <code>getBoolean("opt.uiMode", true)</code>로 Chat이 기본이 됐습니다. 이전 판에는 이 설정이 아예 없어서, 업데이트한 기존 사용자도 다음 실행부터 Chat 화면으로 열렸습니다.</li>
+        <li>뒤로가기로 앱을 닫을 때 뜨는 광고(83bc49f).</li>
+        <li>긴 글을 조각으로 나눠 검사를 요청하는 청킹(eb5aadc).</li>
+      </ul>
+      <p>8월 26일에는 앱 열기 광고를 고친 핫픽스(a88ee55, 1.6.008)가 따로 나갔고, 위에서 본 신규 급증도 같은 8~9월입니다. 주별 사용자당 참여 시간은 8월 18일 주 377초에서 다음 주 297초, 9월 8일 주 253초로 계단처럼 꺾였습니다. 그런데 같은 주 활성 사용자는 3,072명에서 3,400명으로 늘어서, 이 숫자는 화면 변화와 새로 들어온 사용자 구성을 함께 담고 있습니다.</p>
+    </section>
+    <section aria-labelledby="recheck">
+      <h2 id="recheck">AI와 쓴 전략 문서에서 다시 본 곳 넷</h2>
+      <p>이 단절을 처음 정리한 것은 2026년 10월 18일 커밋 eab1837의 전략 문서입니다. 이 커밋에는 Claude 공동 작성 줄이 붙어 있고, GA4 분석 스크립트와 결과 파일이 문서와 함께 들어 있습니다. 이 글을 쓰며 같은 결과 파일로 다시 계산하자 고칠 곳이 여럿 나왔고, 그 가운데 큰 것 넷을 적습니다.</p>
+      <ol>
+        <li>문서는 D30을 "28~30일 평균"이라고 적고 2.4%를 넣었습니다. 2.4%는 30일째 하루 값의 평균이었고, 28~30일 평균은 2.5%입니다. 게다가 문서 범위에는 2026년 9월 코호트가 들어 있었습니다. 데이터가 10월 17일에 끝나서 9월 18일 이후 가입자는 30일째에 닿지 못했고, 이 코호트의 D30은 1.0%로 찍혔습니다. 이 코호트를 빼면 2.6%입니다.</li>
+        <li>문서는 1.6.007의 세 변경과 8월 26일 핫픽스를 나열한 뒤 "시점이 겹치는 변경은 이것뿐"이라고 묶었습니다. 같은 시기의 신규 급증은 적지 않았고, 묶음 배포를 원인 후보 하나처럼 읽게 만듭니다.</li>
+        <li>문서는 사용자당 참여 시간 377초에서 253초를 단절의 근거로 들었습니다. 분모가 바뀐 지표라, 근거로는 자연 유입 코호트 쪽이 깨끗합니다.</li>
+        <li>문서는 알림으로 퀴즈를 연 사용자가 10월 9~17일 "하루 80~97명"이라고 적었습니다. 일별 값은 70~97명이었습니다(10월 13일 70명).</li>
+      </ol>
+      <p>방향을 바꾸는 오류는 없었지만, 2번은 원인 후보를 하나로 좁혀 읽게 만드는 문장이었습니다. 문서는 결론에서 "인과는 확정할 수 없다"고 적었고, 기본 모드 A/B 착수는 운영자가 정할 일로 남겼습니다.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EB%8C%80%EA%B0%9C%ED%8E%B8%20%EC%A7%81%ED%9B%84%20DAU%EB%8A%94%20%EC%98%AC%EB%9E%90%EA%B3%A0%2C%20%EC%9E%90%EC%97%B0%20%EC%9C%A0%EC%9E%85%20%EC%BD%94%ED%98%B8%ED%8A%B8%20D1%EC%9D%80%2015.2%25%EC%97%90%EC%84%9C%2011.2%25%EB%A1%9C%20%EB%82%B4%EB%A0%A4%EA%B0%94%EB%8B%A4">메일로 문의하기</a></p></aside>
+    <section aria-labelledby="hold-rollback">
+      <h2 id="hold-rollback">기본 화면을 바로 되돌리지 않고 신규 A/B를 기다립니다</h2>
+      <p>가장 빠른 대응은 기본 화면을 Classic으로 되돌리는 것입니다. 2026년 9월 24일 운영 기록에는 Classic을 없애고 Chat으로 통일하는 반대 방향 안이 보류로 올라가 있습니다. 그날 28일 사용량을 보니 Classic 사용자는 사용자당 검사 7.6회로 Chat(4.5회)보다 많았고 재방문 비율도 76% 대 64%였습니다. 하지만 기본값이 Chat인 앱에서 Classic을 쓰는 사람은 스스로 찾아 바꾼 사용자라, 이 차이를 화면의 효과로 읽을 수 없습니다. 1년 넘게 Chat에 익숙해진 기존 사용자를 다시 옮기는 일도 비용입니다.</p>
+      <p>전체 채널 코호트로 전후를 비교하는 방법도 버렸습니다. 전체 채널 D1은 2023년 8월 8.0%까지 내려갔다가 그해 10~12월 12.5~15.1%로 돌아온 적이 있습니다. 2022년에는 신규의 77%, 2023년에는 42%가 유료 검색이었으니 채널 구성이 크게 바뀐 시기에 D1도 함께 움직였습니다. 2025~2026년 Cross-network(유료) 비중은 22%와 23%로 비슷했지만, 비교는 자연 유입만으로 했습니다.</p>
+      <p>원인을 가를 수 있는 것은 새 설치를 반씩 나눠 기본 화면만 다르게 주는 A/B입니다. 신규가 주 약 185명이라 10%p 차이를 보려면 그룹당 약 350명이 필요하고, 이미 첫 실행 실험 두 개(11월 8일, 11월 15일 무렵 판정)가 신규를 나눠 쓰고 있습니다. 셋을 겹치면 셋 다 판정하지 못하므로 11월 16일 이후에 시작할 계획입니다. 판정 기준은 4주 뒤 D7 +2%p입니다.</p>
+      <p>큰 화면 개편을 내보내면 그 주부터 들어온 신규 코호트의 D1을 따로 떼어 4주 동안 보십시오. DAU만 보면 유입이 늘어난 달에는 회귀가 보이지 않습니다.</p>
+    </section>
+    <section aria-labelledby="quiz-loop">
+      <h2 id="quiz-loop">기다리는 동안 붙인 아침 퀴즈 알림</h2>
+      <p>2026년 9월 26일 1.6.024부터 아침에 맞춤법 퀴즈 알림을 보냈습니다. 알림으로 퀴즈를 연 사용자는 그 전까지 0명이었고, 10월 9~17일에는 하루 70~97명이었습니다. 로봇을 제외한 기존 사용자 일평균은 9월 7일 주 365명에서 10월 12일 주 447명으로 82명(22%) 늘었습니다. 이 82명 가운데 알림이 만든 증분은 아직 재지 않았고, 알림 횟수를 늘린 갈래와 그대로 둔 갈래를 나눈 실험(<code>qr_extra</code>)이 10월 31일에 사용자당 활성일로 잽니다.</p>
+      <p>알림을 붙이며 숫자 하나가 또 틀어졌습니다. 1.6.030부터 백그라운드 알람이 보내는 이벤트 때문에 GA4 <code>totalUsers</code>가 10월 17일 1,500명에서 19~22일 2,400~2,900명으로 부풀었고, <code>activeUsers</code>는 약 500명 그대로였습니다(10월 23일 확인). 이 글의 DAU는 모두 <code>activeUsers</code> 기준입니다. 테스트 기기와 로봇을 거르는 방법은 <a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 '어제 설치 19건'은 사실 8건이었다</a>에 따로 적었습니다.</p>
+    </section>
+    <section aria-labelledby="cohort-steps">
+      <h2 id="cohort-steps">cohortSpec과 필터 JSON으로 자연 유입 코호트 뽑기</h2>
+      <ol>
+        <li><code>runReport</code>에 <code>cohortSpec</code>을 넣습니다. 코호트마다 <code>dimension: "firstSessionDate"</code>와 한 달짜리 <code>dateRange</code>를 주고, <code>cohortsRange</code>는 <code>DAILY</code>, 0~30일, <code>accumulate: false</code>로 설정합니다. 차원은 <code>cohort</code>, <code>cohortNthDay</code>, 지표는 <code>cohortActiveUsers</code>, <code>cohortTotalUsers</code>입니다. 한 요청에 6개월씩 묶었습니다.</li>
+        <li><code>dimensionFilter</code>로 첫 유입 채널과 로봇을 거릅니다.<pre><code>{"andGroup": {"expressions": [
+  {"filter": {"fieldName": "firstUserDefaultChannelGroup", "stringFilter": {"value": "Organic Search"}}},
+  {"notExpression": {"filter": {"fieldName": "mobileDeviceBranding", "stringFilter": {"value": "(not set)"}}}},
+  {"notExpression": {"filter": {"fieldName": "deviceModel", "stringFilter": {"matchType": "CONTAINS", "value": "OnePlus8"}}}},
+  {"notExpression": {"filter": {"fieldName": "deviceModel", "stringFilter": {"matchType": "BEGINS_WITH", "value": "sdk_gphone"}}}}
+]}}</code></pre></li>
+        <li>D1은 1일째 값을 쓰고, D7과 D30은 6~8일째와 28~30일째 평균을 사용합니다. 표 머리에 어느 쪽인지 적습니다.</li>
+        <li>코호트 마지막 날에 30일을 더한 날이 데이터 끝보다 뒤면 그 코호트는 D30 평균에서 제외합니다.</li>
+        <li>전년 같은 달과 나란히 놓습니다. 9월 하락이 해마다 있는지, 다음 달 돌아오는지를 봅니다.</li>
+        <li>큰 배포 날짜를 경계로 주 코호트 D1을 붙여 단절이 언제 시작됐는지 확인합니다. 주 코호트에도 월 코호트와 같은 필터를 적용합니다(이 글의 주 코호트 스크립트는 브랜드 필터 하나만 썼습니다).</li>
+        <li>DAU를 <code>date</code>와 <code>firstSessionDate</code> 두 차원으로 받아 경과일 구간(당일, 1~7일, 8~30일, 31~90일, 91~365일, 1~2년, 2년 이상)으로 나누고, 해마다 같은 달력 창끼리 비교합니다. 요청은 이 정도면 됩니다.<pre><code>{"dateRanges": [{"startDate": "2026-09-20", "endDate": "2026-10-17"}],
+ "dimensions": [{"name": "date"}, {"name": "firstSessionDate"}],
+ "metrics": [{"name": "activeUsers"}],
+ "limit": 250000}</code></pre>날짜별로 (그날 − firstSessionDate)를 구간에 넣어 더한 뒤 창의 일수로 나눠 평균을 냅니다.</li>
+        <li>사용자 수 지표는 <code>activeUsers</code>로 합니다. 백그라운드 이벤트를 보내는 기능이 있으면 <code>totalUsers</code>는 실제보다 커집니다.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="organic-only">
+      <h2 id="organic-only">자연 유입만 봤고, 월 수백 명 단위에서 맞는 방법입니다</h2>
+      <p>유료 유입 코호트는 이 비교에서 빠졌습니다. 월 코호트가 수백 명은 돼야 평균이 버팁니다. 1.6.007의 단계적 출시 비율과 날짜는 기록에 없어서, 주 코호트 단절이 8월 18일 주보다 2주 늦은 9월 1일 주에 또렷한 이유도 확인하지 못했습니다. 경과일 분해 스크립트에는 로봇 필터가 없어서, 2026년의 당일 신규 34명에는 사전 출시 로봇이 섞였을 수 있습니다. 31~365일 층의 결론에는 영향이 작습니다.</p>
+      <p>시장 쪽 하락도 있습니다. Google Trends(한국)에서 "맞춤법 검사기" 검색 관심도는 2026년 평균이 2025년보다 38% 낮았습니다(2026-10-18 조회). 이 하락은 2026년의 일이라 2025년 9월 코호트부터 계단처럼 내려간 단절을 설명하지는 못합니다. 2026년 7월 코호트 D1 7.7% 같은 추가 하락에 이 감소가 얼마나 섞였는지는 가르지 못했습니다.</p>
+    </section>
+    <section aria-labelledby="after-oct31">
+      <h2 id="after-oct31">알림 실험 판정과 기본 화면 A/B에서 기록할 숫자</h2>
+      <p>10월 31일 <code>qr_extra</code> 판정에서 알림을 늘린 갈래의 사용자당 활성일이 10% 이상 늘고 삭제·알림 차단이 2%p 안에 머무는지 봅니다. 11월 16일 이후 기본 화면 A/B를 시작하면 4주 동안 D1, D7, 첫 7일 검사 수, 삭제율을 갈래별로 기록합니다. 이 결과가 나오기 전에는 Chat 화면을 단절의 원인이라고 쓰지 않습니다.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EB%8C%80%EA%B0%9C%ED%8E%B8%20%EC%A7%81%ED%9B%84%20DAU%EB%8A%94%20%EC%98%AC%EB%9E%90%EA%B3%A0%2C%20%EC%9E%90%EC%97%B0%20%EC%9C%A0%EC%9E%85%20%EC%BD%94%ED%98%B8%ED%8A%B8%20D1%EC%9D%80%2015.2%25%EC%97%90%EC%84%9C%2011.2%25%EB%A1%9C%20%EB%82%B4%EB%A0%A4%EA%B0%94%EB%8B%A4">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>GA4에서 자연 유입 사용자만 리텐션을 보려면 어떻게 하나요?</summary><div><p>Data API 코호트 요청의 <code>dimensionFilter</code>에 <code>firstUserDefaultChannelGroup = "Organic Search"</code>를 넣습니다. 첫 유입 기준이라 나중에 광고로 다시 들어온 사용자도 자연 유입으로 남습니다.</p></div></details>
+        <details><summary>D30은 왜 28~30일 평균으로 보나요?</summary><div><p>하루 값은 요일과 작은 표본 때문에 흔들립니다. 이 앱의 2024년 9월 자연 유입 코호트는 30일째 값이 2.8%, 28~30일 평균이 3.2%였습니다. 어느 쪽을 쓰든 표 머리에 적고 섞지 않습니다.</p></div></details>
+        <details><summary>DAU가 늘었는데 리텐션이 떨어질 수 있나요?</summary><div><p>그렇습니다. 2025년 9월 이 앱은 신규가 3,053명 들어와 DAU가 780명으로 올랐지만, 같은 달 자연 유입 코호트 D1은 13.6%로 전년보다 낮았고 그 뒤 회복하지 않았습니다.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/ax/market-check-before-app/">사진 앱 3개를 만든 뒤에야 시장 조사를 했다: 올해 나온 경쟁 앱 설치 중앙값 1,166</a></li>
+        <li><a href="https://mvgood21.github.io/ax/commit-messages-701/">커밋 701개로 본 AI 코딩 1년: &#x27;완성&#x27;에서 &#x27;원인·검증&#x27;으로</a></li>
+        <li><a href="https://mvgood21.github.io/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
+        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/ax/topic/retro/">회고와 숫자 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Fri, 30 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>버전 문자열 비교: &quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓 – SugarMount</title>
+    <link>https://mvgood21.github.io/ax/string-version-compare/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/ax/string-version-compare/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/string-version-compare-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX 노트 · 사고 기록</span>
+      <h1>"6.7" &lt; "6.11"이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</h1>
+      <p class="lead">Kotlin 문자열 &lt;로는 "6.7"이 "6.11"보다 큽니다. 그래서 Remote Config 값이 6.10이 되자 6.2~6.9 기기의 갱신이 멈췄습니다.</p>
+      <p>서랍에는 (6.7/2.2), 운영 Remote Config에는 6.11/2.3. 맞춤법 앱 <a href="https://mvgood21.github.io/apps/sugarspeller/">한글 띄어쓰기</a>의 콘텐츠 버전 두 개가 이렇게 달랐습니다. 2026년 9월 25일 운영자가 기기에서 본 값입니다. 앱이 두 버전을 사전순 문자열로 비교했기 때문에, 6.2~6.9에 머문 기기는 그 뒤 <code>info_version</code>을 올려 보낸 문제 은행과 공지를 받지 못했습니다. 같은 날 12시 14분 커밋(7b997f8)에서 자리마다 정수로 비교하는 <code>VersionCompare</code>와 단위 테스트 4개를 넣었습니다.</p>
+      <p class="note">근거: 앱 저장소의 git 기록(d5ac5e2, 6d0f4f1, 5f082f8, 71c31ae, a4d5b9a, e9d6b9c, 079feab, 7b997f8, 31c082d, 844c828), CHANGELOG 1.6.019·1.6.023, 문제 은행 검수 문서, 모니터링 스크립트. 2026-10-29에 다시 확인했습니다. Remote Config 템플릿 번호와 프로젝트 식별값은 적지 않았습니다.</p>
+    </section>
+    <section aria-labelledby="symptom">
+      <h2 id="symptom">서랍은 6.7, Remote Config는 6.11이었습니다</h2>
+      <p>이 앱은 문제 은행, 공지, FAQ 같은 콘텐츠를 Remote Config(이하 RC)의 JSON 하나로 내려보냅니다. 스플래시 화면인 <code>ActivityEmpty</code>가 RC의 <code>info_version</code>·<code>clip_version</code>을 기기 Room DB에 저장된 버전과 비교해, RC 쪽이 크면 로컬 콘텐츠를 지우고 다시 넣습니다. 서랍 아래에 찍히는 (6.7/2.2)가 그 저장된 버전입니다.</p>
+      <p>먼저 짚어 볼 곳은 빌드였습니다. 이 앱의 디버그 빌드는 개발용 Firebase 프로젝트의 RC를 읽으므로, 기기가 디버그 빌드라면 운영 값과 다른 숫자가 보일 수 있습니다. 운영 RC 값이 실제로 6.11/2.3이어서 이 가설은 맞지 않았고, 비교 코드가 남았습니다.</p>
+      <pre><code>// ActivityEmpty, 7b997f8 직전
+if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
+    repo.setVersion(VersionT(infoVer, clipVer))
+    // 지우고 다시 넣기
+}</code></pre>
+      <p><code>infoVersion</code>은 String 필드입니다. Kotlin의 String 비교는 앞 글자부터 하나씩 견주는 사전순이라, "6.7"과 "6.11"은 셋째 글자 '7'과 '1'에서 갈립니다. '7'이 크므로 "6.7" &lt; "6.11"은 거짓이고, 앱은 RC 쪽이 오래된 버전이라고 판정했습니다.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/string-version-compare-1-ko.webp" width="1200" height="542" alt="비교 그림: 문자열 비교는 셋째 글자 7과 1을 견주어 6.7이 더 크다고 판정해 갱신을 건너뛰고, 자리별 정수 비교는 7과 11을 견주어 6.11을 새 버전으로 보고 다시 받는다." loading="lazy"><figcaption>같은 두 값을 문자열로 견주면 6.7이, 자리별 정수로 견주면 6.11이 새 버전입니다.</figcaption></figure>
+    </section>
+    <section aria-labelledby="why-silent">
+      <h2 id="why-silent">소수점 뒤가 한 자리일 때는 같은 답이 나왔습니다</h2>
+      <p>문자열 비교 자체는 2020년 첫 Remote Config 연결 때부터 있었습니다. 지금 모양의 <code>infoVersion &lt; infoVer</code>는 2023년 5월 6일 커밋(6d0f4f1)에서 비교 방향을 바로잡으며 생겼고, clip 조건은 이틀 뒤에 붙었습니다. 소수점 뒤가 6.1부터 6.9까지 한 자리인 동안은 사전순과 숫자 순이 같아서 늘 맞는 답을 냈습니다. 어긋나기 시작한 것은 RC 값이 6.10이 된 뒤입니다. 로컬 값별로 옛 비교식이 어떤 답을 내는지 다시 계산해 봤습니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>기기에 저장된 값</th><th>RC 6.10일 때</th><th>RC 6.11일 때</th></tr></thead>
+        <tbody>
+          <tr><td>6.1</td><td>갱신</td><td>갱신</td></tr>
+          <tr><td>6.2 ~ 6.9</td><td>갱신 안 함</td><td>갱신 안 함</td></tr>
+          <tr><td>6.10</td><td>같음</td><td>갱신</td></tr>
+        </tbody>
+      </table></div>
+      <p>6.1은 "6.10"의 앞부분과 같아서 더 짧은 쪽이 작다고 나오고, 6.2부터 6.9까지는 셋째 글자에서 모두 큰 쪽으로 판정됩니다. RC를 6.10으로 올린 날부터 그 사이 값에 머문 기기는 <code>info_version</code>을 올려도 갱신을 받지 못했습니다(<code>clip_version</code>이 함께 오르지 않는 한). 문제 은행 검수 문서에는 9월 13일, 20일, 22일에 공지를 바꾸면서 <code>info_version</code>을 6.10 그대로 둔 기록도 있습니다. 그 세 번은 문자열 비교와 상관없이 기존 사용자 누구에게도 가지 않았습니다.</p>
+      <p>새로 설치한 기기에서는 이 결함이 보이지 않았습니다. 버전 행이 비어 있는 첫 실행은 비교 없이 RC 값을 그대로 넣기 때문에, 새 설치는 늘 최신 콘텐츠로 시작합니다.</p>
+    </section>
+    <section aria-labelledby="agents">
+      <h2 id="agents">에이전트 커밋 세 번 중 콘텐츠 비교를 고친 것은 없었습니다</h2>
+      <p>git 기록을 따라가 보면, 버전 비교를 직접 건드리거나 판단한 에이전트 커밋만 세어도 세 번입니다. 2025년 8월 9일 15시 32분, Claude Code가 만든 커밋(5f082f8)은 "업데이트 알림이 계속 뜨는" 원인을 <code>app_version</code> 문자열 비교로 보고 Major.Minor.Patch 셋을 정수로 비교하게 바꿨습니다. 당시 앱 버전은 1.5.031이라 비교하는 major·minor가 한 글자씩이었고, 문자열로 비교해도 답이 같았습니다. 같은 날 17시 51분 "fix: 수정"이라는 커밋(71c31ae)이 이 부분을 문자열 비교로 되돌렸고, 되돌린 이유는 남아 있지 않습니다. 콘텐츠 버전 비교는 두 커밋 모두 건드리지 않았습니다.</p>
+      <p>2025년 12월 11일 RC 동기화 리팩터링 커밋(a4d5b9a, Claude Opus 4.5 공동 작성)은 테스트 11개를 추가했습니다(커밋 메시지에는 13개라고 적혀 있습니다). 그중 <code>versionComparison_isCorrect</code>는 "5.0" &lt; "5.1"이 참인지 확인합니다. 한 자리 값만 넣었고, 제품 코드를 부르지 않고 Kotlin의 String 연산자만 확인하므로, 비교문을 어떻게 바꿔도 통과합니다. 지키는 코드를 지웠을 때 빨개지지 않는 테스트를 가려내는 방법은 <a href="https://mvgood21.github.io/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다</a>에 적었습니다.</p>
+      <p>2026년 9월 25일 오전, 문제 은행 124개를 검수한 에이전트(Claude Opus 5.5)는 11시 8분 커밋(e9d6b9c)의 반영 절차에 "<code>info_version</code>을 "7.0"으로 올린다. <code>ActivityEmpty</code>는 버전을 문자열로 비교한다"고 적었습니다. 15분 뒤 실제로 RC에 올린 값은 6.11이었고, 문서는 "6.10 → 6.11은 문자열로도 커서 6.10 사용자는 갱신된다"로 바뀌었습니다. 문서에는 6.9→6.10 같은 올림이 인식되지 않는다는 문장이 남아 있었지만, 6.10 아래에 머문 기기를 어떻게 할지는 다루지 않았습니다. 11시 23분 커밋(079feab)은 프로젝트의 CLAUDE.md에 "자릿수가 바뀌는 올림은 갱신으로 인식되지 않는다"를 규칙으로 적었고, 비교 코드는 그대로 두었습니다.</p>
+      <p>운영자가 기기 서랍의 6.7/2.2를 운영 RC 값과 나란히 놓고 나서야 6.10 아래 기기가 드러났습니다. 비교문을 고친 12시 14분 커밋(7b997f8)도 에이전트(Claude Fable 5.1)가 썼고, 이번에는 운영자가 기기 값과 RC 값이 다르다는 것을 짚어 준 뒤였습니다. 이 사건이 커밋 메시지에 어떻게 남았는지는 <a href="https://mvgood21.github.io/ax/commit-messages-701/">커밋 701개로 본 AI 코딩 1년</a>에서 다른 사례와 함께 다뤘습니다.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/string-version-compare-2-ko.webp" width="1200" height="836" alt="단계 그림: 2023년 5월 지금 모양의 문자열 비교, 2025년 8월 9일 에이전트의 정수 비교 수정이 2시간 19분 뒤 되돌려짐, 2025년 12월 11일 한 자리 값만 넣은 테스트 추가, 2026년 9월 25일 11시 8분 7.0으로 올리자는 계획, 11시 23분 실제로 6.11을 올림, 12시 14분 VersionCompare와 테스트 4개." loading="lazy"><figcaption>지금 모양의 문자열 비교는 2023년 5월부터 2026년 9월 25일 12시 14분까지 남아 있었습니다.</figcaption></figure>
+    </section>
+    <section aria-labelledby="fix">
+      <h2 id="fix">VersionCompare로 콘텐츠·앱 버전 비교를 묶었습니다</h2>
+      <p>RC 값을 7.0으로 올리면 6.x 기기는 "6.x" &lt; "7.0"이 참이라 당장은 갱신을 받습니다. 대신 7.10에서 같은 일이 다시 나고, 콘텐츠를 고치는 사람마다 "자릿수가 바뀌는 올림을 하지 말 것"을 기억해야 합니다. 그래서 영구 규칙으로는 버렸습니다.</p>
+      <p>2025년 8월처럼 세 자리를 모두 정수로 비교하는 방식도 맞지 않았습니다. 이 앱은 <code>app_version</code>의 major와 minor만 보고 패치 자리는 보지 않도록 짜여 있어서, 패치까지 비교하면 패치 출시 때마다 이전 패치 사용자에게 마켓 이동 판정이 나갑니다. 7b997f8은 비교 함수 하나를 두고, 콘텐츠 버전 비교와 <code>app_version</code>의 major·minor 비교를 모두 그 함수로 바꿨습니다.</p>
+      <pre><code>object VersionCompare {
+    fun compare(a: String, b: String): Int {
+        val pa = parts(a); val pb = parts(b)
+        for (i in 0 until maxOf(pa.size, pb.size)) {
+            val x = pa.getOrElse(i) { 0 }; val y = pb.getOrElse(i) { 0 }
+            if (x != y) return x.compareTo(y)
+        }
+        return 0
+    }
+    fun isNewer(remote: String, local: String) = compare(remote, local) &gt; 0
+    private fun parts(v: String) = v.trim().split('.').map { it.trim().toIntOrNull() ?: 0 }
+}</code></pre>
+      <p><code>VersionCompareTest</code> 4개는 실패했던 값 그대로("6.11"과 "6.7"), 같은 값, 자리 수가 다른 값("1.10.0"과 "1.9.9", "6.11"과 "6.11.0"), 숫자가 아닌 값을 확인합니다. 첫 테스트에는 "6.7" &lt; "6.11"이 거짓이라는 단언도 넣었습니다. 커밋 시점 단위 테스트는 112개가 통과했습니다. 버전 문자열을 &lt;로 비교하는 코드는 새로 쓰지 마십시오. 이 규칙은 지금 CLAUDE.md에 들어 있습니다.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%226.7%22%20%3C%20%226.11%22%EC%9D%B4%20%EA%B1%B0%EC%A7%93%EC%9D%B4%EB%9D%BC%20%EC%BD%98%ED%85%90%EC%B8%A0%20%EA%B0%B1%EC%8B%A0%EC%9D%B4%20%EB%A9%88%EC%B7%84%EB%8B%A4%3A%206.2~6.9%20%EA%B8%B0%EA%B8%B0%EB%A7%8C%20%EB%A7%89%ED%9E%8C%20Remote%20Config%20%EB%B2%84%EC%A0%84%20%EB%B9%84%EA%B5%90">메일로 문의하기</a></p></aside>
+    <section aria-labelledby="force">
+      <h2 id="force">같은 JSON의 force는 보급 전에 켜져 사용자를 막았습니다</h2>
+      <p>콘텐츠 버전이 들어 있는 RC의 <code>version</code> JSON에는 <code>app_version</code>과 <code>force</code>도 있고, 7b997f8 이후 <code>app_version</code>의 major·minor 판정도 <code>VersionCompare</code>를 거칩니다. 스플래시는 설치된 버전과 <code>app_version</code>이 글자까지 같으면 통과시키고, 다르면 major·minor만 비교하고, 마지막에 <code>force</code>가 true면 그 결과를 덮어써 업데이트 팝업을 보여 줍니다.</p>
+      <p>9월 18일 커밋(31c082d)의 기록을 보면, 1.6.017을 깐 기기에 "A new version has been released!"가 떠서 처음에는 코드를 의심했습니다. 원인은 RC의 <code>app_version</code>이 배포한 버전과 어긋난 것이었습니다. 패치 상향(1.6.017 → 1.6.018)은 major·minor 비교로 구제되지 않아서, RC 값을 배포한 버전과 똑같이 맞춰야 팝업이 사라집니다.</p>
+      <p>같은 9월 18일에는 신버전 보급률이 낮은 상태에서 <code>force</code>를 켰고, 5시간 만에 그날 세션이 25% 줄었습니다. 9월 13일 건은 당일 기록이 GA4 표준 리포트의 집계 지연을 잠금으로 읽었다고 정정했고, 나중 문서는 다시 잠금 사례로 적어 기록끼리 엇갈려 여기서는 세지 않습니다. 1.6.019(9월 19일)부터 <code>monitor.py --only rc</code>가 RC의 <code>version</code> JSON을 읽고, GA4에서 어제와 오늘 활성 사용자 중 <code>app_version</code>과 글자까지 같은 버전의 비율을 찍습니다. <code>force</code>가 true인데 그 비율이 90% 미만이면 "나머지는 지금 스플래시 팝업에 막혀 있다"는 경고를 냅니다. 단계적 출시 비율이 의도와 다르게 나간 사고는 <a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다</a>에 따로 있습니다.</p>
+    </section>
+    <section aria-labelledby="steps">
+      <h2 id="steps">git grep 한 줄, 실패 값 테스트, 기존 설치 확인</h2>
+      <ol>
+        <li>버전처럼 생긴 이름끼리 &lt;, &gt;로 비교하는 줄을 찾습니다. 자기 저장소에서는 리비전 자리를 빼고 돌립니다. 이 저장소에서 아래처럼 7b997f8 직전 리비전을 넣으면 <code>ActivityEmpty</code>의 두 줄(248, 270행)과 a4d5b9a 테스트의 세 줄이 나옵니다(2026-10-29 실행).
+          <pre><code>git grep -nE '[Vv]er[A-Za-z]*(\[[0-9]\])?\s*[&lt;&gt;]=?\s*[A-Za-z.\[]*[Vv]er' 7b997f8^ -- '*.kt' '*.java'</code></pre></li>
+        <li>찾은 비교를 함수 하나로 모으고, 실패했던 값 그대로 테스트를 겁니다. 최소한 "6.11"과 "6.7", "1.10.0"과 "1.9.9"를 넣습니다.</li>
+        <li>확인은 새 설치에서 하지 않습니다. 고치기 전 빌드를 깔고 RC 값을 6.9로 둔 채 한 번 실행해 저장 버전을 6.9로 만듭니다. 고친 빌드를 데이터를 지우지 않고 덮어 설치한 뒤 RC 값을 6.10으로 올리고, 화면에 찍히는 저장 버전이 6.10으로 바뀌는지 봅니다. 6.15에서 6.16처럼 자릿수가 그대로인 올림은 옛 비교로도 통과해서 수정 확인이 되지 않습니다.</li>
+        <li>콘텐츠를 고치면 <code>info_version</code>을 올립니다.</li>
+        <li><code>force</code>를 켜기 전에 GA4에서 appVersion별 활성 사용자 중 RC <code>app_version</code>과 같은 버전의 비율을 봅니다. 90%가 안 되면 켜지 않습니다.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">이미 깔린 옛 빌드는 앱 수정으로 구하지 못합니다</h2>
+      <p>비교는 기기에서 돌기 때문에, 고친 빌드로 업데이트하기 전의 기기는 계속 문자열로 비교합니다. 그 뒤 RC 값은 10월 1일 6.12, 10월 9일 6.13, 10월 10일 6.14, 10월 24일 6.15로 올라갔지만, 옛 빌드에 6.2~6.9가 저장된 기기에는 "6.7" &lt; "6.15"도 거짓입니다.</p>
+      <p>그 기기를 서버 쪽에서 구할 한 가지 수단은 RC 값을 7.0으로 한 번 올리는 것입니다. 옛 빌드에서는 "6.7" &lt; "7.0"이 참이고, 새 빌드의 <code>VersionCompare</code>에서도 7.0이 6.15보다 크므로 두 경로가 모두 갱신합니다. 영구 규칙으로는 버린 방법이지만, 옛 빌드가 남아 있는 동안 한 번 쓰는 이행 수단으로는 맞습니다. 그 뒤로는 옛 빌드 비율이 충분히 낮아질 때까지 7.1~7.9 안에서만 올려야 합니다. 10월 24일 기준 RC 값은 6.15이고, 이 앱이 7.0으로 올렸다는 기록은 없습니다. 옛 조건이 OR라 <code>clip_version</code>을 올려도 갱신 조건은 참이 되지만, 그 기기들이 clip 2.3에서 왜 갱신되지 않았는지 모르므로 이 경로는 확인된 수단으로 치지 않았습니다.</p>
+      <p><code>VersionCompare</code>는 숫자가 아닌 자리를 0으로 읽습니다. RC에 "6.l1" 같은 오타가 들어가면 6.0으로 읽혀 갱신이 조용히 건너뛰어지고, 테스트도 "abc"보다 "6.7"이 새 버전이라고 확인할 뿐 경고는 내지 않습니다. "6.11"과 "6.11.0"은 같은 버전으로 봅니다.</p>
+      <p>1.6.023에서 릴리스 APK를 API 34 에뮬레이터에 올려 서랍의 6.11/2.3을 확인했지만, 그 설치가 새 설치였는지는 기록에 없습니다. 새 설치였다면 비교문을 거치지 않은 확인입니다. 저장 버전이 2.2, RC가 2.3인 <code>clip_version</code>도 남은 의문입니다. "2.2" &lt; "2.3"은 문자열로도 참이고 옛 조건은 OR였으므로, clip 쪽에서 갱신이 일어났어야 합니다. clip이 언제 2.3이 됐는지 기록이 없어, 이 기기가 6.7/2.2에 머문 이유를 문자열 비교 하나로 다 설명하지는 못합니다.</p>
+      <p>버전 행을 콘텐츠보다 먼저 쓰는 순서도 같은 갱신 경로의 결함이었습니다. 9월 28일 S21 실기기에서 첫 실행이 오프라인이면 문제 은행이 빈 채로 다음 <code>info_version</code>까지 굳는 것을 찾았고, 커밋 ce024cd가 버전이 같아도 은행이 비면 다시 넣게 고쳤습니다.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">CLAUDE.md에 옛 규칙이 아직 남아 있습니다</h2>
+      <p>2026년 10월 29일 기준 HEAD의 CLAUDE.md 206~207행은 여전히 "비교가 문자열이라 자릿수가 바뀌는 올림은 갱신으로 인식되지 않는다"고 적고 있고, 734행은 <code>VersionCompare</code>로 숫자 비교한다고 적습니다. 에이전트가 앞쪽 규칙을 읽으면 코드가 아직 문자열로 비교한다고 믿고 그에 맞춰 올림 값을 고를 수 있습니다. 206행 "비교가 문자열이라"부터 207행 끝까지는 옛 빌드를 구하는 7.0 이행 규칙으로 고쳐 쓰고, 205~206행의 "<code>info_version</code>을 반드시 올린다"는 남깁니다. 제품 코드를 부르지 않는 <code>versionComparison_isCorrect</code>도 테스트 목록에 남아 있습니다. 이 테스트를 지우거나 <code>VersionCompare</code>를 부르게 바꾸는 일이 남았습니다.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%226.7%22%20%3C%20%226.11%22%EC%9D%B4%20%EA%B1%B0%EC%A7%93%EC%9D%B4%EB%9D%BC%20%EC%BD%98%ED%85%90%EC%B8%A0%20%EA%B0%B1%EC%8B%A0%EC%9D%B4%20%EB%A9%88%EC%B7%84%EB%8B%A4%3A%206.2~6.9%20%EA%B8%B0%EA%B8%B0%EB%A7%8C%20%EB%A7%89%ED%9E%8C%20Remote%20Config%20%EB%B2%84%EC%A0%84%20%EB%B9%84%EA%B5%90">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>Kotlin에서 "6.7" &lt; "6.11"은 왜 거짓인가요?</summary><div><p>String 비교가 앞 글자부터 견주는 사전순이기 때문입니다. 셋째 글자 '7'이 '1'보다 커서 "6.7"이 더 크다고 나옵니다.</p></div></details>
+        <details><summary>버전을 7.0으로 올리면 문자열 비교로도 되지 않나요?</summary><div><p>당장은 됩니다. 7.10에서 같은 일이 다시 나고, 콘텐츠를 고치는 사람마다 자릿수가 바뀌는 올림을 피해야 합니다.</p></div></details>
+        <details><summary>Remote Config의 force는 언제 켜도 되나요?</summary><div><p>app_version과 같은 버전을 쓰는 활성 사용자가 90%를 넘은 뒤입니다. 이 앱은 보급률이 낮을 때 켰다가 그날 세션이 25% 줄었습니다.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
+        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Fri, 30 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>Claude Code 여러 세션 충돌과 파일 주인 표 – SugarMount</title>
     <link>https://mvgood21.github.io/ax/file-owner-table/</link>
@@ -107,8 +478,8 @@ git diff --name-only $(git merge-base &lt;base&gt; &lt;branch&gt;) &lt;branch&gt
         <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-review-refutation/">에이전트 84개가 돈 릴리스 전 검토: 발견마다 3명이 반박하고, 버틴 20건만 고쳤다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -195,12 +566,12 @@ unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$TEST_PUB[~/][0-9]*" | sort -u | wc
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
         <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
         <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/androidx-pdf-isolated-process/">androidx.pdf beta01: 격리 프로세스에서 Application.onCreate가 한 번 더 돌아 PDF가 조용히 안 열렸다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -333,10 +704,10 @@ lifecycleScope.launch {
       <ul>
         <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
         <li><a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
         <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
-        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -446,12 +817,12 @@ lifecycleScope.launch {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
         <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
         <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/androidx-pdf-isolated-process/">androidx.pdf beta01: 격리 프로세스에서 Application.onCreate가 한 번 더 돌아 PDF가 조용히 안 열렸다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -550,12 +921,12 @@ three_star = cleared and time &lt;= par(base, scale, floor) and mistakes &lt;= a
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/puzzle-first-chapter-walls/">퍼즐 게임 첫날 이탈 분석: 기기별 이벤트 순서와 판별 계산으로 찾은 첫 장의 벽 4판</a></li>
         <li><a href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
         <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -670,9 +1041,9 @@ print(pages.most_common(), "FAQ questions:", questions)</code></pre>
         <li><a href="https://mvgood21.github.io/ax/static-site-check-gate/">여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</a></li>
         <li><a href="https://mvgood21.github.io/ax/ai-region-privacy-policy/">개인정보처리방침 AI 처리 위치(국외 이전): 하루에 두 번 고친 고지를 코드에 묶기</a></li>
         <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -787,10 +1158,10 @@ NOT_TEST = {"notExpression": {"orGroup": {"expressions": [
       <ul>
         <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
         <li><a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
         <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
-        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -895,8 +1266,8 @@ export function cacheKey(api, group, original, corrected, model) {
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
         <li><a href="https://mvgood21.github.io/ax/contrast-checker-missed-40-percent/">대비 검사기는 텍스트 조각 40%를 재지 못하고도 통과를 냈다: &#x27;몇 개를 측정했나&#x27;를 출력하게 바꾸기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1026,8 +1397,8 @@ const gaps = await agent(CTX + CHECKLIST + final + dossier, { schema: CRIT })</c
         <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-review-refutation/">에이전트 84개가 돈 릴리스 전 검토: 발견마다 3명이 반박하고, 버틴 20건만 고쳤다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1138,12 +1509,12 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(":core
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
         <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
         <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
         <li><a href="https://mvgood21.github.io/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/androidx-pdf-isolated-process/">androidx.pdf beta01: 격리 프로세스에서 Application.onCreate가 한 번 더 돌아 PDF가 조용히 안 열렸다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1266,8 +1637,8 @@ git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --gre
         <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-review-refutation/">에이전트 84개가 돈 릴리스 전 검토: 발견마다 3명이 반박하고, 버틴 20건만 고쳤다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1400,8 +1771,8 @@ adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
         <li><a href="https://mvgood21.github.io/ax/contrast-checker-missed-40-percent/">대비 검사기는 텍스트 조각 40%를 재지 못하고도 통과를 냈다: &#x27;몇 개를 측정했나&#x27;를 출력하게 바꾸기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1529,12 +1900,12 @@ print("my app in results:", MY_APP in ids)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
         <li><a href="https://mvgood21.github.io/ax/commit-messages-701/">커밋 701개로 본 AI 코딩 1년: &#x27;완성&#x27;에서 &#x27;원인·검증&#x27;으로</a></li>
         <li><a href="https://mvgood21.github.io/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
         <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/retro/">회고와 숫자 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1664,9 +2035,9 @@ $ SOURCE_DATE=2026-12-31 python tools/build.py
         <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://mvgood21.github.io/ax/ai-region-privacy-policy/">개인정보처리방침 AI 처리 위치(국외 이전): 하루에 두 번 고친 고지를 코드에 묶기</a></li>
         <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1784,8 +2155,8 @@ grep -rL --include='*Test.kt' -e 'assert' -e 'check(matches' app/src/</code></pr
         <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
         <li><a href="https://mvgood21.github.io/ax/contrast-checker-missed-40-percent/">대비 검사기는 텍스트 조각 40%를 재지 못하고도 통과를 냈다: &#x27;몇 개를 측정했나&#x27;를 출력하게 바꾸기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1921,12 +2292,12 @@ git log --until=2026-10-20 --format='%(trailers:key=Co-authored-by,valueonly)' \
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
         <li><a href="https://mvgood21.github.io/ax/market-check-before-app/">사진 앱 3개를 만든 뒤에야 시장 조사를 했다: 올해 나온 경쟁 앱 설치 중앙값 1,166</a></li>
         <li><a href="https://mvgood21.github.io/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
         <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/retro/">회고와 숫자 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2032,8 +2403,8 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
         <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/contrast-checker-missed-40-percent/">대비 검사기는 텍스트 조각 40%를 재지 못하고도 통과를 냈다: &#x27;몇 개를 측정했나&#x27;를 출력하게 바꾸기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2195,12 +2566,12 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
         <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2318,8 +2689,8 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
         <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-review-refutation/">에이전트 84개가 돈 릴리스 전 검토: 발견마다 3명이 반박하고, 버틴 20건만 고쳤다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2459,9 +2830,9 @@ curl -s "$POLICY_URL" | grep -o 'data-policy-version="[0-9-]*"'</code></pre>
         <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://mvgood21.github.io/ax/static-site-check-gate/">여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</a></li>
         <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2606,12 +2977,12 @@ font.save(dst)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
         <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
         <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
         <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/androidx-pdf-isolated-process/">androidx.pdf beta01: 격리 프로세스에서 Application.onCreate가 한 번 더 돌아 PDF가 조용히 안 열렸다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2702,8 +3073,8 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
         <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2788,12 +3159,12 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
         <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
         <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
         <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2913,8 +3284,8 @@ flutter test test/theme_matrix/ --dart-define=Y2_NO_SETTLE=true
         <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3033,12 +3404,12 @@ FlowRow(
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
         <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
         <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
         <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3121,8 +3492,8 @@ Mem:              13           8           2           0           2           4
         <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3248,10 +3619,10 @@ if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFract
       <ul>
         <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
         <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
         <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
-        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3371,8 +3742,8 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3470,12 +3841,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
         <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
         <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
         <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3539,9 +3910,9 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://mvgood21.github.io/ax/static-site-check-gate/">여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</a></li>
         <li><a href="https://mvgood21.github.io/ax/ai-region-privacy-policy/">개인정보처리방침 AI 처리 위치(국외 이전): 하루에 두 번 고친 고지를 코드에 묶기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3872,7 +4243,7 @@ for mid, rel, edits, kind, target in MUT:
       <h2 id="metrics">결정에 쓴 지표 네 개</h2>
       <ul>
         <li>계획 봇의 3,000수 상한 도달 수: 0이 아니면 그 버전은 탈락입니다.</li>
-        <li>계획 봇 중앙값 ÷ 탐욕 봇 중앙값: 실력 차이가 판 길이로 얼마나 드러나는지 봅니다. 점수 도전 모드에서는 "잘하면 오래 간다"가 재미의 대부분입니다.</li>
+        <li>계획 봇 중앙값 / 탐욕 봇 중앙값: 실력 차이가 판 길이로 얼마나 드러나는지 봅니다. 점수 도전 모드에서는 "잘하면 오래 간다"가 재미의 대부분입니다.</li>
         <li>탐욕 봇 판 길이: 서툰 사람이 너무 빨리 끝나지 않는지 봅니다.</li>
         <li>트레이 생성 시간 p95: 기기에서 공급 비용이 문제가 되는지 봅니다.</li>
       </ul>
@@ -3931,12 +4302,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/puzzle-first-chapter-walls/">퍼즐 게임 첫날 이탈 분석: 기기별 이벤트 순서와 판별 계산으로 찾은 첫 장의 벽 4판</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
         <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4047,8 +4418,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4149,12 +4520,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
         <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
         <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
         <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5496,12 +5867,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
         <li><a href="https://mvgood21.github.io/ax/market-check-before-app/">사진 앱 3개를 만든 뒤에야 시장 조사를 했다: 올해 나온 경쟁 앱 설치 중앙값 1,166</a></li>
         <li><a href="https://mvgood21.github.io/ax/commit-messages-701/">커밋 701개로 본 AI 코딩 1년: &#x27;완성&#x27;에서 &#x27;원인·검증&#x27;으로</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
         <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/retro/">회고와 숫자 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5603,8 +5974,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5630,11 +6001,11 @@ done</code></pre>
       <ul class="card-list">
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법</a></h3><p class="sub">AI 코딩 에이전트에게 일을 나누고 규칙을 전하는 방법, 여러 세션을 한 저장소에서 함께 돌리며 겪은 충돌과 그 뒤에 정한 작업 방식입니다.</p><p class="meta">글 7개</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시</a></h3><p class="sub">AI가 만든 코드를 출시하기 전에 거치는 단위 테스트, 릴리스 게이트, 실기기 확인과, 그 과정에서 실제로 잡힌 결함을 정리했습니다.</p><p class="meta">글 8개</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발</a></h3><p class="sub">에이전트와 Android 앱을 만들며 만난 Gradle 빌드, 라이브러리 업그레이드, 화면 구성, 성능 문제와 각각을 어떻게 풀었는지 적은 기록입니다.</p><p class="meta">글 8개</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/games/">게임 개발</a></h3><p class="sub">퍼즐 게임의 레벨을 에이전트와 함께 만들고, 풀 수 있는지 검증하고, 난이도를 맞추면서 정한 규칙과 측정한 숫자를 모았습니다.</p><p class="meta">글 3개</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발</a></h3><p class="sub">에이전트와 Android 앱을 만들며 만난 Gradle 빌드, 라이브러리 업그레이드, 화면 구성, 성능 문제와 각각을 어떻게 풀었는지 적은 기록입니다.</p><p class="meta">글 9개</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/games/">게임 개발</a></h3><p class="sub">퍼즐 게임의 레벨을 에이전트와 함께 만들고, 풀 수 있는지 검증하고, 난이도를 맞추면서 정한 규칙과 측정한 숫자를 모았습니다.</p><p class="meta">글 4개</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/store/">스토어와 수익화</a></h3><p class="sub">Google Play 등록과 심사, 스토어 스크린샷과 설명, 광고 설정처럼 앱을 내놓은 뒤 운영하는 일을 에이전트와 나눠 한 기록입니다.</p><p class="meta">글 3개</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/web/">웹사이트와 검색</a></h3><p class="sub">이 사이트를 에이전트와 만들며 정한 페이지 구조, 구글·네이버 검색 최적화, 구조화 데이터, 디자인 시스템을 실제 코드 기준으로 설명합니다.</p><p class="meta">글 4개</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/retro/">회고와 숫자</a></h3><p class="sub">기간을 끊어 돌아본 결과입니다. 무엇이 빨랐고 무엇이 틀렸는지를 git 기록과 QA 보고서에서 직접 센 숫자와 함께 적습니다.</p><p class="meta">글 3개</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/retro/">회고와 숫자</a></h3><p class="sub">기간을 끊어 돌아본 결과입니다. 무엇이 빨랐고 무엇이 틀렸는지를 git 기록과 QA 보고서에서 직접 센 숫자와 함께 적습니다.</p><p class="meta">글 4개</p></li>
       </ul>
     </section>
     <section aria-labelledby="start">
@@ -5648,12 +6019,12 @@ done</code></pre>
     <section aria-labelledby="notes">
       <h2 id="notes">최신 글</h2>
       <ul class="card-list">
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></h3><p class="sub">화살표 매듭풀기 1,100판은 역구성 생성기가 만들고 G2 게이트가 걸렀습니다. 이동 규칙을 먼저 고정해 생성이 곧 검증이 됐고, expert F0는 0.50에서 0.11로 내려갔습니다.</p><p class="meta">게임 개발 · 방법 · 2026년 10월 30일</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></h3><p class="sub">맞춤법 앱의 자연 유입 코호트 D1이 2025년 8월 대개편 뒤 15.2%에서 11.2%로 내려갔습니다. 줄어든 DAU의 70%가 가입 31~365일 층이었고, 원인은 아직 가리지 못했습니다.</p><p class="meta">회고와 숫자 · 측정 · 2026년 10월 30일</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></h3><p class="sub">Kotlin 문자열 비교로 콘텐츠 버전을 견주던 맞춤법 앱이 Remote Config 6.10부터 6.2~6.9에 머문 기기에 문제 은행과 공지를 보내지 못했습니다. 원인과 수정, 확인 절차입니다.</p><p class="meta">Android 개발 · 사고 기록 · 2026년 10월 30일</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></h3><p class="sub">같은 작업 트리의 커밋 하나가 다른 세션 파일 50개를 담아 간 뒤 공유 파일 주인 표를 만들었습니다. 머지 13개 중 7개의 손 머지가 어디서 났는지 git으로 세었습니다.</p><p class="meta">에이전트와 일하는 법 · 방법 · 2026년 10월 29일</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></h3><p class="sub">실제 광고 ID로 만든 한판블록 AAB의 dex에 테스트 광고 문자열 5개가 남았습니다. listOf().any를 상수끼리 ||로 바꾸자 0개가 됐고, 건수만 세는 검사를 정했습니다.</p><p class="meta">Android 개발 · 측정 · 2026년 10월 29일</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></h3><p class="sub">Play 리뷰의 &#x27;고급 구독 일시적인 오류&#x27;는 상품을 기다리지 않는 구독 상세 화면 탓이었습니다. 90일간 16명 중 1명만 결제를 시작했고, 수정 뒤 13명 중 4명이 됐습니다.</p><p class="meta">스토어와 수익화 · 사고 기록 · 2026년 10월 29일</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></h3><p class="sub">Play 16KB 페이지 요건으로 .so 6개를 다시 빌드할 때 NDK 27·29는 사진 전환에 파란 색조를 냈습니다. 다시 재 보니 NDK 25도 링커 플래그 하나로 16KB 정렬이 됐습니다.</p><p class="meta">Android 개발 · 사고 기록 · 2026년 10월 28일</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></h3><p class="sub">테스터 의견 &#x27;시간이 너무 길어서 쉬움&#x27;을 듣고 퍼즐 목표 시간을 158개 레벨 시뮬레이션으로 30% 줄였습니다. 처음 안 45%는 501레벨 이후 일반 플레이어 별 3개 비율이 1%라 버렸습니다.</p><p class="meta">게임 개발 · 측정 · 2026년 10월 28일</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></h3><p class="sub">Google은 2026-05-07, 네이버는 07-09에 FAQ 노출을 끝냈습니다. FAQPage 106쪽을 지우지 않고 손을 뗀 이유와, 대신 고친 RSS 본문·날짜 신호·앱 마크업입니다.</p><p class="meta">웹사이트와 검색 · 방법 · 2026년 10월 28일</p></li>
       </ul>
     </section>
     <section aria-labelledby="by-the-numbers">
@@ -5788,8 +6159,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -6374,435 +6745,6 @@ done</code></pre>
       <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a> · 패키지 이름: <code>com.sugarmount.sugarclip</code></p>
     </section>]]></description>
     <pubDate>Mon, 05 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>한글 띄어쓰기: 맞춤법 검사 앱 – SugarMount</title>
-    <link>https://mvgood21.github.io/apps/sugarspeller/</link>
-    <guid isPermaLink="true">https://mvgood21.github.io/apps/sugarspeller/</guid>
-    <description><![CDATA[<header class="app-hero">
-      <img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarspeller/icon.webp" width="96" height="96" alt="" fetchpriority="high">
-      <h1>한글 띄어쓰기</h1>
-      <p class="lead">한글 띄어쓰기는 붙여 넣거나 다른 앱에서 공유한 문장의 맞춤법과 띄어쓰기를 네이버·다음 검사기로 한 번에 고쳐 주는 Android 앱이에요.</p>
-      <p class="status"><span class="badge badge--live">Google Play</span> <span class="brandline">SugarSpeller · 한글 맞춤법 검사 : 띄어쓰기 마법사</span></p>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugarspeller&amp;referrer=utm_source%3Dmvgood21.github.io%26utm_medium%3Dapp_page%26utm_campaign%3Dsugarspeller" rel="noopener">Google Play에서 받기</a><a class="button button--outline" href="https://mvgood21.github.io/privacy/sugarspeller/">한글 띄어쓰기 개인정보처리방침</a></div>
-    </header>
-    <ul class="shots" tabindex="0" aria-label="한글 띄어쓰기 스크린샷"><li><img src="https://mvgood21.github.io/assets/apps/sugarspeller/shot1.webp" width="360" height="620" loading="lazy" alt="공유한 문장의 맞춤법과 띄어쓰기를 검사하는 화면"></li><li><img src="https://mvgood21.github.io/assets/apps/sugarspeller/shot2.webp" width="360" height="620" loading="lazy" alt="긴 글을 한 번에 변환하는 화면"></li><li><img src="https://mvgood21.github.io/assets/apps/sugarspeller/shot3.webp" width="360" height="620" loading="lazy" alt="검사 방식을 고르는 화면"></li></ul>
-    <section aria-labelledby="tasks">
-      <h2 id="tasks">이런 때 쓰세요</h2>
-      <ul>
-        <li><a href="https://mvgood21.github.io/apps/sugarspeller/long-text-check/">자기소개서처럼 긴 글의 맞춤법을 한 번에 검사하고 싶을 때</a></li>
-        <li>카카오톡에 보낼 문장을 보내기 전에 고치고 싶을 때</li>
-        <li>왜 틀렸는지 설명을 보고 맞춤법을 익히고 싶을 때</li>
-        <li>하루 5문제 맞춤법 퀴즈로 헷갈리는 표현을 연습하고 싶을 때</li>
-      </ul>
-    </section>
-    <section aria-labelledby="features">
-      <h2 id="features">이런 일을 해요</h2>
-      <ul class="features">
-        <li><h3>공유만으로 검사</h3><p>카카오톡·메모 앱에서 공유하거나 글자를 선택해 메뉴에서 고르면 바로 검사해요. 복사해서 붙여 넣지 않아도 돼요.</p></li>
-        <li><h3>긴 글도 한 번에</h3><p>무료 3,000자, 기본 구독 4,000자, 고급 구독 7,000자까지 한 번에 검사해요.</p></li>
-        <li><h3>검사기 선택</h3><p>네이버 또는 다음(카카오) 맞춤법 검사기 중 하나를 골라요. 채팅 화면과 미니창에서는 한쪽이 실패하면 다른 쪽으로 한 번 더 시도해요.</p></li>
-        <li><h3>왜 틀렸나요?</h3><p>고친 부분을 누르면 왜 틀렸는지 AI가 짧게 설명해요. 누를 때만 원래 어절과 고친 어절, 오류 유형, 쓴 검사기를 보내고, 앞뒤 문장은 보내지 않아요.</p></li>
-        <li><h3>검사 기록</h3><p>검사한 원문과 교정문을 기기에 보관해 다시 볼 수 있어요.</p></li>
-        <li><h3>오늘의 맞춤법 퀴즈</h3><p>헷갈리는 맞춤법 문제를 매일 5개씩 풀고 해설을 봐요.</p></li>
-      </ul>
-    </section>
-    <section class="facts" aria-labelledby="facts-h">
-      <h2 id="facts-h">한눈에 보기</h2>
-      <div class="table-wrap">
-        <table>
-          <tbody>
-            <tr><th scope="row">상태</th><td>Google Play</td></tr>
-            <tr><th scope="row">가격</th><td>무료(광고 포함). 구독: 기본(4,000자, 배너 광고), 고급(7,000자, 광고 없음)</td></tr>
-            <tr><th scope="row">한 번에 검사하는 글자 수</th><td>무료 3,000자 · 기본 4,000자 · 고급 7,000자</td></tr>
-            <tr><th scope="row">인터넷</th><td>필요해요. 검사할 글은 네이버 또는 다음 맞춤법 검사기로 보내 검사해요.</td></tr>
-            <tr><th scope="row">계정</th><td>필요 없어요.</td></tr>
-            <tr><th scope="row">언어</th><td>한국어 문장 검사(앱 화면은 한국어·영어)</td></tr>
-            <tr><th scope="row">패키지 이름</th><td><code>com.sugarmount.sugarspeller</code></td></tr>
-            <tr><th scope="row">개발자</th><td>simpest (SugarMount)</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-    <section aria-labelledby="data">
-      <h2 id="data">데이터와 권한</h2>
-      <ul>
-        <li>검사할 글은 검사를 위해 네이버 또는 다음(카카오) 맞춤법 검사기로만 보내요. 저희 서버에는 보내지 않아요.</li>
-        <li>검사 기록은 기기에만 저장해요.</li>
-        <li>“왜 틀렸나요?”를 누를 때만 원래 어절과 고친 어절, 오류 유형, 쓴 검사기(네이버·다음), 구독 여부를 저희 서버(Google Firebase)로 보내요. 서버는 설명을 만들려고 어절과 오류 유형만 Google Vertex AI(Gemini)에 보내요. 앞뒤 문장은 보내지 않아요.</li>
-        <li>광고(Google AdMob, 미디에이션 파트너 Liftoff), 사용 통계(Google Analytics), 원격 설정·알림(Firebase), 정상 설치된 앱의 요청인지 확인하는 Firebase App Check(Google Play Integrity)가 들어 있어요.</li>
-        <li>AI 설명의 하루 이용 횟수를 세기 위해 익명 식별자(Firebase 익명 계정)를 자동으로 만들어요. 이름·이메일·전화번호와 연결되지 않아요.</li>
-      </ul>
-      <p>자세한 내용은 <a href="https://mvgood21.github.io/privacy/sugarspeller/">한글 띄어쓰기 개인정보처리방침</a>에서 볼 수 있어요.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">할 수 없는 일</h2>
-      <ul>
-        <li>한 번에 검사하는 글자 수에 한도가 있어요. 무료 3,000자, 기본 구독 4,000자, 고급 구독 7,000자예요.</li>
-        <li>인터넷이 없으면 검사할 수 없어요. 검사할 글은 네이버 또는 다음 맞춤법 검사기로 보내요.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">자주 묻는 질문</h2>
-      <div class="faq">
-        <details><summary>한 번에 몇 글자까지 검사하나요?</summary><div><p>무료로 3,000자, 기본 구독은 4,000자, 고급 구독은 7,000자까지 한 번에 검사해요.</p></div></details>
-        <details><summary>검사한 글이 저장되거나 서버로 올라가나요?</summary><div><p>검사할 글은 검사를 위해 네이버 또는 다음 맞춤법 검사기로만 전송되고, 저희 서버로는 보내지 않아요. 검사 기록은 사용자의 기기에만 남아요. “왜 틀렸나요?”를 누르면 고친 어절과 그 설명이 저희 서버(Google Firebase)에 캐시될 수 있어요.</p></div></details>
-        <details><summary>다른 앱에서 바로 검사할 수 있나요?</summary><div><p>네. 다른 앱의 공유 메뉴에서 한글 띄어쓰기를 고르거나, 글자를 길게 눌렀을 때 나오는 텍스트 선택 메뉴에서 맞춤법 검사를 고르면 바로 검사해요.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="guides-heading">
-      <h2 id="guides-heading">도움말</h2>
-      <ul class="related-links">
-        <li><a href="https://mvgood21.github.io/apps/sugarspeller/long-text-check/">맞춤법 검사기 글자 수 제한, 휴대폰으로 긴 글 검사</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="ax-app-heading">
-      <h2 id="ax-app-heading">이 앱의 AX 노트</h2>
-      <ul class="related-links">
-        <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
-        <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="releases-heading">
-      <h2 id="releases-heading">최근 업데이트</h2>
-      <ul>
-        <li><strong>1.6.030</strong> · <time datetime="2026-10-18">2026년 10월 18일</time> · 새 미니 게임 &#x27;맞춤법 소나기&#x27;를 넣었어요. 떨어지는 틀린 말을 바른 말로 고쳐 입력하는 게임이에요.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="related-heading">
-      <h2 id="related-heading">관련 앱</h2>
-      <ul class="related">
-        <li><a href="https://mvgood21.github.io/apps/sugarclip/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarclip/icon.webp" width="56" height="56" alt=""><span>SugarClip</span></a></li>
-        <li><a href="https://mvgood21.github.io/apps/doc-viewer/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugardoc/icon.webp" width="56" height="56" alt=""><span>한글뷰어 슈가독</span></a></li>
-      </ul>
-    </section>
-    <p class="meta updated">최종 업데이트 <time datetime="2026-10-23">2026년 10월 23일</time></p>
-    <section aria-labelledby="contact">
-      <h2 id="contact">문의</h2>
-      <p>앱이 제대로 동작하지 않거나 궁금한 점이 있으면 이메일로 알려 주세요.</p>
-      <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a> · 패키지 이름: <code>com.sugarmount.sugarspeller</code></p>
-    </section>]]></description>
-    <pubDate>Mon, 05 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>화살표 매듭풀기: 1,000레벨 두뇌 퍼즐 게임 – SugarMount</title>
-    <link>https://mvgood21.github.io/apps/arrow-knots/</link>
-    <guid isPermaLink="true">https://mvgood21.github.io/apps/arrow-knots/</guid>
-    <description><![CDATA[<section class="hero">
-      <img class="app-icon app-icon--lg" src="https://mvgood21.github.io/assets/apps/arrows/icon.webp" width="72" height="72" alt="">
-      <p class="eyebrow">Android 퍼즐 게임</p>
-      <h1>화살표 매듭풀기</h1>
-      <p class="lead">화살표 매듭풀기는 서로 길을 막은 화살표를 순서대로 하나씩 탭해 빼내 판을 비우는 Android 퍼즐 게임이에요. 회원가입 없이 오프라인으로도 할 수 있어요.</p>
-      <p class="status"><span class="badge badge--live">Google Play</span> <span class="brandline">화살표 매듭풀기 - Arrow Knots</span></p>
-      <ul class="trust" aria-label="한눈에 보는 특징">
-        <li>회원가입 없음</li>
-        <li>오프라인 플레이</li>
-        <li>진행 기록은 기기에 저장</li>
-      </ul>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.arrows&amp;referrer=utm_source%3Dmvgood21.github.io%26utm_medium%3Dapp_page%26utm_campaign%3Darrows" rel="noopener">Google Play에서 받기</a><a class="button button--outline" href="https://mvgood21.github.io/privacy/arrow-knots/">화살표 매듭풀기 개인정보처리방침</a></div>
-    </section>
-    <ul class="shots" aria-label="스크린샷">
-      <li><img src="https://mvgood21.github.io/assets/apps/arrows/shot1-ko.webp" width="360" height="640" loading="lazy" alt="하트 모양으로 얽힌 화살표 판과 하트·타이머가 보이는 게임 화면"></li>
-      <li><img src="https://mvgood21.github.io/assets/apps/arrows/shot2-ko.webp" width="360" height="640" loading="lazy" alt="빠르게 이어서 화살표를 빼 콤보가 쌓이는 화면"></li>
-      <li><img src="https://mvgood21.github.io/assets/apps/arrows/shot3-ko.webp" width="360" height="640" loading="lazy" alt="별 3개와 시간·최고 콤보·점수를 보여 주는 클리어 화면"></li>
-    </ul>
-    <section aria-labelledby="tasks">
-      <h2 id="tasks">이런 때 쓰세요</h2>
-      <ul>
-        <li>화살표 퍼즐 규칙과 푸는 요령을 알고 싶을 때</li>
-        <li>인터넷 없이 짧게 즐길 퍼즐 게임을 찾을 때</li>
-        <li>매일 새 판으로 연속 기록을 이어 가고 싶을 때</li>
-      </ul>
-    </section>
-    <section aria-labelledby="how-to-play">
-      <h2 id="how-to-play">게임 방법</h2>
-      <p>화살표를 탭하면 머리가 가리키는 쪽으로 몸통을 따라 미끄러져 판 밖으로 빠져나가요. 앞길에 다른 화살표가 있으면 부딪혀 튕겨 나오고 하트가 하나 줄어요.</p>
-      <ol class="steps">
-        <li><strong>앞이 빈 화살표를 탭해요.</strong> 머리 앞쪽 길이 열려 있는 화살표는 바로 빠져나가요.</li>
-        <li><strong>막힌 화살표는 순서를 찾아요.</strong> 그 앞을 막고 있는 화살표를 먼저 빼서 길을 열어 줘요.</li>
-        <li><strong>판을 모두 비우면 클리어예요.</strong> 목표 시간 안에, 실수를 거의 하지 않고 풀면 별 3개를 받아요.</li>
-      </ol>
-      <p>처음에는 세 판짜리 튜토리얼(누르기, 막혔을 때, 순서 찾기)로 시작하고, 튜토리얼에서는 하트가 줄지 않아요.</p>
-    </section>
-    <section aria-labelledby="features">
-      <h2 id="features">주요 기능</h2>
-      <ul class="features">
-        <li><h3>1,000개 레벨, 4개 파트</h3><p>파트 1(1~200레벨)은 판이 한 화면에 다 들어오고, 201레벨부터는 판이 화면보다 커져서 탭해 확대하고 끌어서 둘러봐요. 1,000레벨을 다 깨도 새 판이 계속 이어져요.</p></li>
-        <li><h3>25레벨마다 보너스 미니게임</h3><p>월드(25레벨)를 마칠 때마다 네온 러시, 그림자 기억, 번호 순서, 보스 타임어택 중 하나가 열리고, 별 개수에 따라 보상 상자에서 코인을 받아요.</p></li>
-        <li><h3>오늘의 퍼즐</h3><p>매일 모두에게 같은 새 판이 하나 나와요. 월요일이 가장 쉽고 주말이 가장 어려워요. 그날 풀면 연속 기록이 늘고, 한 달에 7·15·25일을 채우면 동·은·금 트로피를 받아요.</p></li>
-        <li><h3>힌트와 코인</h3><p>힌트는 레벨마다 3개예요(가장 큰 판 몇 곳은 4개). 길을 가장 많이 여는 화살표를 반짝이고 대신 빼 줘요. 레벨을 처음 깨면 코인이 쌓이고, 코인 100개로 힌트 하나를 살 수 있어요.</p></li>
-        <li><h3>하트와 이어하기</h3><p>하트는 화살표 수에 따라 3~5개예요. 실수 없이 연달아 빼면 잃은 하트가 돌아오고, 하트를 다 잃으면 광고를 한 편 보고 하트 2개로 이어 풀 수 있어요(도전마다 한 번).</p></li>
-        <li><h3>콤보와 목표 시간</h3><p>1초 남짓한 간격으로 이어서 빼면 콤보가 쌓여요. 목표 시간을 넘겨도 실패는 아니고, 타이머는 일시정지 메뉴에서 숨길 수 있어요.</p></li>
-        <li><h3>보기 편한 색</h3><p>화살표 색 6가지는 적록·청황 색각 이상 시뮬레이션으로 확인해 골랐어요.</p></li>
-      </ul>
-    </section>
-    <section class="facts" aria-labelledby="facts">
-      <h2 id="facts">한눈에 보기</h2>
-      <table>
-        <tbody>
-          <tr><th scope="row">가격</th><td>무료. 광고가 있고, 인앱 상품으로 광고 제거와 힌트 15개 묶음이 있어요</td></tr>
-          <tr><th scope="row">레벨</th><td>1,000개(4개 파트), 그다음도 새 판이 이어짐. 오늘의 퍼즐 매일 1판</td></tr>
-          <tr><th scope="row">계정</th><td>없음(회원가입·로그인 없음)</td></tr>
-          <tr><th scope="row">인터넷</th><td>없어도 플레이 가능. 광고, 결제, 사용 통계 전송에 쓰여요</td></tr>
-          <tr><th scope="row">서버 전송</th><td>진행 기록은 기기에만 저장. 광고(AdMob, Liftoff)와 사용 통계·오류 보고(Firebase)는 Google·Liftoff가 처리</td></tr>
-          <tr><th scope="row">필요한 권한</th><td>진동, 인터넷·네트워크 상태, 광고 ID, Google Play 결제</td></tr>
-          <tr><th scope="row">Android 버전</th><td>7.0 이상, 세로 화면</td></tr>
-          <tr><th scope="row">언어</th><td>한국어, 영어</td></tr>
-          <tr><th scope="row">최신 버전</th><td>1.2.3</td></tr>
-          <tr><th scope="row">패키지 이름</th><td><code>com.sugarmount.arrows</code></td></tr>
-          <tr><th scope="row">개발자</th><td>simpest (SugarMount)</td></tr>
-        </tbody>
-      </table>
-    </section>
-    <section aria-labelledby="data">
-      <h2 id="data">데이터와 권한</h2>
-      <ul>
-        <li>계정이 없어요. 레벨, 별, 코인, 보유 힌트 같은 진행 기록은 이 기기의 앱 저장소에만 저장되고 저희 서버로 보내지 않아요. 저희는 이 앱용 서버를 운영하지 않아요.</li>
-        <li>광고는 Google AdMob과 광고 파트너 Liftoff가 보여 줘요. 이때 광고 ID, 기기·네트워크 정보가 각 회사의 정책에 따라 쓰일 수 있어요.</li>
-        <li>버전 1.2.1부터 게임을 다듬고 광고 성과를 재기 위해 Google Firebase로 이름 없는 사용 통계(튜토리얼 완료, 처음 깬 레벨 번호 등)와 비정상 종료 보고를 받아요. 이름, 이메일, 연락처는 보내지 않아요.</li>
-        <li>권한은 네 가지예요. 진동(게임 중 진동, 설정에서 끌 수 있음), 인터넷과 네트워크 상태(광고, 동의 화면, 결제), 광고 SDK가 추가하는 광고 ID(광고 표시와 성과 측정), Google Play 결제 라이브러리가 추가하는 결제 권한이에요. 위치, 연락처, 카메라, 사진, 마이크 권한은 요청하지 않아요.</li>
-        <li>동의가 필요한 지역에서는 일시정지 메뉴의 '개인정보 설정'에서 광고 동의 선택을 언제든 바꿀 수 있어요.</li>
-      </ul>
-      <p>자세한 내용은 <a href="https://mvgood21.github.io/privacy/arrow-knots/">화살표 매듭풀기 개인정보처리방침</a>에 있어요.</p>
-    </section>
-    <section aria-labelledby="pricing">
-      <h2 id="pricing">무료와 유료</h2>
-      <ul>
-        <li>모든 레벨과 모드를 무료로 할 수 있어요.</li>
-        <li>4레벨부터 화면 아래에 배너 광고가 있어요. 튜토리얼과 1~3레벨에는 없어요.</li>
-        <li>전면 광고는 레벨을 15번 깬 뒤부터, 레벨을 깨고 다음 레벨로 넘어갈 때만 가끔 나와요. 졌을 때나 푸는 도중에는 나오지 않아요.</li>
-        <li>앱을 나갔다가 몇 분 뒤 돌아오면 광고가 한 번 나올 수 있어요.</li>
-        <li>힌트, 이어하기, 코인 2배, 연속 기록 지키기 광고는 직접 고를 때만 나와요. 레벨 사이에 나오는 보너스 제안은 건너뛸 수 있어요.</li>
-        <li>광고 제거는 한 번만 결제하면 돼요. 배너, 전면 광고, 돌아올 때 나오는 광고가 사라지고 힌트 10개도 함께 받아요. 힌트나 이어하기용 광고는 원할 때 그대로 볼 수 있어요.</li>
-        <li>힌트 15개 묶음도 따로 살 수 있어요. 결제는 Google Play 결제로 처리돼요.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">할 수 없는 일</h2>
-      <ul>
-        <li>계정과 클라우드 저장이 없어서 진행 기록을 다른 기기로 옮길 수 없어요. 앱 데이터를 지우거나 앱을 삭제하면 진행 기록과 보유 힌트도 함께 지워져요(광고 제거 구매는 Google Play에서 복원돼요).</li>
-        <li>순위표나 친구와 겨루는 기능은 없어요.</li>
-        <li>가로 화면은 지원하지 않아요.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">자주 묻는 질문</h2>
-      <div class="faq">
-        <details><summary>화살표 매듭풀기는 인터넷 없이 할 수 있나요?</summary><div><p>네, 인터넷이 없어도 모든 레벨을 할 수 있어요. 인터넷은 광고, 결제, 사용 통계 전송에 쓰이고, 광고를 불러오지 못해도 게임은 그대로 진행돼요.</p></div></details>
-        <details><summary>폰을 바꾸면 진행 기록이 옮겨지나요?</summary><div><p>아니요. 계정이 없고 진행 기록은 그 기기에만 저장되므로 옮겨지지 않아요. 광고 제거 구매만 Google Play에서 복원돼요.</p></div></details>
-        <details><summary>광고를 없앨 수 있나요?</summary><div><p>네, 광고 제거를 한 번 결제하면 배너, 전면 광고, 돌아올 때 나오는 광고가 사라져요. 자세한 내용은 <a href="https://mvgood21.github.io/apps/arrow-knots/#pricing">무료와 유료</a>를 보세요.</p></div></details>
-        <details><summary>레벨이 너무 어려워서 막혔어요.</summary><div><p>힌트를 쓰면 길을 가장 많이 여는 화살표를 대신 빼 줘요. 제법 풀다가 두 번 연달아 지면 다음 도전이 조금 쉬워져요.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="contact">
-      <h2 id="contact">문의</h2>
-      <p>게임이 제대로 동작하지 않거나 궁금한 점이 있으면 이메일로 알려 주세요. 기기 모델, Android 버전, 막힌 레벨 번호를 함께 적어 주시면 확인이 빨라요. 일시정지 메뉴의 '의견 보내기'를 누르면 앱 버전과 기기 정보가 미리 채워진 메일이 열려요.</p>
-      <p>이메일: sugarmount21@gmail.com · 패키지 이름: <code>com.sugarmount.arrows</code></p>
-    </section>
-    <section aria-labelledby="ax-app-heading">
-      <h2 id="ax-app-heading">이 앱의 AX 노트</h2>
-      <ul class="related-links">
-        <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="releases-heading">
-      <h2 id="releases-heading">최근 업데이트</h2>
-      <ul>
-        <li><strong>1.2.3</strong> · <time datetime="2026-10-17">2026년 10월 17일</time> · Android 7 기기에서 실행하자마자 꺼지던 문제를 고쳤고, 플레이 방법 2·3단계를 건너뛸 수 있어요.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="related-heading">
-      <h2 id="related-heading">관련 앱</h2>
-      <ul class="related">
-        <li><a href="https://mvgood21.github.io/apps/blocks/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/blocks/icon.webp" width="56" height="56" alt=""><span>한판블록</span></a></li>
-        <li><a href="https://mvgood21.github.io/apps/sugaralbum/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugaralbum/icon.webp" width="56" height="56" alt=""><span>슈가앨범</span></a></li>
-        <li><a href="https://mvgood21.github.io/apps/image-compress/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarcompress/icon.webp" width="56" height="56" alt=""><span>사진 용량 줄이기</span></a></li>
-      </ul>
-    </section>
-    <p class="meta updated">최종 업데이트 <time datetime="2026-10-18">2026년 10월 18일</time></p>]]></description>
-    <pubDate>Sat, 03 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>이미지 변환 JPG·PNG·WebP: 사진 확장자 변경 – SugarMount</title>
-    <link>https://mvgood21.github.io/apps/image-convert/</link>
-    <guid isPermaLink="true">https://mvgood21.github.io/apps/image-convert/</guid>
-    <description><![CDATA[<section class="hero" aria-labelledby="app-title">
-      <img class="app-icon app-icon--lg" src="https://mvgood21.github.io/assets/apps/sugarconvert/icon.webp" width="88" height="88" fetchpriority="high" alt="">
-      <p class="eyebrow">사진 앱</p>
-      <h1 id="app-title">이미지 변환 JPG·PNG·WebP</h1>
-      <p class="lead">HEIC·PNG·WebP를 JPG, 투명 PNG, 작은 WebP로 바꿔 새 파일로 저장하는 Android 앱이에요. 여러 장을 한 번에 기기 안에서 처리해요.</p>
-      <p class="status"><span class="badge badge--live">Google Play</span> <span class="brandline">사진 형식 변환 JPG·PNG·WebP · SugarConvert</span></p>
-      <ul class="trust" aria-label="데이터 처리">
-        <li>업로드 없음</li>
-        <li>원본 보존</li>
-        <li>저장소 권한 없음</li>
-        <li>회원 가입 없음</li>
-      </ul>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugarconvert&amp;referrer=utm_source%3Dmvgood21.github.io%26utm_medium%3Dapp_page%26utm_campaign%3Dsugarconvert" rel="noopener">Google Play에서 받기</a><a class="button button--outline" href="https://mvgood21.github.io/privacy/image-convert/">이미지 변환 개인정보처리방침</a></div>
-    </section>
-    <ul class="shots" tabindex="0" role="region" aria-label="스크린샷">
-      <li><img src="https://mvgood21.github.io/assets/apps/sugarconvert/shot1-ko.webp" width="360" height="640" loading="lazy" alt="목적별 프리셋과 저장한 프로필을 고르는 홈 화면"></li>
-      <li><img src="https://mvgood21.github.io/assets/apps/sugarconvert/shot2-ko.webp" width="360" height="640" loading="lazy" alt="형식·품질·투명 배경·긴 변을 고르는 변환 옵션 화면"></li>
-      <li><img src="https://mvgood21.github.io/assets/apps/sugarconvert/shot3-ko.webp" width="360" height="640" loading="lazy" alt="원본과 결과를 나란히 확인하는 결과 화면"></li>
-    </ul>
-    <section aria-labelledby="tasks">
-      <h2 id="tasks">이런 때 쓰세요</h2>
-      <ul>
-        <li><a href="https://mvgood21.github.io/apps/image-convert/heic-to-jpg/">갤럭시로 찍은 HEIC 사진을 JPG로 바꿔야 할 때</a></li>
-        <li><a href="https://mvgood21.github.io/apps/image-convert/png-to-jpg/">PNG를 JPG로 바꾸고 투명한 배경을 흰색으로 채우고 싶을 때</a></li>
-        <li>WebP 이미지를 JPG로 바꾸고 싶을 때</li>
-        <li>로고를 투명 배경 PNG로 저장하고 싶을 때</li>
-      </ul>
-    </section>
-    <section aria-labelledby="features">
-      <h2 id="features">이런 일을 해요</h2>
-      <p>제출 사이트가 JPG만 받거나, 로고를 투명 배경 PNG로 넘겨야 하거나, 쇼핑몰에 올릴 사진을 작은 WebP로 만들어야 할 때 써요. 원본 사진은 그대로 두고 결과를 새 파일로 저장해요.</p>
-      <ol class="steps">
-        <li><strong>사진 고르기</strong> — Android 사진 선택 도구나 ‘파일에서 고르기’로 사진을 골라요. 파일에서 고른 사진은 원래 파일 이름에 새 확장자를 붙여 저장해요. 특정 사진만 다른 형식으로 저장하려면 그 사진을 눌러 정해요.</li>
-        <li><strong>형식과 옵션 정하기</strong> — 저장 형식을 고르면 그 형식에 필요한 옵션만 보여요. JPEG는 품질과 투명 부분의 배경색, PNG는 투명도 유지 여부, WebP는 손실·무손실과 품질이에요. 긴 변 축소, 흑백, 파일 이름 규칙도 여기서 정하고 미리보기로 확인해요.</li>
-        <li><strong>확인하고 저장·공유하기</strong> — 원본과 결과를 나란히 보고 저장하거나 공유해요. 저장한 사진은 <code>Pictures/SugarConvert</code> 폴더에 새 파일로 들어가요.</li>
-      </ol>
-      <h3>바로 쓰는 프리셋</h3>
-      <dl>
-        <dt>제출용 JPG</dt>
-        <dd>품질 90, 투명한 부분은 흰색으로 채워요.</dd>
-        <dt>웹용 WebP</dt>
-        <dd>품질 80, 긴 변을 1920 px로 줄여요.</dd>
-        <dt>투명 PNG</dt>
-        <dd>로고·그래픽의 투명도를 그대로 유지해요.</dd>
-        <dt>흑백 JPG</dt>
-        <dd>문서·인쇄용으로 색을 빼요.</dd>
-      </dl>
-      <h3>프로필과 실행 이력</h3>
-      <p>형식·품질·크기·이름 규칙에 이름을 붙여 프로필로 저장하면 홈 화면에서 한 번에 다시 적용할 수 있어요. 프로필은 8개까지 저장해요. 최근 실행 이력(날짜·장수·형식·용량)은 기기 안에만 남고 파일 이름은 기록하지 않아요.</p>
-      <p>한 장이 실패해도 나머지는 계속 처리되고, 실패한 사진만 다시 시도할 수 있어요. 결과 화면은 변환 전후의 실제 파일 크기를 보여 주고, 원본보다 커지면 그것도 알려 줘요.</p>
-    </section>
-    <section class="facts" aria-labelledby="facts-h">
-      <h2 id="facts-h">한눈에 보기</h2>
-      <div class="table-wrap" tabindex="0" role="region" aria-labelledby="facts-h">
-        <table>
-          <tbody>
-            <tr><th scope="row">가격</th><td>무료(광고 포함). Pro는 일회성 인앱 구매로, 광고를 없애고 한 번에 처리하는 장수를 늘려요.</td></tr>
-            <tr><th scope="row">입력 형식</th><td>JPEG, PNG, WebP, HEIC·HEIF. HEIC는 기기가 읽을 수 있을 때만 변환되고, 읽지 못한 사진은 그 장만 실패해요.</td></tr>
-            <tr><th scope="row">출력 형식</th><td>JPEG, PNG, WebP(손실·무손실). 사진마다 다른 형식을 정할 수 있고, 확장자는 실제로 저장한 형식에 맞춰요.</td></tr>
-            <tr><th scope="row">품질</th><td>JPEG와 손실 WebP는 40~100(기본 90). PNG와 무손실 WebP는 품질 설정을 쓰지 않아요.</td></tr>
-            <tr><th scope="row">투명한 부분</th><td>JPEG는 고른 배경색(흰색·검정·회색)으로 채워요. PNG·WebP는 투명도를 유지하거나 색으로 채울 수 있어요.</td></tr>
-            <tr><th scope="row">해상도</th><td>기본은 유지. 긴 변을 1280·1920·2560 px 또는 직접 입력한 값(320~8000 px)으로 줄일 수 있어요. 확대는 하지 않아요.</td></tr>
-            <tr><th scope="row">메타데이터</th><td>위치·카메라 정보(EXIF)는 결과 파일에 복사하지 않아요. 사진 방향은 결과에 반영해요.</td></tr>
-            <tr><th scope="row">한 번에 처리</th><td>무료 20장, Pro 100장</td></tr>
-            <tr><th scope="row">사진 한 장당</th><td>50 MB, 50 MP까지</td></tr>
-            <tr><th scope="row">원본</th><td>수정하지 않아요. 결과는 <code>Pictures/SugarConvert</code>에 새 파일로 저장해요.</td></tr>
-            <tr><th scope="row">업로드</th><td>없음. 변환은 모두 기기 안에서 해요.</td></tr>
-            <tr><th scope="row">필요한 권한</th><td>저장소 권한을 요청하지 않아요. 사진 선택 도구나 파일 선택기에서 고른 사진만 읽어요.</td></tr>
-            <tr><th scope="row">지원 Android</th><td>Android 10 이상</td></tr>
-            <tr><th scope="row">언어</th><td>한국어, 영어</td></tr>
-            <tr><th scope="row">패키지 이름</th><td><code>com.sugarmount.sugarconvert</code></td></tr>
-            <tr><th scope="row">개발자</th><td>simpest (SugarMount)</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-    <section aria-labelledby="data">
-      <h2 id="data">데이터와 권한</h2>
-      <ul>
-        <li>사진, 파일 이름, 결과 파일은 저희 서버나 외부로 전송되지 않아요. 저희는 별도의 서버를 운영하지 않아요.</li>
-        <li>사진 처리에는 인터넷 연결이 필요 없어요. 광고와 Pro 구매는 인터넷이 연결되어 있을 때만 동작해요.</li>
-        <li>저장소 권한을 요청하지 않아요. 사진 선택 도구나 파일 선택기에서 직접 고른 사진만 읽을 수 있어요.</li>
-        <li>계정을 만들지 않아요. 프로필, 실행 이력, 설정은 기기 안에만 저장되고 앱을 삭제하면 함께 지워져요.</li>
-        <li>무료 버전의 광고는 Google AdMob이 표시하고, 광고 SDK가 광고 ID·IP 주소 같은 정보를 Google 정책에 따라 수집할 수 있어요. 필요한 지역에서는 동의 화면이 뜨고, 선택은 설정의 ‘광고 개인정보 선택’에서 바꿀 수 있어요. Pro를 구매하면 광고를 표시하지 않아요.</li>
-        <li>익명 사용 통계(Firebase Analytics)와 오류 보고(Firebase Crashlytics)는 기본으로 켜져 있고, 설정에서 각각 끌 수 있어요. 사진과 파일 이름은 포함되지 않아요.</li>
-      </ul>
-      <p>자세한 내용은 <a href="https://mvgood21.github.io/privacy/image-convert/">이미지 변환 개인정보처리방침</a>에서 확인할 수 있어요.</p>
-    </section>
-    <section aria-labelledby="pro">
-      <h2 id="pro">무료와 Pro</h2>
-      <div class="two-col">
-        <div class="box">
-          <h3>무료</h3>
-          <ul>
-            <li>모든 형식·옵션·프리셋·프로필 사용</li>
-            <li>한 번에 20장까지 처리</li>
-            <li>광고 표시(결과 화면 배너, 전면 광고, 앱 오프닝 광고)</li>
-          </ul>
-        </div>
-        <div class="box">
-          <h3>Pro</h3>
-          <ul>
-            <li>Google Play 일회성 구매, 구독이 아니에요</li>
-            <li>광고 제거</li>
-            <li>한 번에 100장까지 처리</li>
-          </ul>
-        </div>
-      </div>
-      <p class="muted">가격은 Google Play에 표시된 금액을 따라요. 기기를 바꿨다면 설정의 ‘구매 복원’으로 같은 Google 계정의 구매를 다시 적용할 수 있어요.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">할 수 없는 일</h2>
-      <ul>
-        <li>GIF·BMP 파일과 PDF는 변환하지 않아요. 고를 때 제외돼요. 움직이는 WebP 같은 애니메이션 이미지도 변환하지 않고, 그 장만 실패해요.</li>
-        <li>자르기, 회전, 보정 같은 편집은 하지 않아요. 크기는 긴 변을 줄이는 것만 할 수 있고, 사진을 키우지는 않아요.</li>
-        <li>PNG나 무손실 WebP로 저장해도 JPEG 원본에서 이미 잃은 화질은 되살아나지 않고, 파일이 더 커질 수 있어요.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">자주 묻는 질문</h2>
-      <div class="faq">
-        <details>
-          <summary>아이폰에서 받은 HEIC 사진을 JPG로 바꿀 수 있나요?</summary>
-          <div><p>네, 기기가 HEIC를 읽을 수 있으면 JPG로 바꿀 수 있어요. 홈 화면의 ‘제출용 JPG’ 프리셋을 고르면 품질 90의 JPG로 저장해요. 기기가 읽지 못하는 HEIC는 그 장만 실패하고 나머지는 계속 처리돼요.</p></div>
-        </details>
-        <details>
-          <summary>변환한 파일의 이름은 어떻게 되나요?</summary>
-          <div><p>‘파일에서 고르기’로 고른 사진은 원래 파일 이름에 새 확장자를 붙여 저장해요. Android 사진 선택 도구는 파일 이름을 앱에 알려 주지 않아서, 그렇게 고른 사진은 SugarConvert와 저장 시각을 붙인 이름으로 저장돼요.</p></div>
-        </details>
-        <details>
-          <summary>투명 배경 PNG를 JPG로 바꾸면 배경은 어떻게 되나요?</summary>
-          <div><p>JPG는 투명도를 담을 수 없어서, 투명한 부분을 고른 배경색으로 채워요. 기본은 흰색이고 검정이나 회색을 고를 수 있어요. 투명도를 유지하려면 PNG나 WebP로 저장하세요.</p></div>
-        </details>
-        <details>
-          <summary>사진이 서버로 올라가나요?</summary>
-          <div><p>아니요, 사진은 업로드되지 않고 기기 안에서만 변환돼요. 자세한 내용은 <a href="https://mvgood21.github.io/apps/image-convert/#data">데이터와 권한</a>을 보세요.</p></div>
-        </details>
-      </div>
-    </section>
-    <section aria-labelledby="contact">
-      <h2 id="contact">문의</h2>
-      <p>앱이 제대로 동작하지 않거나 궁금한 점이 있으면 이메일로 알려 주세요. 사용 중인 기기 모델과 Android 버전을 함께 적어 주시면 확인에 도움이 돼요.</p>
-      <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a><br>패키지 이름: <code>com.sugarmount.sugarconvert</code></p>
-    </section>
-    <section aria-labelledby="guides-heading">
-      <h2 id="guides-heading">도움말</h2>
-      <ul class="related-links">
-        <li><a href="https://mvgood21.github.io/apps/image-convert/heic-to-jpg/">갤럭시에서 HEIC 사진을 JPG로 바꾸는 법</a></li>
-        <li><a href="https://mvgood21.github.io/apps/image-convert/png-to-jpg/">갤럭시에서 PNG를 JPG로 바꾸는 법, 투명 배경은?</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="ax-app-heading">
-      <h2 id="ax-app-heading">이 앱의 AX 노트</h2>
-      <ul class="related-links">
-        <li><a href="https://mvgood21.github.io/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-gate/">AI가 만든 Android 앱, 출시 전에 무엇을 검사하나: 릴리스 게이트와 R8 크래시</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="releases-heading">
-      <h2 id="releases-heading">최근 업데이트</h2>
-      <ul>
-        <li><strong>1.0.3</strong> · <time datetime="2026-10-04">2026년 10월 4일</time> · &#x27;파일에서 고르기&#x27;를 추가했어요. 이렇게 고른 사진은 원래 파일 이름을 그대로 유지해요.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="related-heading">
-      <h2 id="related-heading">관련 앱</h2>
-      <ul class="related">
-        <li><a href="https://mvgood21.github.io/apps/sugaralbum/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugaralbum/icon.webp" width="56" height="56" alt=""><span>슈가앨범</span></a></li>
-        <li><a href="https://mvgood21.github.io/apps/image-compress/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarcompress/icon.webp" width="56" height="56" alt=""><span>사진 용량 줄이기</span></a></li>
-        <li><a href="https://mvgood21.github.io/apps/image-flip/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarflip/icon.webp" width="56" height="56" alt=""><span>사진 반전·회전</span></a></li>
-      </ul>
-    </section>
-    <p class="meta updated">최종 업데이트 <time datetime="2026-10-18">2026년 10월 18일</time></p>]]></description>
-    <pubDate>Thu, 24 Sep 2026 09:00:00 +0900</pubDate>
   </item>
 </channel>
 </rss>

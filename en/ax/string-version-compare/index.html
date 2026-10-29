@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>&quot;6.7&quot; &lt; &quot;6.11&quot; is false: a version string bug – SugarMount</title>
+  <meta name="description" content="A Korean spelling app compared Remote Config content versions as Kotlin strings, so from 6.10 on, devices stored at 6.2 to 6.9 got no quiz or notice updates.">
+  <link rel="canonical" href="https://mvgood21.github.io/en/ax/string-version-compare/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/string-version-compare/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/string-version-compare/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/string-version-compare/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="&quot;6.7&quot; &lt; &quot;6.11&quot; is false: a version string bug – SugarMount">
+  <meta property="og:description" content="A Korean spelling app compared Remote Config content versions as Kotlin strings, so from 6.10 on, devices stored at 6.2 to 6.9 got no quiz or notice updates.">
+  <meta property="og:url" content="https://mvgood21.github.io/en/ax/string-version-compare/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-string-version-compare-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/en/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=51d09451">
+  <link rel="stylesheet" href="/assets/site.css?v=51d09451">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=51d09451">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/en/ax/string-version-compare/#article","headline":"\"6.7\" < \"6.11\" is false: comparing Remote Config versions as strings froze content updates","description":"A Korean spelling app compared Remote Config content versions as Kotlin strings, so from 6.10 on, devices stored at 6.2 to 6.9 got no quiz or notice updates.","url":"https://mvgood21.github.io/en/ax/string-version-compare/","mainEntityOfPage":"https://mvgood21.github.io/en/ax/string-version-compare/","inLanguage":"en","articleSection":"Android development","datePublished":"2026-10-30T09:00:00+09:00","dateModified":"2026-10-30T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-string-version-compare-en.png","https://mvgood21.github.io/assets/ax/cover/string-version-compare-en.webp","https://mvgood21.github.io/assets/ax/string-version-compare-1-en.webp","https://mvgood21.github.io/assets/ax/string-version-compare-2-en.webp"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why is \"6.7\" < \"6.11\" false in Kotlin?","acceptedAnswer":{"@type":"Answer","text":"String comparison is lexicographic, character by character. At the third character '7' is greater than '1', so \"6.7\" sorts after \"6.11\"."}},{"@type":"Question","name":"Wouldn't bumping the version to 7.0 work with string comparison?","acceptedAnswer":{"@type":"Answer","text":"For now, yes. It breaks again at 7.10, and everyone editing content has to avoid bumps that add a digit."}},{"@type":"Question","name":"When is it safe to turn on Remote Config's force flag?","acceptedAnswer":{"@type":"Answer","text":"Once at least 90% of active users run exactly the app_version string. This app turned it on with low adoption and lost 25% of the day's sessions."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://mvgood21.github.io/en/ax/"},{"@type":"ListItem","position":3,"name":"Android development","item":"https://mvgood21.github.io/en/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"\"6.7\" < \"6.11\" is false: comparing Remote Config versions as strings froze content updates"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=51d09451">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/string-version-compare/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-android">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/android/">Android development</a></li><li><span aria-current="page">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/string-version-compare-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX note · Incident</span>
+      <h1>"6.7" &lt; "6.11" is false: comparing Remote Config versions as strings froze content updates</h1>
+      <p class="lead">Kotlin's string &lt; says "6.7" is greater than "6.11". Once the content version in Remote Config reached 6.10, that comparison stopped updates on every device with 6.2 to 6.9 stored.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Android development</span> <span aria-hidden="true">·</span> <span>11 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-10-30">October 30, 2026</time></p><!-- /build:meta -->
+      <p>The drawer of <a href="/en/apps/sugarspeller/">SugarSpeller</a>, our Korean spelling app, showed content version (6.7/2.2) while production Remote Config held 6.11/2.3. The operator read both numbers off a device on September 25, 2026. The app compared the two versions as strings, so devices with 6.2 to 6.9 stored never received the quiz bank and notice updates sent through <code>info_version</code> after that. A commit at 12:14 the same day (7b997f8) added <code>VersionCompare</code>, which compares each dot-separated part as an integer, plus four unit tests.</p>
+      <p class="note">Sources: the app repository's git history (d5ac5e2, 6d0f4f1, 5f082f8, 71c31ae, a4d5b9a, e9d6b9c, 079feab, 7b997f8, 31c082d, 844c828), CHANGELOG entries 1.6.019 and 1.6.023, the quiz bank review document and the monitoring script, rechecked on 2026-10-29. Remote Config template numbers and project identifiers are left out.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (9)</summary><ol><li><a href="#symptom">The drawer said 6.7; Remote Config said 6.11</a></li><li><a href="#why-silent">With one digit after the dot, both orders agree</a></li><li><a href="#agents">Three agent commits, none of them fixed the content check</a></li><li><a href="#fix">One VersionCompare for both content and app versions</a></li><li><a href="#force">The force flag in the same JSON went on before adoption</a></li><li><a href="#steps">One git grep, a test with the failing values, a check on an old install</a></li><li><a href="#limits">Builds already installed still compare strings</a></li><li><a href="#next">The old rule is still in CLAUDE.md</a></li><li><a href="#faq">FAQ</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#symptom">The drawer said 6.7; Remote Config said 6.11</a></li><li><a href="#why-silent">With one digit after the dot, both orders agree</a></li><li><a href="#agents">Three agent commits, none of them fixed the content check</a></li><li><a href="#fix">One VersionCompare for both content and app versions</a></li><li><a href="#force">The force flag in the same JSON went on before adoption</a></li><li><a href="#steps">One git grep, a test with the failing values, a check on an old install</a></li><li><a href="#limits">Builds already installed still compare strings</a></li><li><a href="#next">The old rule is still in CLAUDE.md</a></li><li><a href="#faq">FAQ</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="symptom">
+      <h2 id="symptom">The drawer said 6.7; Remote Config said 6.11</h2>
+      <p>The app ships its quiz bank, notices and FAQ as one JSON value in Firebase Remote Config (RC below). On the splash screen, <code>ActivityEmpty</code> compares RC's <code>info_version</code> and <code>clip_version</code> with the version stored in the device's Room database. If RC is newer, it deletes the local content and inserts the new set. The (6.7/2.2) at the bottom of the drawer is that stored version.</p>
+      <p>One suspect was the build. Debug builds of this app read the RC of a separate development Firebase project, so a debug build on the device could show numbers that differ from production. Production RC really was 6.11/2.3, which ruled that out and left the comparison code.</p>
+      <pre><code>// ActivityEmpty, just before 7b997f8
+if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
+    repo.setVersion(VersionT(infoVer, clipVer))
+    // delete and re-insert content
+}</code></pre>
+      <p><code>infoVersion</code> is a String field. Kotlin compares strings lexicographically, character by character, so "6.7" and "6.11" first differ at the third character: '7' against '1'. '7' is larger, "6.7" &lt; "6.11" evaluates to false, and the app concluded that RC held the older version.</p>
+      <figure class="ax-fig"><img src="/assets/ax/string-version-compare-1-en.webp" width="1200" height="582" alt="Comparison: the string comparison looks at the third characters 7 and 1, decides 6.7 is larger and skips the update; the per-part integer comparison looks at 7 and 11, treats 6.11 as newer and downloads again." loading="lazy"><figcaption>Compared as strings, 6.7 wins; compared part by part as integers, 6.11 is the newer version.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="why-silent">
+      <h2 id="why-silent">With one digit after the dot, both orders agree</h2>
+      <p>String comparison has been there since the app first connected to Remote Config in 2020. The current form, <code>infoVersion &lt; infoVer</code>, appeared on May 6, 2023 (6d0f4f1), when a commit flipped the comparison to the right direction; the clip condition was added two days later. While the minor part ran from 6.1 to 6.9, lexicographic order and numeric order were the same, and the check always gave the right answer. It broke when RC moved to 6.10. We recomputed what the old expression returns for each stored value:</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Stored on the device</th><th>RC at 6.10</th><th>RC at 6.11</th></tr></thead>
+        <tbody>
+          <tr><td>6.1</td><td>updates</td><td>updates</td></tr>
+          <tr><td>6.2 to 6.9</td><td>skips</td><td>skips</td></tr>
+          <tr><td>6.10</td><td>equal</td><td>updates</td></tr>
+        </tbody>
+      </table></div>
+      <p>"6.1" is a prefix of "6.10", so the shorter string sorts first; 6.2 through 6.9 all win at the third character. From the day RC reached 6.10, a device stuck in that range ignored every <code>info_version</code> bump (unless <code>clip_version</code> also went up). The quiz bank review document also records that notices changed on September 13, 20 and 22 without any change to <code>info_version</code>, which stayed at 6.10. Those three notices reached no existing user, string comparison or not.</p>
+      <p>Fresh installs never showed the bug. On first run there is no stored version row, so the app inserts the RC content without comparing anything and starts on the latest set.</p>
+    </section>
+
+    <section aria-labelledby="agents">
+      <h2 id="agents">Three agent commits, none of them fixed the content check</h2>
+      <p>Counting only the times an agent touched or reasoned about the version check itself, the git history shows three. On August 9, 2025 at 15:32, a commit generated with Claude Code (5f082f8) blamed a "persistent update notice" on the string comparison of <code>app_version</code> and switched major, minor and patch to integer comparison. The app was at 1.5.031, so major and minor were one character each and the string comparison gave the same answer anyway. At 17:51 that day a commit whose message just says "fix" (71c31ae) put the string comparison back. No reason was recorded. Neither commit touched the content version check.</p>
+      <p>On December 11, 2025, an RC sync refactor (a4d5b9a, co-authored by Claude Opus 4.5) added 11 tests (its message says 13). One of them, <code>versionComparison_isCorrect</code>, asserts that "5.0" &lt; "5.1". It uses single-digit values and calls no app code, only Kotlin's String operator, so it passes whatever the production check does. How we find tests that stay green when the guarded code is deleted is in <a href="/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database</a>.</p>
+      <p>On the morning of September 25, 2026, the agent reviewing all 124 quiz items (Claude Opus 5.5) wrote into the publishing steps of its 11:08 commit (e9d6b9c): the splash screen compares versions as strings, so bump <code>info_version</code> to 7.0. Fifteen minutes later the value that went up was 6.11, and the document now said that 6.10 to 6.11 is larger even as a string, so 6.10 users would update. The document still said a 6.9 to 6.10 bump is not recognized, but said nothing about what to do for devices stuck below 6.10. The 11:23 commit (079feab) also added a rule to the project's CLAUDE.md, that a bump which changes the number of digits is not seen as an update, and left the comparison code as it was.</p>
+      <p>Devices below 6.10 surfaced only when the operator put the drawer's 6.7/2.2 next to production RC. The 12:14 fix (7b997f8) was also written by an agent (Claude Fable 5.1), this time after the operator had pointed out that the device and RC values differed. How this incident shows up in the commit messages is covered, along with other cases, in <a href="/en/ax/commit-messages-701/">A year of AI coding in 701 commits</a>.</p>
+      <figure class="ax-fig"><img src="/assets/ax/string-version-compare-2-en.webp" width="1200" height="960" alt="Step diagram: May 2023 the current string comparison lands; Aug 9, 2025 an agent's numeric fix is reverted 2 hours 19 minutes later; Dec 11, 2025 a test with single-digit values only; Sep 25, 2026 at 11:08 a plan to bump to 7.0; at 11:23 6.11 is published instead; at 12:14 VersionCompare and 4 tests." loading="lazy"><figcaption>The current string comparison stayed from May 2023 until 12:14 on September 25, 2026.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="fix">
+      <h2 id="fix">One VersionCompare for both content and app versions</h2>
+      <p>Setting RC to 7.0 would have unblocked 6.x devices for now, since "6.x" &lt; "7.0" is true. It would break again at 7.10, and everyone editing content would have to remember never to make a bump that adds a digit, so we dropped it as a permanent rule.</p>
+      <p>Comparing all three parts as integers, as in August 2025, did not fit either. This app looks only at the major and minor parts of <code>app_version</code> and ignores the patch on purpose; comparing the patch would send every user on an older patch to the store after each patch release. 7b997f8 keeps one function and routes both the content version check and the major/minor checks of <code>app_version</code> through it.</p>
+      <pre><code>object VersionCompare {
+    fun compare(a: String, b: String): Int {
+        val pa = parts(a); val pb = parts(b)
+        for (i in 0 until maxOf(pa.size, pb.size)) {
+            val x = pa.getOrElse(i) { 0 }; val y = pb.getOrElse(i) { 0 }
+            if (x != y) return x.compareTo(y)
+        }
+        return 0
+    }
+    fun isNewer(remote: String, local: String) = compare(remote, local) &gt; 0
+    private fun parts(v: String) = v.trim().split('.').map { it.trim().toIntOrNull() ?: 0 }
+}</code></pre>
+      <p>The four tests in <code>VersionCompareTest</code> cover the values that failed ("6.11" against "6.7"), equal values, parts of different lengths or counts ("1.10.0" against "1.9.9", "6.11" against "6.11.0") and non-numeric input. The first test also asserts that "6.7" &lt; "6.11" is false. 112 unit tests passed at that commit. Do not write a new version check with a string &lt;; that rule is in CLAUDE.md now.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20%226.7%22%20%3C%20%226.11%22%20is%20false%3A%20comparing%20Remote%20Config%20versions%20as%20strings%20froze%20content%20updates">Email us</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="force">
+      <h2 id="force">The force flag in the same JSON went on before adoption</h2>
+      <p>The RC <code>version</code> JSON that holds the content versions also holds <code>app_version</code> and <code>force</code>, and since 7b997f8 the major/minor check of <code>app_version</code> goes through <code>VersionCompare</code> too. The splash screen decides in this order: if the installed version matches <code>app_version</code> character for character, let the user in; otherwise compare major and minor only; finally, if <code>force</code> is true, override the result and show the update dialog.</p>
+      <p>A September 18 commit (31c082d) records that a device with 1.6.017 showed "A new version has been released!", and the code was the first suspect. The real cause was an RC <code>app_version</code> that did not match the shipped version. A patch bump (1.6.017 to 1.6.018) is not rescued by the major/minor check, so the dialog goes away only when the RC value matches the shipped version exactly.</p>
+      <p>On that same September 18, <code>force</code> went on while few users had the new version, and sessions for the day were down 25% five hours later. A September 13 case is left out here: a note written that day corrected an earlier reading as GA4 standard-report lag rather than a lockout, while later documents list it as a lockout again. Since 1.6.019 (September 19), <code>monitor.py --only rc</code> reads the RC <code>version</code> JSON and prints, from GA4 for yesterday and today, the share of active users on exactly the <code>app_version</code> string. If <code>force</code> is true and that share is under 90%, it warns that the rest are stuck behind the splash dialog right now. A separate rollout incident, where a staged percentage went out wrong, is in <a href="/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%</a>.</p>
+    </section>
+
+    <section aria-labelledby="steps">
+      <h2 id="steps">One git grep, a test with the failing values, a check on an old install</h2>
+      <ol>
+        <li>Find lines that compare version-like names with &lt; or &gt;. In your own repository, drop the revision. In ours, with the revision just before 7b997f8 as below, the command finds the two lines in <code>ActivityEmpty</code> (248 and 270) and three lines in the a4d5b9a test (run on 2026-10-29).
+          <pre><code>git grep -nE '[Vv]er[A-Za-z]*(\[[0-9]\])?\s*[&lt;&gt;]=?\s*[A-Za-z.\[]*[Vv]er' 7b997f8^ -- '*.kt' '*.java'</code></pre></li>
+        <li>Move every hit into one function and test it with the values that failed. At minimum: "6.11" against "6.7" and "1.10.0" against "1.9.9".</li>
+        <li>Do not verify on a fresh install. Install the build from before the fix and run it once with RC at 6.9 so the stored version is 6.9. Install the fixed build over it without clearing data, raise RC to 6.10, and check that the stored version shown on screen becomes 6.10. A bump that keeps the digit count, such as 6.15 to 6.16, passes under the old comparison too and proves nothing.</li>
+        <li>When content changes, bump <code>info_version</code>.</li>
+        <li>Before turning <code>force</code> on, check in GA4 the share of active users whose appVersion equals the RC <code>app_version</code>. Under 90%, leave it off.</li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="limits">
+      <h2 id="limits">Builds already installed still compare strings</h2>
+      <p>The comparison runs on the device, so a device that has not updated to the fixed build keeps comparing strings. RC has since gone to 6.12 (October 1), 6.13 (October 9), 6.14 (October 10) and 6.15 (October 24), but on an old build with 6.2 to 6.9 stored, "6.7" &lt; "6.15" is still false.</p>
+      <p>One server-side way to reach those devices is a one-time bump of the RC value to 7.0. On old builds "6.7" &lt; "7.0" is true, and on new builds <code>VersionCompare</code> also sees 7.0 as newer than 6.15, so both paths update. We dropped 7.0 as a permanent rule, but as a one-time migration while old builds remain it is the right tool; after it, bumps should stay within 7.1 to 7.9 until old builds are rare enough. As of October 24 the RC value is 6.15, and there is no record of this app moving to 7.0. Because the old condition is an OR, raising <code>clip_version</code> would also make it true, but we do not know why those devices did not update at clip 2.3, so we do not count that path as a confirmed fix.</p>
+      <p><code>VersionCompare</code> reads any non-numeric part as 0. A typo such as "6.l1" in RC would read as 6.0 and the update would be skipped silently; the test only confirms that "6.7" is newer than "abc" and raises no warning. "6.11" and "6.11.0" count as the same version.</p>
+      <p>For 1.6.023 a release APK on an API 34 emulator showed 6.11/2.3 in the drawer, but the record does not say whether that was a fresh install. If it was, the check never ran. <code>clip_version</code> is an open question too: stored 2.2, RC 2.3. "2.2" &lt; "2.3" is true even as strings and the old condition was an OR, so the clip side should have triggered an update. The history does not say when clip became 2.3, so string comparison alone does not fully explain why this device stayed at 6.7/2.2.</p>
+      <p>Writing the version row before the content was another defect on the same update path. On September 28, on a physical S21, a first run while offline left the quiz bank empty until the next <code>info_version</code>; commit ce024cd now refills the bank when it is empty even if the version matches.</p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">The old rule is still in CLAUDE.md</h2>
+      <p>As of October 29, 2026, lines 206 and 207 of CLAUDE.md at HEAD still say the comparison is a string comparison and a bump that adds a digit is not seen as an update, while line 734 says versions are compared numerically with <code>VersionCompare</code>. An agent reading the first rule could believe the code still compares strings and pick bump values to suit that. The text from "the comparison is a string" on line 206 to the end of line 207 should become the one-time 7.0 migration rule for old builds; the "always bump info_version" rule on lines 205 and 206 stays. <code>versionComparison_isCorrect</code>, which calls no app code, is also still in the test suite; it should either be deleted or call <code>VersionCompare</code>.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20%226.7%22%20%3C%20%226.11%22%20is%20false%3A%20comparing%20Remote%20Config%20versions%20as%20strings%20froze%20content%20updates">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Why is "6.7" &lt; "6.11" false in Kotlin?</summary><div><p>String comparison is lexicographic, character by character. At the third character '7' is greater than '1', so "6.7" sorts after "6.11".</p></div></details>
+        <details><summary>Wouldn't bumping the version to 7.0 work with string comparison?</summary><div><p>For now, yes. It breaks again at 7.10, and everyone editing content has to avoid bumps that add a digit.</p></div></details>
+        <details><summary>When is it safe to turn on Remote Config's force flag?</summary><div><p>Once at least 90% of active users run exactly the app_version string. This app turned it on with low adoption and lost 25% of the day's sessions.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
+        <li><a href="/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
+        <li><a href="/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+      </ul>
+      <p><a href="/en/ax/topic/android/">All notes on Android development</a> · <a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/sitemap/">Site map</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>
