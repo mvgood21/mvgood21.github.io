@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Android assets .gz가 안 열리는 이유 – SugarMount</title>
+  <meta name="description" content="Android assets에 미리 gzip해 넣은 팩 5개는 APK의 deflate보다 18바이트씩 컸고, 이름의 .gz가 빠져 FileNotFoundException까지 났습니다.">
+  <link rel="canonical" href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Android assets .gz가 안 열리는 이유 – SugarMount">
+  <meta property="og:description" content="Android assets에 미리 gzip해 넣은 팩 5개는 APK의 deflate보다 18바이트씩 컸고, 이름의 .gz가 빠져 FileNotFoundException까지 났습니다.">
+  <meta property="og:url" content="https://mvgood21.github.io/ax/android-assets-gz-suffix/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-android-assets-gz-suffix-ko.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=51d09451">
+  <link rel="stylesheet" href="/assets/site.css?v=51d09451">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=51d09451">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/ax/android-assets-gz-suffix/#article","headline":"Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException","description":"Android assets에 미리 gzip해 넣은 팩 5개는 APK의 deflate보다 18바이트씩 컸고, 이름의 .gz가 빠져 FileNotFoundException까지 났습니다.","url":"https://mvgood21.github.io/ax/android-assets-gz-suffix/","mainEntityOfPage":"https://mvgood21.github.io/ax/android-assets-gz-suffix/","inLanguage":"ko","articleSection":"Android 개발","datePublished":"2026-10-31T09:00:00+09:00","dateModified":"2026-10-31T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-android-assets-gz-suffix-ko.png","https://mvgood21.github.io/assets/ax/cover/android-assets-gz-suffix-ko.webp","https://mvgood21.github.io/assets/ax/android-assets-gz-suffix-1-ko.webp","https://mvgood21.github.io/assets/ax/android-assets-gz-suffix-2-ko.webp"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Android assets에 넣은 .gz 파일을 열면 왜 FileNotFoundException이 나나요?","acceptedAnswer":{"@type":"Answer","text":"이 프로젝트 빌드(AGP 9.4.1)가 이름 끝의 .gz를 떼고 내용을 풀어 APK에 넣었기 때문입니다. APK 목록에는 x.pack.gz 대신 압축이 풀린 x.pack 이 있었습니다. 코드는 .gz 없는 이름으로 열고, GZIPInputStream도 빼야 합니다."}},{"@type":"Question","name":"에셋을 미리 gzip하면 APK가 작아지나요?","acceptedAnswer":{"@type":"Answer","text":"텍스트 레벨 팩 1,100판에서는 작아지지 않았습니다. 릴리스 APK의 deflate 결과가 705,144바이트, 미리 gzip한 파일이 705,234바이트로 팩마다 gzip 헤더와 트레일러 18바이트만큼 컸습니다."}},{"@type":"Question","name":"JVM 단위 테스트로 이런 패키징 문제를 잡을 수 있나요?","acceptedAnswer":{"@type":"Answer","text":"이름 규칙 하나는 잡을 수 있습니다. 실제로 AssetManager가 파일을 여는지는 기기나 에뮬레이터에서 앱을 실행해야 확인됩니다."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/"},{"@type":"ListItem","position":2,"name":"AX 노트","item":"https://mvgood21.github.io/ax/"},{"@type":"ListItem","position":3,"name":"Android 개발","item":"https://mvgood21.github.io/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=51d09451">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a class="nav-apps" href="/apps/">앱</a>
+        <a class="nav-ax" href="/ax/" aria-current="page">AX 노트</a>
+        <a class="nav-about" href="/about/">소개</a>
+        <a class="nav-privacy" href="/privacy/">개인정보처리방침</a>
+      </nav>
+      <a class="lang" href="/en/ax/android-assets-gz-suffix/" lang="en" hreflang="en">English</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>메뉴</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="전체 메뉴">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">닫기</button>
+      <p class="menu-title" id="m-photo">사진·영상</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>슈가앨범</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 용량 줄이기</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 반전·회전</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>이미지 변환 JPG·PNG·WebP</span></a></li></ul>
+      <p class="menu-title" id="m-document">문서·글</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글 띄어쓰기</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글뷰어 슈가독</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">생활</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>생생카드</span></a></li></ul>
+      <p class="menu-title" id="m-games">게임</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>화살표 매듭풀기</span></a></li><li><a class="app-tile" data-app="blocks" href="/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한판블록</span></a></li></ul>
+      <p><a href="/apps/">모든 앱 보기</a></p>
+      <ul class="menu-links"><li><a href="/ax/" aria-current="page">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-android">
+    <nav class="crumbs" aria-label="이동 경로"><ol><li><a href="/">SugarMount</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/ax/topic/android/">Android 개발</a></li><li><span aria-current="page">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/android-assets-gz-suffix-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX 노트 · 측정</span>
+      <h1>Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</h1>
+      <p class="lead">미리 gzip한 레벨 팩은 APK 안 압축본보다 팩마다 18바이트 컸습니다. 이름 끝의 .gz는 빌드에서 빠져 기기에서 열리지도 않았습니다.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/about/">작성 SugarMount</a> <span aria-hidden="true">·</span> <span>Android 개발</span> <span aria-hidden="true">·</span> <span>읽는 시간 9분</span> <span aria-hidden="true">·</span> 최종 업데이트 <time datetime="2026-10-31">2026년 10월 31일</time></p><!-- /build:meta -->
+      <p>미리 gzip해 둔 레벨 팩 5개는 합계 705,234바이트였고, 같은 팩을 평문으로 넣은 릴리스 APK 안의 압축 크기는 705,144바이트였습니다. 설계 단계에서 gzip을 고른 근거 "4.4배"는 원본과 gz를 비교한 숫자였고, APK가 스스로 압축한 결과와는 비교하지 않았습니다. 이 결정은 2026년 10월 3일 22시 28분, <a href="/apps/arrow-knots/">화살표 매듭풀기</a>의 1,000레벨 개편 빌드가 S21에서 실행 직후 <code>FileNotFoundException</code>으로 죽으면서 드러났습니다. 같은 팩을 읽는 JVM 테스트는 모두 통과한 상태였습니다.</p>
+      <p class="note">근거는 게임 저장소의 git 기록(f5b50c0, e3c7781, 4d46413), 같은 날 에이전트 세션 기록에 남은 몽키 로그와 APK 목록, 2026년 10월 28일에 만든 릴리스·디버그 APK의 압축 크기(Python zipfile로 읽음)입니다. 기준일은 2026년 10월 30일입니다.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>목차 (9)</summary><ol><li><a href="#size">gz 705,234바이트 대 APK 안 705,144바이트</a></li><li><a href="#wrong-pair">설계의 4.4배는 원본과 gz를 비교했습니다</a></li><li><a href="#apk-list">APK 목록에는 arrows-p1.pack만 있었습니다</a></li><li><a href="#why-green">테스트는 앱과 다른 함수로 같은 파일을 열었습니다</a></li><li><a href="#fix">평문 팩으로 바꿨고, 확장자 우회는 얻는 게 없습니다</a></li><li><a href="#test-limits">19줄 이름 검사가 보지 않는 폴더와 모듈</a></li><li><a href="#how-to">내 APK에서 assets 이름과 크기를 확인하는 순서</a></li><li><a href="#next">남은 일: 명세에 남은 .pack.gz</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">목차</p><ol><li><a href="#size">gz 705,234바이트 대 APK 안 705,144바이트</a></li><li><a href="#wrong-pair">설계의 4.4배는 원본과 gz를 비교했습니다</a></li><li><a href="#apk-list">APK 목록에는 arrows-p1.pack만 있었습니다</a></li><li><a href="#why-green">테스트는 앱과 다른 함수로 같은 파일을 열었습니다</a></li><li><a href="#fix">평문 팩으로 바꿨고, 확장자 우회는 얻는 게 없습니다</a></li><li><a href="#test-limits">19줄 이름 검사가 보지 않는 폴더와 모듈</a></li><li><a href="#how-to">내 APK에서 assets 이름과 크기를 확인하는 순서</a></li><li><a href="#next">남은 일: 명세에 남은 .pack.gz</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="size">
+      <h2 id="size">gz 705,234바이트 대 APK 안 705,144바이트</h2>
+      <p>2026년 10월 28일에 만든 릴리스 APK를 열어 레벨 팩 5개의 원본 크기와 압축 크기를 읽고, 커밋 4d46413 직전까지 저장소에 있던 <code>.gz</code> 파일 크기와 나란히 놓았습니다. 팩 내용은 4d46413 이후 바뀌지 않았고, 옛 <code>.gz</code>를 풀면 SHA-1이 평문 팩과 같으니 같은 바이트를 비교한 것입니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>팩</th><th>원본</th><th>옛 .gz 파일</th><th>릴리스 APK 안 압축</th><th>차이</th></tr></thead>
+        <tbody>
+          <tr><td>p1 (1~200)</td><td>122,966</td><td>25,896</td><td>25,878</td><td>18</td></tr>
+          <tr><td>p2 (201~500)</td><td>524,852</td><td>111,113</td><td>111,095</td><td>18</td></tr>
+          <tr><td>p3 (501~700)</td><td>679,344</td><td>147,461</td><td>147,443</td><td>18</td></tr>
+          <tr><td>p4 (701~1000)</td><td>1,397,319</td><td>310,108</td><td>310,090</td><td>18</td></tr>
+          <tr><td>endless (1001~1100)</td><td>492,814</td><td>110,656</td><td>110,638</td><td>18</td></tr>
+          <tr><td>합계</td><td>3,217,295</td><td>705,234</td><td>705,144</td><td>90</td></tr>
+        </tbody>
+      </table></div>
+      <p>다섯 팩 모두 차이가 정확히 18바이트입니다. gzip 파일은 deflate 데이터 앞에 10바이트 헤더, 뒤에 8바이트 트레일러(CRC32와 원본 길이)를 붙이니, 압축된 본문 크기는 같고 차이는 gzip 포장뿐입니다. 텍스트 에셋은 미리 gzip하지 마십시오.</p>
+      <figure class="ax-fig"><img src="/assets/ax/android-assets-gz-suffix-1-ko.webp" width="1200" height="544" alt="막대그래프: 레벨 팩 5개의 원본은 3,217,295바이트, 디버그 APK 안 압축 크기는 1,195,288바이트, 옛 gz 파일은 705,234바이트, 릴리스 APK 안 압축 크기는 705,144바이트." loading="lazy"><figcaption>릴리스 APK의 deflate만으로 미리 gzip한 파일보다 90바이트 작았습니다.</figcaption></figure>
+      <p>같은 팩이 디버그 APK에서는 1,195,288바이트로, 릴리스의 약 1.7배였습니다. 이 차이의 원인은 확인하지 않았습니다. 에셋 크기를 비교할 때는 릴리스 APK를 여십시오.</p>
+    </section>
+
+    <section aria-labelledby="wrong-pair">
+      <h2 id="wrong-pair">설계의 4.4배는 원본과 gz를 비교했습니다</h2>
+      <p>gzip을 고른 근거는 그날 오후 에이전트가 쓴 설계안의 한 줄이었습니다. "300레벨이 원본 535KB, gz 121KB(4.4배)"라고 적고, 1,000레벨이면 gz로 0.7~0.85MB가 된다고 추정했습니다. 원본 크기는 APK에 그대로 실리지 않으니(평문 팩도 deflate로 줄여 넣습니다), 비교할 짝은 gz 파일과 APK가 압축한 평문 팩입니다.</p>
+      <p>이 형식은 17시 18분에 커밋된 개편 명세(f5b50c0)에 들어갔습니다. 커밋 본문에 따르면 에이전트 24개의 교차 검증을 거친 문서이고, 팩을 <code>.pack.gz</code>로 두고 <code>GZIPInputStream</code>으로 읽으라고 적었습니다. 18시 32분에는 커밋 e3c7781이 팩 다섯 개를 이 형식으로 만들었습니다. 이 커밋을 포함해 구현·리뷰·병합을 맡은 에이전트 41개의 워크플로가 22시 27분에 "실패 없음"으로 끝났습니다. 그 '완료'가 JVM 테스트와 디버그 빌드 기준이었던 사정은 <a href="/ax/parallel-agent-workstreams/">'에이전트 수백 개 써도 돼'의 실제</a>에 적어 두었습니다.</p>
+    </section>
+
+    <section aria-labelledby="apk-list">
+      <h2 id="apk-list">APK 목록에는 arrows-p1.pack만 있었습니다</h2>
+      <p>크래시를 처음 잡은 것은 운영자가 첫 요청에 "S21에 설치해서 E2E 테스트까지"를 넣어 둔 덕에 돌린 신규 설치 몽키 테스트였습니다. 앱 데이터를 지우고 시드 7, 21, 99로 무작위 입력 800회를 넣는 스크립트인데, 시드 7과 21에서 각각 fatal 2건이 나왔고 기록에 남은 로그는 모두 같았습니다.</p>
+      <pre><code>E AndroidRuntime: java.lang.RuntimeException: Unable to start activity
+  ComponentInfo{…/sugar.arrows.MainActivity}:
+  java.io.FileNotFoundException: arrows-p1.pack.gz</code></pre>
+      <p>30초 뒤 에이전트가 디버그 APK의 assets 목록을 열었습니다. 소스 폴더의 <code>arrows-p1.pack.gz</code>는 25,896바이트였고, APK에는 122,966바이트의 <code>assets/arrows-p1.pack</code>이 있었습니다. 팩 다섯 개가 모두 이름에서 <code>.gz</code>가 빠지고 압축이 풀린 크기로 들어 있더군요. 커밋 메시지는 이 동작을 aapt가 한다고 적었습니다.</p>
+      <figure class="ax-fig"><img src="/assets/ax/android-assets-gz-suffix-2-ko.webp" width="1200" height="970" alt="단계 그림: 10월 3일 17:18 명세가 .pack.gz와 GZIPInputStream을 정함, 18:32 팩 5개 생성, 22:27 에이전트 41개 워크플로가 실패 없이 끝남, 22:28 S21 몽키에서 FileNotFoundException, 22:29 이름 검사 테스트 빨간불, 22:31 커밋 4d46413, 22:34 몽키 시드 3개 fatal 0." loading="lazy"><figcaption>JVM 테스트가 모두 통과한 빌드가 첫 실기기 실행에서 죽었고, 고치는 데 3분 반이 걸렸습니다.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="why-green">
+      <h2 id="why-green">테스트는 앱과 다른 함수로 같은 파일을 열었습니다</h2>
+      <p>앱과 테스트는 팩을 읽는 클래스 <code>PackStore</code>를 함께 쓰지만, 파일을 여는 함수는 따로 넣었습니다. <code>MainActivity</code>는 <code>PackStore(open = assets::open)</code>이고, <code>ProgressTest</code>는 <code>PackStore(open = { FileInputStream(File(ASSETS, it)) })</code>이며 <code>ASSETS</code>는 <code>src/main/assets</code>입니다. 테스트는 저장소의 파일을 그대로 읽으니 <code>.gz</code> 이름도 gzip 내용도 그대로 보입니다. 생성기 모듈의 테스트 헬퍼 <code>Shipped</code>에는 "앱과 도구가 읽는 방식으로 읽는다"는 주석까지 붙어 있었는데, 앱이 실제로 읽는 길은 AssetManager였습니다.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20Android%20assets%EB%A5%BC%20%EB%AF%B8%EB%A6%AC%20gzip%ED%95%9C%20%EC%8B%A4%EC%B8%A1%3A%20APK%20%EC%9D%B4%EB%93%9D%EC%9D%80%200%2C%20.pack.gz%EB%8A%94%20.pack%EC%9D%B4%20%EB%90%98%EC%96%B4%20FileNotFoundException">메일로 문의하기</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="fix">
+      <h2 id="fix">평문 팩으로 바꿨고, 확장자 우회는 얻는 게 없습니다</h2>
+      <p>22시 31분 커밋 4d46413은 팩을 풀어 평문 <code>.pack</code>으로 바꾸고, <code>Levels.kt</code>가 <code>GZIPInputStream</code> 없이 파일을 읽게 했습니다. 생성기의 <code>writeGz</code>는 평문을 쓰는 <code>writePack</code>이 됐습니다. 앱이 쓰지 않던 옛 팩 <code>arrows-v2.pack</code>(534,864바이트)도 지우고, 그 팩을 읽던 테스트 두 개를 새 팩으로 옮겼습니다. 커밋 직전 테스트 256개(엔진 83, 생성기 40, 앱 133)가 통과했고, 22시 34분 다시 설치한 S21에서 몽키 시드 3개가 모두 fatal 0이었으며 튜토리얼을 지나 1레벨까지 들어갔습니다.</p>
+      <p>다른 길도 두 가지 있습니다. 확장자를 다른 이름으로 바꾸면 빌드가 이름을 건드리지 않으니 gzip을 지킬 수 있습니다. 그러나 위 표대로 얻는 크기가 없고, 남는 것은 <code>GZIPInputStream</code>과 같은 바이트를 만들려고 넣은 mtime 0 헤더 처리입니다. 소스는 <code>.gz</code>로 두고 앱만 <code>.pack</code>을 열게 고치는 방법은 기기에서는 동작하지만, 테스트가 계속 앱과 다른 이름과 형식을 읽습니다. 이번 사고의 원인을 그대로 두는 길입니다. 두 대안은 저장소에서 시도한 기록이 없고, 이 비교는 글을 쓰며 한 판단입니다.</p>
+    </section>
+
+    <section aria-labelledby="test-limits">
+      <h2 id="test-limits">19줄 이름 검사가 보지 않는 폴더와 모듈</h2>
+      <p>4d46413이 붙인 <code>AssetNamesTest</code>의 본문은 두 문장입니다. 고치기 전에 먼저 돌려 22시 29분에 <code>no asset name ends in gz FAILED</code>를 확인했습니다.</p>
+      <pre><code>val gz = File("src/main/assets").listFiles().orEmpty().map { it.name }.filter { it.endsWith(".gz") }
+assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
+      <p><code>listFiles()</code>는 하위 폴더를 내려가지 않으니 <code>assets/levels/x.gz</code> 같은 파일은 지나갑니다. <code>src/debug/assets</code> 같은 다른 소스 세트와, 같은 저장소의 다른 앱 모듈 assets도 검사 밖입니다. 메시지의 "on install"도 정확하지 않습니다. 설치하기 전 APK 목록에 이미 <code>.pack</code>이 있었으니 이름이 바뀌는 때는 빌드입니다. AGP 9.4.1의 어느 단계가 이 일을 하는지는 확인하지 않았습니다. 크기 측정도 텍스트 팩 1,100판에서만 했으므로, deflate가 줄이지 못하는 파일은 이 결론 밖에 있습니다.</p>
+    </section>
+
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">내 APK에서 assets 이름과 크기를 확인하는 순서</h2>
+      <ol>
+        <li>릴리스 APK의 목록과 소스 폴더를 나란히 봅니다: <code>unzip -l app-release.apk | grep assets/</code>, <code>ls src/main/assets</code>. 이름과 개수가 다르면 그 파일을 여는 코드부터 찾습니다.</li>
+        <li>이름이 <code>.gz</code>로 끝나는 에셋이 있으면 실패하는 JVM 테스트를 붙이고, 고치기 전에 빨간불을 먼저 봅니다. 하위 폴더가 있으면 <code>walkTopDown()</code>을 씁니다.</li>
+        <li>미리 압축할지는 릴리스 APK 안의 압축 크기로 정합니다. Python이면 <code>zipfile.ZipFile(apk).infolist()</code>의 <code>compress_size</code>를 더해 gz 파일 크기와 비교합니다.</li>
+        <li>앱 데이터를 지운 신규 설치 상태로 실기기에서 첫 화면을 엽니다. 스크립트는 <a href="/ax/fresh-install-monkey-test/">신규 설치 몽키 테스트</a> 글에 있습니다.</li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">남은 일: 명세에 남은 .pack.gz</h2>
+      <p>개편 명세 docs/09-parts-1000-spec.md는 2026년 10월 29일 HEAD(2310d1f)에도 <code>.pack.gz</code>를 네 줄(다섯 군데)에 적고 있고, 읽기 방법도 <code>GZIPInputStream</code>으로 남아 있습니다. 평문을 읽는 헬퍼 이름은 아직 <code>Shipped.gzLines</code>입니다. 명세를 고치는 김에 <code>AssetNamesTest</code>의 검사 범위도 정합니다.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20Android%20assets%EB%A5%BC%20%EB%AF%B8%EB%A6%AC%20gzip%ED%95%9C%20%EC%8B%A4%EC%B8%A1%3A%20APK%20%EC%9D%B4%EB%93%9D%EC%9D%80%200%2C%20.pack.gz%EB%8A%94%20.pack%EC%9D%B4%20%EB%90%98%EC%96%B4%20FileNotFoundException">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>Android assets에 넣은 .gz 파일을 열면 왜 FileNotFoundException이 나나요?</summary><div><p>이 프로젝트 빌드(AGP 9.4.1)가 이름 끝의 .gz를 떼고 내용을 풀어 APK에 넣었기 때문입니다. APK 목록에는 <code>x.pack.gz</code> 대신 압축이 풀린 <code>x.pack</code>이 있었습니다. 코드는 .gz 없는 이름으로 열고, GZIPInputStream도 빼야 합니다.</p></div></details>
+        <details><summary>에셋을 미리 gzip하면 APK가 작아지나요?</summary><div><p>텍스트 레벨 팩 1,100판에서는 작아지지 않았습니다. 릴리스 APK의 deflate 결과가 705,144바이트, 미리 gzip한 파일이 705,234바이트로 팩마다 gzip 헤더와 트레일러 18바이트만큼 컸습니다.</p></div></details>
+        <details><summary>JVM 단위 테스트로 이런 패키징 문제를 잡을 수 있나요?</summary><div><p>이름 규칙 하나는 잡을 수 있습니다. 실제로 AssetManager가 파일을 여는지는 기기나 에뮬레이터에서 앱을 실행해야 확인됩니다.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
+        <li><a href="/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
+        <li><a href="/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
+        <li><a href="/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+      </ul>
+      <p><a href="/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="/ax/">AX 노트 전체 보기</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>한 가지 일을 간단하게 하는 Android 앱</p>
+        <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">앱</p>
+        <ul><li><a href="/apps/sugaralbum/">슈가앨범</a></li><li><a href="/apps/image-compress/">사진 용량 줄이기</a></li><li><a href="/apps/image-flip/">사진 반전·회전</a></li><li><a href="/apps/image-convert/">이미지 변환 JPG·PNG·WebP</a></li><li><a href="/apps/sugarspeller/">한글 띄어쓰기</a></li><li><a href="/apps/sugarclip/">SugarClip</a></li><li><a href="/apps/doc-viewer/">한글뷰어 슈가독</a></li><li><a href="/apps/sugarcard/">생생카드</a></li><li><a href="/apps/arrow-knots/">화살표 매듭풀기</a></li><li><a href="/apps/blocks/">한판블록</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">사이트</p>
+        <ul><li><a href="/apps/">모든 앱</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li><li><a href="/sitemap/">사이트맵</a></li><li><a href="/rss.xml">RSS 피드</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play 개발자 페이지</a></div>
+    </div>
+  </footer>
+</body>
+</html>

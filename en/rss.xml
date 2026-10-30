@@ -6,7 +6,286 @@
   <description>Small Android apps that each do one thing simply, from shrinking photos and opening Korean HWP documents to checking Korean spelling and playing puzzle games.</description>
   <language>en</language>
   <atom:link href="https://mvgood21.github.io/en/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Fri, 30 Oct 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Sat, 31 Oct 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Our .gz Android assets hit FileNotFoundException – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/android-assets-gz-suffix/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/android-assets-gz-suffix/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/android-assets-gz-suffix-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Measurement</span>
+      <h1>Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</h1>
+      <p class="lead">Our pre-gzipped level packs were each 18 bytes larger than the APK's own compressed copies, and the build dropped the trailing .gz, so the files could not be opened on the device.</p>
+      <p>The five pre-gzipped level packs totaled 705,234 bytes. The same packs shipped as plain text take 705,144 bytes compressed inside the release APK. The "4.4×" that justified gzip at design time compared raw files with gz files; the draft never compared gz with what the APK does on its own. The choice surfaced at 22:28 on October 3, 2026 (KST), when the 1,000-level update of <a href="https://mvgood21.github.io/en/apps/arrow-knots/">Arrow Knots</a> died with <code>FileNotFoundException</code> right after launch on our S21. Every JVM test that read the same packs had passed.</p>
+      <p class="note">Sources: the game repository's git history (f5b50c0, e3c7781, 4d46413), the monkey log and APK listing in that day's agent session record, and compressed sizes read with Python's zipfile from the release and debug APKs built on October 28, 2026. Checked October 30, 2026.</p>
+    </section>
+    <section aria-labelledby="size">
+      <h2 id="size">705,234 bytes as gz files, 705,144 inside the APK</h2>
+      <p>We opened the release APK built on October 28, 2026, read the raw and compressed size of each of the five level packs, and set them next to the <code>.gz</code> files the repository held until commit 4d46413. The pack contents haven't changed since 4d46413, and each old <code>.gz</code>, decompressed, has the same SHA-1 as its plain pack, so these are the same bytes.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Pack</th><th>Raw</th><th>Old .gz file</th><th>Compressed in release APK</th><th>Difference</th></tr></thead>
+        <tbody>
+          <tr><td>p1 (1-200)</td><td>122,966</td><td>25,896</td><td>25,878</td><td>18</td></tr>
+          <tr><td>p2 (201-500)</td><td>524,852</td><td>111,113</td><td>111,095</td><td>18</td></tr>
+          <tr><td>p3 (501-700)</td><td>679,344</td><td>147,461</td><td>147,443</td><td>18</td></tr>
+          <tr><td>p4 (701-1000)</td><td>1,397,319</td><td>310,108</td><td>310,090</td><td>18</td></tr>
+          <tr><td>endless (1001-1100)</td><td>492,814</td><td>110,656</td><td>110,638</td><td>18</td></tr>
+          <tr><td>Total</td><td>3,217,295</td><td>705,234</td><td>705,144</td><td>90</td></tr>
+        </tbody>
+      </table></div>
+      <p>Every pack differs by exactly 18 bytes. A gzip file wraps deflate data in a 10-byte header and an 8-byte trailer (CRC32 and original length), so the compressed bodies are the same size and the gap is the gzip wrapper. Don't pre-gzip text assets.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/android-assets-gz-suffix-1-en.webp" width="1200" height="596" alt="Bar chart: the five level packs are 3,217,295 bytes raw, 1,195,288 bytes compressed in the debug APK, 705,234 bytes as the old gz files, and 705,144 bytes compressed in the release APK." loading="lazy"><figcaption>The release APK's deflate alone came out 90 bytes smaller than the pre-gzipped files.</figcaption></figure>
+      <p>In the debug APK the same packs take 1,195,288 bytes, about 1.7 times the release figure. We haven't checked why. Measure asset sizes in a release APK.</p>
+    </section>
+    <section aria-labelledby="wrong-pair">
+      <h2 id="wrong-pair">The design's 4.4× compared the wrong pair</h2>
+      <p>The case for gzip was one line in a design draft an agent wrote that afternoon: "300 levels = 535 KB raw / 121 KB gz (4.4×)", with an estimate of 0.7 to 0.85 MB gzipped for 1,000 levels. Raw sizes never ship, since the APK compresses the plain packs too. The pair to compare was the gz files against the plain packs as the APK compresses them.</p>
+      <p>The format went into the update spec committed at 17:18 (f5b50c0). Its commit message says 24 agents cross-checked it. It put the packs in assets as <code>.pack.gz</code> and had the app read them with <code>GZIPInputStream</code>. At 18:32 commit e3c7781 generated the five packs in that format. That commit was part of a 41-agent workflow (implementation, review and merges) that finished at 22:27 with "none failed". Why that "done" meant JVM tests and a debug build is covered in <a href="https://mvgood21.github.io/en/ax/parallel-agent-workstreams/">"Use hundreds of agents" in practice</a>.</p>
+    </section>
+    <section aria-labelledby="apk-list">
+      <h2 id="apk-list">The APK listing had only arrows-p1.pack</h2>
+      <p>The fresh-install monkey test caught it first; it ran because the operator's first request said to install on the S21 and run E2E. The script clears app data and sends 800 random events with seeds 7, 21 and 99. Seeds 7 and 21 each logged two fatal exceptions, and every one that made it into the log had the same message:</p>
+      <pre><code>E AndroidRuntime: java.lang.RuntimeException: Unable to start activity
+  ComponentInfo{…/sugar.arrows.MainActivity}:
+  java.io.FileNotFoundException: arrows-p1.pack.gz</code></pre>
+      <p>Thirty seconds later the agent listed the assets inside the debug APK. The source folder had <code>arrows-p1.pack.gz</code> at 25,896 bytes; the APK had <code>assets/arrows-p1.pack</code> at 122,966 bytes. All five packs looked like that: no <code>.gz</code> in the name, stored at their decompressed size. The commit message attributes this to aapt.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/android-assets-gz-suffix-2-en.webp" width="1200" height="1058" alt="Step diagram for October 3: at 17:18 the spec picks .pack.gz and GZIPInputStream, at 18:32 five packs are generated, at 22:27 the 41-agent workflow finishes with no failures, at 22:28 the S21 monkey run hits FileNotFoundException, at 22:29 the name test goes red, at 22:31 commit 4d46413, at 22:34 three monkey seeds show 0 fatal." loading="lazy"><figcaption>A build with every JVM test green died on its first real-device launch; the fix took three and a half minutes.</figcaption></figure>
+    </section>
+    <section aria-labelledby="why-green">
+      <h2 id="why-green">The tests opened the same files through a different function</h2>
+      <p>The app and the tests share <code>PackStore</code>, the class that reads packs, but each passes in its own way to open a file. <code>MainActivity</code> uses <code>PackStore(open = assets::open)</code>. <code>ProgressTest</code> uses <code>PackStore(open = { FileInputStream(File(ASSETS, it)) })</code>, where <code>ASSETS</code> is <code>src/main/assets</code>. The tests read the repository files as they are, so they see the <code>.gz</code> name and the gzip bytes. The generator module's test helper <code>Shipped</code> even carried the comment "read the way the app and tools read them". The app reads through AssetManager.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Pre-gzipping%20Android%20assets%2C%20measured%3A%20zero%20APK%20savings%2C%20and%20.pack.gz%20became%20.pack%20with%20a%20FileNotFoundException">Email us</a></p></aside>
+    <section aria-labelledby="fix">
+      <h2 id="fix">Plain packs, and what renaming the extension would have kept</h2>
+      <p>At 22:31, 4d46413 decompressed the packs into plain <code>.pack</code> files and removed <code>GZIPInputStream</code> from <code>Levels.kt</code>. The generator's <code>writeGz</code> became <code>writePack</code>, which writes text. The same commit deleted <code>arrows-v2.pack</code> (534,864 bytes), an old pack the app no longer read; two tests still did, and were moved to the new packs. Before the commit, 256 tests passed (engine 83, generator 40, app 133). At 22:34 the reinstalled app on the S21 had 0 fatal exceptions on all three monkey seeds and got through the tutorial to level 1.</p>
+      <p>Two other fixes were possible. Renaming the extension to something else would keep the build away from the name, so gzip could stay. But the table shows there is no size to gain, and all that would remain is <code>GZIPInputStream</code> plus the mtime-0 header the generator wrote to keep builds byte-identical. Keeping <code>.gz</code> in the source and having only the app open <code>.pack</code> would work on a device, but the tests would go on reading a different name and format than the app, which is how this crash got through. Neither alternative was tried in the repository; this comparison is our judgment while writing the note.</p>
+    </section>
+    <section aria-labelledby="test-limits">
+      <h2 id="test-limits">What the 19-line name test doesn't look at</h2>
+      <p>The body of <code>AssetNamesTest</code>, added in 4d46413, is two statements. It was run before the fix and failed at 22:29 with <code>no asset name ends in gz FAILED</code>.</p>
+      <pre><code>val gz = File("src/main/assets").listFiles().orEmpty().map { it.name }.filter { it.endsWith(".gz") }
+assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
+      <p><code>listFiles()</code> doesn't descend into subfolders, so a file like <code>assets/levels/x.gz</code> slips past. Other source sets such as <code>src/debug/assets</code>, and the assets of the other app module in the same repository, aren't checked either. The "on install" in the message is also wrong: the APK listing showed <code>.pack</code> before anything was installed, so the rename happens at build time. We haven't confirmed which step of AGP 9.4.1 does it. The size result comes from 1,100 levels of text packs only; files that deflate can't shrink are outside it.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Checking asset names and sizes in your own APK</h2>
+      <ol>
+        <li>Put the release APK listing next to the source folder: <code>unzip -l app-release.apk | grep assets/</code> and <code>ls src/main/assets</code>. If names or counts differ, find the code that opens those files.</li>
+        <li>Add a JVM test that fails on any asset name ending in <code>.gz</code>, and watch it fail before you fix anything. If you have subfolders, use <code>walkTopDown()</code>.</li>
+        <li>Decide whether to pre-compress from the compressed sizes inside the release APK. In Python, add up <code>compress_size</code> over <code>zipfile.ZipFile(apk).infolist()</code> and compare with your gz files.</li>
+        <li>Open the first screen on a real device from a fresh install with app data cleared. The script is in <a href="https://mvgood21.github.io/en/ax/fresh-install-monkey-test/">the fresh-install monkey test note</a>.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Still to do: .pack.gz left in the spec</h2>
+      <p>As of HEAD on October 29, 2026 (2310d1f), the update spec docs/09-parts-1000-spec.md still names <code>.pack.gz</code> five times, on four lines, and still says the packs are read with <code>GZIPInputStream</code>. The helper that reads the plain packs is still called <code>Shipped.gzLines</code>. When the spec gets fixed, we'll also decide how far <code>AssetNamesTest</code> should look.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Pre-gzipping%20Android%20assets%2C%20measured%3A%20zero%20APK%20savings%2C%20and%20.pack.gz%20became%20.pack%20with%20a%20FileNotFoundException">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Why does opening a .gz file from Android assets throw FileNotFoundException?</summary><div><p>Because this project's build (AGP 9.4.1) dropped the trailing .gz and stored the file decompressed: the APK listing showed a decompressed <code>x.pack</code> instead of <code>x.pack.gz</code>. Open the name without .gz and drop GZIPInputStream.</p></div></details>
+        <details><summary>Does pre-gzipping assets make the APK smaller?</summary><div><p>Not for our 1,100 levels of text packs. The release APK's deflate came to 705,144 bytes; the pre-gzipped files were 705,234 bytes, larger by the 18-byte gzip header and trailer per pack.</p></div></details>
+        <details><summary>Can a JVM unit test catch this kind of packaging problem?</summary><div><p>It can enforce the naming rule. Whether AssetManager actually opens the file is only confirmed by running the app on a device or emulator.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Sat, 31 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>market:// store chooser on SKT-sold Samsung phones – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/market-uri-store-chooser/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/market-uri-store-chooser/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/market-uri-store-chooser-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX note · How-to</span>
+      <h1>A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</h1>
+      <p class="lead">On two Samsung phones sold by SKT in Korea (Galaxy S21 and S20), three store apps answer a market:// link. Pointing the intent at the Play Store app first skips the chooser and opens the Play listing.</p>
+      <p>On a Galaxy S21, tapping a store link in our app's drawer brought up a sheet asking whether to open ONE store (a Korean app store), Galaxy Store (Samsung's store) or Play, instead of the Play listing. It was October 9, 2026, and we were tapping through commit efc0acf, which added a menu of our puzzle games to the drawer of <a href="https://mvgood21.github.io/en/apps/sugarspeller/">SugarSpeller</a>, on the S21. All 300 unit tests had already passed. Fifty-nine minutes later, commit 8bbe179 changed the store link to target Play first.</p>
+      <p class="note">Sources: the SugarSpeller repository's git history (f6ef50e, efc0acf, 8bbe179, b6cda27), CHANGELOG entry 1.6.026, the monitoring log (WATCH.md, Oct 23), and adb queries we ran again on a Galaxy S21 and S20 on 2026-10-30.</p>
+    </section>
+    <section aria-labelledby="three-handlers">
+      <h2 id="three-handlers">Three store apps answer one market:// link</h2>
+      <p>On October 30 we asked two SKT-sold phones which apps handle <code>market://details?id=…</code>. A Galaxy S21 on Android 15 and a Galaxy S20 on Android 13 both listed three: Play, Galaxy Store and ONE store, each with isDefault=true, meaning its filter accepts implicit intents (it declares CATEGORY_DEFAULT). When such an intent has more than one candidate and no default app is set, Android asks the user to choose.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/market-uri-store-chooser-1-en.webp" width="1200" height="612" alt="Comparison: with no target app, a market:// link on the S21 has three store candidates and shows a chooser; with the Play package set there is one candidate and the Play listing opens directly." loading="lazy"><figcaption>Setting the Play package cuts the candidates for the same market:// link from three to one, and the chooser goes away.</figcaption></figure>
+      <p>The drawer links to <a href="https://mvgood21.github.io/en/apps/blocks/">Block Turn</a>, Arrow Knots and SugarCard, and all three are on Play only. The game links carry the referrer <code>utm_source=sugarspeller&amp;utm_medium=crosspromo&amp;utm_campaign=drawer</code>, which only Play reads and reports in the Play Console acquisition report. A user who picks another store lands on a page with no app, and even an install that follows doesn't count as cross-promotion.</p>
+    </section>
+    <section aria-labelledby="wrong-assumption">
+      <h2 id="wrong-assumption">The old code read a failure as "no Play"</h2>
+      <p>The first version opened <code>market://</code> and fell back to the https address on <code>ActivityNotFoundException</code>. The comment on that branch said the device had no Play Store app. The assumption was that only Play opens market:// links. That code first went in with the SugarCard menu in commit f6ef50e on September 20, and on October 9 efc0acf moved it unchanged into a launcher shared by the games and SugarCard. Claude co-authored both commits.</p>
+      <p>On SKT-sold Samsung phones that assumption means the fallback never runs. With three candidates there is no exception; the chooser appears, and the code treats the store as opened. The same check showed that the SugarCard menu had carried the same problem since the September 20 code.</p>
+    </section>
+    <section aria-labelledby="missed">
+      <h2 id="missed">Why 300 unit tests and two reviews missed it</h2>
+      <p>The store test in efc0acf compared the started intent's URI and never looked at its package. Robolectric has no other store apps installed, and by default startActivity doesn't fail there. In the same piece of work, three analysis agents and two adversarial reviews found and closed three test gaps (a missing <code>&lt;queries&gt;</code> entry, hiding the rows on Android 6.0, and the Classic drawer wiring). None of them questioned the market:// assumption.</p>
+      <p>The chooser showed up when we tapped the menu on the S21 itself. The repository's working notes say runtime checks are done on a release APK, and the check after the fix ran on one (the routine is written up in <a href="https://mvgood21.github.io/en/ax/release-gate/">the release gate note</a>).</p>
+    </section>
+    <section aria-labelledby="fix-order">
+      <h2 id="fix-order">Try Play, then plain market, then https</h2>
+      <p>8bbe179 keeps three candidates in a list and opens them in order, moving on only when one throws.</p>
+<pre><code>val attempts = listOf(
+    view("market://details?$query").setPackage(PLAY_STORE),
+    view("market://details?$query"),                           // no Play: any store
+    view("https://play.google.com/store/apps/details?$query"), // no store app: browser
+)</code></pre>
+      <p>An intent pinned to the Play package throws on a device without Play, which gives the list the failure signal the old code never had. The existing test gained an assertion that the started intent's package is Play, and a new test checks that with only another store present (checkActivities(true)) the plain market:// address opens with no package. Unit tests went to 301/301. Delete the setPackage call and the package comes back null, so the assertion fails (the same check we describe in <a href="https://mvgood21.github.io/en/ax/guard-removal-test/">deleting the guard</a>).</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/market-uri-store-chooser-2-en.webp" width="1200" height="738" alt="Step diagram: open the app if installed; otherwise market:// with the Play package, then plain market://, then the https address. On the S21 on October 9, Block Turn opened in Play with no chooser." loading="lazy"><figcaption>A later candidate runs only when the one before it throws, so a phone with Play always lands on the Play listing.</figcaption></figure>
+      <p>On the S21 release APK that day, the installed Arrow Knots launched straight away, Block Turn, not installed, opened in Play with no chooser, and SugarCard went to Play as well. The GA4 log showed <code>game_open{game=arrows,installed=1}</code>, <code>{game=blocks,installed=0}</code> and <code>sugarcard_open{installed=0}</code>. The fix went into the 1.6.026 release branch, so the game menu pointed at Play from the first build users got, published the same morning.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20market%3A//%20link%20opens%20a%20store%20chooser%20on%20SKT-sold%20Samsung%20phones%3A%20set%20the%20Play%20package%20first">Email us</a></p></aside>
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">Keeping the chooser, or opening https first</h2>
+      <p>We dropped the idea of leaving the chooser alone because the apps are on Play only. Pinning Play with nothing after it would open nothing on a phone without Play, so plain market and https stay as fallbacks.</p>
+      <p>On the S21 on October 30, Play and Chrome both handle the Play https listing, and play.google.com is a system-verified link for Play, so opening https first would probably have opened Play too (we didn't tap it to check). But a browser accepts https on nearly every phone, so there is no exception, and which app opens depends on the device's settings. That doesn't fit a list that moves on when a candidate fails, so https stays last.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">Don't pin Play if your app is on other stores too</h2>
+      <p>If you send Korean users to an app that is only on Play, set the Play package on the market:// intent. If the app is also on ONE store or Galaxy Store, don't: the pin pulls those stores' users over to Play. On a phone without Play, the second candidate opens another store, which doesn't list our apps. We checked that path only in a Robolectric test; we have no such phone. We also checked only two Samsung phones sold by SKT, not KT or LG U+ models, unlocked models or other makers.</p>
+    </section>
+    <section aria-labelledby="check">
+      <h2 id="check">Two adb queries and one package assertion</h2>
+      <ol>
+        <li>Connect the phone and run <code>adb shell cmd package query-activities --brief -a android.intent.action.VIEW -d "market://details?id=com.example.app"</code>. If the first line says 2 or more activities found, the phone can show a chooser; each candidate also shows its isDefault value.</li>
+        <li>Run it again with the Play Store app's package, <code>-p com.android.vending</code>, at the end. You should get one.</li>
+        <li>Change the store link to try Play, then plain market, then https, catching only <code>ActivityNotFoundException</code> to move to the next one.</li>
+        <li>Assert the started intent's <code>package</code> in a unit test, and check once that the test fails when you remove setPackage.</li>
+        <li>Put the release APK on a phone sold in Korea and tap the link yourself.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Still open: UTM installs and 16 drawer E2E tests</h2>
+      <p>From October 9 to 22 the game rows were tapped 33 times in GA4 (Block Turn 5, Arrow Knots 16, and 12 from 1.6.026 with no game value). Whether those taps became installs is only in the Play Console acquisition report, and we haven't judged it yet. On the S21, 16 E2E tests that open the drawer fail, and they fail the same way on the baseline build before the change (360bed3), so the game-row E2E tests never ran on the device and we tapped the rows by hand instead. Finding the cause of those failures comes next.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20market%3A//%20link%20opens%20a%20store%20chooser%20on%20SKT-sold%20Samsung%20phones%3A%20set%20the%20Play%20package%20first">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Why does a Galaxy phone ask which store to use when I open a Play link?</summary><div><p>More than one store app on the phone handles market:// addresses. On SKT-sold Galaxy S21 and S20 phones on 2026-10-30, Play, Galaxy Store and ONE store all did, and when the link names no target app, Android asks the user to pick.</p></div></details>
+        <details><summary>How do I open the Play Store listing directly from my app?</summary><div><p>Set the Play Store app as the package of the market://details intent with setPackage. On a device without Play that intent throws ActivityNotFoundException, so keep plain market:// and the https address as fallbacks, in that order.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Sat, 31 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Splash hang from addOnCompleteListener at onStop – SugarMount</title>
+    <link>https://mvgood21.github.io/en/ax/splash-listener-onstop/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/en/ax/splash-listener-onstop/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/splash-listener-onstop-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>A splash that never moved on: addOnCompleteListener(this) and onStop</h1>
+      <p class="lead">A listener added with addOnCompleteListener(this) is removed at onStop. If the screen went off during the fetch, the code that opens the next screen never ran.</p>
+      <p>Launch our Korean spelling app <a href="https://mvgood21.github.io/en/apps/sugarspeller/">SugarSpeller</a> with the phone's screen off, get past the lock screen, and it stayed on a black splash screen. On October 11, 2026, during a device check before a production release on a Galaxy S21 running the R8 release APK, we first saw it stuck on vc95, then reproduced it on vc96 by launching with the screen off. The cause, <code>fetchAndActivate().addOnCompleteListener(this)</code>, had been in the repository since its first commit on December 16, 2020. Commit ab95e9a fixed it at 15:43 on October 11.</p>
+      <p class="note">Sources: the app repository's git history (d5ac5e2, ab95e9a), CHANGELOG 1.6.029, the device-check notes in the release document, the agent session log from that day, the monitoring log (WATCH.md), and the Google Play services Task reference. Rechecked on 2026-10-30.</p>
+    </section>
+    <section aria-labelledby="removed-at-onstop">
+      <h2 id="removed-at-onstop">A listener removed at onStop is not called when the user comes back</h2>
+      <p>The splash activity, <code>ActivityEmpty</code>, starts one Remote Config (RC) fetch in <code>onCreate</code>. When the fetch completes, it checks versions and calls <code>checkMyPermission()</code>, which moves on to the next screen. That completion listener was the only path to the next screen.</p>
+      <pre><code>// ActivityEmpty just before ab95e9a, abridged (same line since d5ac5e2, 2020-12-16)
+// [START fetch_config_with_callback]
+remoteConfig.fetchAndActivate().addOnCompleteListener(this) { task -&gt;
+    ...
+    checkMyPermission()   // (annotation) every branch moves on from here
+}</code></pre>
+      <p>The Task reference says of the overload that takes an Activity: "The listener will be automatically removed during onStop." If the screen turns off or the user switches apps before the fetch finishes, onStop comes first and the listener is gone. No lifecycle log from that day shows exactly when onStop arrived while the screen was off, so this step rests on the documentation and on reproducing the hang before and after the fix.</p>
+      <p>Nothing retried on return, either. The activity was still alive, so <code>onCreate</code> did not run again, and <code>onStart</code> only set system bar flags. The app stayed on the splash until the process was killed. On the test phone, the GA4 debug log showed first_open, session_start, screen_view and two app-open ad events, then nothing.</p>
+      <p>The <code>[START fetch_config_with_callback]</code> marker in the comment also appears in the Remote Config sample of Firebase's quickstart-android, which calls <code>addOnCompleteListener(this)</code> too. The marker and the line match, so the code most likely came from that sample. The other way this splash locked users out, through the RC force-update flag, is in <a href="https://mvgood21.github.io/en/ax/string-version-compare/">"6.7" &lt; "6.11" is false</a>.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/splash-listener-onstop-1-en.webp" width="1200" height="698" alt="Comparison: a listener scoped to the activity is removed at onStop, misses the fetch result and leaves the app on the splash; an unscoped listener with whenStarted keeps the result and goes to the main screen once the activity is visible again." loading="lazy"><figcaption>With the listener detached from the activity and only navigation deferred to STARTED, a launch with the screen off reached the main screen once the lock screen was dismissed.</figcaption></figure>
+    </section>
+    <section aria-labelledby="first-sighting">
+      <h2 id="first-sighting">The first hang was force-stopped and set aside</h2>
+      <p>The operator asked for a deeper device check before production. A Claude Code agent ran it on the S21 with ad domains blocked by DNS: an update install, rotations, 15 round trips to the home screen, and three 5,000-event monkey runs with zero app crashes and zero app ANRs.</p>
+      <p>Around 14:37 the agent woke the S21 from sleep and found vc95, installed about ten minutes earlier, stuck on the splash after the lock screen was dismissed. The log does not show when or how the app was launched. The agent force-stopped it, relaunched, saw the main screen, and noted in its own progress notes that this was a vc95 problem to check later on vc96. A relaunch after a force stop starts again from onCreate with the screen on, so that check could not show the cause.</p>
+      <p>Forty minutes later the agent deliberately launched vc96 with the screen off. It hung again, and only then did the agent open the code. The line was the same in both versions.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/splash-listener-onstop-2-en.webp" width="1200" height="862" alt="Step diagram: at 14:37 the agent first finds vc95 stuck on the splash and force-stops past it; at 15:17 it reproduces the hang on vc96 by launching with the screen off; at 15:19 three tests are written first and 2 fail; at 15:37 all 437 unit tests pass; at 15:43 commit ab95e9a." loading="lazy"><figcaption>The first hang was force-stopped and parked; after reproducing it on purpose 40 minutes later, the fix was committed in about 25 minutes.</figcaption></figure>
+    </section>
+    <section aria-labelledby="when-started">
+      <h2 id="when-started">Unscope the listener, defer only the navigation</h2>
+      <p>ab95e9a drops <code>this</code> from the listener so it no longer depends on the activity, and adds an <code>isFinishing || isDestroyed</code> check as its first line. Every call that opens the next screen goes through a new helper, <code>whenStarted</code>.</p>
+      <pre><code>fun whenStarted(owner: LifecycleOwner, block: () -&gt; Unit) {
+    owner.lifecycleScope.launch { owner.lifecycle.withStarted(block) }
+}</code></pre>
+      <p>If the activity is visible (STARTED or later), the block runs now. If it is stopped, the block runs once when it becomes visible again. If the activity is destroyed first, it never runs. Five call sites were wrapped: three <code>checkMyPermission()</code> calls on the splash, the callback after the app-open ad wait, and <code>goIntent</code> on the logo screen (<code>ActivityIntro</code>). The agent wrote the three <code>whenStarted</code> unit tests first and ran them against an empty function, where 2 failed, before writing the body.</p>
+      <p>Removing <code>this</code> and nothing else was not enough. The listener would fire, but it would start the next activity from a stopped screen, and as the commit comment puts it, that <code>startActivity</code> is blocked or late. A user who went home during the splash might also see the app jump back over the home screen. The post-fix device check included "does not pop up over home".</p>
+      <p>Re-adding the listener in <code>onStart</code> would also work for the fetch: the reference says a listener added to a completed Task is scheduled immediately. It fixes only the RC Task, though. Two of the five wrapped sites, the ad-wait callback and the logo screen's Timer, are not Tasks. Using <code>Task.await()</code> in a coroutine would mean adding kotlinx-coroutines-play-services; the app's build.gradle has only coroutines-android and lifecycle, and the log shows no sign this path was weighed that day.</p>
+      <p>Don't hang navigation on <code>addOnCompleteListener(this)</code>. Receive the result regardless of the activity, and defer only the screen change to the lifecycle.</p>
+      <p><code>whenStarted</code> has its own limit: if the user never comes back, the next screen never opens. If the activity is destroyed in the meantime, the block is dropped, and reopening the app runs <code>onCreate</code> and a fresh fetch. That last part is a reading of the code, not something we tested on a device.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20splash%20that%20never%20moved%20on%3A%20addOnCompleteListener%28this%29%20and%20onStop">Email us</a></p></aside>
+    <section aria-labelledby="device-steps">
+      <h2 id="device-steps">One grep and a screen-off launch test</h2>
+      <p>Start by finding listeners scoped to an activity. The first line below is the search the agent ran that day; it found nothing else in the main sources. The second line widens it to fragments' <code>requireActivity()</code> and Canceled listeners; it was not used that day. The risky ones are listeners that navigate.</p>
+      <pre><code>git grep -nE "addOn(Complete|Success|Failure)Listener\(this"
+git grep -nE "addOn(Complete|Success|Failure|Canceled)Listener\((this|requireActivity\(\)|activity)"</code></pre>
+      <p>Then test on a device with an R8 release build. Steps 1-2 were run on vc96 before the fix and on the fixed build; steps 3-4 on the fixed build.</p>
+      <ol>
+        <li>Turn the screen off with <code>adb shell input keyevent SLEEP</code>, wait 3 seconds, and launch with <code>adb shell monkey -p &lt;package&gt; -c android.intent.category.LAUNCHER 1</code>.</li>
+        <li>Wait 20 seconds, wake the phone and dismiss the lock screen. <code>adb shell dumpsys window | grep mCurrentFocus</code> should name the main activity. Before the fix it named the splash; after, the main screen.</li>
+        <li>Launch, press Home right away, and launch again 12 seconds later. The phone should stay on the home screen in between and land on the main screen after. Repeat on the logo screen.</li>
+        <li>Press Back during the splash and check for crashes.</li>
+      </ol>
+      <p>The three <code>whenStarted</code> tests use Robolectric and <code>LifecycleRegistry.createUnsafe</code> to move the state from RESUMED to CREATED and back to STARTED. After the fix all 437 unit tests passed, and two monkey runs on the fixed build had zero crashes and ANRs. How the release carrying this fix, 1.6.029, went to 100% of users at once is in <a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%</a>.</p>
+    </section>
+    <section aria-labelledby="new-install-17">
+      <h2 id="new-install-17">How much of the 17% new-install drop-off this explains is unknown</h2>
+      <p>A baseline written the day before the fix found that of 739 new users from September 12 to October 9, 611 (82.7%) reached the main screen within 24 hours. The CHANGELOG says only that this bug "may be part of" the 17% who did not.</p>
+      <p>A check on October 15 counted 107 of 120 new 1.6.029 installs (89%) reaching the main screen. That number cannot isolate the bug. The baseline used main-screen views, while 1.6.029 used the <code>main_shown</code> event added in 1.6.028; the same release also started an A/B test that removes the app-open ad from the first session for half of new installs; and the sample is 120 people. No event records a hang, so we cannot count how many users hit it.</p>
+      <p>The device check covered one S21 with ads blocked by DNS. We did not test live ads, other makers' lock screens, or returning after the process was killed in the background.</p>
+    </section>
+    <section aria-labelledby="wiring-test">
+      <h2 id="wiring-test">Still open: no test guards the five call sites</h2>
+      <p>The unit tests cover <code>whenStarted</code> itself. The release notes say so: the wiring, whether ActivityEmpty and ActivityIntro actually call whenStarted, could not be guarded by unit tests and was checked on the device. If someone adds a new navigation call to the splash without <code>whenStarted</code>, today's tests still pass; only a device test that launches with the screen off or leaves the app during the splash would catch it.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20splash%20that%20never%20moved%20on%3A%20addOnCompleteListener%28this%29%20and%20onStop">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>When does addOnCompleteListener(activity, …) remove the listener?</summary><div><p>At the activity's onStop. The Task reference says so, and in this app a screen turning off during the fetch was enough to lose the result.</p></div></details>
+        <details><summary>Doesn't an unscoped listener leak the activity?</summary><div><p>Here the listener returns at once if isFinishing or isDestroyed, and whenStarted skips the navigation when the activity is gone. We did not measure leaks separately.</p></div></details>
+        <details><summary>Why didn't monkey testing catch it?</summary><div><p>That day's monkey runs kept the screen on and sent no Home key. The hang needs onStop to arrive before the fetch completes, so it only shows up in a test that turns the screen off or leaves the app during the fetch.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/en/ax/topic/android/">All notes on Android development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Sat, 31 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>Arrow puzzle level generator: 1,100 levels gated – SugarMount</title>
     <link>https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/</link>
@@ -117,9 +396,9 @@ depth(board):                   # peel
         <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/games/">All notes on Game development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -252,9 +531,9 @@ depth(board):                   # peel
         <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -367,10 +646,10 @@ if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
@@ -478,8 +757,8 @@ git diff --name-only $(git merge-base &lt;base&gt; &lt;branch&gt;) &lt;branch&gt
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -566,10 +845,10 @@ unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$TEST_PUB[~/][0-9]*" | sort -u | wc
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
@@ -705,10 +984,10 @@ lifecycleScope.launch {
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -818,10 +1097,10 @@ lifecycleScope.launch {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
@@ -925,9 +1204,9 @@ three_star = cleared and time &lt;= par(base, scale, floor) and mistakes &lt;= a
         <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/games/">All notes on Game development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1042,9 +1321,9 @@ print(pages.most_common(), "FAQ questions:", questions)</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1159,10 +1438,10 @@ NOT_TEST = {"notExpression": {"orGroup": {"expressions": [
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1267,8 +1546,8 @@ export function cacheKey(api, group, original, corrected, model) {
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1398,8 +1677,8 @@ const gaps = await agent(CTX + CHECKLIST + final + dossier, { schema: CRIT })</c
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1510,10 +1789,10 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(":core
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare&#x27;s cmap claimed 11,172 syllables but drew only 2,479</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
@@ -1638,8 +1917,8 @@ git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --gre
         <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1779,8 +2058,8 @@ adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1911,9 +2190,9 @@ print("my app in results:", MY_APP in ids)</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2039,9 +2318,9 @@ out of date:
         <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2159,8 +2438,8 @@ grep -rL --include='*Test.kt' -e 'assert' -e 'check(matches' app/src/</code></pr
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2300,9 +2579,9 @@ git log --until=2026-10-20 --format='%(trailers:key=Co-authored-by,valueonly)' \
         <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2408,8 +2687,8 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2574,9 +2853,9 @@ after_hint = win(board after the correct first move, 2 pieces left, lines it cle
         <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/games/">All notes on Game development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2694,8 +2973,8 @@ Schedule expires: YYYY-MM-DD / register again on: YYYY-MM-DD
         <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2835,9 +3114,9 @@ curl -s "$POLICY_URL" | grep -o 'data-policy-version="[0-9-]*"'</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2982,10 +3261,10 @@ font.save(dst)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
@@ -3079,8 +3358,8 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3165,10 +3444,10 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
@@ -3290,8 +3569,8 @@ flutter test test/theme_matrix/ --dart-define=Y2_NO_SETTLE=true
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3410,10 +3689,10 @@ FlowRow(
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
@@ -3498,8 +3777,8 @@ Mem:              13           8           2           0           2           4
         <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3625,10 +3904,10 @@ if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFract
       <ul>
         <li><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3752,8 +4031,8 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3851,10 +4130,10 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
@@ -3920,9 +4199,9 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://mvgood21.github.io/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4314,9 +4593,9 @@ room  = is there space for a 3×3 square, a 1×4 bar, a 4×1 bar (0–3)</code><
         <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/games/">All notes on Game development</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4426,8 +4705,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4533,10 +4812,10 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
       </ul>
@@ -5883,9 +6162,9 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5987,8 +6266,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6014,7 +6293,7 @@ done</code></pre>
       <ul class="card-list">
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/workflow/">Working with agents</a></h3><p class="sub">How work is split between an AI coding agent and a person, how rules reach the agent, and what we changed after several sessions collided in one repository.</p><p class="meta">7 notes</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/quality/">Testing and release</a></h3><p class="sub">Unit tests, release gates and on-device checks that AI-written code goes through before each release, with the real defects those checks caught along the way.</p><p class="meta">8 notes</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/android/">Android development</a></h3><p class="sub">Gradle builds, library upgrades, UI and performance problems we ran into while building Android apps with a coding agent, and how each one was solved.</p><p class="meta">9 notes</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/android/">Android development</a></h3><p class="sub">Gradle builds, library upgrades, UI and performance problems we ran into while building Android apps with a coding agent, and how each one was solved.</p><p class="meta">12 notes</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/games/">Game development</a></h3><p class="sub">Generating puzzle game levels with an agent, proving every level can be solved, and tuning difficulty: the rules we settled on and the numbers we measured.</p><p class="meta">4 notes</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/store/">Play Store and monetization</a></h3><p class="sub">Google Play listings and review, store screenshots and descriptions, and ad setup: the work of shipping and running apps, shared with an AI coding agent.</p><p class="meta">3 notes</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/topic/web/">Website and search</a></h3><p class="sub">The page structure, Google and Naver search optimization, structured data and design system of this site, built with an agent and explained from the actual code.</p><p class="meta">4 notes</p></li>
@@ -6032,12 +6311,12 @@ done</code></pre>
     <section aria-labelledby="notes">
       <h2 id="notes">Latest notes</h2>
       <ul class="card-list">
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></h3><p class="sub">Five pre-gzipped Android asset packs were 18 bytes each larger than the APK&#x27;s own deflate, and the .gz names vanished, causing FileNotFoundException on launch.</p><p class="meta">Android development · Measurement · October 31, 2026</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></h3><p class="sub">On two SKT-sold Samsung phones, three store apps answer a market:// link and Android shows a chooser. Setting the Play package first opened Play directly.</p><p class="meta">Android development · How-to · October 31, 2026</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></h3><p class="sub">Our spelling app used addOnCompleteListener(this) for Remote Config; the listener was dropped at onStop, so a screen-off launch never left the splash.</p><p class="meta">Android development · Incident · October 31, 2026</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></h3><p class="sub">All 1,100 Arrow Knots levels come from a reverse-construction generator and pass the G2 pack gate. Fixing the move rule first made each board solvable as built.</p><p class="meta">Game development · Method · October 30, 2026</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></h3><p class="sub">After an August 2025 redesign, D1 retention of our spelling app&#x27;s organic cohorts fell from 15.2% to 11.2%; 70% of lost daily users were 31-365 days old.</p><p class="meta">Retrospectives and numbers · Measurement · October 30, 2026</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></h3><p class="sub">A Korean spelling app compared Remote Config content versions as Kotlin strings, so from 6.10 on, devices stored at 6.2 to 6.9 got no quiz or notice updates.</p><p class="meta">Android development · Incident · October 30, 2026</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></h3><p class="sub">One commit swept 50 files from another Claude session into a release fix. We built an owner table next; 7 of 13 merges still needed hand merging.</p><p class="meta">Working with agents · How-to · October 29, 2026</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></h3><p class="sub">A real-ID Block Turn build kept 5 Google test ad strings in its dex. A plain || in place of listOf().any took it to 0. We count IDs and never print them.</p><p class="meta">Android development · Measurement · October 29, 2026</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></h3><p class="sub">A Play review said the premium plan showed a &#x27;temporary error&#x27; for a month. The details screen never waited for products: 1 of 16 users reached checkout.</p><p class="meta">Play Store and monetization · Incident · October 29, 2026</p></li>
       </ul>
     </section>
     <section aria-labelledby="by-the-numbers">
@@ -6172,8 +6451,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://mvgood21.github.io/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6290,9 +6569,9 @@ done</code></pre>
     <section aria-labelledby="ax-app-heading">
       <h2 id="ax-app-heading">AX notes on this app</h2>
       <ul class="related-links">
+        <li><a href="https://mvgood21.github.io/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
         <li><a href="https://mvgood21.github.io/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://mvgood21.github.io/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
       </ul>
     </section>
     <section aria-labelledby="releases-heading">
@@ -6481,282 +6760,6 @@ done</code></pre>
       </ul>
     </section>
     <p class="meta updated">Last updated <time datetime="2026-10-18">October 18, 2026</time></p>]]></description>
-    <pubDate>Mon, 05 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>SugarAlbum: photo to video maker for Android – SugarMount</title>
-    <link>https://mvgood21.github.io/en/apps/sugaralbum/</link>
-    <guid isPermaLink="true">https://mvgood21.github.io/en/apps/sugaralbum/</guid>
-    <description><![CDATA[<header class="app-hero">
-      <img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugaralbum/icon.webp" width="96" height="96" alt="" fetchpriority="high">
-      <h1>SugarAlbum</h1>
-      <p class="lead">SugarAlbum is an Android app that turns the photos you pick into a video with a theme and built-in background music, processed on your device only.</p>
-      <p class="status"><span class="badge badge--live">Google Play</span> <span class="brandline">Easy Video Maker</span></p>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugaralbum&amp;referrer=utm_source%3Dmvgood21.github.io%26utm_medium%3Dapp_page%26utm_campaign%3Dsugaralbum&amp;hl=en" rel="noopener">Get it on Google Play</a><a class="button button--outline" href="https://mvgood21.github.io/en/privacy/sugaralbum/">SugarAlbum privacy policy</a></div>
-    </header>
-    <ul class="shots" tabindex="0" aria-label="SugarAlbum screenshots"><li><img src="https://mvgood21.github.io/assets/apps/sugaralbum/shot1.webp" width="439" height="780" loading="lazy" alt="Making a video from selected photos"></li><li><img src="https://mvgood21.github.io/assets/apps/sugaralbum/shot2.webp" width="439" height="780" loading="lazy" alt="Picking photos in order for the video"></li><li><img src="https://mvgood21.github.io/assets/apps/sugaralbum/shot3.webp" width="439" height="780" loading="lazy" alt="Previewing the video and choosing its title and resolution"></li></ul>
-    <section aria-labelledby="tasks">
-      <h2 id="tasks">Use it to</h2>
-      <ul>
-        <li>Make a short video from photos in your gallery</li>
-        <li>Turn trip or family photos into a video with music</li>
-        <li>Make a video on your phone without uploading photos</li>
-      </ul>
-    </section>
-    <section aria-labelledby="features">
-      <h2 id="features">What it does</h2>
-      <ul class="features">
-        <li><h3>Just pick photos</h3><p>Pick photos in order and the scenes are arranged for you.</p></li>
-        <li><h3>Preview</h3><p>See the finished video before you save.</p></li>
-        <li><h3>Title and resolution</h3><p>Add a title and choose a resolution such as FHD (1920×1080).</p></li>
-        <li><h3>Background music</h3><p>Uses music bundled with the app.</p></li>
-      </ul>
-    </section>
-    <section class="facts" aria-labelledby="facts-h">
-      <h2 id="facts-h">At a glance</h2>
-      <div class="table-wrap">
-        <table>
-          <tbody>
-            <tr><th scope="row">Status</th><td>Google Play</td></tr>
-            <tr><th scope="row">Price</th><td>Free with ads. No in-app purchases</td></tr>
-            <tr><th scope="row">Where it runs</th><td>On your device only. Photos and videos are never uploaded.</td></tr>
-            <tr><th scope="row">Permissions</th><td>Photos and videos (to make the video), notifications (progress while rendering)</td></tr>
-            <tr><th scope="row">Account</th><td>Not needed.</td></tr>
-            <tr><th scope="row">Package name</th><td><code>com.sugarmount.sugaralbum</code></td></tr>
-            <tr><th scope="row">Developer</th><td>simpest (SugarMount)</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-    <section aria-labelledby="data">
-      <h2 id="data">Data and permissions</h2>
-      <ul>
-        <li>Photos, videos and the videos you make are processed on your device and never uploaded.</li>
-        <li>Photo analysis for arranging scenes (date taken, quality and, on some devices, face positions) also happens on the device.</li>
-        <li>The app includes ads (Google AdMob), usage statistics (Google Analytics), and remote config and notifications (Firebase).</li>
-      </ul>
-      <p>See <a href="https://mvgood21.github.io/en/privacy/sugaralbum/">SugarAlbum privacy policy</a> for details.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">What it can't do</h2>
-      <ul>
-        <li>You can&#x27;t add your own music. Each theme comes with a track bundled in the app.</li>
-        <li>Resolutions are 1920×1080, 1280×720 and 640×360. Nothing larger is available.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">Frequently asked questions</h2>
-      <div class="faq">
-        <details><summary>Are my photos uploaded?</summary><div><p>No. Photos and videos are processed on your device only.</p></div></details>
-        <details><summary>What resolutions can I save?</summary><div><p>The resolution you choose on screen, such as FHD (1920×1080).</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="ax-app-heading">
-      <h2 id="ax-app-heading">AX notes on this app</h2>
-      <ul class="related-links">
-        <li><a href="https://mvgood21.github.io/en/ax/ndk-16kb-page-blue-tint/">16 KB page size support: a blue tint that only NDK 27 and 29 produced, and 12 .so files measured again</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="releases-heading">
-      <h2 id="releases-heading">Recent updates</h2>
-      <ul>
-        <li><strong>1.1.006</strong> · <time datetime="2026-01-03">January 3, 2026</time> · Updated for newer Android and Google Play requirements (16 KB page size).</li>
-      </ul>
-    </section>
-    <section aria-labelledby="related-heading">
-      <h2 id="related-heading">Related apps</h2>
-      <ul class="related">
-        <li><a href="https://mvgood21.github.io/en/apps/image-compress/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarcompress/icon.webp" width="56" height="56" alt=""><span>Compress Image</span></a></li>
-        <li><a href="https://mvgood21.github.io/en/apps/image-flip/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarflip/icon.webp" width="56" height="56" alt=""><span>Flip &amp; Rotate Image</span></a></li>
-        <li><a href="https://mvgood21.github.io/en/apps/image-convert/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarconvert/icon.webp" width="56" height="56" alt=""><span>Convert Image JPG PNG WEBP</span></a></li>
-      </ul>
-    </section>
-    <p class="meta updated">Last updated <time datetime="2026-10-23">October 23, 2026</time></p>
-    <section aria-labelledby="contact">
-      <h2 id="contact">Contact</h2>
-      <p>If something isn't working or you have a question, email us.</p>
-      <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a> · Package name: <code>com.sugarmount.sugaralbum</code></p>
-    </section>]]></description>
-    <pubDate>Mon, 05 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>SugarCard: Korean greeting cards for Android – SugarMount</title>
-    <link>https://mvgood21.github.io/en/apps/sugarcard/</link>
-    <guid isPermaLink="true">https://mvgood21.github.io/en/apps/sugarcard/</guid>
-    <description><![CDATA[<header class="app-hero">
-      <img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarcard/icon.webp" width="96" height="96" alt="" fetchpriority="high">
-      <h1>SugarCard</h1>
-      <p class="lead">SugarCard is a Korean-language Android app for sending Lunar New Year, Chuseok and Christmas greeting cards with your own message written on the card picture.</p>
-      <p class="status"><span class="badge badge--live">Google Play</span> <span class="brandline">SaengSaeng Card</span></p>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugarcard&amp;referrer=utm_source%3Dmvgood21.github.io%26utm_medium%3Dapp_page%26utm_campaign%3Dsugarcard&amp;hl=en" rel="noopener">Get it on Google Play</a><a class="button button--outline" href="https://mvgood21.github.io/en/privacy/sugarcard/">SugarCard privacy policy</a></div>
-    </header>
-    <ul class="shots" tabindex="0" aria-label="SugarCard screenshots"><li><img src="https://mvgood21.github.io/assets/apps/sugarcard/shot1.webp" width="360" height="780" loading="lazy" alt="Making a Chuseok greeting card"></li><li><img src="https://mvgood21.github.io/assets/apps/sugarcard/shot2.webp" width="360" height="780" loading="lazy" alt="Choosing a Lunar New Year card design"></li><li><img src="https://mvgood21.github.io/assets/apps/sugarcard/shot3.webp" width="360" height="780" loading="lazy" alt="A Christmas greeting card"></li></ul>
-    <section aria-labelledby="tasks">
-      <h2 id="tasks">Use it to</h2>
-      <ul>
-        <li><a href="https://mvgood21.github.io/en/apps/sugarcard/christmas-greetings/">Send a Christmas greeting card on KakaoTalk</a></li>
-        <li>Make a Lunar New Year greeting card</li>
-        <li>Send a Chuseok greeting card</li>
-      </ul>
-    </section>
-    <section aria-labelledby="features">
-      <h2 id="features">What it does</h2>
-      <ul class="features">
-        <li><h3>Cards for each holiday</h3><p>Lunar New Year, Chuseok and Christmas each come with four card styles. The holiday that fits the current month shows first.</p></li>
-        <li><h3>Your own greeting</h3><p>Type a greeting and it is placed on the card picture.</p></li>
-        <li><h3>Share in one tap</h3><p>Send the card image to KakaoTalk, text messages or another app you pick. Christmas cards can also go out as a snow video.</p></li>
-        <li><h3>Greeting history</h3><p>Greetings you sent are kept on your device, and you can delete them.</p></li>
-      </ul>
-    </section>
-    <section class="facts" aria-labelledby="facts-h">
-      <h2 id="facts-h">At a glance</h2>
-      <div class="table-wrap">
-        <table>
-          <tbody>
-            <tr><th scope="row">Status</th><td>Google Play</td></tr>
-            <tr><th scope="row">Price</th><td>Free with ads. A subscription reduces ads.</td></tr>
-            <tr><th scope="row">Internet</th><td>Card images are bundled with the app. The internet is used for ads and notices, and the app connects to a Naver search page in the background when the main screen opens (nothing is shown on screen).</td></tr>
-            <tr><th scope="row">Account</th><td>Not needed.</td></tr>
-            <tr><th scope="row">Language</th><td>Korean</td></tr>
-            <tr><th scope="row">Package name</th><td><code>com.sugarmount.sugarcard</code></td></tr>
-            <tr><th scope="row">Developer</th><td>simpest (SugarMount)</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-    <section aria-labelledby="data">
-      <h2 id="data">Data and permissions</h2>
-      <ul>
-        <li>Messages and finished cards are made and stored on your device. When you share, they go only to the app you pick.</li>
-        <li>The app includes ads (Google AdMob), usage statistics (Google Analytics), and remote config and notifications (Firebase).</li>
-        <li>When the main screen opens and the app connects to the Naver search page, your IP address, browser information (User-Agent) and cookies may reach Naver. Your messages are not included.</li>
-        <li>No account is created.</li>
-      </ul>
-      <p>See <a href="https://mvgood21.github.io/en/privacy/sugarcard/">SugarCard privacy policy</a> for details.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">What it can't do</h2>
-      <ul>
-        <li>Cards cover three holidays only: Lunar New Year, Chuseok and Christmas. There are no birthday or wedding cards.</li>
-        <li>Sharing as a video works for Christmas cards only. Other cards are shared as images.</li>
-        <li>The app is in Korean only.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">Frequently asked questions</h2>
-      <div class="faq">
-        <details><summary>What occasions does it cover?</summary><div><p>Lunar New Year, Chuseok and Christmas. There are no birthday or wedding cards yet.</p></div></details>
-        <details><summary>Can I write my own greeting?</summary><div><p>Yes. The greeting you type is placed on the card picture.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="guides-heading">
-      <h2 id="guides-heading">Help articles</h2>
-      <ul class="related-links">
-        <li><a href="https://mvgood21.github.io/en/apps/sugarcard/christmas-greetings/">Korean Christmas greeting card messages</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="related-heading">
-      <h2 id="related-heading">Related apps</h2>
-      <ul class="related">
-        <li><a href="https://mvgood21.github.io/en/apps/sugaralbum/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugaralbum/icon.webp" width="56" height="56" alt=""><span>SugarAlbum</span></a></li>
-        <li><a href="https://mvgood21.github.io/en/apps/image-compress/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarcompress/icon.webp" width="56" height="56" alt=""><span>Compress Image</span></a></li>
-        <li><a href="https://mvgood21.github.io/en/apps/image-flip/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarflip/icon.webp" width="56" height="56" alt=""><span>Flip &amp; Rotate Image</span></a></li>
-      </ul>
-    </section>
-    <p class="meta updated">Last updated <time datetime="2026-10-23">October 23, 2026</time></p>
-    <section aria-labelledby="contact">
-      <h2 id="contact">Contact</h2>
-      <p>If something isn't working or you have a question, email us.</p>
-      <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a> · Package name: <code>com.sugarmount.sugarcard</code></p>
-    </section>]]></description>
-    <pubDate>Mon, 05 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>SugarClip: copy history and sharing for Android – SugarMount</title>
-    <link>https://mvgood21.github.io/en/apps/sugarclip/</link>
-    <guid isPermaLink="true">https://mvgood21.github.io/en/apps/sugarclip/</guid>
-    <description><![CDATA[<header class="app-hero">
-      <img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarclip/icon.webp" width="96" height="96" alt="" fetchpriority="high">
-      <h1>SugarClip</h1>
-      <p class="lead">SugarClip is an Android app that sends the text you copy to the note app you chose and keeps a searchable history of your clips on your device.</p>
-      <p class="status"><span class="badge badge--live">Google Play</span></p>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugarclip&amp;referrer=utm_source%3Dmvgood21.github.io%26utm_medium%3Dapp_page%26utm_campaign%3Dsugarclip&amp;hl=en" rel="noopener">Get it on Google Play</a><a class="button button--outline" href="https://mvgood21.github.io/en/privacy/sugarclip/">SugarClip privacy policy</a></div>
-    </header>
-    <ul class="shots" tabindex="0" aria-label="SugarClip screenshots"><li><img src="https://mvgood21.github.io/assets/apps/sugarclip/shot1.webp" width="481" height="780" loading="lazy" alt="List of saved clips"></li><li><img src="https://mvgood21.github.io/assets/apps/sugarclip/shot2.webp" width="481" height="780" loading="lazy" alt="Content copied from a web page saved as HTML"></li><li><img src="https://mvgood21.github.io/assets/apps/sugarclip/shot3.webp" width="481" height="780" loading="lazy" alt="Choosing the note app to share to when you copy"></li></ul>
-    <section aria-labelledby="tasks">
-      <h2 id="tasks">Use it to</h2>
-      <ul>
-        <li>Find something you copied earlier</li>
-        <li>Collect copied text in a note app automatically</li>
-        <li>Keep content copied from a web page with its formatting</li>
-      </ul>
-    </section>
-    <section aria-labelledby="features">
-      <h2 id="features">What it does</h2>
-      <ul class="features">
-        <li><h3>Share by copying</h3><p>No pasting: copy and the share screen of your chosen app opens. On Android 10 and later this usually works while SugarClip is open.</p></li>
-        <li><h3>Pick the target app</h3><p>KakaoTalk “Chat with myself”, Google Keep, OneNote or Evernote.</p></li>
-        <li><h3>History and search</h3><p>Copied text and web page HTML are saved with the time and source label, and you can search them.</p></li>
-        <li><h3>Pause and resume</h3><p>Pause the service when you don&#x27;t need auto-sharing.</p></li>
-      </ul>
-    </section>
-    <section class="facts" aria-labelledby="facts-h">
-      <h2 id="facts-h">At a glance</h2>
-      <div class="table-wrap">
-        <table>
-          <tbody>
-            <tr><th scope="row">Status</th><td>Google Play</td></tr>
-            <tr><th scope="row">Price</th><td>Free with banner ads. No in-app purchases</td></tr>
-            <tr><th scope="row">Storage</th><td>Copied content stays on your device.</td></tr>
-            <tr><th scope="row">Account</th><td>Not needed.</td></tr>
-            <tr><th scope="row">Package name</th><td><code>com.sugarmount.sugarclip</code></td></tr>
-            <tr><th scope="row">Developer</th><td>simpest (SugarMount)</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-    <section aria-labelledby="data">
-      <h2 id="data">Data and permissions</h2>
-      <ul>
-        <li>Copied content (clips) stays on your device and is not sent to our servers or to ad and analytics services.</li>
-        <li>Shared clips go only to the share screen of the app you pick.</li>
-        <li>The app includes ads (Google AdMob), usage statistics (Google Analytics), and remote config and notifications (Firebase).</li>
-      </ul>
-      <p>See <a href="https://mvgood21.github.io/en/privacy/sugarclip/">SugarClip privacy policy</a> for details.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">What it can't do</h2>
-      <ul>
-        <li>On Android 10 and later, system limits mean it usually records only what you copy while SugarClip is open. Nothing is recorded in the background.</li>
-        <li>Sharing targets are limited to KakaoTalk Chat with myself, Google Keep, OneNote and Evernote.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">Frequently asked questions</h2>
-      <div class="faq">
-        <details><summary>Does copied text leave my phone?</summary><div><p>No. Clips are stored on your device and go to another app only when you share them.</p></div></details>
-        <details><summary>Which apps can I share to?</summary><div><p>KakaoTalk “Chat with myself”, Google Keep, OneNote or Evernote.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="releases-heading">
-      <h2 id="releases-heading">Recent updates</h2>
-      <ul>
-        <li><strong>1.2.001</strong> · <time datetime="2023-09-21">September 21, 2023</time> · Updated for newer Android versions.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="related-heading">
-      <h2 id="related-heading">Related apps</h2>
-      <ul class="related">
-        <li><a href="https://mvgood21.github.io/en/apps/sugarspeller/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarspeller/icon.webp" width="56" height="56" alt=""><span>SugarSpeller</span></a></li>
-        <li><a href="https://mvgood21.github.io/en/apps/doc-viewer/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugardoc/icon.webp" width="56" height="56" alt=""><span>HWP Viewer SugarDoc</span></a></li>
-      </ul>
-    </section>
-    <p class="meta updated">Last updated <time datetime="2026-10-23">October 23, 2026</time></p>
-    <section aria-labelledby="contact">
-      <h2 id="contact">Contact</h2>
-      <p>If something isn't working or you have a question, email us.</p>
-      <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a> · Package name: <code>com.sugarmount.sugarclip</code></p>
-    </section>]]></description>
     <pubDate>Mon, 05 Oct 2026 09:00:00 +0900</pubDate>
   </item>
 </channel>

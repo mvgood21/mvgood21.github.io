@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Our .gz Android assets hit FileNotFoundException – SugarMount</title>
+  <meta name="description" content="Five pre-gzipped Android asset packs were 18 bytes each larger than the APK&#x27;s own deflate, and the .gz names vanished, causing FileNotFoundException on launch.">
+  <link rel="canonical" href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Our .gz Android assets hit FileNotFoundException – SugarMount">
+  <meta property="og:description" content="Five pre-gzipped Android asset packs were 18 bytes each larger than the APK&#x27;s own deflate, and the .gz names vanished, causing FileNotFoundException on launch.">
+  <meta property="og:url" content="https://mvgood21.github.io/en/ax/android-assets-gz-suffix/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-android-assets-gz-suffix-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/en/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=51d09451">
+  <link rel="stylesheet" href="/assets/site.css?v=51d09451">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=51d09451">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/en/ax/android-assets-gz-suffix/#article","headline":"Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException","description":"Five pre-gzipped Android asset packs were 18 bytes each larger than the APK's own deflate, and the .gz names vanished, causing FileNotFoundException on launch.","url":"https://mvgood21.github.io/en/ax/android-assets-gz-suffix/","mainEntityOfPage":"https://mvgood21.github.io/en/ax/android-assets-gz-suffix/","inLanguage":"en","articleSection":"Android development","datePublished":"2026-10-31T09:00:00+09:00","dateModified":"2026-10-31T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-android-assets-gz-suffix-en.png","https://mvgood21.github.io/assets/ax/cover/android-assets-gz-suffix-en.webp","https://mvgood21.github.io/assets/ax/android-assets-gz-suffix-1-en.webp","https://mvgood21.github.io/assets/ax/android-assets-gz-suffix-2-en.webp"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why does opening a .gz file from Android assets throw FileNotFoundException?","acceptedAnswer":{"@type":"Answer","text":"Because this project's build (AGP 9.4.1) dropped the trailing .gz and stored the file decompressed: the APK listing showed a decompressed x.pack instead of x.pack.gz . Open the name without .gz and drop GZIPInputStream."}},{"@type":"Question","name":"Does pre-gzipping assets make the APK smaller?","acceptedAnswer":{"@type":"Answer","text":"Not for our 1,100 levels of text packs. The release APK's deflate came to 705,144 bytes; the pre-gzipped files were 705,234 bytes, larger by the 18-byte gzip header and trailer per pack."}},{"@type":"Question","name":"Can a JVM unit test catch this kind of packaging problem?","acceptedAnswer":{"@type":"Answer","text":"It can enforce the naming rule. Whether AssetManager actually opens the file is only confirmed by running the app on a device or emulator."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://mvgood21.github.io/en/ax/"},{"@type":"ListItem","position":3,"name":"Android development","item":"https://mvgood21.github.io/en/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=51d09451">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/android-assets-gz-suffix/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-android">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/android/">Android development</a></li><li><span aria-current="page">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/android-assets-gz-suffix-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX notes · Measurement</span>
+      <h1>Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</h1>
+      <p class="lead">Our pre-gzipped level packs were each 18 bytes larger than the APK's own compressed copies, and the build dropped the trailing .gz, so the files could not be opened on the device.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Android development</span> <span aria-hidden="true">·</span> <span>7 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-10-31">October 31, 2026</time></p><!-- /build:meta -->
+      <p>The five pre-gzipped level packs totaled 705,234 bytes. The same packs shipped as plain text take 705,144 bytes compressed inside the release APK. The "4.4×" that justified gzip at design time compared raw files with gz files; the draft never compared gz with what the APK does on its own. The choice surfaced at 22:28 on October 3, 2026 (KST), when the 1,000-level update of <a href="/en/apps/arrow-knots/">Arrow Knots</a> died with <code>FileNotFoundException</code> right after launch on our S21. Every JVM test that read the same packs had passed.</p>
+      <p class="note">Sources: the game repository's git history (f5b50c0, e3c7781, 4d46413), the monkey log and APK listing in that day's agent session record, and compressed sizes read with Python's zipfile from the release and debug APKs built on October 28, 2026. Checked October 30, 2026.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (9)</summary><ol><li><a href="#size">705,234 bytes as gz files, 705,144 inside the APK</a></li><li><a href="#wrong-pair">The design&#x27;s 4.4× compared the wrong pair</a></li><li><a href="#apk-list">The APK listing had only arrows-p1.pack</a></li><li><a href="#why-green">The tests opened the same files through a different function</a></li><li><a href="#fix">Plain packs, and what renaming the extension would have kept</a></li><li><a href="#test-limits">What the 19-line name test doesn&#x27;t look at</a></li><li><a href="#how-to">Checking asset names and sizes in your own APK</a></li><li><a href="#next">Still to do: .pack.gz left in the spec</a></li><li><a href="#faq">FAQ</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#size">705,234 bytes as gz files, 705,144 inside the APK</a></li><li><a href="#wrong-pair">The design&#x27;s 4.4× compared the wrong pair</a></li><li><a href="#apk-list">The APK listing had only arrows-p1.pack</a></li><li><a href="#why-green">The tests opened the same files through a different function</a></li><li><a href="#fix">Plain packs, and what renaming the extension would have kept</a></li><li><a href="#test-limits">What the 19-line name test doesn&#x27;t look at</a></li><li><a href="#how-to">Checking asset names and sizes in your own APK</a></li><li><a href="#next">Still to do: .pack.gz left in the spec</a></li><li><a href="#faq">FAQ</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="size">
+      <h2 id="size">705,234 bytes as gz files, 705,144 inside the APK</h2>
+      <p>We opened the release APK built on October 28, 2026, read the raw and compressed size of each of the five level packs, and set them next to the <code>.gz</code> files the repository held until commit 4d46413. The pack contents haven't changed since 4d46413, and each old <code>.gz</code>, decompressed, has the same SHA-1 as its plain pack, so these are the same bytes.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Pack</th><th>Raw</th><th>Old .gz file</th><th>Compressed in release APK</th><th>Difference</th></tr></thead>
+        <tbody>
+          <tr><td>p1 (1-200)</td><td>122,966</td><td>25,896</td><td>25,878</td><td>18</td></tr>
+          <tr><td>p2 (201-500)</td><td>524,852</td><td>111,113</td><td>111,095</td><td>18</td></tr>
+          <tr><td>p3 (501-700)</td><td>679,344</td><td>147,461</td><td>147,443</td><td>18</td></tr>
+          <tr><td>p4 (701-1000)</td><td>1,397,319</td><td>310,108</td><td>310,090</td><td>18</td></tr>
+          <tr><td>endless (1001-1100)</td><td>492,814</td><td>110,656</td><td>110,638</td><td>18</td></tr>
+          <tr><td>Total</td><td>3,217,295</td><td>705,234</td><td>705,144</td><td>90</td></tr>
+        </tbody>
+      </table></div>
+      <p>Every pack differs by exactly 18 bytes. A gzip file wraps deflate data in a 10-byte header and an 8-byte trailer (CRC32 and original length), so the compressed bodies are the same size and the gap is the gzip wrapper. Don't pre-gzip text assets.</p>
+      <figure class="ax-fig"><img src="/assets/ax/android-assets-gz-suffix-1-en.webp" width="1200" height="596" alt="Bar chart: the five level packs are 3,217,295 bytes raw, 1,195,288 bytes compressed in the debug APK, 705,234 bytes as the old gz files, and 705,144 bytes compressed in the release APK." loading="lazy"><figcaption>The release APK's deflate alone came out 90 bytes smaller than the pre-gzipped files.</figcaption></figure>
+      <p>In the debug APK the same packs take 1,195,288 bytes, about 1.7 times the release figure. We haven't checked why. Measure asset sizes in a release APK.</p>
+    </section>
+
+    <section aria-labelledby="wrong-pair">
+      <h2 id="wrong-pair">The design's 4.4× compared the wrong pair</h2>
+      <p>The case for gzip was one line in a design draft an agent wrote that afternoon: "300 levels = 535 KB raw / 121 KB gz (4.4×)", with an estimate of 0.7 to 0.85 MB gzipped for 1,000 levels. Raw sizes never ship, since the APK compresses the plain packs too. The pair to compare was the gz files against the plain packs as the APK compresses them.</p>
+      <p>The format went into the update spec committed at 17:18 (f5b50c0). Its commit message says 24 agents cross-checked it. It put the packs in assets as <code>.pack.gz</code> and had the app read them with <code>GZIPInputStream</code>. At 18:32 commit e3c7781 generated the five packs in that format. That commit was part of a 41-agent workflow (implementation, review and merges) that finished at 22:27 with "none failed". Why that "done" meant JVM tests and a debug build is covered in <a href="/en/ax/parallel-agent-workstreams/">"Use hundreds of agents" in practice</a>.</p>
+    </section>
+
+    <section aria-labelledby="apk-list">
+      <h2 id="apk-list">The APK listing had only arrows-p1.pack</h2>
+      <p>The fresh-install monkey test caught it first; it ran because the operator's first request said to install on the S21 and run E2E. The script clears app data and sends 800 random events with seeds 7, 21 and 99. Seeds 7 and 21 each logged two fatal exceptions, and every one that made it into the log had the same message:</p>
+      <pre><code>E AndroidRuntime: java.lang.RuntimeException: Unable to start activity
+  ComponentInfo{…/sugar.arrows.MainActivity}:
+  java.io.FileNotFoundException: arrows-p1.pack.gz</code></pre>
+      <p>Thirty seconds later the agent listed the assets inside the debug APK. The source folder had <code>arrows-p1.pack.gz</code> at 25,896 bytes; the APK had <code>assets/arrows-p1.pack</code> at 122,966 bytes. All five packs looked like that: no <code>.gz</code> in the name, stored at their decompressed size. The commit message attributes this to aapt.</p>
+      <figure class="ax-fig"><img src="/assets/ax/android-assets-gz-suffix-2-en.webp" width="1200" height="1058" alt="Step diagram for October 3: at 17:18 the spec picks .pack.gz and GZIPInputStream, at 18:32 five packs are generated, at 22:27 the 41-agent workflow finishes with no failures, at 22:28 the S21 monkey run hits FileNotFoundException, at 22:29 the name test goes red, at 22:31 commit 4d46413, at 22:34 three monkey seeds show 0 fatal." loading="lazy"><figcaption>A build with every JVM test green died on its first real-device launch; the fix took three and a half minutes.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="why-green">
+      <h2 id="why-green">The tests opened the same files through a different function</h2>
+      <p>The app and the tests share <code>PackStore</code>, the class that reads packs, but each passes in its own way to open a file. <code>MainActivity</code> uses <code>PackStore(open = assets::open)</code>. <code>ProgressTest</code> uses <code>PackStore(open = { FileInputStream(File(ASSETS, it)) })</code>, where <code>ASSETS</code> is <code>src/main/assets</code>. The tests read the repository files as they are, so they see the <code>.gz</code> name and the gzip bytes. The generator module's test helper <code>Shipped</code> even carried the comment "read the way the app and tools read them". The app reads through AssetManager.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Pre-gzipping%20Android%20assets%2C%20measured%3A%20zero%20APK%20savings%2C%20and%20.pack.gz%20became%20.pack%20with%20a%20FileNotFoundException">Email us</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="fix">
+      <h2 id="fix">Plain packs, and what renaming the extension would have kept</h2>
+      <p>At 22:31, 4d46413 decompressed the packs into plain <code>.pack</code> files and removed <code>GZIPInputStream</code> from <code>Levels.kt</code>. The generator's <code>writeGz</code> became <code>writePack</code>, which writes text. The same commit deleted <code>arrows-v2.pack</code> (534,864 bytes), an old pack the app no longer read; two tests still did, and were moved to the new packs. Before the commit, 256 tests passed (engine 83, generator 40, app 133). At 22:34 the reinstalled app on the S21 had 0 fatal exceptions on all three monkey seeds and got through the tutorial to level 1.</p>
+      <p>Two other fixes were possible. Renaming the extension to something else would keep the build away from the name, so gzip could stay. But the table shows there is no size to gain, and all that would remain is <code>GZIPInputStream</code> plus the mtime-0 header the generator wrote to keep builds byte-identical. Keeping <code>.gz</code> in the source and having only the app open <code>.pack</code> would work on a device, but the tests would go on reading a different name and format than the app, which is how this crash got through. Neither alternative was tried in the repository; this comparison is our judgment while writing the note.</p>
+    </section>
+
+    <section aria-labelledby="test-limits">
+      <h2 id="test-limits">What the 19-line name test doesn't look at</h2>
+      <p>The body of <code>AssetNamesTest</code>, added in 4d46413, is two statements. It was run before the fix and failed at 22:29 with <code>no asset name ends in gz FAILED</code>.</p>
+      <pre><code>val gz = File("src/main/assets").listFiles().orEmpty().map { it.name }.filter { it.endsWith(".gz") }
+assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
+      <p><code>listFiles()</code> doesn't descend into subfolders, so a file like <code>assets/levels/x.gz</code> slips past. Other source sets such as <code>src/debug/assets</code>, and the assets of the other app module in the same repository, aren't checked either. The "on install" in the message is also wrong: the APK listing showed <code>.pack</code> before anything was installed, so the rename happens at build time. We haven't confirmed which step of AGP 9.4.1 does it. The size result comes from 1,100 levels of text packs only; files that deflate can't shrink are outside it.</p>
+    </section>
+
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Checking asset names and sizes in your own APK</h2>
+      <ol>
+        <li>Put the release APK listing next to the source folder: <code>unzip -l app-release.apk | grep assets/</code> and <code>ls src/main/assets</code>. If names or counts differ, find the code that opens those files.</li>
+        <li>Add a JVM test that fails on any asset name ending in <code>.gz</code>, and watch it fail before you fix anything. If you have subfolders, use <code>walkTopDown()</code>.</li>
+        <li>Decide whether to pre-compress from the compressed sizes inside the release APK. In Python, add up <code>compress_size</code> over <code>zipfile.ZipFile(apk).infolist()</code> and compare with your gz files.</li>
+        <li>Open the first screen on a real device from a fresh install with app data cleared. The script is in <a href="/en/ax/fresh-install-monkey-test/">the fresh-install monkey test note</a>.</li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">Still to do: .pack.gz left in the spec</h2>
+      <p>As of HEAD on October 29, 2026 (2310d1f), the update spec docs/09-parts-1000-spec.md still names <code>.pack.gz</code> five times, on four lines, and still says the packs are read with <code>GZIPInputStream</code>. The helper that reads the plain packs is still called <code>Shipped.gzLines</code>. When the spec gets fixed, we'll also decide how far <code>AssetNamesTest</code> should look.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Pre-gzipping%20Android%20assets%2C%20measured%3A%20zero%20APK%20savings%2C%20and%20.pack.gz%20became%20.pack%20with%20a%20FileNotFoundException">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Why does opening a .gz file from Android assets throw FileNotFoundException?</summary><div><p>Because this project's build (AGP 9.4.1) dropped the trailing .gz and stored the file decompressed: the APK listing showed a decompressed <code>x.pack</code> instead of <code>x.pack.gz</code>. Open the name without .gz and drop GZIPInputStream.</p></div></details>
+        <details><summary>Does pre-gzipping assets make the APK smaller?</summary><div><p>Not for our 1,100 levels of text packs. The release APK's deflate came to 705,144 bytes; the pre-gzipped files were 705,234 bytes, larger by the 18-byte gzip header and trailer per pack.</p></div></details>
+        <details><summary>Can a JVM unit test catch this kind of packaging problem?</summary><div><p>It can enforce the naming rule. Whether AssetManager actually opens the file is only confirmed by running the app on a device or emulator.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
+        <li><a href="/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
+        <li><a href="/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+      </ul>
+      <p><a href="/en/ax/topic/android/">All notes on Android development</a> · <a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/sitemap/">Site map</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>

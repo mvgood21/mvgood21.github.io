@@ -1,0 +1,108 @@
+[
+ {
+  "kind": "compare",
+  "ko": {
+   "title": "화면이 꺼진 채 실행한 스플래시 (2026-10-11, Galaxy S21, R8 릴리스)",
+   "left": [
+    "addOnCompleteListener(this)",
+    [
+     "onCreate에서 Remote Config 조회 시작",
+     "조회가 끝나기 전에 onStop이 와서 리스너가 지워짐",
+     "돌아와도 다시 조회하지 않아 스플래시에 남음"
+    ]
+   ],
+   "right": [
+    "묶지 않은 리스너 + whenStarted",
+    [
+     "리스너는 액티비티와 상관없이 결과를 받음",
+     "화면 이동은 STARTED가 될 때까지 기다림",
+     "잠금을 해제하면 메인 화면으로 감"
+    ]
+   ],
+   "note": "수정 전 vc96과 수정 뒤 빌드(ab95e9a)를 같은 절차로 시험했습니다.",
+   "alt": "비교 그림: 액티비티에 묶은 리스너는 onStop에서 지워져 조회 결과를 놓치고 스플래시에 남고, 묶지 않은 리스너에 whenStarted를 쓰면 결과를 받아 두었다가 화면이 다시 보일 때 메인으로 간다.",
+   "caption": "리스너를 액티비티에서 떼고 화면 이동만 STARTED까지 미루자, 화면이 꺼진 채 실행해도 잠금을 해제하면 메인으로 갔습니다."
+  },
+  "en": {
+   "title": "Launching with the screen off (Oct 11, 2026, Galaxy S21, R8 release build)",
+   "left": [
+    "addOnCompleteListener(this)",
+    [
+     "onCreate starts the Remote Config fetch",
+     "onStop arrives before the fetch ends and removes the listener",
+     "Nothing fetches again on return, so the splash stays"
+    ]
+   ],
+   "right": [
+    "Unscoped listener + whenStarted",
+    [
+     "The listener gets the result whatever the activity is doing",
+     "Navigation waits until the activity is STARTED",
+     "Past the lock screen, the app opens the main screen"
+    ]
+   ],
+   "note": "vc96 before the fix and the ab95e9a build after it, same steps.",
+   "alt": "Comparison: a listener scoped to the activity is removed at onStop, misses the fetch result and leaves the app on the splash; an unscoped listener with whenStarted keeps the result and goes to the main screen once the activity is visible again.",
+   "caption": "With the listener detached from the activity and only navigation deferred to STARTED, a launch with the screen off reached the main screen once the lock screen was dismissed."
+  }
+ },
+ {
+  "kind": "steps",
+  "ko": {
+   "title": "출시 전 기기 확인에서 고치기까지 (2026-10-11, 세션 기록과 git 기록)",
+   "items": [
+    [
+     "14:37 vc95",
+     "깨워 잠금을 풀자 스플래시에 멈춰 있음. 강제 종료로 넘기고 95 문제로 미룸."
+    ],
+    [
+     "15:17 vc96",
+     "화면을 끈 채 실행해 재현. 코드를 열어 addOnCompleteListener(this)를 찾음."
+    ],
+    [
+     "15:19 테스트 먼저",
+     "whenStarted 테스트 3개를 쓰고 빈 함수로 돌려 2개 실패."
+    ],
+    [
+     "15:37 통과",
+     "단위 테스트 437개 통과, 릴리스 APK로 기기 재확인."
+    ],
+    [
+     "15:43 ab95e9a",
+     "리스너를 떼고 화면 이동 5곳을 whenStarted로 감싸 커밋."
+    ]
+   ],
+   "note": "시각은 한국 시간입니다. 14:37은 세션 기록의 대략적인 시각입니다.",
+   "alt": "단계 그림: 14시 37분 vc95가 스플래시에 멈춰 있는 것을 처음 보고 강제 종료로 넘김, 15시 17분 vc96을 화면을 끈 채 실행해 재현, 15시 19분 테스트 3개를 먼저 써서 2개 실패, 15시 37분 단위 테스트 437개 통과, 15시 43분 ab95e9a 커밋.",
+   "caption": "첫 목격은 강제 종료로 넘겼고, 40분 뒤 일부러 재현한 다음에는 약 25분 만에 커밋했습니다."
+  },
+  "en": {
+   "title": "From the pre-release device check to the fix (Oct 11, 2026, session log and git history)",
+   "items": [
+    [
+     "14:37 vc95",
+     "Woken and unlocked, it is stuck on the splash. Force-stopped and parked as a 95 problem."
+    ],
+    [
+     "15:17 vc96",
+     "Launched with the screen off on purpose: same hang. The agent opens the code and finds addOnCompleteListener(this)."
+    ],
+    [
+     "15:19 tests first",
+     "Three whenStarted tests against an empty function: 2 fail."
+    ],
+    [
+     "15:37 green",
+     "437 unit tests pass; the release APK is checked on the phone again."
+    ],
+    [
+     "15:43 ab95e9a",
+     "Listener detached, 5 navigation calls wrapped in whenStarted, committed."
+    ]
+   ],
+   "note": "Times are KST. 14:37 is approximate, from the session log.",
+   "alt": "Step diagram: at 14:37 the agent first finds vc95 stuck on the splash and force-stops past it; at 15:17 it reproduces the hang on vc96 by launching with the screen off; at 15:19 three tests are written first and 2 fail; at 15:37 all 437 unit tests pass; at 15:43 commit ab95e9a.",
+   "caption": "The first hang was force-stopped and parked; after reproducing it on purpose 40 minutes later, the fix was committed in about 25 minutes."
+  }
+ }
+]

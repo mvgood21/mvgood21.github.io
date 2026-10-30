@@ -6,7 +6,286 @@
   <description>한 가지 일을 간단하게 하는 Android 앱을 만듭니다. 사진 용량 줄이기부터 한글 문서 보기, 한글 맞춤법, 퍼즐 게임까지 앱마다 하는 일은 하나입니다.</description>
   <language>ko</language>
   <atom:link href="https://mvgood21.github.io/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Fri, 30 Oct 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Sat, 31 Oct 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Android assets .gz가 안 열리는 이유 – SugarMount</title>
+    <link>https://mvgood21.github.io/ax/android-assets-gz-suffix/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/ax/android-assets-gz-suffix/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/android-assets-gz-suffix-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX 노트 · 측정</span>
+      <h1>Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</h1>
+      <p class="lead">미리 gzip한 레벨 팩은 APK 안 압축본보다 팩마다 18바이트 컸습니다. 이름 끝의 .gz는 빌드에서 빠져 기기에서 열리지도 않았습니다.</p>
+      <p>미리 gzip해 둔 레벨 팩 5개는 합계 705,234바이트였고, 같은 팩을 평문으로 넣은 릴리스 APK 안의 압축 크기는 705,144바이트였습니다. 설계 단계에서 gzip을 고른 근거 "4.4배"는 원본과 gz를 비교한 숫자였고, APK가 스스로 압축한 결과와는 비교하지 않았습니다. 이 결정은 2026년 10월 3일 22시 28분, <a href="https://mvgood21.github.io/apps/arrow-knots/">화살표 매듭풀기</a>의 1,000레벨 개편 빌드가 S21에서 실행 직후 <code>FileNotFoundException</code>으로 죽으면서 드러났습니다. 같은 팩을 읽는 JVM 테스트는 모두 통과한 상태였습니다.</p>
+      <p class="note">근거는 게임 저장소의 git 기록(f5b50c0, e3c7781, 4d46413), 같은 날 에이전트 세션 기록에 남은 몽키 로그와 APK 목록, 2026년 10월 28일에 만든 릴리스·디버그 APK의 압축 크기(Python zipfile로 읽음)입니다. 기준일은 2026년 10월 30일입니다.</p>
+    </section>
+    <section aria-labelledby="size">
+      <h2 id="size">gz 705,234바이트 대 APK 안 705,144바이트</h2>
+      <p>2026년 10월 28일에 만든 릴리스 APK를 열어 레벨 팩 5개의 원본 크기와 압축 크기를 읽고, 커밋 4d46413 직전까지 저장소에 있던 <code>.gz</code> 파일 크기와 나란히 놓았습니다. 팩 내용은 4d46413 이후 바뀌지 않았고, 옛 <code>.gz</code>를 풀면 SHA-1이 평문 팩과 같으니 같은 바이트를 비교한 것입니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>팩</th><th>원본</th><th>옛 .gz 파일</th><th>릴리스 APK 안 압축</th><th>차이</th></tr></thead>
+        <tbody>
+          <tr><td>p1 (1~200)</td><td>122,966</td><td>25,896</td><td>25,878</td><td>18</td></tr>
+          <tr><td>p2 (201~500)</td><td>524,852</td><td>111,113</td><td>111,095</td><td>18</td></tr>
+          <tr><td>p3 (501~700)</td><td>679,344</td><td>147,461</td><td>147,443</td><td>18</td></tr>
+          <tr><td>p4 (701~1000)</td><td>1,397,319</td><td>310,108</td><td>310,090</td><td>18</td></tr>
+          <tr><td>endless (1001~1100)</td><td>492,814</td><td>110,656</td><td>110,638</td><td>18</td></tr>
+          <tr><td>합계</td><td>3,217,295</td><td>705,234</td><td>705,144</td><td>90</td></tr>
+        </tbody>
+      </table></div>
+      <p>다섯 팩 모두 차이가 정확히 18바이트입니다. gzip 파일은 deflate 데이터 앞에 10바이트 헤더, 뒤에 8바이트 트레일러(CRC32와 원본 길이)를 붙이니, 압축된 본문 크기는 같고 차이는 gzip 포장뿐입니다. 텍스트 에셋은 미리 gzip하지 마십시오.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/android-assets-gz-suffix-1-ko.webp" width="1200" height="544" alt="막대그래프: 레벨 팩 5개의 원본은 3,217,295바이트, 디버그 APK 안 압축 크기는 1,195,288바이트, 옛 gz 파일은 705,234바이트, 릴리스 APK 안 압축 크기는 705,144바이트." loading="lazy"><figcaption>릴리스 APK의 deflate만으로 미리 gzip한 파일보다 90바이트 작았습니다.</figcaption></figure>
+      <p>같은 팩이 디버그 APK에서는 1,195,288바이트로, 릴리스의 약 1.7배였습니다. 이 차이의 원인은 확인하지 않았습니다. 에셋 크기를 비교할 때는 릴리스 APK를 여십시오.</p>
+    </section>
+    <section aria-labelledby="wrong-pair">
+      <h2 id="wrong-pair">설계의 4.4배는 원본과 gz를 비교했습니다</h2>
+      <p>gzip을 고른 근거는 그날 오후 에이전트가 쓴 설계안의 한 줄이었습니다. "300레벨이 원본 535KB, gz 121KB(4.4배)"라고 적고, 1,000레벨이면 gz로 0.7~0.85MB가 된다고 추정했습니다. 원본 크기는 APK에 그대로 실리지 않으니(평문 팩도 deflate로 줄여 넣습니다), 비교할 짝은 gz 파일과 APK가 압축한 평문 팩입니다.</p>
+      <p>이 형식은 17시 18분에 커밋된 개편 명세(f5b50c0)에 들어갔습니다. 커밋 본문에 따르면 에이전트 24개의 교차 검증을 거친 문서이고, 팩을 <code>.pack.gz</code>로 두고 <code>GZIPInputStream</code>으로 읽으라고 적었습니다. 18시 32분에는 커밋 e3c7781이 팩 다섯 개를 이 형식으로 만들었습니다. 이 커밋을 포함해 구현·리뷰·병합을 맡은 에이전트 41개의 워크플로가 22시 27분에 "실패 없음"으로 끝났습니다. 그 '완료'가 JVM 테스트와 디버그 빌드 기준이었던 사정은 <a href="https://mvgood21.github.io/ax/parallel-agent-workstreams/">'에이전트 수백 개 써도 돼'의 실제</a>에 적어 두었습니다.</p>
+    </section>
+    <section aria-labelledby="apk-list">
+      <h2 id="apk-list">APK 목록에는 arrows-p1.pack만 있었습니다</h2>
+      <p>크래시를 처음 잡은 것은 운영자가 첫 요청에 "S21에 설치해서 E2E 테스트까지"를 넣어 둔 덕에 돌린 신규 설치 몽키 테스트였습니다. 앱 데이터를 지우고 시드 7, 21, 99로 무작위 입력 800회를 넣는 스크립트인데, 시드 7과 21에서 각각 fatal 2건이 나왔고 기록에 남은 로그는 모두 같았습니다.</p>
+      <pre><code>E AndroidRuntime: java.lang.RuntimeException: Unable to start activity
+  ComponentInfo{…/sugar.arrows.MainActivity}:
+  java.io.FileNotFoundException: arrows-p1.pack.gz</code></pre>
+      <p>30초 뒤 에이전트가 디버그 APK의 assets 목록을 열었습니다. 소스 폴더의 <code>arrows-p1.pack.gz</code>는 25,896바이트였고, APK에는 122,966바이트의 <code>assets/arrows-p1.pack</code>이 있었습니다. 팩 다섯 개가 모두 이름에서 <code>.gz</code>가 빠지고 압축이 풀린 크기로 들어 있더군요. 커밋 메시지는 이 동작을 aapt가 한다고 적었습니다.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/android-assets-gz-suffix-2-ko.webp" width="1200" height="970" alt="단계 그림: 10월 3일 17:18 명세가 .pack.gz와 GZIPInputStream을 정함, 18:32 팩 5개 생성, 22:27 에이전트 41개 워크플로가 실패 없이 끝남, 22:28 S21 몽키에서 FileNotFoundException, 22:29 이름 검사 테스트 빨간불, 22:31 커밋 4d46413, 22:34 몽키 시드 3개 fatal 0." loading="lazy"><figcaption>JVM 테스트가 모두 통과한 빌드가 첫 실기기 실행에서 죽었고, 고치는 데 3분 반이 걸렸습니다.</figcaption></figure>
+    </section>
+    <section aria-labelledby="why-green">
+      <h2 id="why-green">테스트는 앱과 다른 함수로 같은 파일을 열었습니다</h2>
+      <p>앱과 테스트는 팩을 읽는 클래스 <code>PackStore</code>를 함께 쓰지만, 파일을 여는 함수는 따로 넣었습니다. <code>MainActivity</code>는 <code>PackStore(open = assets::open)</code>이고, <code>ProgressTest</code>는 <code>PackStore(open = { FileInputStream(File(ASSETS, it)) })</code>이며 <code>ASSETS</code>는 <code>src/main/assets</code>입니다. 테스트는 저장소의 파일을 그대로 읽으니 <code>.gz</code> 이름도 gzip 내용도 그대로 보입니다. 생성기 모듈의 테스트 헬퍼 <code>Shipped</code>에는 "앱과 도구가 읽는 방식으로 읽는다"는 주석까지 붙어 있었는데, 앱이 실제로 읽는 길은 AssetManager였습니다.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20Android%20assets%EB%A5%BC%20%EB%AF%B8%EB%A6%AC%20gzip%ED%95%9C%20%EC%8B%A4%EC%B8%A1%3A%20APK%20%EC%9D%B4%EB%93%9D%EC%9D%80%200%2C%20.pack.gz%EB%8A%94%20.pack%EC%9D%B4%20%EB%90%98%EC%96%B4%20FileNotFoundException">메일로 문의하기</a></p></aside>
+    <section aria-labelledby="fix">
+      <h2 id="fix">평문 팩으로 바꿨고, 확장자 우회는 얻는 게 없습니다</h2>
+      <p>22시 31분 커밋 4d46413은 팩을 풀어 평문 <code>.pack</code>으로 바꾸고, <code>Levels.kt</code>가 <code>GZIPInputStream</code> 없이 파일을 읽게 했습니다. 생성기의 <code>writeGz</code>는 평문을 쓰는 <code>writePack</code>이 됐습니다. 앱이 쓰지 않던 옛 팩 <code>arrows-v2.pack</code>(534,864바이트)도 지우고, 그 팩을 읽던 테스트 두 개를 새 팩으로 옮겼습니다. 커밋 직전 테스트 256개(엔진 83, 생성기 40, 앱 133)가 통과했고, 22시 34분 다시 설치한 S21에서 몽키 시드 3개가 모두 fatal 0이었으며 튜토리얼을 지나 1레벨까지 들어갔습니다.</p>
+      <p>다른 길도 두 가지 있습니다. 확장자를 다른 이름으로 바꾸면 빌드가 이름을 건드리지 않으니 gzip을 지킬 수 있습니다. 그러나 위 표대로 얻는 크기가 없고, 남는 것은 <code>GZIPInputStream</code>과 같은 바이트를 만들려고 넣은 mtime 0 헤더 처리입니다. 소스는 <code>.gz</code>로 두고 앱만 <code>.pack</code>을 열게 고치는 방법은 기기에서는 동작하지만, 테스트가 계속 앱과 다른 이름과 형식을 읽습니다. 이번 사고의 원인을 그대로 두는 길입니다. 두 대안은 저장소에서 시도한 기록이 없고, 이 비교는 글을 쓰며 한 판단입니다.</p>
+    </section>
+    <section aria-labelledby="test-limits">
+      <h2 id="test-limits">19줄 이름 검사가 보지 않는 폴더와 모듈</h2>
+      <p>4d46413이 붙인 <code>AssetNamesTest</code>의 본문은 두 문장입니다. 고치기 전에 먼저 돌려 22시 29분에 <code>no asset name ends in gz FAILED</code>를 확인했습니다.</p>
+      <pre><code>val gz = File("src/main/assets").listFiles().orEmpty().map { it.name }.filter { it.endsWith(".gz") }
+assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
+      <p><code>listFiles()</code>는 하위 폴더를 내려가지 않으니 <code>assets/levels/x.gz</code> 같은 파일은 지나갑니다. <code>src/debug/assets</code> 같은 다른 소스 세트와, 같은 저장소의 다른 앱 모듈 assets도 검사 밖입니다. 메시지의 "on install"도 정확하지 않습니다. 설치하기 전 APK 목록에 이미 <code>.pack</code>이 있었으니 이름이 바뀌는 때는 빌드입니다. AGP 9.4.1의 어느 단계가 이 일을 하는지는 확인하지 않았습니다. 크기 측정도 텍스트 팩 1,100판에서만 했으므로, deflate가 줄이지 못하는 파일은 이 결론 밖에 있습니다.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">내 APK에서 assets 이름과 크기를 확인하는 순서</h2>
+      <ol>
+        <li>릴리스 APK의 목록과 소스 폴더를 나란히 봅니다: <code>unzip -l app-release.apk | grep assets/</code>, <code>ls src/main/assets</code>. 이름과 개수가 다르면 그 파일을 여는 코드부터 찾습니다.</li>
+        <li>이름이 <code>.gz</code>로 끝나는 에셋이 있으면 실패하는 JVM 테스트를 붙이고, 고치기 전에 빨간불을 먼저 봅니다. 하위 폴더가 있으면 <code>walkTopDown()</code>을 씁니다.</li>
+        <li>미리 압축할지는 릴리스 APK 안의 압축 크기로 정합니다. Python이면 <code>zipfile.ZipFile(apk).infolist()</code>의 <code>compress_size</code>를 더해 gz 파일 크기와 비교합니다.</li>
+        <li>앱 데이터를 지운 신규 설치 상태로 실기기에서 첫 화면을 엽니다. 스크립트는 <a href="https://mvgood21.github.io/ax/fresh-install-monkey-test/">신규 설치 몽키 테스트</a> 글에 있습니다.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">남은 일: 명세에 남은 .pack.gz</h2>
+      <p>개편 명세 docs/09-parts-1000-spec.md는 2026년 10월 29일 HEAD(2310d1f)에도 <code>.pack.gz</code>를 네 줄(다섯 군데)에 적고 있고, 읽기 방법도 <code>GZIPInputStream</code>으로 남아 있습니다. 평문을 읽는 헬퍼 이름은 아직 <code>Shipped.gzLines</code>입니다. 명세를 고치는 김에 <code>AssetNamesTest</code>의 검사 범위도 정합니다.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20Android%20assets%EB%A5%BC%20%EB%AF%B8%EB%A6%AC%20gzip%ED%95%9C%20%EC%8B%A4%EC%B8%A1%3A%20APK%20%EC%9D%B4%EB%93%9D%EC%9D%80%200%2C%20.pack.gz%EB%8A%94%20.pack%EC%9D%B4%20%EB%90%98%EC%96%B4%20FileNotFoundException">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>Android assets에 넣은 .gz 파일을 열면 왜 FileNotFoundException이 나나요?</summary><div><p>이 프로젝트 빌드(AGP 9.4.1)가 이름 끝의 .gz를 떼고 내용을 풀어 APK에 넣었기 때문입니다. APK 목록에는 <code>x.pack.gz</code> 대신 압축이 풀린 <code>x.pack</code>이 있었습니다. 코드는 .gz 없는 이름으로 열고, GZIPInputStream도 빼야 합니다.</p></div></details>
+        <details><summary>에셋을 미리 gzip하면 APK가 작아지나요?</summary><div><p>텍스트 레벨 팩 1,100판에서는 작아지지 않았습니다. 릴리스 APK의 deflate 결과가 705,144바이트, 미리 gzip한 파일이 705,234바이트로 팩마다 gzip 헤더와 트레일러 18바이트만큼 컸습니다.</p></div></details>
+        <details><summary>JVM 단위 테스트로 이런 패키징 문제를 잡을 수 있나요?</summary><div><p>이름 규칙 하나는 잡을 수 있습니다. 실제로 AssetManager가 파일을 여는지는 기기나 에뮬레이터에서 앱을 실행해야 확인됩니다.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
+        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Sat, 31 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>market:// 스토어 선택 창 없이 Play로 열기 – SugarMount</title>
+    <link>https://mvgood21.github.io/ax/market-uri-store-chooser/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/ax/market-uri-store-chooser/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/market-uri-store-chooser-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX 노트 · 방법</span>
+      <h1>SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</h1>
+      <p class="lead">SKT 판매 삼성 폰 두 대(S21·S20)에서는 market:// 링크를 스토어 앱 3개가 받았습니다. Play 패키지를 먼저 지정하면 선택 창이 사라집니다.</p>
+      <p>Galaxy S21에서 서랍의 스토어 링크를 열자 Play 상세 대신 원스토어, 갤럭시 스토어, Play 가운데 하나를 고르라는 창이 나왔습니다. 2026년 10월 9일, <a href="https://mvgood21.github.io/apps/sugarspeller/">한글 띄어쓰기</a> 앱 서랍에 형제 게임 메뉴를 넣은 efc0acf를 S21 실기기에서 눌러 보던 중이었고, 단위 테스트 300개는 이미 모두 통과한 상태였습니다. 59분 뒤 8bbe179에서 Play 패키지를 먼저 지정하는 순서로 고쳤습니다.</p>
+      <p class="note">근거: 한글 띄어쓰기 앱 저장소의 git 기록(f6ef50e, efc0acf, 8bbe179, b6cda27), CHANGELOG 1.6.026, 관측 기록(WATCH.md 10-23), 2026-10-30에 Galaxy S21·S20에 adb로 다시 질의한 결과입니다.</p>
+    </section>
+    <section aria-labelledby="three-handlers">
+      <h2 id="three-handlers">market:// 링크 하나를 스토어 앱 3개가 받습니다</h2>
+      <p>10월 30일에 SKT 판매 모델 두 대에서 <code>market://details?id=…</code>를 받는 앱을 물어봤습니다. Galaxy S21(Android 15)도 Galaxy S20(Android 13)도 답은 Play, 갤럭시 스토어, 원스토어 3개였고, 셋 모두 받을 앱을 지정하지 않은 Intent를 받겠다고(isDefault=true, CATEGORY_DEFAULT 선언) 나왔습니다. 이런 Intent에 후보가 2개 이상이고 기본 앱이 정해져 있지 않으면 Android는 고르는 창을 보여 줍니다.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/market-uri-store-chooser-1-ko.webp" width="1200" height="577" alt="비교 그림: 받을 앱을 정하지 않은 market:// 링크는 S21에서 스토어 앱 3개가 받아 선택 창이 뜨고, Play 패키지를 지정한 링크는 후보가 1개라 Play 상세가 바로 열린다." loading="lazy"><figcaption>같은 market:// 주소도 Play 패키지를 지정하면 후보가 3개에서 1개로 줄어 선택 창이 사라집니다.</figcaption></figure>
+      <p>서랍이 보내는 <a href="https://mvgood21.github.io/apps/blocks/">한판블록</a>, 화살표 매듭풀기, 생생카드는 Play에만 있습니다. 게임 링크에는 <code>utm_source=sugarspeller&amp;utm_medium=crosspromo&amp;utm_campaign=drawer</code> referrer를 붙였는데, 이 값도 Play만 읽어 Play Console 획득 보고서에 넣습니다. 사용자가 다른 스토어를 고르면 앱이 없는 화면을 보고, 설치하더라도 교차 홍보에서 온 설치로 세어지지 않습니다.</p>
+    </section>
+    <section aria-labelledby="wrong-assumption">
+      <h2 id="wrong-assumption">실패를 'Play 없음'으로 읽은 코드</h2>
+      <p>처음 코드는 <code>market://</code>을 열고, <code>ActivityNotFoundException</code>이 나면 https 주소로 넘어갔습니다. 그 분기에 붙은 주석은 "Play 스토어 앱이 없는 기기"였습니다. market://을 여는 앱은 Play뿐이라는 가정입니다. 이 코드는 9월 20일 f6ef50e의 생생카드 메뉴에 처음 들어갔고, 10월 9일 efc0acf가 게임과 생생카드가 함께 쓰는 런처로 그대로 옮겼습니다. 두 커밋 모두 Claude가 공동 작성했습니다.</p>
+      <p>SKT 판매 삼성 폰에서는 이 가정 때문에 대체 경로가 한 번도 돌지 않습니다. 후보가 3개라 예외가 나지 않고 선택 창이 뜨니, 코드는 스토어를 열었다고 판단하고 끝납니다. 생생카드 메뉴도 9월 20일 코드부터 같은 문제를 안고 있었다는 것을 이때 함께 알았습니다.</p>
+    </section>
+    <section aria-labelledby="missed">
+      <h2 id="missed">단위 테스트 300개와 리뷰 2회가 지나친 이유</h2>
+      <p>efc0acf의 스토어 테스트는 시작된 Intent의 주소(data)만 비교했고, 어느 앱이 받을지(package)는 보지 않았습니다. Robolectric 환경에는 다른 스토어 앱이 없고, 기본 설정에서는 startActivity가 실패하지도 않습니다. 같은 작업에서 분석 에이전트 3개와 적대적 리뷰 2회가 테스트 구멍 3곳(<code>&lt;queries&gt;</code> 누락, Android 6.0 숨김, Classic 서랍 배선)을 찾아 막았지만, market:// 가정은 아무도 지적하지 않았습니다.</p>
+      <p>이 문제는 S21 실기기에서 메뉴를 직접 눌러 보다가 나왔습니다. 저장소 작업 지침은 런타임 확인을 릴리스 APK로 하라고 적어 두었고, 수정 뒤 확인도 릴리스 APK로 했습니다(절차는 <a href="https://mvgood21.github.io/ax/release-gate/">릴리스 게이트 글</a>에 정리했습니다).</p>
+    </section>
+    <section aria-labelledby="fix-order">
+      <h2 id="fix-order">Play 지정, 일반 market, https 순서로 시도</h2>
+      <p>8bbe179는 후보 세 개를 목록으로 두고 차례로 엽니다. 예외가 나면 다음 후보로 넘어가고, 하나라도 열리면 거기서 끝납니다.</p>
+<pre><code>val attempts = listOf(
+    view("market://details?$query").setPackage(PLAY_STORE),
+    view("market://details?$query"),                           // Play가 없으면 다른 스토어라도
+    view("https://play.google.com/store/apps/details?$query"), // 스토어 앱이 없으면 브라우저
+)</code></pre>
+      <p>Play 패키지를 지정한 Intent는 Play가 없는 기기에서 예외를 내므로, 처음 코드에는 없던 실패 신호가 생깁니다. 테스트는 기존 테스트에 "시작된 Intent의 package가 Play인가" 단언을 더했고, Play 없이 다른 스토어만 있는 환경(checkActivities(true))에서 일반 market:// 주소가 package 없이 열리는지 보는 테스트를 새로 넣었습니다. 단위 테스트는 301/301이 됐습니다. 첫 후보의 setPackage를 지우면 package가 비어 이 단언이 실패합니다(같은 방식은 <a href="https://mvgood21.github.io/ax/guard-removal-test/">가드 지워 보기</a>에 썼습니다).</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/market-uri-store-chooser-2-ko.webp" width="1200" height="738" alt="단계 그림: 설치돼 있으면 앱을 열고, 없으면 Play 패키지를 지정한 market://, 실패하면 일반 market://, 그래도 실패하면 https 주소를 연다. 10월 9일 S21에서는 한판블록이 선택 창 없이 Play 상세로 열렸다." loading="lazy"><figcaption>앞 후보가 예외를 낼 때만 다음 후보로 넘어가므로, Play가 있는 폰에서는 늘 Play 상세가 열립니다.</figcaption></figure>
+      <p>같은 날 S21의 릴리스 APK에서 설치된 화살표 매듭풀기는 게임 앱이 바로 열렸고, 설치되지 않은 한판블록은 선택 창 없이 Play 상세로, 생생카드도 Play로 갔습니다. GA4 로그에도 <code>game_open{game=arrows,installed=1}</code>, <code>{game=blocks,installed=0}</code>, <code>sugarcard_open{installed=0}</code>이 찍혔습니다. 이 수정은 1.6.026 배포 브랜치에 함께 들어갔고, 그 버전이 같은 날 오전 Play에 게시돼 게임 메뉴는 처음 나갈 때부터 Play를 지정했습니다.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20SKT%20%ED%8C%90%EB%A7%A4%20%EC%82%BC%EC%84%B1%20%ED%8F%B0%EC%97%90%EC%84%9C%20market%3A//%EC%9D%84%20%EC%97%B4%EB%A9%B4%20%EC%8A%A4%ED%86%A0%EC%96%B4%20%EC%84%A0%ED%83%9D%20%EC%B0%BD%EC%9D%B4%20%EB%9C%AC%EB%8B%A4%3A%20Play%20%ED%8C%A8%ED%82%A4%EC%A7%80%EB%B6%80%ED%84%B0%20%EC%A7%80%EC%A0%95%ED%95%98%EA%B8%B0">메일로 문의하기</a></p></aside>
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">선택 창을 두는 안과 https를 먼저 여는 안</h2>
+      <p>선택 창을 그대로 두는 안은 앱이 Play에만 있다는 이유 하나로 버렸습니다. Play만 지정하고 뒤를 비우는 안은 Play가 없는 기기에서 아무것도 열지 못해서, 일반 market과 https를 뒤에 남겼습니다.</p>
+      <p>10월 30일 S21에서 Play 상세 https 주소는 Play와 Chrome 두 앱이 받았고, play.google.com은 Play에 시스템 설정으로 검증된 링크라 https를 먼저 열어도 Play가 열렸을 가능성이 높습니다(실제로 눌러 보지는 않았습니다). 그래도 브라우저는 거의 언제나 https를 받으니 예외가 나지 않고, 어느 앱이 열릴지가 기기 설정에 달립니다. 실패하면 다음 후보로 가는 구조와 맞지 않아 https는 마지막에 두었습니다.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">다른 스토어에도 올린 앱이면 Play를 고정하지 않습니다</h2>
+      <p>국내 사용자에게 Play에만 있는 앱을 보낼 때는 market:// Intent에 Play 패키지를 지정하십시오. 원스토어나 갤럭시 스토어에도 올린 앱이라면 이 고정이 그 스토어 사용자를 Play로 끌고 가므로 쓰지 않습니다. Play가 없는 기기에서는 두 번째 후보가 다른 스토어를 열고, 그 스토어에는 앱이 없습니다. 이 경로는 Robolectric 테스트로만 확인했고, 그런 실기기는 없습니다. 확인한 폰도 SKT 판매 삼성 두 대뿐이라 KT·LG U+ 모델, 자급제 모델, 다른 제조사 폰은 재 보지 않았습니다.</p>
+    </section>
+    <section aria-labelledby="check">
+      <h2 id="check">adb 질의 두 번과 package 단언 하나</h2>
+      <ol>
+        <li>폰을 연결하고 <code>adb shell cmd package query-activities --brief -a android.intent.action.VIEW -d "market://details?id=com.example.app"</code>를 실행합니다. 첫 줄의 "N activities found"가 2 이상이면 선택 창이 뜰 수 있는 폰이고, 후보마다 isDefault 값도 함께 나옵니다.</li>
+        <li>같은 명령 끝에 Play 스토어 앱의 패키지 <code>-p com.android.vending</code>를 붙여 다시 실행합니다. 1개가 나와야 합니다.</li>
+        <li>스토어 링크 코드를 Play 지정, 일반 market, https 순서로 바꾸고, 각 단계에서 <code>ActivityNotFoundException</code>만 받아 다음 후보로 넘어가게 합니다.</li>
+        <li>단위 테스트에 시작된 Intent의 <code>package</code> 단언을 넣고, setPackage를 지웠을 때 실패하는지 한 번 봅니다.</li>
+        <li>릴리스 APK를 국내 판매 실기기에 올려 링크를 직접 누릅니다.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">남은 일: UTM 설치 수와 서랍 E2E 16건</h2>
+      <p>10월 9일부터 22일까지 게임 줄은 33번 눌렸습니다(한판블록 5, 화살표 매듭풀기 16, 게임 값이 없는 1.6.026 기록 12, GA4). 그 탭이 설치로 이어졌는지는 Play Console 획득 보고서에만 있어 아직 판정하지 않았습니다. S21에서 서랍을 여는 E2E 테스트 16건은 변경 전 기준선(360bed3) 빌드에서도 똑같이 실패해서, 게임 줄 E2E는 기기에서 돌리지 못하고 손으로 눌러 확인했습니다. 그 실패 원인부터 찾을 차례입니다.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20SKT%20%ED%8C%90%EB%A7%A4%20%EC%82%BC%EC%84%B1%20%ED%8F%B0%EC%97%90%EC%84%9C%20market%3A//%EC%9D%84%20%EC%97%B4%EB%A9%B4%20%EC%8A%A4%ED%86%A0%EC%96%B4%20%EC%84%A0%ED%83%9D%20%EC%B0%BD%EC%9D%B4%20%EB%9C%AC%EB%8B%A4%3A%20Play%20%ED%8C%A8%ED%82%A4%EC%A7%80%EB%B6%80%ED%84%B0%20%EC%A7%80%EC%A0%95%ED%95%98%EA%B8%B0">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>갤럭시에서 Play 스토어 링크를 누르면 왜 스토어를 고르라고 하나요?</summary><div><p>폰에 market:// 주소를 받는 스토어 앱이 여러 개 있기 때문입니다. 2026-10-30 기준 SKT 판매 Galaxy S21·S20에서는 Play, 갤럭시 스토어, 원스토어 3개가 받았고, 링크가 받을 앱을 정하지 않으면 Android가 고르는 창을 보여 줍니다.</p></div></details>
+        <details><summary>앱에서 Play 스토어 상세를 바로 열려면 어떻게 하나요?</summary><div><p>market://details Intent에 setPackage로 Play 스토어 앱을 지정합니다. Play가 없는 기기에서는 이 Intent가 ActivityNotFoundException을 내므로, 일반 market://과 https 주소를 차례로 대체 후보로 놓습니다.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
+        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Sat, 31 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>스플래시 멈춤과 addOnCompleteListener – SugarMount</title>
+    <link>https://mvgood21.github.io/ax/splash-listener-onstop/</link>
+    <guid isPermaLink="true">https://mvgood21.github.io/ax/splash-listener-onstop/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://mvgood21.github.io/assets/ax/cover/splash-listener-onstop-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX 노트 · 사고 기록</span>
+      <h1>addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</h1>
+      <p class="lead">addOnCompleteListener(this)로 건 리스너는 onStop에서 사라집니다. 조회 중 화면이 꺼지면 다음 화면으로 가는 코드가 불리지 않았습니다.</p>
+      <p>화면이 꺼진 상태에서 맞춤법 앱 <a href="https://mvgood21.github.io/apps/sugarspeller/">한글 띄어쓰기</a>를 실행하면, 잠금을 해제해도 검은 스플래시에서 넘어가지 않았습니다. 2026년 10월 11일 오후, Galaxy S21에서 R8 릴리스 APK로 출시 전 기기 확인을 하다가 vc95에서 먼저 스플래시에 멈춘 것을 봤고, vc96에서 화면을 끈 채 실행해 재현했습니다. 원인인 <code>fetchAndActivate().addOnCompleteListener(this)</code> 한 줄은 2020년 12월 16일 저장소 첫 커밋부터 있었고, 10월 11일 15시 43분 커밋(ab95e9a)에서 고쳤습니다.</p>
+      <p class="note">근거: 앱 저장소의 git 기록(d5ac5e2, ab95e9a), CHANGELOG 1.6.029, 릴리스 문서의 기기 확인 기록, 당시 에이전트 세션 기록, 모니터링 기록(WATCH.md), Google Play services Task 참조 문서. 2026-10-30에 다시 확인했습니다.</p>
+    </section>
+    <section aria-labelledby="removed-at-onstop">
+      <h2 id="removed-at-onstop">onStop이 지운 리스너는 돌아와도 불리지 않습니다</h2>
+      <p>스플래시 화면 <code>ActivityEmpty</code>는 <code>onCreate</code>에서 Remote Config(이하 RC) 조회를 한 번 시작합니다. 조회가 끝나면 버전을 확인하고 <code>checkMyPermission()</code>을 불러 다음 화면으로 넘어갑니다. 다음 화면으로 가는 길이 이 완료 리스너 안에만 있었습니다.</p>
+      <pre><code>// ActivityEmpty, ab95e9a 직전, 줄임 (2020-12-16 d5ac5e2부터 같은 줄)
+// [START fetch_config_with_callback]
+remoteConfig.fetchAndActivate().addOnCompleteListener(this) { task -&gt;
+    ...
+    checkMyPermission()   // (설명) 성공·실패 갈래 모두 여기서 다음 화면으로
+}</code></pre>
+      <p>Task 참조 문서는 Activity를 받는 <code>addOnCompleteListener</code>를 두고 "The listener will be automatically removed during onStop."이라고 적습니다. 조회가 끝나기 전에 화면이 꺼지거나 사용자가 다른 앱으로 가면 onStop이 먼저 오고, 리스너가 지워집니다. 그날 화면이 꺼진 동안 onStop이 정확히 언제 왔는지 남긴 수명주기 로그는 없어, 이 단계는 문서와 수정 전후 재현으로 받친 설명입니다.</p>
+      <p>돌아왔을 때 다시 시도하는 코드도 없었습니다. 액티비티가 살아 있으니 <code>onCreate</code>는 다시 불리지 않고, <code>onStart</code>는 시스템 바 플래그만 설정합니다. 그래서 프로세스를 죽이기 전까지 스플래시에 남습니다. 그날 기기의 GA4 디버그 로그에는 first_open, session_start, screen_view와 앱 열기 광고 이벤트 두 개까지만 찍혔습니다.</p>
+      <p>주석의 <code>[START fetch_config_with_callback]</code> 표지는 Firebase quickstart-android의 Remote Config 예제에도 그대로 있고, 그 예제도 <code>addOnCompleteListener(this)</code>를 사용합니다. 표지와 줄이 같아 예제에서 온 코드로 보입니다. 같은 스플래시가 RC의 강제 업데이트 값 때문에 사용자를 막은 일은 <a href="https://mvgood21.github.io/ax/string-version-compare/">"6.7" &lt; "6.11"이 거짓이라 콘텐츠 갱신이 멈춘 기록</a>에 따로 적었습니다.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/splash-listener-onstop-1-ko.webp" width="1200" height="658" alt="비교 그림: 액티비티에 묶은 리스너는 onStop에서 지워져 조회 결과를 놓치고 스플래시에 남고, 묶지 않은 리스너에 whenStarted를 쓰면 결과를 받아 두었다가 화면이 다시 보일 때 메인으로 간다." loading="lazy"><figcaption>리스너를 액티비티에서 떼고 화면 이동만 STARTED까지 미루자, 화면이 꺼진 채 실행해도 잠금을 해제하면 메인으로 갔습니다.</figcaption></figure>
+    </section>
+    <section aria-labelledby="first-sighting">
+      <h2 id="first-sighting">처음 본 멈춤은 강제 종료로 넘겼습니다</h2>
+      <p>운영자가 production 전에 심층 기기 확인을 요청했고, Claude Code 에이전트가 S21에서 광고 DNS를 막고 업데이트, 회전, 홈 왕복 15회, 몽키 5,000회 x 3을 돌렸습니다. 몽키에서 앱 크래시와 앱 ANR은 0건이었습니다.</p>
+      <p>14시 37분쯤 에이전트가 꺼져 있던 S21을 깨워 잠금을 풀자, 10여 분 전에 설치해 둔 vc95가 스플래시에 멈춰 있었습니다. 앱이 언제 어떻게 실행됐는지는 기록에 남아 있지 않아 모릅니다. 에이전트는 강제 종료하고 다시 실행해 메인 화면이 뜨는 것만 확인한 뒤, 자기 진행 메모에 95 버전 문제로 적고 96에서 따로 확인하기로 하고 넘어갔습니다. 강제 종료 뒤 다시 실행하면 onCreate부터 새로 시작해 화면이 켜진 채 조회가 끝나므로, 그 확인은 원인을 드러내지 못합니다.</p>
+      <p>40분 뒤 vc96을 일부러 화면을 끈 채 실행해 보자 다시 멈췄고, 그제야 코드를 열었습니다. 원인 줄은 두 버전에서 똑같은 한 줄입니다.</p>
+      <figure class="ax-fig"><img src="https://mvgood21.github.io/assets/ax/splash-listener-onstop-2-ko.webp" width="1200" height="790" alt="단계 그림: 14시 37분 vc95가 스플래시에 멈춰 있는 것을 처음 보고 강제 종료로 넘김, 15시 17분 vc96을 화면을 끈 채 실행해 재현, 15시 19분 테스트 3개를 먼저 써서 2개 실패, 15시 37분 단위 테스트 437개 통과, 15시 43분 ab95e9a 커밋." loading="lazy"><figcaption>첫 목격은 강제 종료로 넘겼고, 40분 뒤 일부러 재현한 다음에는 약 25분 만에 커밋했습니다.</figcaption></figure>
+    </section>
+    <section aria-labelledby="when-started">
+      <h2 id="when-started">리스너는 풀고 화면 이동만 STARTED까지 미뤘습니다</h2>
+      <p>ab95e9a는 리스너에서 <code>this</code>를 빼 액티비티와 떼어 놓고, 첫 줄에 <code>isFinishing || isDestroyed</code> 검사를 넣었습니다. 다음 화면으로 가는 호출을 옮겨 넣은 곳은 새로 만든 <code>whenStarted</code>입니다.</p>
+      <pre><code>fun whenStarted(owner: LifecycleOwner, block: () -&gt; Unit) {
+    owner.lifecycleScope.launch { owner.lifecycle.withStarted(block) }
+}</code></pre>
+      <p>화면이 보이는 상태(STARTED 이상)면 바로 실행하고, 멈춰 있으면 다시 보일 때 한 번 실행하고, 그 전에 액티비티가 없어지면 실행하지 않습니다. 이렇게 바꾼 호출은 5곳입니다. 스플래시의 <code>checkMyPermission()</code> 호출 3곳, 앱 열기 광고 대기가 끝난 콜백, 로고 화면(<code>ActivityIntro</code>)의 <code>goIntent</code>입니다. 에이전트는 <code>whenStarted</code>의 단위 테스트 3개를 먼저 쓰고, 빈 함수로 돌려 2개가 실패하는 것을 본 뒤 구현했습니다.</p>
+      <p><code>this</code>만 빼는 수정은 쓰지 않았습니다. 그러면 리스너는 불리지만 멈춘 화면에서 다음 액티비티를 띄우게 되고, 커밋 주석에 적은 대로 그 <code>startActivity</code>는 막히거나 늦습니다. 스플래시 중 홈으로 나간 사용자 앞에 앱이 다시 튀어나올 수도 있습니다. 수정 뒤 기기 확인에는 홈 위로 튀어나오지 않는지가 들어 있습니다.</p>
+      <p>다른 길은 리스너를 <code>onStart</code>에서 다시 붙이는 것입니다. 문서상 이미 끝난 Task에 리스너를 붙이면 바로 호출이 예약됩니다. 하지만 이 방법으로 고쳐지는 곳은 RC Task 하나뿐입니다. 같은 커밋이 바꾼 5곳 가운데 광고 대기 콜백과 로고 화면의 Timer는 Task가 아니라서 이 방법이 닿지 않습니다. <code>Task.await()</code>로 코루틴에 넣으려면 kotlinx-coroutines-play-services를 새로 들여야 합니다. 지금 build.gradle에는 coroutines-android와 lifecycle만 있고, 그날 기록에 이 길을 따진 흔적은 없습니다.</p>
+      <p>화면을 넘기는 콜백은 <code>addOnCompleteListener(this)</code>에 걸지 마십시오. 결과는 액티비티와 상관없이 받고, 화면 이동만 수명주기에 맞춰 미루십시오.</p>
+      <p><code>whenStarted</code>도 사용자가 돌아오지 않으면 다음 화면으로 가지 않습니다. 그사이 액티비티가 없어지면 블록을 버리고, 앱을 다시 열면 <code>onCreate</code>가 조회를 처음부터 시작합니다. 이 마지막 부분은 코드를 읽고 한 판단이고, 기기에서 시험하지는 않았습니다.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20addOnCompleteListener%28this%29%EA%B0%80%20onStop%EC%97%90%EC%84%9C%20%EC%A7%80%EC%9A%B4%20%EB%A6%AC%EC%8A%A4%EB%84%88%20%EB%95%8C%EB%AC%B8%EC%97%90%20%EC%8A%A4%ED%94%8C%EB%9E%98%EC%8B%9C%EC%97%90%20%EB%A9%88%EC%B6%98%20%EB%B2%84%EA%B7%B8">메일로 문의하기</a></p></aside>
+    <section aria-labelledby="device-steps">
+      <h2 id="device-steps">grep 한 줄과 화면을 끄고 실행하는 기기 시험</h2>
+      <p>먼저 액티비티에 묶인 리스너를 찾습니다. 그날 에이전트가 같은 결함을 찾으며 쓴 검색은 아래 첫 줄이고, main 소스에서 0건이었습니다. 둘째 줄은 프래그먼트의 <code>requireActivity()</code>와 Canceled 리스너까지 넓힌 패턴으로, 그날 쓰지는 않았습니다. 리스너 안에 화면 이동이 있는 곳이 위험합니다.</p>
+      <pre><code>git grep -nE "addOn(Complete|Success|Failure)Listener\(this"
+git grep -nE "addOn(Complete|Success|Failure|Canceled)Listener\((this|requireActivity\(\)|activity)"</code></pre>
+      <p>기기 시험은 R8 릴리스 빌드로 합니다. 아래 1~2는 수정 전 vc96과 수정 뒤 빌드에, 3~4는 수정 뒤 빌드에 돌린 순서입니다.</p>
+      <ol>
+        <li>화면 끄기: <code>adb shell input keyevent SLEEP</code>, 3초 뒤 <code>adb shell monkey -p &lt;패키지&gt; -c android.intent.category.LAUNCHER 1</code>로 실행합니다.</li>
+        <li>20초 기다린 뒤 깨우고 잠금을 해제합니다. <code>adb shell dumpsys window | grep mCurrentFocus</code>가 메인 액티비티를 가리켜야 합니다. 수정 전에는 스플래시를, 수정 뒤에는 메인을 가리켰습니다.</li>
+        <li>실행 직후 홈으로 나갔다가 12초 뒤 다시 실행합니다. 그사이 홈 화면에 머무는지, 돌아오면 메인인지 봅니다. 로고 화면에서도 같은 시험을 합니다.</li>
+        <li>스플래시 중에 뒤로 가기를 눌러 크래시가 없는지 봅니다.</li>
+      </ol>
+      <p><code>whenStarted</code>에는 Robolectric과 <code>LifecycleRegistry.createUnsafe</code>로 RESUMED, CREATED, STARTED 순서로 상태를 옮기는 단위 테스트 3개를 붙였습니다. 수정 뒤 단위 테스트 437개가 모두 통과했고, 수정본 몽키 2회도 크래시·ANR 0이었습니다. 이 수정이 든 1.6.029는 단계적 출시 없이 처음부터 100%로 나갔고, 그 경위는 <a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나간 기록</a>에 따로 있습니다.</p>
+    </section>
+    <section aria-labelledby="new-install-17">
+      <h2 id="new-install-17">신규 17%가 메인에 못 온 것과의 관계는 모릅니다</h2>
+      <p>수정 전날 만든 기준선 문서에 따르면 9월 12일~10월 9일 신규 739명 중 24시간 안에 메인 화면에 온 사람은 611명(82.7%)입니다. CHANGELOG는 이 버그가 "신규 17% 메인 미도달의 일부일 수 있다"고만 적었습니다.</p>
+      <p>10월 15일 점검에서 1.6.029 신규는 first_open 120명 중 107명(89%)이 메인에 왔습니다. 이 숫자로 버그의 몫을 셀 수는 없습니다. 기준선은 메인 화면 도달로, 1.6.029는 1.6.028에 새로 넣은 <code>main_shown</code> 이벤트로 재서 잣대가 다르고, 같은 1.6.029에 새 설치 절반의 첫 세션 앱 열기 광고를 빼는 A/B가 함께 들어갔고, 표본이 120명입니다. 멈춤을 따로 남기는 이벤트가 없어 몇 명이 멈췄는지도 세지 못합니다.</p>
+      <p>기기 확인은 S21 한 대, 광고를 DNS로 막은 상태에서만 했습니다. 실제 광고가 뜨는 경로와 다른 제조사의 잠금 화면, 백그라운드에서 프로세스가 죽은 뒤 돌아오는 경우는 시험하지 않았습니다.</p>
+    </section>
+    <section aria-labelledby="wiring-test">
+      <h2 id="wiring-test">남은 일: 5곳의 배선은 테스트가 지키지 않습니다</h2>
+      <p>단위 테스트는 <code>whenStarted</code> 자체만 지킵니다. 릴리스 문서에도 "배선(ActivityEmpty·Intro가 whenStarted를 부르는지)은 단위 테스트로 못 막아 기기로 확인했다"고 적었습니다. 누가 스플래시에 새 화면 이동을 <code>whenStarted</code> 없이 넣으면 지금 테스트는 통과하고, 그 실수는 화면을 끄거나 스플래시 중 홈으로 나가는 기기 시험에서만 드러납니다.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20addOnCompleteListener%28this%29%EA%B0%80%20onStop%EC%97%90%EC%84%9C%20%EC%A7%80%EC%9A%B4%20%EB%A6%AC%EC%8A%A4%EB%84%88%20%EB%95%8C%EB%AC%B8%EC%97%90%20%EC%8A%A4%ED%94%8C%EB%9E%98%EC%8B%9C%EC%97%90%20%EB%A9%88%EC%B6%98%20%EB%B2%84%EA%B7%B8">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>addOnCompleteListener(this)는 언제 리스너를 지우나요?</summary><div><p>액티비티의 onStop 때 제거합니다. Task 참조 문서에 그렇게 적혀 있고, 이 앱은 조회 중 화면이 꺼지면 결과를 놓쳤습니다.</p></div></details>
+        <details><summary>액티비티에 묶지 않으면 메모리 누수가 생기지 않나요?</summary><div><p>이 앱은 리스너 첫 줄에서 isFinishing이나 isDestroyed면 바로 끝내고, 화면 이동은 whenStarted가 액티비티가 없어지면 실행하지 않습니다. 누수를 따로 재 보지는 않았습니다.</p></div></details>
+        <details><summary>몽키 테스트로는 왜 못 찾았나요?</summary><div><p>그날 몽키는 화면을 켜 둔 채 홈 키 없이 돌렸기 때문입니다. 이 멈춤은 조회가 끝나기 전에 onStop이 와야 생겨서, 화면을 끄거나 조회 중에 홈으로 나가는 시험을 따로 넣어야 보입니다.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
+        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
+        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+      </ul>
+      <p><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Sat, 31 Oct 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>화살표 퍼즐 레벨 생성기: 1,100판 자동 게이트 – SugarMount</title>
     <link>https://mvgood21.github.io/ax/arrow-puzzle-level-generator/</link>
@@ -117,9 +396,9 @@ depth(board):                   # peel
         <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/puzzle-first-chapter-walls/">퍼즐 게임 첫날 이탈 분석: 기기별 이벤트 순서와 판별 계산으로 찾은 첫 장의 벽 4판</a></li>
         <li><a href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -252,9 +531,9 @@ depth(board):                   # peel
         <li><a href="https://mvgood21.github.io/ax/market-check-before-app/">사진 앱 3개를 만든 뒤에야 시장 조사를 했다: 올해 나온 경쟁 앱 설치 중앙값 1,166</a></li>
         <li><a href="https://mvgood21.github.io/ax/commit-messages-701/">커밋 701개로 본 AI 코딩 1년: &#x27;완성&#x27;에서 &#x27;원인·검증&#x27;으로</a></li>
         <li><a href="https://mvgood21.github.io/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/retro/">회고와 숫자 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -367,10 +646,10 @@ if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
         <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
-        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
@@ -478,8 +757,8 @@ git diff --name-only $(git merge-base &lt;base&gt; &lt;branch&gt;) &lt;branch&gt
         <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-review-refutation/">에이전트 84개가 돈 릴리스 전 검토: 발견마다 3명이 반박하고, 버틴 20건만 고쳤다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -566,10 +845,10 @@ unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$TEST_PUB[~/][0-9]*" | sort -u | wc
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
         <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
-        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
@@ -704,10 +983,10 @@ lifecycleScope.launch {
       <ul>
         <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
         <li><a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
         <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -817,10 +1096,10 @@ lifecycleScope.launch {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
         <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
@@ -924,9 +1203,9 @@ three_star = cleared and time &lt;= par(base, scale, floor) and mistakes &lt;= a
         <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/puzzle-first-chapter-walls/">퍼즐 게임 첫날 이탈 분석: 기기별 이벤트 순서와 판별 계산으로 찾은 첫 장의 벽 4판</a></li>
         <li><a href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1041,9 +1320,9 @@ print(pages.most_common(), "FAQ questions:", questions)</code></pre>
         <li><a href="https://mvgood21.github.io/ax/static-site-check-gate/">여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</a></li>
         <li><a href="https://mvgood21.github.io/ax/ai-region-privacy-policy/">개인정보처리방침 AI 처리 위치(국외 이전): 하루에 두 번 고친 고지를 코드에 묶기</a></li>
         <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1158,10 +1437,10 @@ NOT_TEST = {"notExpression": {"orGroup": {"expressions": [
       <ul>
         <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
         <li><a href="https://mvgood21.github.io/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
         <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1266,8 +1545,8 @@ export function cacheKey(api, group, original, corrected, model) {
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
         <li><a href="https://mvgood21.github.io/ax/contrast-checker-missed-40-percent/">대비 검사기는 텍스트 조각 40%를 재지 못하고도 통과를 냈다: &#x27;몇 개를 측정했나&#x27;를 출력하게 바꾸기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1397,8 +1676,8 @@ const gaps = await agent(CTX + CHECKLIST + final + dossier, { schema: CRIT })</c
         <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-review-refutation/">에이전트 84개가 돈 릴리스 전 검토: 발견마다 3명이 반박하고, 버틴 20건만 고쳤다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1509,10 +1788,10 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(":core
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
         <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
-        <li><a href="https://mvgood21.github.io/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
@@ -1637,8 +1916,8 @@ git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --gre
         <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-review-refutation/">에이전트 84개가 돈 릴리스 전 검토: 발견마다 3명이 반박하고, 버틴 20건만 고쳤다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1771,8 +2050,8 @@ adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
         <li><a href="https://mvgood21.github.io/ax/contrast-checker-missed-40-percent/">대비 검사기는 텍스트 조각 40%를 재지 못하고도 통과를 냈다: &#x27;몇 개를 측정했나&#x27;를 출력하게 바꾸기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1903,9 +2182,9 @@ print("my app in results:", MY_APP in ids)</code></pre>
         <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
         <li><a href="https://mvgood21.github.io/ax/commit-messages-701/">커밋 701개로 본 AI 코딩 1년: &#x27;완성&#x27;에서 &#x27;원인·검증&#x27;으로</a></li>
         <li><a href="https://mvgood21.github.io/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/retro/">회고와 숫자 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2035,9 +2314,9 @@ $ SOURCE_DATE=2026-12-31 python tools/build.py
         <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://mvgood21.github.io/ax/ai-region-privacy-policy/">개인정보처리방침 AI 처리 위치(국외 이전): 하루에 두 번 고친 고지를 코드에 묶기</a></li>
         <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2155,8 +2434,8 @@ grep -rL --include='*Test.kt' -e 'assert' -e 'check(matches' app/src/</code></pr
         <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
         <li><a href="https://mvgood21.github.io/ax/contrast-checker-missed-40-percent/">대비 검사기는 텍스트 조각 40%를 재지 못하고도 통과를 냈다: &#x27;몇 개를 측정했나&#x27;를 출력하게 바꾸기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2295,9 +2574,9 @@ git log --until=2026-10-20 --format='%(trailers:key=Co-authored-by,valueonly)' \
         <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
         <li><a href="https://mvgood21.github.io/ax/market-check-before-app/">사진 앱 3개를 만든 뒤에야 시장 조사를 했다: 올해 나온 경쟁 앱 설치 중앙값 1,166</a></li>
         <li><a href="https://mvgood21.github.io/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/retro/">회고와 숫자 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2403,8 +2682,8 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
         <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/contrast-checker-missed-40-percent/">대비 검사기는 텍스트 조각 40%를 재지 못하고도 통과를 냈다: &#x27;몇 개를 측정했나&#x27;를 출력하게 바꾸기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2569,9 +2848,9 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
         <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2689,8 +2968,8 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
         <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-review-refutation/">에이전트 84개가 돈 릴리스 전 검토: 발견마다 3명이 반박하고, 버틴 20건만 고쳤다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2830,9 +3109,9 @@ curl -s "$POLICY_URL" | grep -o 'data-policy-version="[0-9-]*"'</code></pre>
         <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://mvgood21.github.io/ax/static-site-check-gate/">여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</a></li>
         <li><a href="https://mvgood21.github.io/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2977,10 +3256,10 @@ font.save(dst)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
         <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
-        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
@@ -3073,8 +3352,8 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
         <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3159,10 +3438,10 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
         <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
-        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
@@ -3284,8 +3563,8 @@ flutter test test/theme_matrix/ --dart-define=Y2_NO_SETTLE=true
         <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3404,10 +3683,10 @@ FlowRow(
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
         <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
-        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
@@ -3492,8 +3771,8 @@ Mem:              13           8           2           0           2           4
         <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3619,10 +3898,10 @@ if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFract
       <ul>
         <li><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
         <li><a href="https://mvgood21.github.io/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
         <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3742,8 +4021,8 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3841,10 +4120,10 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
         <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
-        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
@@ -3910,9 +4189,9 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://mvgood21.github.io/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://mvgood21.github.io/ax/static-site-check-gate/">여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</a></li>
         <li><a href="https://mvgood21.github.io/ax/ai-region-privacy-policy/">개인정보처리방침 AI 처리 위치(국외 이전): 하루에 두 번 고친 고지를 코드에 묶기</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4305,9 +4584,9 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/puzzle-first-chapter-walls/">퍼즐 게임 첫날 이탈 분석: 기기별 이벤트 순서와 판별 계산으로 찾은 첫 장의 벽 4판</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4418,8 +4697,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4520,10 +4799,10 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
         <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
-        <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
-        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
-        <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
       </ul>
@@ -5870,9 +6149,9 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
         <li><a href="https://mvgood21.github.io/ax/market-check-before-app/">사진 앱 3개를 만든 뒤에야 시장 조사를 했다: 올해 나온 경쟁 앱 설치 중앙값 1,166</a></li>
         <li><a href="https://mvgood21.github.io/ax/commit-messages-701/">커밋 701개로 본 AI 코딩 1년: &#x27;완성&#x27;에서 &#x27;원인·검증&#x27;으로</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
-        <li><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/retro/">회고와 숫자 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5974,8 +6253,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
         <li><a href="https://mvgood21.github.io/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
         <li><a href="https://mvgood21.github.io/ax/agent-permission-table/">AI 마케터를 하루 4번 예약 실행하며 정한 권한 표: 돈·계정·정책은 사람이 누른다</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -6001,7 +6280,7 @@ done</code></pre>
       <ul class="card-list">
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/workflow/">에이전트와 일하는 법</a></h3><p class="sub">AI 코딩 에이전트에게 일을 나누고 규칙을 전하는 방법, 여러 세션을 한 저장소에서 함께 돌리며 겪은 충돌과 그 뒤에 정한 작업 방식입니다.</p><p class="meta">글 7개</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시</a></h3><p class="sub">AI가 만든 코드를 출시하기 전에 거치는 단위 테스트, 릴리스 게이트, 실기기 확인과, 그 과정에서 실제로 잡힌 결함을 정리했습니다.</p><p class="meta">글 8개</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발</a></h3><p class="sub">에이전트와 Android 앱을 만들며 만난 Gradle 빌드, 라이브러리 업그레이드, 화면 구성, 성능 문제와 각각을 어떻게 풀었는지 적은 기록입니다.</p><p class="meta">글 9개</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/android/">Android 개발</a></h3><p class="sub">에이전트와 Android 앱을 만들며 만난 Gradle 빌드, 라이브러리 업그레이드, 화면 구성, 성능 문제와 각각을 어떻게 풀었는지 적은 기록입니다.</p><p class="meta">글 12개</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/games/">게임 개발</a></h3><p class="sub">퍼즐 게임의 레벨을 에이전트와 함께 만들고, 풀 수 있는지 검증하고, 난이도를 맞추면서 정한 규칙과 측정한 숫자를 모았습니다.</p><p class="meta">글 4개</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/store/">스토어와 수익화</a></h3><p class="sub">Google Play 등록과 심사, 스토어 스크린샷과 설명, 광고 설정처럼 앱을 내놓은 뒤 운영하는 일을 에이전트와 나눠 한 기록입니다.</p><p class="meta">글 3개</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/topic/web/">웹사이트와 검색</a></h3><p class="sub">이 사이트를 에이전트와 만들며 정한 페이지 구조, 구글·네이버 검색 최적화, 구조화 데이터, 디자인 시스템을 실제 코드 기준으로 설명합니다.</p><p class="meta">글 4개</p></li>
@@ -6019,12 +6298,12 @@ done</code></pre>
     <section aria-labelledby="notes">
       <h2 id="notes">최신 글</h2>
       <ul class="card-list">
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></h3><p class="sub">Android assets에 미리 gzip해 넣은 팩 5개는 APK의 deflate보다 18바이트씩 컸고, 이름의 .gz가 빠져 FileNotFoundException까지 났습니다.</p><p class="meta">Android 개발 · 측정 · 2026년 10월 31일</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></h3><p class="sub">SKT 판매 삼성 폰 두 대에서 market:// 링크를 스토어 앱 3개가 받아 선택 창이 나왔습니다. Play 패키지를 먼저 지정하고 실패할 때만 다음 주소로 넘기자 Play가 바로 열렸습니다.</p><p class="meta">Android 개발 · 방법 · 2026년 10월 31일</p></li>
+        <li class="card"><h3><a href="https://mvgood21.github.io/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></h3><p class="sub">addOnCompleteListener(this)로 건 Remote Config 리스너가 onStop에서 지워져, 화면이 꺼진 채 실행한 맞춤법 앱이 스플래시에 멈췄습니다. 수정과 기기 시험입니다.</p><p class="meta">Android 개발 · 사고 기록 · 2026년 10월 31일</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></h3><p class="sub">화살표 매듭풀기 1,100판은 역구성 생성기가 만들고 G2 게이트가 걸렀습니다. 이동 규칙을 먼저 고정해 생성이 곧 검증이 됐고, expert F0는 0.50에서 0.11로 내려갔습니다.</p><p class="meta">게임 개발 · 방법 · 2026년 10월 30일</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></h3><p class="sub">맞춤법 앱의 자연 유입 코호트 D1이 2025년 8월 대개편 뒤 15.2%에서 11.2%로 내려갔습니다. 줄어든 DAU의 70%가 가입 31~365일 층이었고, 원인은 아직 가리지 못했습니다.</p><p class="meta">회고와 숫자 · 측정 · 2026년 10월 30일</p></li>
         <li class="card"><h3><a href="https://mvgood21.github.io/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></h3><p class="sub">Kotlin 문자열 비교로 콘텐츠 버전을 견주던 맞춤법 앱이 Remote Config 6.10부터 6.2~6.9에 머문 기기에 문제 은행과 공지를 보내지 못했습니다. 원인과 수정, 확인 절차입니다.</p><p class="meta">Android 개발 · 사고 기록 · 2026년 10월 30일</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></h3><p class="sub">같은 작업 트리의 커밋 하나가 다른 세션 파일 50개를 담아 간 뒤 공유 파일 주인 표를 만들었습니다. 머지 13개 중 7개의 손 머지가 어디서 났는지 git으로 세었습니다.</p><p class="meta">에이전트와 일하는 법 · 방법 · 2026년 10월 29일</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></h3><p class="sub">실제 광고 ID로 만든 한판블록 AAB의 dex에 테스트 광고 문자열 5개가 남았습니다. listOf().any를 상수끼리 ||로 바꾸자 0개가 됐고, 건수만 세는 검사를 정했습니다.</p><p class="meta">Android 개발 · 측정 · 2026년 10월 29일</p></li>
-        <li class="card"><h3><a href="https://mvgood21.github.io/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></h3><p class="sub">Play 리뷰의 &#x27;고급 구독 일시적인 오류&#x27;는 상품을 기다리지 않는 구독 상세 화면 탓이었습니다. 90일간 16명 중 1명만 결제를 시작했고, 수정 뒤 13명 중 4명이 됐습니다.</p><p class="meta">스토어와 수익화 · 사고 기록 · 2026년 10월 29일</p></li>
       </ul>
     </section>
     <section aria-labelledby="by-the-numbers">
@@ -6159,8 +6438,8 @@ done</code></pre>
         <li><a href="https://mvgood21.github.io/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://mvgood21.github.io/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
         <li><a href="https://mvgood21.github.io/ax/hwp-edit-save-gate/">편집 기능을 만들고도 꺼서 출시했다: HWP 저장 검증 게이트가 잡은 누름틀 결함</a></li>
-        <li><a href="https://mvgood21.github.io/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
+        <li><a href="https://mvgood21.github.io/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
       </ul>
       <p><a href="https://mvgood21.github.io/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://mvgood21.github.io/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -6277,9 +6556,9 @@ done</code></pre>
     <section aria-labelledby="ax-app-heading">
       <h2 id="ax-app-heading">이 앱의 AX 노트</h2>
       <ul class="related-links">
+        <li><a href="https://mvgood21.github.io/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
         <li><a href="https://mvgood21.github.io/ax/release-ad-id-grep/">R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</a></li>
         <li><a href="https://mvgood21.github.io/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
-        <li><a href="https://mvgood21.github.io/ax/puzzle-first-chapter-walls/">퍼즐 게임 첫날 이탈 분석: 기기별 이벤트 순서와 판별 계산으로 찾은 첫 장의 벽 4판</a></li>
       </ul>
     </section>
     <section aria-labelledby="releases-heading">
@@ -6468,282 +6747,6 @@ done</code></pre>
       </ul>
     </section>
     <p class="meta updated">최종 업데이트 <time datetime="2026-10-18">2026년 10월 18일</time></p>]]></description>
-    <pubDate>Mon, 05 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>슈가앨범: 사진으로 동영상 만들기 앱 – SugarMount</title>
-    <link>https://mvgood21.github.io/apps/sugaralbum/</link>
-    <guid isPermaLink="true">https://mvgood21.github.io/apps/sugaralbum/</guid>
-    <description><![CDATA[<header class="app-hero">
-      <img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugaralbum/icon.webp" width="96" height="96" alt="" fetchpriority="high">
-      <h1>슈가앨범</h1>
-      <p class="lead">슈가앨범은 고른 사진을 테마에 맞춰 배경음악이 들어간 영상으로 만들어 주는 Android 앱이에요. 사진은 기기 안에서만 처리해요.</p>
-      <p class="status"><span class="badge badge--live">Google Play</span> <span class="brandline">SugarAlbum · 쉬운 동영상 만들기 - 슈가앨범</span></p>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugaralbum&amp;referrer=utm_source%3Dmvgood21.github.io%26utm_medium%3Dapp_page%26utm_campaign%3Dsugaralbum" rel="noopener">Google Play에서 받기</a><a class="button button--outline" href="https://mvgood21.github.io/privacy/sugaralbum/">슈가앨범 개인정보처리방침</a></div>
-    </header>
-    <ul class="shots" tabindex="0" aria-label="슈가앨범 스크린샷"><li><img src="https://mvgood21.github.io/assets/apps/sugaralbum/shot1.webp" width="439" height="780" loading="lazy" alt="고른 사진으로 영상을 만드는 화면"></li><li><img src="https://mvgood21.github.io/assets/apps/sugaralbum/shot2.webp" width="439" height="780" loading="lazy" alt="영상에 넣을 사진을 순서대로 고르는 화면"></li><li><img src="https://mvgood21.github.io/assets/apps/sugaralbum/shot3.webp" width="439" height="780" loading="lazy" alt="영상 제목과 해상도를 정하고 미리 보는 화면"></li></ul>
-    <section aria-labelledby="tasks">
-      <h2 id="tasks">이런 때 쓰세요</h2>
-      <ul>
-        <li>갤러리 사진으로 짧은 영상을 만들고 싶을 때</li>
-        <li>여행·가족 사진을 음악이 들어간 영상으로 남기고 싶을 때</li>
-        <li>사진을 업로드하지 않고 휴대폰에서 영상을 만들고 싶을 때</li>
-      </ul>
-    </section>
-    <section aria-labelledby="features">
-      <h2 id="features">이런 일을 해요</h2>
-      <ul class="features">
-        <li><h3>사진만 고르면 끝</h3><p>사진을 순서대로 고르면 장면이 자동으로 구성돼요.</p></li>
-        <li><h3>미리 보기</h3><p>저장하기 전에 완성될 영상을 바로 확인해요.</p></li>
-        <li><h3>제목과 해상도</h3><p>영상 제목을 넣고 FHD(1920×1080) 등 용도에 맞는 해상도를 골라요.</p></li>
-        <li><h3>배경 음악</h3><p>테마마다 앱에 들어 있는 배경음악이 자동으로 들어가요.</p></li>
-      </ul>
-    </section>
-    <section class="facts" aria-labelledby="facts-h">
-      <h2 id="facts-h">한눈에 보기</h2>
-      <div class="table-wrap">
-        <table>
-          <tbody>
-            <tr><th scope="row">상태</th><td>Google Play</td></tr>
-            <tr><th scope="row">가격</th><td>무료(광고 포함). 앱 안 결제 없음</td></tr>
-            <tr><th scope="row">처리 위치</th><td>기기 안에서만 처리해요. 사진과 영상을 업로드하지 않아요.</td></tr>
-            <tr><th scope="row">필요 권한</th><td>사진·동영상 접근(영상 만들기), 알림(만드는 중 진행 표시)</td></tr>
-            <tr><th scope="row">계정</th><td>필요 없어요.</td></tr>
-            <tr><th scope="row">패키지 이름</th><td><code>com.sugarmount.sugaralbum</code></td></tr>
-            <tr><th scope="row">개발자</th><td>simpest (SugarMount)</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-    <section aria-labelledby="data">
-      <h2 id="data">데이터와 권한</h2>
-      <ul>
-        <li>사진·동영상과 만든 영상은 기기 안에서만 처리하며 업로드하지 않아요.</li>
-        <li>장면 구성을 위한 사진 분석(촬영 날짜, 화질, 일부 기기에서 얼굴 위치)도 기기 안에서만 해요.</li>
-        <li>광고(Google AdMob), 사용 통계(Google Analytics), 원격 설정·알림(Firebase)이 들어 있어요.</li>
-      </ul>
-      <p>자세한 내용은 <a href="https://mvgood21.github.io/privacy/sugaralbum/">슈가앨범 개인정보처리방침</a>에서 볼 수 있어요.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">할 수 없는 일</h2>
-      <ul>
-        <li>내 음악 파일은 넣을 수 없어요. 배경음악은 테마마다 앱에 들어 있는 곡이 자동으로 들어가요.</li>
-        <li>해상도는 1920×1080, 1280×720, 640×360 중에서 골라요. 그보다 큰 해상도로는 저장할 수 없어요.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">자주 묻는 질문</h2>
-      <div class="faq">
-        <details><summary>사진이 서버로 올라가나요?</summary><div><p>아니요. 사진과 영상은 기기 안에서만 처리되고 업로드되지 않아요.</p></div></details>
-        <details><summary>어떤 해상도로 저장할 수 있나요?</summary><div><p>FHD(1920×1080) 등 화면에서 고른 해상도로 저장해요.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="ax-app-heading">
-      <h2 id="ax-app-heading">이 앱의 AX 노트</h2>
-      <ul class="related-links">
-        <li><a href="https://mvgood21.github.io/ax/ndk-16kb-page-blue-tint/">16KB 페이지 크기 대응기: NDK 27·29에서만 생긴 파란 색조와 다시 측정한 .so 12개</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="releases-heading">
-      <h2 id="releases-heading">최근 업데이트</h2>
-      <ul>
-        <li><strong>1.1.006</strong> · <time datetime="2026-01-03">2026년 1월 3일</time> · 최신 Android와 Google Play 요구사항(16KB 페이지 크기)에 맞춰 업데이트했어요.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="related-heading">
-      <h2 id="related-heading">관련 앱</h2>
-      <ul class="related">
-        <li><a href="https://mvgood21.github.io/apps/image-compress/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarcompress/icon.webp" width="56" height="56" alt=""><span>사진 용량 줄이기</span></a></li>
-        <li><a href="https://mvgood21.github.io/apps/image-flip/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarflip/icon.webp" width="56" height="56" alt=""><span>사진 반전·회전</span></a></li>
-        <li><a href="https://mvgood21.github.io/apps/image-convert/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarconvert/icon.webp" width="56" height="56" alt=""><span>이미지 변환 JPG·PNG·WebP</span></a></li>
-      </ul>
-    </section>
-    <p class="meta updated">최종 업데이트 <time datetime="2026-10-23">2026년 10월 23일</time></p>
-    <section aria-labelledby="contact">
-      <h2 id="contact">문의</h2>
-      <p>앱이 제대로 동작하지 않거나 궁금한 점이 있으면 이메일로 알려 주세요.</p>
-      <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a> · 패키지 이름: <code>com.sugarmount.sugaralbum</code></p>
-    </section>]]></description>
-    <pubDate>Mon, 05 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>생생카드: 설날·추석·크리스마스 인사말 카드 – SugarMount</title>
-    <link>https://mvgood21.github.io/apps/sugarcard/</link>
-    <guid isPermaLink="true">https://mvgood21.github.io/apps/sugarcard/</guid>
-    <description><![CDATA[<header class="app-hero">
-      <img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarcard/icon.webp" width="96" height="96" alt="" fetchpriority="high">
-      <h1>생생카드</h1>
-      <p class="lead">생생카드는 설날·추석·크리스마스 카드 그림에 직접 쓴 인사말을 얹어 카카오톡 등으로 보내는 Android 앱이에요.</p>
-      <p class="status"><span class="badge badge--live">Google Play</span> <span class="brandline">SugarCard · 생생카드: 명절, 크리스마스 인사말 카드</span></p>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugarcard&amp;referrer=utm_source%3Dmvgood21.github.io%26utm_medium%3Dapp_page%26utm_campaign%3Dsugarcard" rel="noopener">Google Play에서 받기</a><a class="button button--outline" href="https://mvgood21.github.io/privacy/sugarcard/">생생카드 개인정보처리방침</a></div>
-    </header>
-    <ul class="shots" tabindex="0" aria-label="생생카드 스크린샷"><li><img src="https://mvgood21.github.io/assets/apps/sugarcard/shot1.webp" width="360" height="780" loading="lazy" alt="추석 인사말 카드를 만드는 화면"></li><li><img src="https://mvgood21.github.io/assets/apps/sugarcard/shot2.webp" width="360" height="780" loading="lazy" alt="설날 카드 디자인을 고르는 화면"></li><li><img src="https://mvgood21.github.io/assets/apps/sugarcard/shot3.webp" width="360" height="780" loading="lazy" alt="크리스마스 인사말 카드 화면"></li></ul>
-    <section aria-labelledby="tasks">
-      <h2 id="tasks">이런 때 쓰세요</h2>
-      <ul>
-        <li><a href="https://mvgood21.github.io/apps/sugarcard/christmas-greetings/">크리스마스 인사말 카드를 카톡으로 보내고 싶을 때</a></li>
-        <li>설날 새해 인사 카드를 만들고 싶을 때</li>
-        <li>추석 인사말 카드를 보내고 싶을 때</li>
-      </ul>
-    </section>
-    <section aria-labelledby="features">
-      <h2 id="features">이런 일을 해요</h2>
-      <ul class="features">
-        <li><h3>명절별 카드 그림</h3><p>설날·추석·크리스마스마다 네 가지 스타일(예: 설날은 배경·심플·MZ·캐릭)의 카드 그림이 들어 있어요. 앱을 연 달에 맞는 명절이 먼저 보여요.</p></li>
-        <li><h3>직접 쓰는 인사말</h3><p>인사말을 입력하면 카드 그림 위에 얹어 한 장의 카드로 만들어요.</p></li>
-        <li><h3>바로 공유</h3><p>공유 버튼을 누르면 카카오톡, 문자 등 고른 앱으로 카드 이미지를 보내요. 크리스마스 카드는 눈 내리는 영상으로도 보낼 수 있어요.</p></li>
-        <li><h3>인사말 기록</h3><p>보낸 인사말을 기기에 보관하고, 필요 없으면 지워요.</p></li>
-      </ul>
-    </section>
-    <section class="facts" aria-labelledby="facts-h">
-      <h2 id="facts-h">한눈에 보기</h2>
-      <div class="table-wrap">
-        <table>
-          <tbody>
-            <tr><th scope="row">상태</th><td>Google Play</td></tr>
-            <tr><th scope="row">가격</th><td>무료(광고 포함). 구독하면 광고가 줄어듭니다.</td></tr>
-            <tr><th scope="row">인터넷</th><td>카드 그림은 앱에 들어 있습니다. 광고와 공지에 인터넷을 쓰고, 메인 화면을 열 때 앱이 백그라운드에서 네이버 검색 페이지에 접속합니다(화면에 표시하지는 않습니다).</td></tr>
-            <tr><th scope="row">계정</th><td>필요 없습니다.</td></tr>
-            <tr><th scope="row">언어</th><td>한국어</td></tr>
-            <tr><th scope="row">패키지 이름</th><td><code>com.sugarmount.sugarcard</code></td></tr>
-            <tr><th scope="row">개발자</th><td>simpest (SugarMount)</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-    <section aria-labelledby="data">
-      <h2 id="data">데이터와 권한</h2>
-      <ul>
-        <li>카드 문구와 완성한 카드는 기기 안에서만 만들고 저장합니다. 공유를 고르면 사용자가 선택한 앱으로만 전달됩니다.</li>
-        <li>광고(Google AdMob), 사용 통계(Google Analytics), 원격 설정·알림(Firebase)이 들어 있습니다.</li>
-        <li>메인 화면을 열 때 앱이 네이버 검색 페이지에 접속하므로, IP 주소, 브라우저 정보(User-Agent), 쿠키가 네이버에 전달될 수 있습니다. 작성한 문구는 포함되지 않습니다.</li>
-        <li>계정을 만들지 않습니다.</li>
-      </ul>
-      <p>자세한 내용은 <a href="https://mvgood21.github.io/privacy/sugarcard/">생생카드 개인정보처리방침</a>에서 볼 수 있어요.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">할 수 없는 일</h2>
-      <ul>
-        <li>카드는 설날·추석·크리스마스 세 가지 명절용만 있어요. 생일·결혼 같은 다른 날의 카드는 없어요.</li>
-        <li>영상으로 보내기는 크리스마스 카드에서만 돼요. 다른 명절 카드는 이미지로 보내요.</li>
-        <li>앱 화면은 한국어만 지원해요.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">자주 묻는 질문</h2>
-      <div class="faq">
-        <details><summary>어떤 날에 쓸 수 있나요?</summary><div><p>설날, 추석, 크리스마스 카드가 들어 있어요. 생일이나 결혼 같은 다른 날의 카드는 아직 없어요.</p></div></details>
-        <details><summary>인사말을 직접 쓸 수 있나요?</summary><div><p>네. 입력한 인사말이 카드 그림 위에 들어가요.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="guides-heading">
-      <h2 id="guides-heading">도움말</h2>
-      <ul class="related-links">
-        <li><a href="https://mvgood21.github.io/apps/sugarcard/christmas-greetings/">크리스마스 인사말 문구와 카드, 휴대폰으로 보내는 법</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="related-heading">
-      <h2 id="related-heading">관련 앱</h2>
-      <ul class="related">
-        <li><a href="https://mvgood21.github.io/apps/sugaralbum/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugaralbum/icon.webp" width="56" height="56" alt=""><span>슈가앨범</span></a></li>
-        <li><a href="https://mvgood21.github.io/apps/image-compress/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarcompress/icon.webp" width="56" height="56" alt=""><span>사진 용량 줄이기</span></a></li>
-        <li><a href="https://mvgood21.github.io/apps/image-flip/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarflip/icon.webp" width="56" height="56" alt=""><span>사진 반전·회전</span></a></li>
-      </ul>
-    </section>
-    <p class="meta updated">최종 업데이트 <time datetime="2026-10-23">2026년 10월 23일</time></p>
-    <section aria-labelledby="contact">
-      <h2 id="contact">문의</h2>
-      <p>앱이 제대로 동작하지 않거나 궁금한 점이 있으면 이메일로 알려 주세요.</p>
-      <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a> · 패키지 이름: <code>com.sugarmount.sugarcard</code></p>
-    </section>]]></description>
-    <pubDate>Mon, 05 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>SugarClip: 복사한 글 기록·공유 앱 – SugarMount</title>
-    <link>https://mvgood21.github.io/apps/sugarclip/</link>
-    <guid isPermaLink="true">https://mvgood21.github.io/apps/sugarclip/</guid>
-    <description><![CDATA[<header class="app-hero">
-      <img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarclip/icon.webp" width="96" height="96" alt="" fetchpriority="high">
-      <h1>SugarClip</h1>
-      <p class="lead">SugarClip은 복사한 텍스트를 미리 정한 메모 앱으로 보내고, 시각·출처와 함께 기기에 기록해 두는 Android 앱이에요.</p>
-      <p class="status"><span class="badge badge--live">Google Play</span> <span class="brandline">SugarClip - 모든 복사 공유!</span></p>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugarclip&amp;referrer=utm_source%3Dmvgood21.github.io%26utm_medium%3Dapp_page%26utm_campaign%3Dsugarclip" rel="noopener">Google Play에서 받기</a><a class="button button--outline" href="https://mvgood21.github.io/privacy/sugarclip/">SugarClip 개인정보처리방침</a></div>
-    </header>
-    <ul class="shots" tabindex="0" aria-label="SugarClip 스크린샷"><li><img src="https://mvgood21.github.io/assets/apps/sugarclip/shot1.webp" width="481" height="780" loading="lazy" alt="저장한 클립 목록 화면"></li><li><img src="https://mvgood21.github.io/assets/apps/sugarclip/shot2.webp" width="481" height="780" loading="lazy" alt="웹 페이지에서 복사한 내용을 HTML로 저장한 화면"></li><li><img src="https://mvgood21.github.io/assets/apps/sugarclip/shot3.webp" width="481" height="780" loading="lazy" alt="복사할 때 공유할 메모 앱을 고르는 화면"></li></ul>
-    <section aria-labelledby="tasks">
-      <h2 id="tasks">이런 때 쓰세요</h2>
-      <ul>
-        <li>복사해 둔 글을 나중에 다시 찾아보고 싶을 때</li>
-        <li>복사한 글을 메모 앱에 바로 모으고 싶을 때</li>
-        <li>웹 페이지에서 복사한 내용을 형식 그대로 보관하고 싶을 때</li>
-      </ul>
-    </section>
-    <section aria-labelledby="features">
-      <h2 id="features">이런 일을 해요</h2>
-      <ul class="features">
-        <li><h3>복사만으로 공유</h3><p>붙여 넣지 않아도, 복사하면 정해 둔 앱의 공유 화면이 열려요. Android 10 이상에서는 보통 SugarClip이 열려 있을 때 동작해요.</p></li>
-        <li><h3>공유할 앱 고르기</h3><p>카카오톡 나에게 보내기, Google Keep, OneNote, Evernote 중 하나를 골라요.</p></li>
-        <li><h3>클립 기록과 검색</h3><p>복사한 텍스트와 웹 페이지의 HTML을 시각·출처 표시(라벨)와 함께 저장하고 검색해요.</p></li>
-        <li><h3>중지와 시작</h3><p>자동 공유가 필요 없을 때는 서비스를 잠시 멈춰요.</p></li>
-      </ul>
-    </section>
-    <section class="facts" aria-labelledby="facts-h">
-      <h2 id="facts-h">한눈에 보기</h2>
-      <div class="table-wrap">
-        <table>
-          <tbody>
-            <tr><th scope="row">상태</th><td>Google Play</td></tr>
-            <tr><th scope="row">가격</th><td>무료(배너 광고). 앱 안 결제 없음</td></tr>
-            <tr><th scope="row">저장 위치</th><td>복사한 내용은 기기 안에만 저장해요.</td></tr>
-            <tr><th scope="row">계정</th><td>필요 없어요.</td></tr>
-            <tr><th scope="row">패키지 이름</th><td><code>com.sugarmount.sugarclip</code></td></tr>
-            <tr><th scope="row">개발자</th><td>simpest (SugarMount)</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-    <section aria-labelledby="data">
-      <h2 id="data">데이터와 권한</h2>
-      <ul>
-        <li>복사한 내용(클립)은 기기 안에만 저장하고, 저희 서버나 광고·통계 서비스로 보내지 않아요.</li>
-        <li>공유한 클립은 사용자가 고른 앱의 공유 화면으로만 전달돼요.</li>
-        <li>광고(Google AdMob), 사용 통계(Google Analytics), 원격 설정·알림(Firebase)이 들어 있어요.</li>
-      </ul>
-      <p>자세한 내용은 <a href="https://mvgood21.github.io/privacy/sugarclip/">SugarClip 개인정보처리방침</a>에서 볼 수 있어요.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">할 수 없는 일</h2>
-      <ul>
-        <li>Android 10 이상에서는 시스템 제한 때문에 보통 SugarClip 화면이 열려 있을 때 복사한 내용만 기록돼요. 백그라운드에서는 기록되지 않아요.</li>
-        <li>보낼 수 있는 앱은 카카오톡 나에게 보내기, Google Keep, OneNote, Evernote 네 가지예요.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">자주 묻는 질문</h2>
-      <div class="faq">
-        <details><summary>복사한 내용이 서버로 가나요?</summary><div><p>아니요. 클립은 기기 안에만 저장되고, 사용자가 고른 앱으로 공유할 때만 그 앱에 전달돼요.</p></div></details>
-        <details><summary>어떤 앱으로 공유할 수 있나요?</summary><div><p>카카오톡 나에게 보내기, Google Keep, OneNote, Evernote 중 하나를 고를 수 있어요.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="releases-heading">
-      <h2 id="releases-heading">최근 업데이트</h2>
-      <ul>
-        <li><strong>1.2.001</strong> · <time datetime="2023-09-21">2023년 9월 21일</time> · 새 Android 버전에 맞춰 업데이트했어요.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="related-heading">
-      <h2 id="related-heading">관련 앱</h2>
-      <ul class="related">
-        <li><a href="https://mvgood21.github.io/apps/sugarspeller/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugarspeller/icon.webp" width="56" height="56" alt=""><span>한글 띄어쓰기</span></a></li>
-        <li><a href="https://mvgood21.github.io/apps/doc-viewer/"><img class="app-icon" src="https://mvgood21.github.io/assets/apps/sugardoc/icon.webp" width="56" height="56" alt=""><span>한글뷰어 슈가독</span></a></li>
-      </ul>
-    </section>
-    <p class="meta updated">최종 업데이트 <time datetime="2026-10-23">2026년 10월 23일</time></p>
-    <section aria-labelledby="contact">
-      <h2 id="contact">문의</h2>
-      <p>앱이 제대로 동작하지 않거나 궁금한 점이 있으면 이메일로 알려 주세요.</p>
-      <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a> · 패키지 이름: <code>com.sugarmount.sugarclip</code></p>
-    </section>]]></description>
     <pubDate>Mon, 05 Oct 2026 09:00:00 +0900</pubDate>
   </item>
 </channel>

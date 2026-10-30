@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Splash hang from addOnCompleteListener at onStop – SugarMount</title>
+  <meta name="description" content="Our spelling app used addOnCompleteListener(this) for Remote Config; the listener was dropped at onStop, so a screen-off launch never left the splash.">
+  <link rel="canonical" href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">
+  <link rel="alternate" hreflang="ko" href="https://mvgood21.github.io/ax/splash-listener-onstop/">
+  <link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/ax/splash-listener-onstop/">
+  <link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/ax/splash-listener-onstop/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Splash hang from addOnCompleteListener at onStop – SugarMount">
+  <meta property="og:description" content="Our spelling app used addOnCompleteListener(this) for Remote Config; the listener was dropped at onStop, so a screen-off launch never left the splash.">
+  <meta property="og:url" content="https://mvgood21.github.io/en/ax/splash-listener-onstop/">
+  <meta property="og:image" content="https://mvgood21.github.io/assets/og/ax-splash-listener-onstop-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://mvgood21.github.io/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://mvgood21.github.io/en/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=51d09451">
+  <link rel="stylesheet" href="/assets/site.css?v=51d09451">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=51d09451">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://mvgood21.github.io/en/ax/splash-listener-onstop/#article","headline":"A splash that never moved on: addOnCompleteListener(this) and onStop","description":"Our spelling app used addOnCompleteListener(this) for Remote Config; the listener was dropped at onStop, so a screen-off launch never left the splash.","url":"https://mvgood21.github.io/en/ax/splash-listener-onstop/","mainEntityOfPage":"https://mvgood21.github.io/en/ax/splash-listener-onstop/","inLanguage":"en","articleSection":"Android development","datePublished":"2026-10-31T09:00:00+09:00","dateModified":"2026-10-31T09:00:00+09:00","image":["https://mvgood21.github.io/assets/og/ax-splash-listener-onstop-en.png","https://mvgood21.github.io/assets/ax/cover/splash-listener-onstop-en.webp","https://mvgood21.github.io/assets/ax/splash-listener-onstop-1-en.webp","https://mvgood21.github.io/assets/ax/splash-listener-onstop-2-en.webp"],"author":{"@id":"https://mvgood21.github.io/#org"},"publisher":{"@id":"https://mvgood21.github.io/#org"},"isPartOf":{"@id":"https://mvgood21.github.io/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"When does addOnCompleteListener(activity, …) remove the listener?","acceptedAnswer":{"@type":"Answer","text":"At the activity's onStop. The Task reference says so, and in this app a screen turning off during the fetch was enough to lose the result."}},{"@type":"Question","name":"Doesn't an unscoped listener leak the activity?","acceptedAnswer":{"@type":"Answer","text":"Here the listener returns at once if isFinishing or isDestroyed, and whenStarted skips the navigation when the activity is gone. We did not measure leaks separately."}},{"@type":"Question","name":"Why didn't monkey testing catch it?","acceptedAnswer":{"@type":"Answer","text":"That day's monkey runs kept the screen on and sent no Home key. The hang needs onStop to arrive before the fetch completes, so it only shows up in a test that turns the screen off or leaves the app during the fetch."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://mvgood21.github.io/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://mvgood21.github.io/en/ax/"},{"@type":"ListItem","position":3,"name":"Android development","item":"https://mvgood21.github.io/en/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"A splash that never moved on: addOnCompleteListener(this) and onStop"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=51d09451">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/splash-listener-onstop/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-android">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/android/">Android development</a></li><li><span aria-current="page">A splash that never moved on: addOnCompleteListener(this) and onStop</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/splash-listener-onstop-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>A splash that never moved on: addOnCompleteListener(this) and onStop</h1>
+      <p class="lead">A listener added with addOnCompleteListener(this) is removed at onStop. If the screen went off during the fetch, the code that opens the next screen never ran.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Android development</span> <span aria-hidden="true">·</span> <span>8 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-10-31">October 31, 2026</time></p><!-- /build:meta -->
+      <p>Launch our Korean spelling app <a href="/en/apps/sugarspeller/">SugarSpeller</a> with the phone's screen off, get past the lock screen, and it stayed on a black splash screen. On October 11, 2026, during a device check before a production release on a Galaxy S21 running the R8 release APK, we first saw it stuck on vc95, then reproduced it on vc96 by launching with the screen off. The cause, <code>fetchAndActivate().addOnCompleteListener(this)</code>, had been in the repository since its first commit on December 16, 2020. Commit ab95e9a fixed it at 15:43 on October 11.</p>
+      <p class="note">Sources: the app repository's git history (d5ac5e2, ab95e9a), CHANGELOG 1.6.029, the device-check notes in the release document, the agent session log from that day, the monitoring log (WATCH.md), and the Google Play services Task reference. Rechecked on 2026-10-30.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (7)</summary><ol><li><a href="#removed-at-onstop">A listener removed at onStop is not called when the user comes back</a></li><li><a href="#first-sighting">The first hang was force-stopped and set aside</a></li><li><a href="#when-started">Unscope the listener, defer only the navigation</a></li><li><a href="#device-steps">One grep and a screen-off launch test</a></li><li><a href="#new-install-17">How much of the 17% new-install drop-off this explains is unknown</a></li><li><a href="#wiring-test">Still open: no test guards the five call sites</a></li><li><a href="#faq">FAQ</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#removed-at-onstop">A listener removed at onStop is not called when the user comes back</a></li><li><a href="#first-sighting">The first hang was force-stopped and set aside</a></li><li><a href="#when-started">Unscope the listener, defer only the navigation</a></li><li><a href="#device-steps">One grep and a screen-off launch test</a></li><li><a href="#new-install-17">How much of the 17% new-install drop-off this explains is unknown</a></li><li><a href="#wiring-test">Still open: no test guards the five call sites</a></li><li><a href="#faq">FAQ</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="removed-at-onstop">
+      <h2 id="removed-at-onstop">A listener removed at onStop is not called when the user comes back</h2>
+      <p>The splash activity, <code>ActivityEmpty</code>, starts one Remote Config (RC) fetch in <code>onCreate</code>. When the fetch completes, it checks versions and calls <code>checkMyPermission()</code>, which moves on to the next screen. That completion listener was the only path to the next screen.</p>
+      <pre><code>// ActivityEmpty just before ab95e9a, abridged (same line since d5ac5e2, 2020-12-16)
+// [START fetch_config_with_callback]
+remoteConfig.fetchAndActivate().addOnCompleteListener(this) { task -&gt;
+    ...
+    checkMyPermission()   // (annotation) every branch moves on from here
+}</code></pre>
+      <p>The Task reference says of the overload that takes an Activity: "The listener will be automatically removed during onStop." If the screen turns off or the user switches apps before the fetch finishes, onStop comes first and the listener is gone. No lifecycle log from that day shows exactly when onStop arrived while the screen was off, so this step rests on the documentation and on reproducing the hang before and after the fix.</p>
+      <p>Nothing retried on return, either. The activity was still alive, so <code>onCreate</code> did not run again, and <code>onStart</code> only set system bar flags. The app stayed on the splash until the process was killed. On the test phone, the GA4 debug log showed first_open, session_start, screen_view and two app-open ad events, then nothing.</p>
+      <p>The <code>[START fetch_config_with_callback]</code> marker in the comment also appears in the Remote Config sample of Firebase's quickstart-android, which calls <code>addOnCompleteListener(this)</code> too. The marker and the line match, so the code most likely came from that sample. The other way this splash locked users out, through the RC force-update flag, is in <a href="/en/ax/string-version-compare/">"6.7" &lt; "6.11" is false</a>.</p>
+      <figure class="ax-fig"><img src="/assets/ax/splash-listener-onstop-1-en.webp" width="1200" height="698" alt="Comparison: a listener scoped to the activity is removed at onStop, misses the fetch result and leaves the app on the splash; an unscoped listener with whenStarted keeps the result and goes to the main screen once the activity is visible again." loading="lazy"><figcaption>With the listener detached from the activity and only navigation deferred to STARTED, a launch with the screen off reached the main screen once the lock screen was dismissed.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="first-sighting">
+      <h2 id="first-sighting">The first hang was force-stopped and set aside</h2>
+      <p>The operator asked for a deeper device check before production. A Claude Code agent ran it on the S21 with ad domains blocked by DNS: an update install, rotations, 15 round trips to the home screen, and three 5,000-event monkey runs with zero app crashes and zero app ANRs.</p>
+      <p>Around 14:37 the agent woke the S21 from sleep and found vc95, installed about ten minutes earlier, stuck on the splash after the lock screen was dismissed. The log does not show when or how the app was launched. The agent force-stopped it, relaunched, saw the main screen, and noted in its own progress notes that this was a vc95 problem to check later on vc96. A relaunch after a force stop starts again from onCreate with the screen on, so that check could not show the cause.</p>
+      <p>Forty minutes later the agent deliberately launched vc96 with the screen off. It hung again, and only then did the agent open the code. The line was the same in both versions.</p>
+      <figure class="ax-fig"><img src="/assets/ax/splash-listener-onstop-2-en.webp" width="1200" height="862" alt="Step diagram: at 14:37 the agent first finds vc95 stuck on the splash and force-stops past it; at 15:17 it reproduces the hang on vc96 by launching with the screen off; at 15:19 three tests are written first and 2 fail; at 15:37 all 437 unit tests pass; at 15:43 commit ab95e9a." loading="lazy"><figcaption>The first hang was force-stopped and parked; after reproducing it on purpose 40 minutes later, the fix was committed in about 25 minutes.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="when-started">
+      <h2 id="when-started">Unscope the listener, defer only the navigation</h2>
+      <p>ab95e9a drops <code>this</code> from the listener so it no longer depends on the activity, and adds an <code>isFinishing || isDestroyed</code> check as its first line. Every call that opens the next screen goes through a new helper, <code>whenStarted</code>.</p>
+      <pre><code>fun whenStarted(owner: LifecycleOwner, block: () -&gt; Unit) {
+    owner.lifecycleScope.launch { owner.lifecycle.withStarted(block) }
+}</code></pre>
+      <p>If the activity is visible (STARTED or later), the block runs now. If it is stopped, the block runs once when it becomes visible again. If the activity is destroyed first, it never runs. Five call sites were wrapped: three <code>checkMyPermission()</code> calls on the splash, the callback after the app-open ad wait, and <code>goIntent</code> on the logo screen (<code>ActivityIntro</code>). The agent wrote the three <code>whenStarted</code> unit tests first and ran them against an empty function, where 2 failed, before writing the body.</p>
+      <p>Removing <code>this</code> and nothing else was not enough. The listener would fire, but it would start the next activity from a stopped screen, and as the commit comment puts it, that <code>startActivity</code> is blocked or late. A user who went home during the splash might also see the app jump back over the home screen. The post-fix device check included "does not pop up over home".</p>
+      <p>Re-adding the listener in <code>onStart</code> would also work for the fetch: the reference says a listener added to a completed Task is scheduled immediately. It fixes only the RC Task, though. Two of the five wrapped sites, the ad-wait callback and the logo screen's Timer, are not Tasks. Using <code>Task.await()</code> in a coroutine would mean adding kotlinx-coroutines-play-services; the app's build.gradle has only coroutines-android and lifecycle, and the log shows no sign this path was weighed that day.</p>
+      <p>Don't hang navigation on <code>addOnCompleteListener(this)</code>. Receive the result regardless of the activity, and defer only the screen change to the lifecycle.</p>
+      <p><code>whenStarted</code> has its own limit: if the user never comes back, the next screen never opens. If the activity is destroyed in the meantime, the block is dropped, and reopening the app runs <code>onCreate</code> and a fresh fetch. That last part is a reading of the code, not something we tested on a device.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20splash%20that%20never%20moved%20on%3A%20addOnCompleteListener%28this%29%20and%20onStop">Email us</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="device-steps">
+      <h2 id="device-steps">One grep and a screen-off launch test</h2>
+      <p>Start by finding listeners scoped to an activity. The first line below is the search the agent ran that day; it found nothing else in the main sources. The second line widens it to fragments' <code>requireActivity()</code> and Canceled listeners; it was not used that day. The risky ones are listeners that navigate.</p>
+      <pre><code>git grep -nE "addOn(Complete|Success|Failure)Listener\(this"
+git grep -nE "addOn(Complete|Success|Failure|Canceled)Listener\((this|requireActivity\(\)|activity)"</code></pre>
+      <p>Then test on a device with an R8 release build. Steps 1-2 were run on vc96 before the fix and on the fixed build; steps 3-4 on the fixed build.</p>
+      <ol>
+        <li>Turn the screen off with <code>adb shell input keyevent SLEEP</code>, wait 3 seconds, and launch with <code>adb shell monkey -p &lt;package&gt; -c android.intent.category.LAUNCHER 1</code>.</li>
+        <li>Wait 20 seconds, wake the phone and dismiss the lock screen. <code>adb shell dumpsys window | grep mCurrentFocus</code> should name the main activity. Before the fix it named the splash; after, the main screen.</li>
+        <li>Launch, press Home right away, and launch again 12 seconds later. The phone should stay on the home screen in between and land on the main screen after. Repeat on the logo screen.</li>
+        <li>Press Back during the splash and check for crashes.</li>
+      </ol>
+      <p>The three <code>whenStarted</code> tests use Robolectric and <code>LifecycleRegistry.createUnsafe</code> to move the state from RESUMED to CREATED and back to STARTED. After the fix all 437 unit tests passed, and two monkey runs on the fixed build had zero crashes and ANRs. How the release carrying this fix, 1.6.029, went to 100% of users at once is in <a href="/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%</a>.</p>
+    </section>
+
+    <section aria-labelledby="new-install-17">
+      <h2 id="new-install-17">How much of the 17% new-install drop-off this explains is unknown</h2>
+      <p>A baseline written the day before the fix found that of 739 new users from September 12 to October 9, 611 (82.7%) reached the main screen within 24 hours. The CHANGELOG says only that this bug "may be part of" the 17% who did not.</p>
+      <p>A check on October 15 counted 107 of 120 new 1.6.029 installs (89%) reaching the main screen. That number cannot isolate the bug. The baseline used main-screen views, while 1.6.029 used the <code>main_shown</code> event added in 1.6.028; the same release also started an A/B test that removes the app-open ad from the first session for half of new installs; and the sample is 120 people. No event records a hang, so we cannot count how many users hit it.</p>
+      <p>The device check covered one S21 with ads blocked by DNS. We did not test live ads, other makers' lock screens, or returning after the process was killed in the background.</p>
+    </section>
+
+    <section aria-labelledby="wiring-test">
+      <h2 id="wiring-test">Still open: no test guards the five call sites</h2>
+      <p>The unit tests cover <code>whenStarted</code> itself. The release notes say so: the wiring, whether ActivityEmpty and ActivityIntro actually call whenStarted, could not be guarded by unit tests and was checked on the device. If someone adds a new navigation call to the splash without <code>whenStarted</code>, today's tests still pass; only a device test that launches with the screen off or leaves the app during the splash would catch it.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20splash%20that%20never%20moved%20on%3A%20addOnCompleteListener%28this%29%20and%20onStop">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>When does addOnCompleteListener(activity, …) remove the listener?</summary><div><p>At the activity's onStop. The Task reference says so, and in this app a screen turning off during the fetch was enough to lose the result.</p></div></details>
+        <details><summary>Doesn't an unscoped listener leak the activity?</summary><div><p>Here the listener returns at once if isFinishing or isDestroyed, and whenStarted skips the navigation when the activity is gone. We did not measure leaks separately.</p></div></details>
+        <details><summary>Why didn't monkey testing catch it?</summary><div><p>That day's monkey runs kept the screen on and sent no Home key. The hang needs onStop to arrive before the fetch completes, so it only shows up in a test that turns the screen off or leaves the app during the fetch.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
+        <li><a href="/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
+        <li><a href="/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+      </ul>
+      <p><a href="/en/ax/topic/android/">All notes on Android development</a> · <a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/sitemap/">Site map</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>
