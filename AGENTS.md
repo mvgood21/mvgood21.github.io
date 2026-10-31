@@ -1,4 +1,4 @@
-# mvgood21.github.io — SugarMount site
+# sugarmount21.com — SugarMount site
 
 GitHub Pages site for every SugarMount (simpest) Android app: home, app pages, privacy policies, `app-ads.txt`.
 Korean at `/`, English at `/en/`. Support email: sugarmount21@gmail.com.

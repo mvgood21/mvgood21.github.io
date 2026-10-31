@@ -34,7 +34,7 @@ FONT_EB = os.path.join(ROOT, "tools/fonts/nanumsquareeb.ttf")
 FONT_R = os.path.join(ROOT, "tools/fonts/nanumsquarer.ttf")
 PAPER, FILL, INK, INK2, LINE = (246, 248, 251), (238, 241, 245), (20, 32, 51), (75, 86, 104), (220, 226, 234)
 W, H = 1200, 630
-DOMAIN = "mvgood21.github.io"
+DOMAIN = "sugarmount21.com"
 
 # Brand mark colours = site.css --sds-mark-* (light). build.py BRAND_MARK must use the same values.
 MARK_TOP, MARK_LEFT, MARK_RIGHT, MARK_EDGE = "#FFFFFF", "#142033", "#4B5668", "#142033"

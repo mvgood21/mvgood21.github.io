@@ -10,7 +10,7 @@ from email.utils import format_datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import dates  # noqa: E402
 
-SITE = "https://mvgood21.github.io"
+SITE = "https://sugarmount21.com"
 ORG = {"@id": SITE + "/#org"}
 WEBSITE = {"@id": SITE + "/#website"}
 PUB, MOD, ART_PUB = "2026-10-01", "2026-10-05", "2026-10-03"
@@ -74,7 +74,7 @@ def page(lang, path, title, main, lds=(), *, og="/assets/og.png", alt=True, noin
     head += [f'<meta property="og:image" content="{SITE + og}">', f'<meta property="og:locale" content="{t["locale"]}">']
     if alt and not noindex:
         head.append(f'<meta property="og:locale:alternate" content="{t["alt_locale"]}">')
-    head += ['<link rel="icon" type="image/png" sizes="64x64" href="https://mvgood21.github.io/assets/favicon.png">',
+    head += ['<link rel="icon" type="image/png" sizes="64x64" href="https://sugarmount21.com/assets/favicon.png">',
              '<link rel="stylesheet" href="/assets/site.css?v=1">']
     head += [f'<script type="application/ld+json">{json.dumps(x, ensure_ascii=False)}</script>' for x in lds]
     switch = other_path if (alt and not noindex) else pre(other_lang) + "/"

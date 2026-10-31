@@ -83,7 +83,7 @@ class StructuredData(Base):
 
     def test_breadcrumb_short(self):
         f = self.files()
-        f = self.edit(f, "privacy/index.html", '{"@type": "ListItem", "position": 1, "name": "SugarMount", "item": "https://mvgood21.github.io/"}, ', "")
+        f = self.edit(f, "privacy/index.html", '{"@type": "ListItem", "position": 1, "name": "SugarMount", "item": "https://sugarmount21.com/"}, ', "")
         self.assertGate(f, "SD-CRUMB-SHORT")
 
     def test_breadcrumb_home_name(self):
@@ -115,7 +115,7 @@ class StructuredData(Base):
         self.assertGate(f, "SD-APP-REQUIRED")
 
     def test_app_url_absolute(self):
-        f = self.edit(self.files(), "apps/foo/index.html", '#app", "name": "Foo 앱", "url": "https://mvgood21.github.io/apps/foo/"',
+        f = self.edit(self.files(), "apps/foo/index.html", '#app", "name": "Foo 앱", "url": "https://sugarmount21.com/apps/foo/"',
                       '#app", "name": "Foo 앱", "url": "/apps/foo/"')
         self.assertGate(f, "SD-APP-URL")
 
@@ -125,8 +125,8 @@ class StructuredData(Base):
 
     def test_app_screenshot_plain_url(self):
         f = self.edit(self.files(), "apps/foo/index.html",
-                      '{"@type": "ImageObject", "url": "https://mvgood21.github.io/assets/apps/foo/shot1-ko.webp", "width": 360, "height": 780}',
-                      '"https://mvgood21.github.io/assets/apps/foo/shot1-ko.webp"')
+                      '{"@type": "ImageObject", "url": "https://sugarmount21.com/assets/apps/foo/shot1-ko.webp", "width": 360, "height": 780}',
+                      '"https://sugarmount21.com/assets/apps/foo/shot1-ko.webp"')
         self.assertGate(f, "SD-APP-SHOT")
 
     def test_app_description_length(self):
@@ -139,14 +139,14 @@ class StructuredData(Base):
         self.assertGate(f, "SD-IMAGE-MISSING")
 
     def test_primary_image_equals_og(self):
-        f = self.edit(self.files(), "apps/foo/index.html", 'og:image" content="https://mvgood21.github.io/assets/og/app-foo-ko.png"',
-                      'og:image" content="https://mvgood21.github.io/assets/og.png"')
+        f = self.edit(self.files(), "apps/foo/index.html", 'og:image" content="https://sugarmount21.com/assets/og/app-foo-ko.png"',
+                      'og:image" content="https://sugarmount21.com/assets/og.png"')
         self.assertGate(f, "SD-PRIMARY-IMAGE")
 
     def test_org_full_node_outside_home(self):
-        f = self.edit(self.files(), "apps/foo/index.html", '"author": {"@id": "https://mvgood21.github.io/#org"}',
-                      '"author": {"@type": "Organization", "@id": "https://mvgood21.github.io/#org", "name": "SugarMount", '
-                      '"url": "https://mvgood21.github.io/", "email": "sugarmount21@gmail.com"}')
+        f = self.edit(self.files(), "apps/foo/index.html", '"author": {"@id": "https://sugarmount21.com/#org"}',
+                      '"author": {"@type": "Organization", "@id": "https://sugarmount21.com/#org", "name": "SugarMount", '
+                      '"url": "https://sugarmount21.com/", "email": "sugarmount21@gmail.com"}')
         self.assertGate(f, "SD-ORG-FULL")
 
     def test_org_alternate_name_no_handle(self):
@@ -154,17 +154,17 @@ class StructuredData(Base):
         self.assertGate(f, "SD-ORG-ALTNAME")
 
     def test_org_single_url(self):
-        f = self.edit(self.files(), "apps/foo/index.html", '"author": {"@id": "https://mvgood21.github.io/#org"}',
-                      '"author": {"@type": "Organization", "@id": "https://mvgood21.github.io/#org", "url": "https://mvgood21.github.io/about/"}')
+        f = self.edit(self.files(), "apps/foo/index.html", '"author": {"@id": "https://sugarmount21.com/#org"}',
+                      '"author": {"@type": "Organization", "@id": "https://sugarmount21.com/#org", "url": "https://sugarmount21.com/about/"}')
         self.assertGate(f, "SD-ORG-URL")
 
     def test_website_full_node_only_on_ko_home(self):
-        f = self.edit(self.files(), "en/index.html", '"isPartOf": {"@id": "https://mvgood21.github.io/#website"}',
-                      '"isPartOf": {"@type": "WebSite", "@id": "https://mvgood21.github.io/#website", "name": "SugarMount"}')
+        f = self.edit(self.files(), "en/index.html", '"isPartOf": {"@id": "https://sugarmount21.com/#website"}',
+                      '"isPartOf": {"@type": "WebSite", "@id": "https://sugarmount21.com/#website", "name": "SugarMount"}')
         self.assertGate(f, "SD-WEBSITE-FULL")
 
     def test_person_forbidden(self):
-        f = self.edit(self.files(), "apps/foo/task/index.html", '"author": {"@id": "https://mvgood21.github.io/#org"}',
+        f = self.edit(self.files(), "apps/foo/task/index.html", '"author": {"@id": "https://sugarmount21.com/#org"}',
                       '"author": {"@type": "Person", "name": "X"}')
         self.assertGate(f, "SD-FORBIDDEN")
 
@@ -305,15 +305,15 @@ class HeadRules(Base):
         self.assertGate(f, "NOINDEX-MISSING")
 
     def test_noindex_no_canonical(self):
-        f = self.edit(self.files(), "404.html", '<meta charset="utf-8">', '<meta charset="utf-8"><link rel="canonical" href="https://mvgood21.github.io/404.html">')
+        f = self.edit(self.files(), "404.html", '<meta charset="utf-8">', '<meta charset="utf-8"><link rel="canonical" href="https://sugarmount21.com/404.html">')
         self.assertGate(f, "NOINDEX-CANONICAL")
 
     def test_noindex_no_hreflang(self):
-        f = self.edit(self.files(), "404.html", '<meta charset="utf-8">', '<meta charset="utf-8"><link rel="alternate" hreflang="en" href="https://mvgood21.github.io/en/">')
+        f = self.edit(self.files(), "404.html", '<meta charset="utf-8">', '<meta charset="utf-8"><link rel="alternate" hreflang="en" href="https://sugarmount21.com/en/">')
         self.assertGate(f, "NOINDEX-HREFLANG")
 
     def test_noindex_no_og_url(self):
-        f = self.edit(self.files(), "404.html", '<meta charset="utf-8">', '<meta charset="utf-8"><meta property="og:url" content="https://mvgood21.github.io/404.html">')
+        f = self.edit(self.files(), "404.html", '<meta charset="utf-8">', '<meta charset="utf-8"><meta property="og:url" content="https://sugarmount21.com/404.html">')
         self.assertGate(f, "NOINDEX-OGURL")
 
     def test_design_page_is_noindex(self):
@@ -326,15 +326,15 @@ class HeadRules(Base):
         self.assertGate(f, "INDEX-NOINDEX")
 
     def test_canonical_self(self):
-        f = self.edit(self.files(), "apps/index.html", 'rel="canonical" href="https://mvgood21.github.io/apps/"', 'rel="canonical" href="https://mvgood21.github.io/"')
+        f = self.edit(self.files(), "apps/index.html", 'rel="canonical" href="https://sugarmount21.com/apps/"', 'rel="canonical" href="https://sugarmount21.com/"')
         self.assertGate(f, "CANONICAL")
 
     def test_hreflang_target_exists(self):
-        f = self.edit(self.files(), "apps/index.html", 'hreflang="en" href="https://mvgood21.github.io/en/apps/"', 'hreflang="en" href="https://mvgood21.github.io/en/apps/x/"')
+        f = self.edit(self.files(), "apps/index.html", 'hreflang="en" href="https://sugarmount21.com/en/apps/"', 'hreflang="en" href="https://sugarmount21.com/en/apps/x/"')
         self.assertGate(f, "HREFLANG-TARGET")
 
     def test_hreflang_needed_when_counterpart_exists(self):
-        f = self.edit(self.files(), "apps/index.html", '<link rel="alternate" hreflang="x-default" href="https://mvgood21.github.io/apps/">', "")
+        f = self.edit(self.files(), "apps/index.html", '<link rel="alternate" hreflang="x-default" href="https://sugarmount21.com/apps/">', "")
         self.assertGate(f, "HREFLANG-MISSING")
 
     def test_no_hreflang_without_counterpart(self):
@@ -706,7 +706,7 @@ class MoreGates(Base):
         self.assertGate(f, "JS-LINK")
 
     def test_absolute_internal_link_warning(self):
-        f = self.edit(self.files(), "apps/index.html", 'href="/apps/foo/task/"', 'href="https://mvgood21.github.io/apps/foo/task/"')
+        f = self.edit(self.files(), "apps/index.html", 'href="/apps/foo/task/"', 'href="https://sugarmount21.com/apps/foo/task/"')
         self.assertGate(f, "LINK-ABSOLUTE", "warning")
 
     def test_generic_anchor_warning(self):
@@ -723,7 +723,7 @@ class MoreGates(Base):
 
     def test_app_page_needs_primary_image(self):
         f = self.edit(self.files(), "apps/foo/index.html",
-                      '"primaryImageOfPage": {"@type": "ImageObject", "url": "https://mvgood21.github.io/assets/og/app-foo-ko.png", "width": 1200, "height": 630}, ', "")
+                      '"primaryImageOfPage": {"@type": "ImageObject", "url": "https://sugarmount21.com/assets/og/app-foo-ko.png", "width": 1200, "height": 630}, ', "")
         self.assertGate(f, "SD-PRIMARY-IMAGE")
 
     def test_script_defer_warning(self):

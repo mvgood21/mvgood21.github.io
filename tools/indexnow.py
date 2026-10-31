@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""IndexNow ping for mvgood21.github.io (manual, run after a deploy is live).
+"""IndexNow ping for sugarmount21.com (manual, run after a deploy is live).
 
 Targets: pages whose `modified` date in data/content-dates.json equals the deploy date
 (default: today in Asia/Seoul, or $SOURCE_DATE, or --date). Pages where only the header or
@@ -29,8 +29,8 @@ import argparse, ast, datetime, json, os, re, sys, urllib.error, urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOLS = os.path.join(ROOT, "tools")
-SITE = "https://mvgood21.github.io"
-HOST = "mvgood21.github.io"
+SITE = "https://sugarmount21.com"
+HOST = "sugarmount21.com"
 KEY_FILE = os.path.join(ROOT, "data", "indexnow-key.txt")
 DATES_FILE = os.path.join(ROOT, "data", "content-dates.json")
 ENDPOINTS = {

@@ -24,8 +24,8 @@ import dates  # noqa: E402
 from legal_chrome import STANDALONE_PATHS  # noqa: E402  (pages the build never wraps; not checked)
 
 ROOT = dates.ROOT
-SITE = "https://mvgood21.github.io"
-SITE_HOST = "mvgood21.github.io"
+SITE = "https://sugarmount21.com"
+SITE_HOST = "sugarmount21.com"
 ORG_ID = SITE + "/#org"
 SITE_ID = SITE + "/#website"
 NOINDEX_PATHS = frozenset({"404.html", "design/index.html"})
@@ -1102,7 +1102,7 @@ def run(root=ROOT, outputs=None):
     for text, rps in sorted(descs.items()):
         if len(rps) > 1: report.warn("DESC-DUP", rps[0], f"same description on {', '.join(rps)}")
     if set(org_urls) - {SITE + "/"}:
-        report.error("SD-ORG-URL", "#org", "#org url must be only https://mvgood21.github.io/, found "
+        report.error("SD-ORG-URL", "#org", "#org url must be only https://sugarmount21.com/, found "
                      + "; ".join(f"{u} on {', '.join(sorted(ps)[:3])}" for u, ps in sorted(org_urls.items())))
     listed = check_sitemap(site, report, pages, dates_entries)
     check_feeds(site, report, dates_entries)
