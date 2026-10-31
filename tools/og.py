@@ -6,8 +6,9 @@
   python3 tools/og.py --articles   # only the help-article images (after adding or changing an article)
 
 Writes
-  assets/favicon.png (64), favicon.ico (32+48, site root), assets/apple-touch-icon.png (180),
-  assets/logo.png (512)                       3-cube mountain mark (SDS 6.0.3)
+  assets/favicon.png (96), favicon.ico (16+32+48, site root), assets/favicon.svg, assets/apple-touch-icon.png (180),
+  assets/logo.png (512), assets/icon-192.png, assets/icon-maskable-512.png (web manifest)
+                                              3-cube mountain mark (SDS 6.0.3)
   assets/og/app-<id>-<lang>.png               app pages: real screenshots on a neutral ground, no text
                                               (an app with a page but no captures yet: text card with its icon)
   assets/og/article-<id>-<slug>-<16x9|4x3|1x1>-<lang>.png   help articles: the article's largest real
@@ -93,13 +94,33 @@ def mark_svg():
     out.append("</svg>")
     return "".join(out)
 
+def favicon_svg():
+    """Standalone SVG favicon: the mark on the rounded paper tile, colours inline (no site.css in a favicon)."""
+    s = 28 / 3.5 * .86; y0 = (32 - 3.5 * s) / 2
+    f = lambda pts: "M" + " ".join(f"{x:.2f} {y:.2f}".replace(".00", "") for x, y in pts) + "Z"
+    out = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">',
+           '<rect width="32" height="32" rx="7" fill="#{:02X}{:02X}{:02X}"/>'.format(*PAPER)]
+    for top, left, right in mark_cubes(16, y0, s):
+        hexa = [top[0], top[1], right[3], right[2], left[3], top[3]]
+        out += [f'<path fill="{MARK_LEFT}" d="{f(left)}"/>', f'<path fill="{MARK_RIGHT}" d="{f(right)}"/>',
+                f'<path fill="{MARK_TOP}" d="{f(top)}"/>',
+                f'<path d="{f(hexa)}" fill="none" stroke="{MARK_EDGE}" stroke-width="1" stroke-linejoin="round"/>']
+    out.append("</svg>")
+    return "".join(out) + "\n"
+
 def brand_files():
-    mark_image(64, pad=.08, bg=PAPER, radius=.22).save(p("assets/favicon.png"), optimize=True)
-    m48, m32 = mark_image(48, pad=.07, bg=PAPER, radius=.22), mark_image(32, pad=.06, bg=PAPER, radius=.22)
-    m48.save(p("favicon.ico"), format="ICO", sizes=[(48, 48), (32, 32)], append_images=[m32])
+    """Favicons follow Google Search's rule (square, a multiple of 48 px: favicon.ico 48, favicon.png 96), plus an SVG
+    for browsers, the 180 px Apple touch icon, and the web-manifest icons (192/512 'any', 512 'maskable' full-bleed)."""
+    mark_image(96, pad=.08, bg=PAPER, radius=.22).save(p("assets/favicon.png"), optimize=True)
+    m48, m32, m16 = (mark_image(n, pad=pd, bg=PAPER, radius=.22) for n, pd in ((48, .07), (32, .06), (16, .04)))
+    m48.save(p("favicon.ico"), format="ICO", sizes=[(48, 48), (32, 32), (16, 16)], append_images=[m32, m16])
+    with open(p("assets/favicon.svg"), "w", encoding="utf-8", newline="\n") as fh: fh.write(favicon_svg())
     mark_image(180, pad=.14, bg=PAPER).convert("RGB").save(p("assets/apple-touch-icon.png"), optimize=True)
     mark_image(512, pad=.14, bg=PAPER, radius=.22).save(p("assets/logo.png"), optimize=True)
-    return ["assets/favicon.png", "favicon.ico", "assets/apple-touch-icon.png", "assets/logo.png"]
+    mark_image(192, pad=.12, bg=PAPER, radius=.22).save(p("assets/icon-192.png"), optimize=True)
+    mark_image(512, pad=.22, bg=PAPER).convert("RGB").save(p("assets/icon-maskable-512.png"), optimize=True)  # safe zone 80 %
+    return ["assets/favicon.png", "favicon.ico", "assets/apple-touch-icon.png", "assets/logo.png",
+            "assets/icon-192.png", "assets/icon-maskable-512.png"]
 
 # ---------- helpers ----------
 def wrap(draw, text, font, width):

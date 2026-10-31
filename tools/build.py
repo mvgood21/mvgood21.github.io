@@ -457,6 +457,8 @@ def head(lang, title, desc, path, alt_path, *, og_type="website", og_image=None,
     if noindex:
         lines.append('<meta name="robots" content="noindex">')
     else:
+        # large image previews in Search and Discover (Google's default is "standard")
+        lines.append('<meta name="robots" content="max-image-preview:large">')
         lines.append(f'<link rel="canonical" href="{canon}">')
         if alt_path:
             ko_p, en_p = (path, alt_path) if lang == "ko" else (alt_path, path)
@@ -476,8 +478,12 @@ def head(lang, title, desc, path, alt_path, *, og_type="website", og_image=None,
               '<meta name="color-scheme" content="light dark">',
               '<meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">',
               '<meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">',
-              f'<link rel="icon" type="image/png" sizes="64x64" href="{SITE}/assets/favicon.png">',
+              # Google Search favicon: square, a multiple of 48 px (favicon.ico has 48); svg for browsers (tools/og.py).
+              # assets/favicon.png (96) is still drawn for old links but not linked: the HTML budget is tight on long notes.
+              f'<link rel="icon" href="{SITE}/favicon.ico" sizes="48x48">',
+              f'<link rel="icon" type="image/svg+xml" href="{SITE}/assets/favicon.svg">',
               f'<link rel="apple-touch-icon" href="{SITE}/assets/apple-touch-icon.png">',  # absolute, like rel=icon (Naver favicon)
+              '<link rel="manifest" href="/site.webmanifest">',
               f'<link rel="alternate" type="application/rss+xml" title="SugarMount" href="{SITE}{feed}">']
     if (m := ax_extras.ads_meta(ADS)): lines.append(m)  # AdSense site ownership (data/ads.json client)
     lines += [f'<link rel="stylesheet" href="{c}?v={CSSV}">' for c in CSS_FILES]
@@ -1205,6 +1211,8 @@ def wrap_hand(relpath):
         if a: items.append((a[lang]["name"], app_url(a, lang)))
         items.append((headline, None))
         imgs = article_images(a, parts[2], lang) if a else []
+        if not imgs and a and exists(app_og(a, lang).lstrip("/")):
+            imgs = [app_og(a, lang)]  # no capture in the article (e.g. pilot/pricing): Article still needs an image
         og = imgs[0] if imgs else None
         lds.append({"@context": "https://schema.org", "@type": "Article", "@id": SITE + path + "#article",
                     "headline": headline, "description": desc, "url": SITE + path, "mainEntityOfPage": SITE + path, "inLanguage": lang,
@@ -1544,6 +1552,18 @@ def build_robots():
         f"Sitemap: {SITE}/sitemap.xml",
         ""])
 
+def build_manifest():
+    """/site.webmanifest: name and icons for Android home-screen shortcuts and browsers (icons drawn by tools/og.py).
+    display "browser": this is a website, not an installable app (the apps live on Google Play)."""
+    return json.dumps({
+        "name": "SugarMount", "short_name": "SugarMount", "lang": "ko", "start_url": "/", "scope": "/",
+        "display": "browser", "background_color": "#F6F8FB", "theme_color": "#F6F8FB",
+        "icons": [{"src": "/assets/icon-192.png", "sizes": "192x192", "type": "image/png"},
+                  {"src": "/assets/logo.png", "sizes": "512x512", "type": "image/png"},
+                  {"src": "/assets/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+                  {"src": "/assets/favicon.svg", "sizes": "any", "type": "image/svg+xml"}]},
+        ensure_ascii=False, indent=2) + "\n"
+
 def indexnow_key():
     """The public IndexNow key (data/indexnow-key.txt, tools/indexnow.py); the build serves it as /<key>.txt."""
     try:
@@ -1781,6 +1801,7 @@ def main():
     outputs["rss.xml"] = build_rss(outputs, "ko")
     outputs["en/rss.xml"] = build_rss(outputs, "en")
     outputs["robots.txt"] = build_robots()
+    outputs["site.webmanifest"] = build_manifest()
     if (adstxt := ax_extras.ads_txt(ADS)): outputs["ads.txt"] = adstxt
     key = indexnow_key()
     if key: outputs[key + ".txt"] = key
