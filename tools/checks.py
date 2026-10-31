@@ -40,7 +40,8 @@ ORG_FULL_PAGES = frozenset({"index.html", "about/index.html", "en/about/index.ht
 
 KB = 1024
 BUDGET = {
-    "html": 40 * KB, "html_privacy": 60 * KB, "site_css": 40 * KB, "sds_apps_css": 4 * KB, "js": 1 * KB,
+    # sds_apps_css: about 310 B per app; 12 apps took 4092 B, so the 13th (trimbox, 2026-10-30) needs a raise to 5 KB
+    "html": 40 * KB, "html_privacy": 60 * KB, "site_css": 40 * KB, "sds_apps_css": 5 * KB, "js": 1 * KB,
     "icons_per_page": 80 * KB, "shot": 80 * KB, "og_max": 200 * KB, "og_min": 5 * KB, "rss": 10 * 1000 * 1000,
     "font_home": 400 * KB, "font_page": 470 * KB, "font_en": 70 * KB,
     # assets/fonts/pretendard.css (generated). SDS 10/11 says 20 KB; the 30 Hangul subsets the site's text needs already
