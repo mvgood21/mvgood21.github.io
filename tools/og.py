@@ -9,6 +9,7 @@ Writes
   assets/favicon.png (64), favicon.ico (32+48, site root), assets/apple-touch-icon.png (180),
   assets/logo.png (512)                       3-cube mountain mark (SDS 6.0.3)
   assets/og/app-<id>-<lang>.png               app pages: real screenshots on a neutral ground, no text
+                                              (an app with a page but no captures yet: text card with its icon)
   assets/og/article-<id>-<slug>-<16x9|4x3|1x1>-<lang>.png   help articles: the article's largest real
                                               screen on a neutral ground, no text (IA 3.2(4)); ≤ 200 KB
   assets/og.png, assets/og/home-en.png        home text cards, ko and en (icon mountain); --home writes only these
@@ -219,6 +220,13 @@ def icon_grid(apps, x0, y0, cols=4, size=92, gap=16):
             img.paste(ic, (x0 + (i % cols) * (size + gap), y0 + (i // cols) * (size + gap)), ic)
     return draw
 
+def big_icon(a, size=280):
+    def draw(img, dr):
+        src = Image.open(icon_path(a)).convert("RGBA")   # flatten on the card ground first: no dark fringe
+        ground = Image.new("RGBA", src.size, PAPER + (255,)); ground.alpha_composite(src)
+        img.paste(ground.convert("RGB").resize((size, size), Image.LANCZOS), (W - 80 - size, (520 - size) // 2))
+    return draw
+
 def big_mark(img, dr):
     m = mark_image(300, pad=0); img.paste(m, (W - 80 - 300, 100), m)
 
@@ -354,7 +362,13 @@ def main():
         return
     files = brand_files()
     for a in apps:
-        if not a["ko"].get("shots"): continue          # no screenshots (axfamily): no app image
+        if not a["ko"].get("shots"):                   # no real captures yet (axfamily): text card with the icon
+            if a.get("page") in ("hand", "generated"):
+                for lang in ("ko", "en"):
+                    f = f"assets/og/app-{a['id']}-{lang}.png"
+                    text_card(p(f), "Android 앱" if lang == "ko" else "Android app", a[lang]["name"], a[lang]["tagline"],
+                              big_icon(a), 640); files.append(f)
+            continue
         for lang in ("ko", "en"):
             f = f"assets/og/app-{a['id']}-{lang}.png"; app_image(a, lang, p(f)); files.append(f)
     files += article_images(apps)
