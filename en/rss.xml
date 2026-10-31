@@ -6,7 +6,388 @@
   <description>Small Android apps that each do one thing simply, from shrinking photos and opening Korean HWP documents to checking Korean spelling and playing puzzle games.</description>
   <language>en</language>
   <atom:link href="https://sugarmount21.com/en/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Sat, 31 Oct 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Sun, 01 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>HWP compatibility test: Save As in Hancom Docs – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/hwp-hancom-resave-check/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/hwp-hancom-resave-check/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/hwp-hancom-resave-check-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX note · Measurement</span>
+      <h1>Seven edited HWP files in Hancom's Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</h1>
+      <p class="lead">All seven files opened in Hancom Office Viewer with no damage notice. Save As in Hancom Docs needed a sign-in first; both files tried afterwards re-saved, the first (h3) 33 minutes after the production release.</p>
+      <p>The first screen of Hancom Docs was a sign-in form, and the agent stopped there. On October 18, 2026, on a Galaxy S21 (Android 15), we opened seven HWP files edited with the code of our app <a href="https://sugarmount21.com/en/apps/doc-viewer/">HWP Viewer SugarDoc</a> in the two Android apps from Hancom, the company behind the HWP format and the Hangul word processor. All seven opened with no damage notice and their unedited pages matched the originals; only an emoji drew as a blank. Re-saving was tried on two of them, h3 and h7, after the operator signed in, and both passed (171,008 B and 171,520 B).</p>
+      <p class="note">Sources: the Hancom compatibility QA document, the 1.3.0 release record and the plan and design documents in the app repository (sugar-utils), commits 1b7c328, 36b0dfe, 4628d12 and b7dbf3b, and the work session log from that evening. Checked again on October 31, 2026.</p>
+    </section>
+    <section aria-labelledby="criteria">
+      <h2 id="criteria">Four pass criteria, and the agent could reach three</h2>
+      <p>Before edit was switched on, the plan held a Hancom compatibility table. Each document gets the body and table-cell edits that apply to it, plus one file with the special characters <code>&lt; &amp; &gt; " '</code> and an emoji, and one long insertion that pushes text onto a new page. A file passes four checks: (1) it opens with no damage or repair notice, (2) the edited text is visible, (3) unedited pages match the original, (4) Hancom can save it again. Form-field filling had already been cut from the edit scope, for the reasons in <a href="https://sugarmount21.com/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a>, so the form-field column was dropped too.</p>
+      <p>The table started out as a job for a person. On October 18 the operator handed it to the agent, to run on the S21, and limited it to installing free apps: no payments, no sign-ins. The plan that the agent could finish the table alone broke on check 4. The agent installed Hancom Office Viewer (<code>com.tf.thinkdroid.viewer</code>) and Hancom Docs (<code>com.hancom.docs.suite</code> 2.0.15.544) from Play. Viewer had no save function. Hancom Docs could save, and its first screen asked for a sign-in. At 17:24 the agent took a screenshot of the sign-in screen and backed out.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/hwp-hancom-resave-check-1-en.webp" width="1200" height="708" alt="Bar chart: of 7 files, 7 opened with no damage notice, 6 showed the edited text (the emoji file drew a blank), 7 had unedited pages matching the original, and 2 of 2 attempted files re-saved in Hancom Docs." loading="lazy"><figcaption>The two short bars are the emoji file h6, which drew a blank, and the re-save, tried on only two files after sign-in.</figcaption></figure>
+    </section>
+    <section aria-labelledby="test-files">
+      <h2 id="test-files">The test files came from node, running the app's own edit code</h2>
+      <p>The table calls for Korean text and an emoji. <code>adb shell input text</code>, the usual way to type into an app from a script, only takes ASCII, so driving SugarDoc's screen could not produce those files. The agent ran the edit code the app runs inside its WebView (<code>Editor</code> in <code>edit.js</code>: pick a target, apply, then <code>exportChecked</code> to export and reopen) in node, on the same pinned rhwp 0.8.6 engine (measured in <a href="https://sugarmount21.com/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a>). Each result then went through the app's Kotlin preview scrub (<code>PreviewScrubber.scrubHwp5</code>) and save gate (<code>HwpExportVerifier.verify</code>); all seven passed. The on-device save path was covered separately that day by a device E2E run that typed ASCII markers.</p>
+      <p>The generator the agent wrote only picked text runs of two or more characters, and the form document had nothing but empty paragraphs and a form field, so h5 came back with no target (<code>BODY:NONE</code>). It has the same cause as the empty-paragraph case in the <a href="https://sugarmount21.com/en/ax/hwp-edit-save-gate/">save gate note</a>. The agent switched h5 to typing into an empty paragraph, rebuilt the set a minute later, and put the seven files and their originals into <code>Download/HancomCheck/</code> on the S21.</p>
+    </section>
+    <section aria-labelledby="screen-diff">
+      <h2 id="screen-diff">Eight screenshots per file, and h7 checked by eye</h2>
+      <p>Sending an HWP to Viewer through a VIEW intent made Viewer ask for "All files access". The agent tapped "Later" and found another way in: Viewer's own Open button, which hands off to the system file picker and needs no such permission.</p>
+      <p>The comparison script opens the original and the edited file the same way, takes eight screenshots at the same scroll steps, and counts pixels whose grayscale difference is above 40. It also searches the screen's view tree for Korean words meaning damaged, repair, error, cannot open and not supported. The first two runs opened nothing, because the picker started in another folder; a step that walks into the folder fixed that. The same swipe does not stop at exactly the same place twice (4 to 16 px apart on files whose pages did not move), so the script slides the edited shot up or down by at most 70 px (staying clear of the status and tool bars) to the best match before counting. Screens with a nonzero count were turned into side-by-side images and reviewed.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>File</th><th>Edit</th><th>Pages</th><th>Screens with 0 diff</th><th>Where it differed</th></tr></thead>
+        <tbody>
+          <tr><td>h1</td><td>marker text after a body text run</td><td>3→3</td><td>6/8</td><td>the edited line and the next one reflowed</td></tr>
+          <tr><td>h2</td><td>table cell text</td><td>3→3</td><td>7/8</td><td>that cell (1,164 px)</td></tr>
+          <tr><td>h3</td><td>body and table cell</td><td>1→1</td><td>0/8</td><td>the two edits (4,037 px on each screen)</td></tr>
+          <tr><td>h4</td><td>cell and body, document with a form field</td><td>3→3</td><td>6/8</td><td>the edits; the form field placeholder unchanged</td></tr>
+          <tr><td>h5</td><td>text in an empty paragraph of a form</td><td>1→1</td><td>0/8</td><td>the new line (784 px); form objects unchanged</td></tr>
+          <tr><td>h6</td><td>special characters and an emoji (U+1F600)</td><td>3→3</td><td>6/8</td><td>the edited line; characters shown, emoji blank</td></tr>
+          <tr><td>h7</td><td>a sentence of about 480 characters</td><td>1→2</td><td>0/8</td><td>everything moved down a page</td></tr>
+        </tbody>
+      </table></div>
+      <p>h3 and h5 are one page long, so all eight screenshots show the same view and catch the same edit each time. No file produced a warning. Viewer also raised nothing about the preview streams, which the app replaces on save (PrvText with spaces, PrvImage with a blank image).</p>
+      <p>The emoji is still U+1F600 when rhwp reopens the file, yet Viewer drew it as a blank. We had no emoji document authored in Hancom's own software to compare with, so we do not know whether the font or the file is responsible. SugarDoc's edit sheet does not block emoji input.</p>
+    </section>
+    <section aria-labelledby="login-boundary">
+      <h2 id="login-boundary">The release conditions disagreed, and the re-save came after release</h2>
+      <p>At 20:07 the 1.3.0 commit that turned edit on (1b7c328) carried the first version of the QA document: open and display 7 of 7, re-save not checked. It asked the operator to try "Save As" on at least one result file (h3 and h7 suggested) on a signed-in device before release, and to switch edit off (<code>flagEdit=false</code>) if that failed. The agent left edit on because no file had failed; the main session that received its report advised against production until the check was done. The operator approved the production release, and at 20:33 commit 36b0dfe recorded it with "Hancom re-save unverified". The release conditions also differed between documents: the plan listed all four checks and the production ban, while the decision table in the design document only blocked release if check 1 failed.</p>
+      <p>The agent does not type passwords or create accounts, so it asked the operator to sign in; at 20:57 the operator said the S21 was signed in to Hancom Docs. Hancom Docs then asked for "All files access", and the agent would not switch on a security permission itself. Its first directions pointed to the permission list on the app info screen, and the operator replied that the permission was not there. On this S21 it sat under special access in Settings. The agent opened that settings screen directly with an intent, and the operator switched it on at 21:01.</p>
+      <p>The first attempt to open the Hancom Docs editor showed Google Play's "app not recognized" screen (the app had been installed from Play). To see whether our file was the cause, the agent opened the unedited original of h3 the same way, through the file manager's "open with". The original opened in the editor, and the Play screen never came back. The record attributes it to a one-off check on Hancom's side; nobody confirmed the cause.</p>
+      <p>At 21:05 the edited h3 opened in the editor with no damage notice and both edits visible. "Save As" from the menu wrote <code>resave_h3.hwp</code> (171,008 B), which reopened with the same text and layout. h7 opened still pushed from one page to two; <code>resave_h7.hwp</code> (171,520 B) reopened with the two-page layout, table and logo unchanged. Commit 4628d12 recorded both at 21:10.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/hwp-hancom-resave-check-2-en.webp" width="1200" height="1126" alt="Step diagram: 17:16 seven test files built, 17:24 the agent stops at the Hancom Docs sign-in screen, from 17:38 the Viewer comparison opens all 7, 20:07 the commit that turns edit on, 20:33 production, from 20:57 the operator signs in and grants the permission, 21:06 and 21:09 both re-saves pass." loading="lazy"><figcaption>The first re-save (h3) came 33 minutes after the production release, once the operator had signed in.</figcaption></figure>
+      <p>Do not call a file compatible because it opens. The bar is a re-save in the vendor's app, and if that step sits behind a sign-in, name the person who does that step in the table before the work starts.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Seven%20edited%20HWP%20files%20in%20Hancom%27s%20Android%20apps%3A%207%20of%207%20opened%2C%20and%20the%20re-save%20waited%20for%20a%20human%20sign-in">Email us</a></p></aside>
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">Direct editor launch, pixel judging for h7, desktop Hangul: not used</h2>
+      <p>Launching the Hancom Docs editor activity straight from adb would have skipped the file manager, but it was refused with <code>not exported</code>, so the agent went back to the file manager's "open with". In h7 everything moved down, and all eight screens still differed after alignment (168,496 to 221,626 px each), so we dropped the pixel count for that file and judged it from side-by-side images: the table and logo were intact and the text ran onto page 2. Checking in the desktop Hangul word processor was out from the start, because we had no copy to use.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">The pixel diff only aligns vertically, and the re-saved files were only reopened</h2>
+      <p>The comparison only aligns vertically. A different zoom level or horizontal offset is not corrected either, so those screens, like the page-shifted h7, need a person comparing them side by side.</p>
+      <p>Both re-saved files came out smaller than ours (both 235,520 B, from originals of 292,352 B). We never compared their records, so we do not know what went; reopening and reading the text and layout was the whole check. No Korean edit made through SugarDoc's WebView on a phone has been opened in Hancom's apps. Later on the same evening, after the test files were built, the released edit code (1b7c328) stopped offering empty paragraphs without controls as edit targets. The paragraph h5 typed into holds one control (engine query), so that rule does not apply to it. One device (the S21, Android 15) and one Hancom Docs version (2.0.15.544) were used.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Running the same round trip for your own format</h2>
+      <ol>
+        <li>Write the table first: one file per kind of edit (body, table cell, special characters, emoji, a long insertion that moves text to the next page, a form document), four checks each. Put a person's name in every cell that needs a sign-in or a special access permission.</li>
+        <li>Build test files through the same code path as the app, and keep only those that pass the app's save gate. Put each original next to them with an <code>orig_</code> prefix.</li>
+        <li>If the vendor app (made by the company behind the format, here Hancom) asks for broad permissions, look for its own Open menu and the system file picker first.</li>
+        <li>Open original and result the same way, screenshot the same scroll steps, align vertically, count differing pixels. Look by eye at every nonzero screen and at any file whose pages moved.</li>
+        <li>Search the view tree for warnings such as damage or repair notices.</li>
+        <li>In the app that can save, use "Save As" to a new name, reopen it, check text and layout, and note the size.</li>
+        <li>Mark anything you could not run as unchecked, and make sure every document that sets release conditions uses the same checks.</li>
+      </ol>
+      <pre><code># apps that handle the format; the all-files access settings screen
+adb shell cmd package query-activities --brief -a android.intent.action.VIEW \
+  -t application/x-hwp -d content://media/external/downloads/1
+adb shell am start -a android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION \
+  -d package:com.hancom.docs.suite
+# differing pixels after vertical alignment (margins for a 1080x2400 S21,
+# shortened from the session script)
+from PIL import Image, ImageChops
+def diff(a_png, b_png, top=300, bottom=330):
+    A, B = Image.open(a_png).convert("L"), Image.open(b_png).convert("L")
+    bot = A.height - bottom
+    def count(dy, k=1):
+        a = A.crop((0, top, A.width, bot))
+        b = B.crop((0, top + dy, B.width, bot + dy))
+        if k &gt; 1:
+            a = a.resize((a.width // k, a.height // k))
+            b = b.resize((b.width // k, b.height // k))
+        d = ImageChops.difference(a, b).point(lambda v: 1 if v &gt; 40 else 0)
+        return sum(d.getdata())
+    ok = [d for d in range(-120, 121, 2)
+          if top + d &gt;= 230 and bot + d &lt;= A.height - 260]
+    dy = min(ok, key=lambda d: count(d, 4))
+    return count(dy), dy</code></pre>
+      <p>On the S21 the first command listed Hancom Docs and Viewer among the apps that open HWP.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Five files and the desktop word processor are still unchecked</h2>
+      <p>h1, h2, h4, h5 and h6 have not been re-saved in Hancom Docs, and the repository shows no change through its October 29 commits. That set includes the emoji file h6 and h4, the document with a form field. Opening and saving in the desktop Hangul word processor, and the cause of the blank emoji, are also still open.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Seven%20edited%20HWP%20files%20in%20Hancom%27s%20Android%20apps%3A%207%20of%207%20opened%2C%20and%20the%20re-save%20waited%20for%20a%20human%20sign-in">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Can Hancom Office Viewer save an HWP file under a new name?</summary><div><p>Not the version we used on the S21 on October 18, 2026: it had no save function. We used "Save As" in the Hancom Docs editor after signing in.</p></div></details>
+        <details><summary>Where is "All files access" for Hancom Docs on Android?</summary><div><p>On our S21 (Android 15) it was not in the app's permission list but under special access in Settings. Over adb, <code>am start -a android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION -d package:com.hancom.docs.suite</code> opens that screen directly.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">Hancom and HWP are trademarks of Hancom Inc. This note is not affiliated with or endorsed by Hancom Inc.</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Sun, 01 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>HWPX MIME type and Android intent filters – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/hwpx-octet-stream-intent-filter-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX note · Method</span>
+      <h1>On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</h1>
+      <p class="lead">A viewer that only registers document MIME types misses every .hwpx that arrives as octet-stream. Accept octet-stream through one alias, and decide what the file is from its bytes, not its name.</p>
+      <p>When we tapped an .hwpx file in Chrome's download list on a Galaxy S21 (Android 15), our viewer received <code>application/octet-stream</code>. Opening the same kind of file from Samsung My Files on the same phone delivered <code>application/vnd.hancom.hwpx</code>. On October 5, 2026 we sent documents to the release build of our HWP viewer, SugarDoc, from different apps and in different ways, wrote down 18 rows of what arrived, and then corrected the manifest against that matrix and the E2E runs that followed. Filling in the matrix turned up one crash on a share sent without a read grant. A day later, accepting octet-stream shares made the app appear twice in the chooser for a <code>*/*</code> share.</p>
+      <p class="note">Sources: the app repository's intent matrix QA document (2026-10-05), on-device E2E reports (Oct 5 to 7), the 1.0.0 release record (Oct 8 and 9), and the manifest and SendEntryActivity code in commit ca1ade4. HWP and HWPX are the document formats of Hancom Office, a Korean word processor.</p>
+    </section>
+    <section aria-labelledby="mime-by-sender">
+      <h2 id="mime-by-sender">The same .hwpx came in under two MIME types</h2>
+      <p>Eleven of the 18 rows come from real apps sending a document: Samsung My Files (4 rows), Chrome (4) and Files (3). The other seven are a debug sender app (2) and adb (5). While the reader was on screen we read <code>typ=</code> and <code>flg=</code> from <code>dumpsys activity activities</code>.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Sender (device)</th><th>.hwpx</th><th>.hwp</th><th>.pdf</th><th>NEW_TASK</th></tr></thead>
+        <tbody>
+          <tr><td>Samsung My Files (S21)</td><td><code>vnd.hancom.hwpx</code></td><td><code>x-hwp</code></td><td><code>pdf</code></td><td>no (0x3000001)</td></tr>
+          <tr><td>Chrome download list (S21)</td><td><code>octet-stream</code></td><td><code>x-hwp</code></td><td>opened by Chrome</td><td>yes (0x13000003)</td></tr>
+          <tr><td>Files (emulator, API 35)</td><td><code>octet-stream</code></td><td><code>x-hwp</code></td><td><code>pdf</code></td><td>no (0x23000003)</td></tr>
+        </tbody>
+      </table></div>
+      <p>Each sender gets its MIME type from a different place. Chrome passed on whatever the download server sent. Files (DocumentsUI) relies on the MIME table of the system image, and the emulator image had no entry for hwpx; when we checked the AOSP MIME table on October 4 it listed <code>x-hwp</code> but not hwpx. Only My Files attached a Hancom type. In an engine test on October 3, My Files sent an .hwpx as <code>vnd.hancom.hwpx</code> even though MediaStore had recorded it as <code>application/octet-stream</code>.</p>
+      <p>Our early research notes assumed that .hwp files arrive as octet-stream too. They don't: in the matrix all three apps sent .hwp as <code>application/x-hwp</code>. Only .hwpx came through as an unknown file, so a viewer that registers only document types opens .hwp yet is missing from the "Open with" list for .hwpx. The user-side fixes are in <a href="https://sugarmount21.com/en/apps/doc-viewer/hwpx-open/">How to open an HWPX or HWP file on Android</a>.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/hwpx-octet-stream-intent-filter-1-en.webp" width="1200" height="725" alt="Comparison: Samsung My Files sent the same .hwpx as application/vnd.hancom.hwpx, while Chrome's download list and Files on the emulator sent application/octet-stream; .hwp arrived as application/x-hwp from all three." loading="lazy"><figcaption>All three apps sent .hwp as x-hwp; only .hwpx came in as octet-stream.</figcaption></figure>
+      <p>PDFs from Chrome never reached us. Chrome opened downloaded PDFs in its own viewer, and the "Open" button in the download-complete message only showed the download list. No filter can change that, so the matrix conclusion just notes that a Chrome PDF has to go through My Files.</p>
+    </section>
+    <section aria-labelledby="one-alias">
+      <h2 id="one-alias">One alias that takes octet-stream, and a byte check behind it</h2>
+      <p>VIEW is received by a single <code>activity-alias</code>, <code>.reader.OpenUnknownFile</code>. One filter holds the 11 document MIME types and five generic ones. One filter means one entry in the chooser.</p>
+      <pre><code>&lt;activity-alias android:name=".reader.OpenUnknownFile"
+    android:enabled="true" android:exported="true"
+    android:targetActivity=".reader.ReaderActivity"&gt;
+  &lt;intent-filter&gt;
+    &lt;action android:name="android.intent.action.VIEW" /&gt;
+    &lt;category android:name="android.intent.category.DEFAULT" /&gt;
+    &lt;data android:scheme="content" /&gt;
+    &lt;!-- 11 document types: pdf, x-pdf, x-hwp, haansofthwp, vnd.hancom.hwp,
+         vnd.haansoft-hwp, hwp+zip, x-hwp+zip, haansofthwpx,
+         vnd.hancom.hwpx, x-hwpx --&gt;
+    &lt;data android:mimeType="application/vnd.hancom.hwpx" /&gt;
+    &lt;!-- 5 generic types --&gt;
+    &lt;data android:mimeType="application/octet-stream" /&gt;
+    &lt;data android:mimeType="binary/octet-stream" /&gt;
+    &lt;data android:mimeType="application/x-download" /&gt;
+    &lt;data android:mimeType="application/download" /&gt;
+    &lt;data android:mimeType="application/force-download" /&gt;
+  &lt;/intent-filter&gt;
+&lt;/activity-alias&gt;</code></pre>
+      <p><code>x-download</code> is there because on October 4 attachments from korea.kr, a Korean government website, arrived with that type and Chrome did not remap it. Every type is lowercase: the Android documentation says MIME matching in the framework is case-sensitive.</p>
+      <p>Taking octet-stream puts the app in the chooser for every unnamed file, so the reader reads the first 64 KB and decides the format from bytes, copying the whole file first when the proof sits further in. A PDF needs <code>%PDF-</code> in its first 1 KB. HWP 5 needs a CFB container whose FileHeader says "HWP Document File". HWPX needs a ZIP whose first entry is a stored <code>mimetype</code> reading <code>application/hwp+zip</code>. HWP 3 has its own signature. The MIME type and file name can only soften a verdict, never create one. On a local set of 635 files (255 documents, the rest files that must be rejected) the check made no wrong calls.</p>
+      <p>The last two matrix rows test this on a device. We built a 4 KiB file with an m4a header (<code>ftyp M4A</code>) and sent it named .hwp with type <code>application/x-hwp</code>. On the S21 the chooser started 197 to 215 ms after the VIEW; with only one other app able to take the file, the system went straight to the phone's other office viewer, and no copy stayed in our app. The emulator has no other app that takes HWP, so there we sent the same file as <code>application/pdf</code>; the hand-off to Google Drive's PDF viewer took 435 ms.</p>
+    </section>
+    <section aria-labelledby="send-crash">
+      <h2 id="send-crash">A share without a read grant crashed SendEntryActivity</h2>
+      <p>Shares (SEND) land in <code>SendEntryActivity</code>, which has no UI: it forwards to the reader in onCreate and finishes. In one adb row of the October 5 matrix we shared a PDF with only <code>EXTRA_STREAM</code> and no <code>--grant-read-uri-permission</code>. The activity died with a SecurityException and took the process with it.</p>
+      <ol>
+        <li>The sender passed a URI but no read permission for it.</li>
+        <li>The code the agent wrote added <code>FLAG_GRANT_READ_URI_PERMISSION</code> to the intent it forwarded to the reader, trying to pass on a grant the app never held.</li>
+        <li>The system refused that <code>startActivity</code> with a SecurityException, the exception escaped onCreate, and the process went down.</li>
+      </ol>
+      <p>The fix, <code>SendForward</code>, catches only that exception and forwards again without the grant flag and without ClipData. The reader then tries the URI and, if it can't read it, shows the "can't access" screen (E1).</p>
+      <pre><code>fun start(forward: Intent, start: (Intent) -&gt; Unit) {
+    try {
+        start(forward)
+    } catch (e: SecurityException) {
+        start(withoutGrant(forward))  // drop the grant flag and ClipData
+    }
+}</code></pre>
+      <p>A JVM test (<code>SendForwardTest</code>) pins this down, and the device smoke script's <code>send_twice</code> step sends an ungranted SEND on every run. In the 1.0.0 (3) regression on October 8, the eight smoke checks that include this step passed 8 of 8 on both the S21 (Android 15) and the S20 (Android 13). In the matrix only the adb row with the grant removed produced the crash; none of the real-app rows did. We don't know which apps, if any, share this way.</p>
+    </section>
+    <section aria-labelledby="listed-twice">
+      <h2 id="listed-twice">Adding a SEND alias listed the app twice</h2>
+      <p>In the E2E run of October 5 and 6, the entry-intents-10 scenario (a simulated mail share) drew the first page in 21 of 25 cases on the S21 and 20 of 25 on the S20 in its final round. Every failure was an .hwpx shared as octet-stream, because the first design accepted SEND only for the 11 document types. The E2E report suggested deciding after measuring real mail apps; on October 6 the operator chose to accept octet-stream shares first, and the code comment records the reason as "mail apps share .hwpx that way".</p>
+      <p>The agent added a new alias, <code>SendUnknownFile</code>, for octet-stream shares. After that, a share typed <code>*/*</code> matched both the existing <code>SendEntryActivity</code> filter and the new alias, because Android matches a <code>*/*</code> intent against any typed filter. The S20 chooser showed two identical "SugarDoc" entries; on the S21 an extra one-item resolver step appeared.</p>
+      <p>On October 7 we changed it so that only one component is enabled for any given intent. <code>SendEntryActivity</code> lost its filter and became <code>exported=false</code>, and SEND now goes through one of two aliases: <code>SendUnknownFile</code> (11 document types plus octet-stream) while the setting is on, <code>SendDocument</code> (11 types) while it is off. After SEND was fixed, the recheck found that VIEW <code>*/*</code> also matched both <code>ReaderActivity</code> and <code>OpenUnknownFile</code>, a layout that had been there since the October 5 matrix. Tests assumed the <code>ReaderActivity</code> filter, so it was set aside at first and given the same treatment later that day. When the setting changes, the alias taking over is enabled before the other is disabled, so there can briefly be two entries but never zero.</p>
+      <p>We checked with <code>cmd package query-activities</code>. On the S21 release build with the setting on, VIEW for <code>*/*</code>, pdf, hwpx and octet-stream all resolved to <code>OpenUnknownFile</code> alone; with it off, to <code>ViewDocument</code> alone, and octet-stream to nothing. A recheck the same day showed one "SugarDoc" in both the "Open with" and the share choosers.</p>
+      <p>Keep exactly one enabled component per action for each MIME type.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/hwpx-octet-stream-intent-filter-2-en.webp" width="1200" height="970" alt="Timeline: on October 5 the matrix finds a crash on an ungranted SEND; the October 5 to 6 E2E run finds failed octet-stream .hwpx shares; on October 6 an octet-stream SEND alias makes the app appear twice in the S20 chooser; on October 7 SEND and VIEW each end up with one enabled component; on October 9 the operator opens four test folders from KakaoTalk on an S23 without problems." loading="lazy"><figcaption>After SEND was fixed, the recheck found the same duplicate in VIEW, and it was fixed the same way that day.</figcaption></figure>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20On%20Android%2C%20HWPX%20can%20arrive%20as%20application/octet-stream%3A%20an%2018-row%20intent%20matrix%20and%20the%20intent%20filter%20that%20fits%20it">Email us</a></p></aside>
+    <section aria-labelledby="not-chosen">
+      <h2 id="not-chosen">Why not */*, pathPattern, or off by default</h2>
+      <p>We never declared a <code>*/*</code> filter; it would put a document viewer in the list for every photo and recording. Octet-stream carries the same risk on a smaller scale, limited to unnamed files, and the byte check hands non-documents straight on. <code>application/zip</code> and <code>application/unknown</code> stay out until a real app is seen sending them.</p>
+      <p>Matching .hwpx with <code>pathPattern</code> doesn't work for content URIs. My Files handed us a URI shaped like <code>content://media/external/file/N</code>, with no file name in the path. The Android documentation says the path attributes of <code>&lt;data&gt;</code> mean something only when the filter names a host. You can widen the host to <code>*</code> so the path condition applies to any sender, but a URI like that has no extension in its path to match. On October 4 we read a competing app's manifest: it accepted octet-stream only under a pathPattern, and its reviews included complaints that .hwpx didn't appear in the "Open with" list. That link between the manifest and the reviews is our inference.</p>
+      <p>Shipping the generic alias switched off was the other option. In the matrix, turning the setting off and sending an octet-stream VIEW removed the app from the chooser, so off by default means .hwpx from Chrome and Files never lists us. On October 5 the operator approved on by default. The decision table weighed being listed in "Open with" against backlash at an app that grabs files. The setting "Show for all file types" lets users turn it off, and the product spec says a high rejection rate on the generic alias sends us back to off by default or to fewer MIME types.</p>
+    </section>
+    <section aria-labelledby="kakao">
+      <h2 id="kakao">KakaoTalk opened the files, but nobody wrote down the MIME type</h2>
+      <p>The agent could not test KakaoTalk, Korea's main messaging app: a second account has to send the file. The matrix put KakaoTalk, Naver Mail (a Korean webmail service) and Gmail in a separate table of checks for the owner. The October 9 release record has the operator's result: on a Galaxy S23, four test folders sent from another KakaoTalk account (an HWPX official letter, an HWP5 official letter, a PDF and an old HWP3 file) all opened in the viewer. The record has no MIME type and no NEW_TASK flag. Today's filter takes both the document types and octet-stream, so the fact that the files opened doesn't tell us which one KakaoTalk used.</p>
+      <p>The device coverage is narrow too. The matrix ran on the S21 (Android 15) and an API 35 emulator, and the regression added the S20 (Android 13). We didn't look at other manufacturers' file apps, and Files by Google wasn't installed on any test device.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Building the same intent matrix for your app with adb</h2>
+      <ol>
+        <li>Open an .hwpx, an .hwp and a .pdf from each sender. While your reader is on screen, record the MIME type, flags and authority. Leave file names out.<pre><code>adb shell dumpsys activity activities | grep -A3 &lt;package&gt;</code></pre></li>
+        <li>Count how many times your package matches each type. For VIEW and SEND alike, <code>*/*</code>, each document type and octet-stream should give exactly one.<pre><code>adb shell cmd package query-activities --brief \
+  -a android.intent.action.VIEW -t '*/*' -d content://x/y</code></pre></li>
+        <li>Share without a read grant. The app must not crash; it should end on its "can't access" screen.<pre><code>adb shell am start -a android.intent.action.SEND \
+  -t application/pdf --eu android.intent.extra.STREAM &lt;content URI&gt;</code></pre></li>
+        <li>VIEW a non-document, such as an m4a, named .hwp with a document MIME type. Check that it goes to the chooser and that no copy stays in app storage.</li>
+        <li>Turn the generic-type setting off and send an octet-stream VIEW. Your app should be missing from the chooser and come back when the setting is on again.</li>
+        <li>Messenger and mail apps need a second account to send from.</li>
+      </ol>
+      <p>The engine side is in <a href="https://sugarmount21.com/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a>, and the same app's PDF path problem is in <a href="https://sugarmount21.com/en/ax/androidx-pdf-isolated-process/">androidx.pdf beta01 runs your Application.onCreate a second time, in an isolated process, and the PDF silently never opens</a>.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Next: mail app MIME types, and the setting under an open reader</h2>
+      <p>We haven't opened a Naver Mail or Gmail attachment yet. Mail apps were the stated reason for accepting octet-stream shares, so recording their MIME types with dumpsys comes first. We also haven't tried switching the setting while a reader opened through the alias that gets disabled is still on screen; the system might close that reader, or returning to it from Recents might fail. The rule to roll back on a high rejection rate is written down, but there is no record yet of anyone reading that number.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20On%20Android%2C%20HWPX%20can%20arrive%20as%20application/octet-stream%3A%20an%2018-row%20intent%20matrix%20and%20the%20intent%20filter%20that%20fits%20it">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>What is the MIME type of an .hwpx file on Android?</summary><div><p>It depends on the sending app. On October 5, 2026, Samsung My Files sent <code>application/vnd.hancom.hwpx</code>, while Chrome's download list and Files on the emulator sent <code>application/octet-stream</code>. Our filter lists <code>application/haansofthwpx</code>, <code>application/vnd.hancom.hwpx</code>, <code>application/x-hwpx</code>, <code>application/hwp+zip</code> and octet-stream together.</p></div></details>
+        <details><summary>Can I match .hwpx with pathPattern in an intent filter?</summary><div><p>Not for content URIs. The URI Samsung My Files handed us, <code>content://media/external/file/N</code>, carries no file name to match. Match on MIME type and check the bytes.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Sun, 01 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Parallel AI agent branches: 12 integration defects – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/integration-review-defects/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/integration-review-defects/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/integration-review-defects-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</h1>
+      <p class="lead">Every branch had its own agent review and green CI. A separate review of the merged code still confirmed 12 defects the existing tests had not caught; by our count, 10 sat between two packages.</p>
+      <p>Six review agents that read only the merged code reported 2 blockers and 10 majors, and the agents assigned to refute them could not knock down a single one. Before that, each of the 13 feature branches had been reviewed by three adversarial agents and had green CI. This happened in the early hours of October 10, 2026 (Korea time), while merging the first parallel wave (Wave 1) of AXFamily, our family calendar app. None of the 12 were caught by the existing tests or showed up as a git conflict. By our classification, 10 of the 12 were broken agreements between code written by two different packages.</p>
+      <p class="note">Sources: git history (merges 58920b9 to ff0c975, a0351cf, 941d79e, c153fae, 74d3685, 5d51b5b, cee9d0f), the descriptions of the integration PR and the billing package PR, the fix report, and the integration workflow script with its run log (each agent's findings and refutation verdict). Times are KST. Rechecked on 2026-10-31.</p>
+    </section>
+    <section aria-labelledby="timeline">
+      <h2 id="timeline">From the 01:51 merges to the 05:34 PR merge</h2>
+      <p>Wave 1 ran one workflow that put every package through the same steps: one agent implemented it, three agents reviewed the branch through security, cost and correctness lenses, and a fix agent addressed their findings and got the PR to green CI. The two-minute merge of all 13 branches starting at 01:51, and the minimal fixes for 6 package pairs in a0351cf at 02:09, are covered in <a href="https://sugarmount21.com/en/ax/file-owner-table/">Claude Code sessions in one repo: file owner table</a>.</p>
+      <p>Three wiring commits followed to apply the lead session's cross-package decisions, in the order contract, server, app (941d79e at 02:53, c153fae at 03:42, 74d3685 at 04:23). The code the review read included those wiring commits.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/integration-review-defects-1-en.webp" width="1200" height="1192" alt="Step diagram: 13 branches pass their own review and CI, merge at 01:51, 6 broken pairs fixed and tests pass at 02:09, three wiring commits, a six-lens review at 04:29 finds 32 issues, 12 survive refutation, fixed at 05:28, PR merged at 05:34." loading="lazy"><figcaption>After every test was green again, a review that read only the merged code found 12 blocker or major defects.</figcaption></figure>
+      <p>The six reviewers started together at 04:29 and finished within 6 to 9 minutes, making 30 to 95 tool calls each. At 04:38 each of the 12 blocker and major findings went to its own refuting agent, and within a minute all 12 came back as real. The fix agent pushed 5d51b5b at 05:28 (115 files, 2,088 lines added). Once all 11 CI jobs passed, the integration PR was merged into develop at 05:34.</p>
+    </section>
+    <section aria-labelledby="first-guess">
+      <h2 id="first-guess">The first assumption: green tests meant the integration was done</h2>
+      <p>The plan described Wave 1 as "parallel feature work (separate files only)", and its conflict rules were written per shared file. The integration step was told to resolve conflicts keeping both sides' intent, run every test suite, and fix integration breakage minimally.</p>
+      <p>The integration agent finished by that standard. Its PR description said it had fixed only what the integration broke, and listed the numbers: 977 Flutter tests, 274 function unit tests and 291 emulator tests, 441 Rules tests (5 skipped) and 132 media Worker tests, all passing. None of the 12 defects found later changed any of those numbers. The lead session had put a review step at the end of the workflow, and that step is where the defects appeared.</p>
+    </section>
+    <section aria-labelledby="findings">
+      <h2 id="findings">32 findings from six lenses; 12 survived refutation</h2>
+      <p>The six lenses were Rules and contract, function security, cost, app security and privacy, app UX, and flow tracing, which followed the core user flow in code from sign-in to account deletion. They reported 32 findings: 20 minor and 12 blocker or major. The cost lens reported only 3 minor findings. One finding from Rules and contract and one from function security were the same defect, found from both sides, so there were 11 distinct defects.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/integration-review-defects-2-en.webp" width="1200" height="728" alt="Bar chart: blocker and major findings were 2 from Rules and contract, 2 from function security, 2 from app security and privacy, 4 from app UX, 2 from flow tracing and 0 from cost, 12 in all." loading="lazy"><figcaption>Five of the six lenses produced a blocker or major finding; the cost lens produced only minor ones.</figcaption></figure>
+      <p>The refutation prompt told each agent to read the code and refute the finding, defaulting to "not real" unless the defect could be shown. Each refuter made 3 to 6 tool calls and returned a verdict in 16 to 25 seconds. The verdicts cited files and line numbers; the one on the missing index pointed out that comments and assets, queried the same way, already had their composite indexes.</p>
+    </section>
+    <section aria-labelledby="contracts">
+      <h2 id="contracts">By our count, 10 of the 12 sat between two packages</h2>
+      <p>Rewriting each confirmed defect as "which two pieces of code believed different things" gives the table below. The classification is ours, made while writing this note; it is not in the original records. App feature details are kept short.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Lens (severity)</th><th>The two sides</th><th>The mismatch</th></tr></thead>
+        <tbody>
+          <tr><td>Rules and contract, function security (major, same defect twice)</td><td>Rules vs. a function added during wiring</td><td>Rules let any adult in the household edit a list field that the function trusted as proof of consent eligibility</td></tr>
+          <tr><td>Rules and contract (major)</td><td>Records screen query vs. index file</td><td>No composite index for a sorted query</td></tr>
+          <tr><td>Function security (major)</td><td>Revocation check vs. ownership transfer</td><td>A revocation was re-evaluated against the revoker's current role, so a role change undid it</td></tr>
+          <tr><td>App security and privacy (major)</td><td>Records device cleanup vs. sign-out cleanup registry</td><td>Cleanup never registered; it ran only asynchronously and never retried</td></tr>
+          <tr><td>App security and privacy (major)</td><td>Inside the share inbox store</td><td>Copied files left behind when the queue passed 100 items or got corrupted</td></tr>
+          <tr><td>App UX (blocker)</td><td>Billing entry widget vs. family screen</td><td>Zero production callers of the widget</td></tr>
+          <tr><td>App UX (major)</td><td>Household deletion function vs. settings screen</td><td>The app never sent the server's cancel flag and parsed the cancelled reply as an error</td></tr>
+          <tr><td>App UX (major)</td><td>UI spec vs. bottom action button</td><td>Button shown on tabs the spec excluded, with the wrong label</td></tr>
+          <tr><td>App UX (major)</td><td>Banner slot vs. screen state reports</td><td>One failure blocked banners for the whole session (spec says per screen); cached offline screens reported ready</td></tr>
+          <tr><td>Flow tracing (blocker)</td><td>App capture vs. AI extraction function</td><td>For PDF sources the app sent <code>image/webp</code>; the server accepted only <code>application/pdf</code></td></tr>
+          <tr><td>Flow tracing (major)</td><td>Household picker vs. today/calendar screens and billing</td><td>The picker wrote a new key, the screens read an old key nothing wrote, billing used the first household</td></tr>
+        </tbody>
+      </table></div>
+      <p>Only two stayed inside one package: the share inbox files and the bottom button. In the other 10 (9 distinct defects), each side was correct on its own. In the PDF case, the app sent a first-page thumbnail exactly as its own code comment said, and the server counted pages from PDF bytes exactly as the contract said at the time.</p>
+    </section>
+    <section aria-labelledby="why-missed">
+      <h2 id="why-missed">Each branch review read only its own diff</h2>
+      <p>The branch review prompt had each reviewer read <code>git diff origin/develop...origin/&lt;branch&gt;</code>. The index file already existed on develop, and the Rules package was changing it on its own branch, but it never appeared in the diff read by the agent reviewing the records screen's sorted query. The same held for app capture: the server check that accepts only <code>application/pdf</code> for PDF sources was already on develop, but not in that reviewer's diff.</p>
+      <p>The billing package's review had already found one of these defects. In that branch review, the correctness lens had been told to grep for production callers of every new API, the same rule the operator now keeps in the global instructions for all projects. That review did find that nothing called the billing entry widget, but rated it minor; the billing re-review just before integration raised it to major. The call belonged in the family screen file, which the file owner rules kept the billing fix agent from touching, so the agent put the item in the PR description's "to align with other packages" section, marked as required at integration. The integration workflow's wiring task list was already written into the script when it launched at 01:28, before the billing re-review finished. The item came back as a blocker in the integration review that started at 04:29.</p>
+      <p>Tests ran per package against that package's own fakes and the Firestore emulator. As the comment at the top of the index test file already said, the Firestore emulator does not enforce composite indexes. The contract's query table listed sources among the list queries, but the required composite index list in the same section left sources out. CI passed, and only the production Firestore would have answered with <code>FAILED_PRECONDITION</code>. (The review caught it before any production deploy, so it never actually happened.)</p>
+      <p>Agent-written code and tests also hid mismatches. A comment in the today/calendar code said the active-household key was "written by A1's household switcher" (A1 being the family screen package), but <code>git grep</code> found no code anywhere that wrote that key. The bottom button test was named "the FAB is on every tab"; it locked in the placement and label the spec had ruled out.</p>
+      <p>After merging parallel branches, run a review that reads only the merged code, however many branch reviews came before.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%2013%20parallel%20AI%20agent%20branches%20passed%20review%20and%20CI%3B%20a%20review%20of%20the%20merged%20code%20still%20confirmed%2012%20defects">Email us</a></p></aside>
+    <section aria-labelledby="checks">
+      <h2 id="checks">The check we kept: a sorted-query-to-index table</h2>
+      <p>According to the fix report, 5d51b5b added for each defect a test written to fail on the code before the fix; the Rules, index and consent fixes were actually reverted to watch the tests fail. (The revert technique is in <a href="https://sugarmount21.com/en/ax/guard-removal-test/">Finding fake tests by deleting their guards</a>.) Two of the fixes were turned into checks for the next mismatch of the same kind.</p>
+      <p>For indexes, the Rules test suite gained a table of app queries that use orderBy. Each row names the app file, the query and the index it needs, and the test looks for that index in the index file. A final test counts how often <code>orderBy: '</code> appears in each listed file and compares that with the number of table rows, then compares the list of app files containing the string with the table's files. Anyone adding a sorted query has to add a row first.</p>
+      <pre><code>const count = (rel) =&gt; (readFileSync(resolve(appRoot, rel), 'utf8').match(/orderBy:\s*'/g) ?? []).length;
+// …
+expect(actual).toEqual(expected);
+// fail if a file outside the table uses orderBy: '&lt;field&gt;'
+const all = execSync(`grep -rlE "^\\s*orderBy: '" lib || true`, { cwd: appRoot, encoding: 'utf8' })
+  .split('\n').filter(Boolean).map((f) =&gt; f.trim());
+expect(all.sort()).toEqual(files.sort());</code></pre>
+      <p>By October 13, three more app files with sorted queries had been added to the table. The history does not show whether the table check failed first and forced those rows. For household selection, the fix made the app session's current household the single source of truth; with two or more households and no valid selection, the picker returns null instead of falling back to the first one. Three tests pin that rule.</p>
+    </section>
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">Other routes: a staging project, shared test vectors</h2>
+      <p>A real Firestore project would have exposed the missing index at once. The plan had postponed a staging project until after launch, citing low benefit for the risk and one more place that could incur charges. The device end-to-end runs that same morning used an emulator backend to keep costs at zero, so they would not have shown it either.</p>
+      <p>One method had already worked. The billing package's tests were written to read a shared vector file (expected results for whether a subscription counts as active) that the billing server package would add, and skipped themselves with "runs automatically once merged" while the file was missing from develop. Right after the merge, that test ran and caught the app and server disagreeing on the entitlement check, which a0351cf fixed. Contracts without a vector file, like consent eligibility or household selection, could not be caught by that test.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">What a read-only review missed: three device E2E rounds</h2>
+      <p>Three rounds of device E2E, run after the E2E harness commit at 07:37 the same day, found more runtime defects. One of them, d3fde30, fixed Firestore triggers that crashed without a default Admin app, and the 5d51b5b fix report itself says the Android side got Kotlin unit tests only. Why device checks run separately even after a review converges on zero is covered in <a href="https://sugarmount21.com/en/ax/agent-review-refutation/">Agent code review: fix what survives refutation</a>.</p>
+      <p>Each finding got one refuter for 16 to 25 seconds, so 12 out of 12 surviving is not evidence that refutation can be dropped. The app UX lens was told to compare screens against the written UI spec, and the button and banner findings cited spec clauses. In a project without a written spec, that lens has nothing to compare against.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">How to run integration review as its own step</h2>
+      <ol>
+        <li>Collect every branch PR's "to align with other packages" list into the integration task list. Finalize the wiring list only after every branch review is done.</li>
+        <li>Once everything is merged and all suites are green, hand the integration diff to one read-only agent per area, asking for concrete defects with evidence only and for each one to be refuted by the reviewer before it is reported. AXFamily's six lenses were Rules and contract, function security, cost, app security and privacy, app UX (screens vs. the UI spec), and flow tracing (sign-in to account deletion).<pre><code>git diff --stat origin/develop...origin/&lt;integration-branch&gt;</code></pre></li>
+        <li>Count production callers for every new widget, function and parameter, excluding the file that defines it. Zero is a finding by itself.<pre><code>git grep -n "BillingPlanRow(" -- apps/app/lib ':!apps/app/lib/features/billing/plan_row.dart'</code></pre></li>
+        <li>Send each blocker and major to a different agent to refute, and drop anything it cannot be shown (the procedure is in <a href="https://sugarmount21.com/en/ax/agent-review-refutation/">Agent code review: fix what survives refutation</a>).</li>
+        <li>For each confirmed defect, add a test that fails on the old code, and revert the fix once to watch it fail.</li>
+        <li>Turn each defect type into a check: a table check when both sides can be counted, like queries and indexes; a shared vector file read by both sides' tests when it is a decision rule.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Next to check: server queries and gaps in the table</h2>
+      <p>The sorted-query table counts only the <code>orderBy: '</code> string in app code. Server function queries were still added to the required index list by hand on October 13, and the shape of each where clause depends on whoever writes the row. Whether server queries can be counted the same way is the next thing to try.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%2013%20parallel%20AI%20agent%20branches%20passed%20review%20and%20CI%3B%20a%20review%20of%20the%20merged%20code%20still%20confirmed%2012%20defects">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>If every branch had an AI review, do I still need an integration review?</summary><div><p>You still need one. In AXFamily every branch was reviewed by three agents, and the merged code still had 12 blocker or major defects, 10 of them spanning two packages by our count. A branch review reads only that branch's diff, so it misses the other side of a contract whenever that side is not in the diff.</p></div></details>
+        <details><summary>Will Firestore emulator tests catch a missing composite index?</summary><div><p>The emulator does not enforce composite indexes, so tests pass with the index missing. Add a static check that matches the app's sorted queries against the index file, or run the queries against a real project.</p></div></details>
+        <details><summary>How long did the integration review take?</summary><div><p>Review took 6 to 9 minutes and refutation under a minute; the fix took about 49 minutes to its commit and about 55 minutes to the PR merge after CI. Counting the merges and wiring before it, the whole run from the 01:51 merges to the 05:34 PR merge took 3 hours 43 minutes.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Sun, 01 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>AXFamily: shared family calendar and AI assistant – SugarMount</title>
     <link>https://sugarmount21.com/en/apps/axfamily/</link>
@@ -285,12 +666,12 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
         <li><a href="https://sugarmount21.com/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -372,12 +753,12 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
         <li><a href="https://sugarmount21.com/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -466,12 +847,12 @@ git grep -nE "addOn(Complete|Success|Failure|Canceled)Listener\((this|requireAct
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -587,9 +968,9 @@ depth(board):                   # peel
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -722,9 +1103,9 @@ depth(board):                   # peel
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -837,12 +1218,12 @@ if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/release-ad-id-grep/">R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -908,7 +1289,7 @@ if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
     </section>
     <section aria-labelledby="contract-drift">
       <h2 id="contract-drift">Six mismatches git never saw, and 12 review defects, sat outside the table</h2>
-      <p>At 02:09, sixteen minutes after the merges, a0351cf ("minimal fix for Wave 1 integration breakage") repaired six package pairs. The app's paid-plan check (A4) disagreed with the billing server's (B1) subscription states, A4 and the settings package (A5) each declared their own ad-consent type, and the error copy didn't know the media package's new error codes. All six pairs lived in different files, so git raised no conflict. At 05:28, 5d51b5b fixed the 12 defects the integration review confirmed plus minor issues and a contract re-baseline, adding 2,088 lines across 115 files. Guardian checks were pulled into one function (<code>isGuardianOf</code>), and the three screen packages A2, A3 and A4 were made to read which family is being viewed from a single value, <code>AppSession.currentHouseholdId</code>. Two missing indexes went in with a new check that compares the app's orderBy queries with the index table.</p>
+      <p>At 02:09, sixteen minutes after the merges, a0351cf ("minimal fix for Wave 1 integration breakage") repaired six package pairs. The app's paid-plan check (A4) disagreed with the billing server's (B1) subscription states, A4 and the settings package (A5) each declared their own ad-consent type, and the error copy didn't know the media package's new error codes. All six pairs lived in different files, so git raised no conflict. At 05:28, 5d51b5b fixed the 12 defects the integration review confirmed plus minor issues and a contract re-baseline, adding 2,088 lines across 115 files. Guardian checks were pulled into one function (<code>isGuardianOf</code>), and the three screen packages A2, A3 and A4 were made to read which family is being viewed from a single value, <code>AppSession.currentHouseholdId</code>. Two missing indexes went in with a new check that compares the app's orderBy queries with the index table. Where those 12 came from, and why each branch review missed them, is in <a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a>.</p>
       <p>The table named an owner for every shared file and none for concepts such as "guardian" or "current family". The double definitions showed up only in the integration review behind 5d51b5b. Use the owner table to cut text conflicts, and leave contract drift to an integration review plus the checks that review produces. We have not tried the table on work that cannot be split into rows, such as a refactor that cuts across many folders.</p>
     </section>
     <section aria-labelledby="how-to">
@@ -944,12 +1325,12 @@ git diff --name-only $(git merge-base &lt;base&gt; &lt;branch&gt;) &lt;branch&gt
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://sugarmount21.com/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1036,12 +1417,12 @@ unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$TEST_PUB[~/][0-9]*" | sort -u | wc
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1175,10 +1556,10 @@ lifecycleScope.launch {
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1288,12 +1669,12 @@ lifecycleScope.launch {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1395,9 +1776,9 @@ three_star = cleared and time &lt;= par(base, scale, floor) and mistakes &lt;= a
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1512,9 +1893,9 @@ print(pages.most_common(), "FAQ questions:", questions)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
         <li><a href="https://sugarmount21.com/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1629,10 +2010,10 @@ NOT_TEST = {"notExpression": {"orGroup": {"expressions": [
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1733,12 +2114,12 @@ export function cacheKey(api, group, original, corrected, model) {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1864,12 +2245,12 @@ const gaps = await agent(CTX + CHECKLIST + final + dossier, { schema: CRIT })</c
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://sugarmount21.com/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1980,12 +2361,12 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(":core
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2104,12 +2485,12 @@ git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --gre
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://sugarmount21.com/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2245,12 +2626,12 @@ adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2381,9 +2762,9 @@ print("my app in results:", MY_APP in ids)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2509,9 +2890,9 @@ out of date:
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
         <li><a href="https://sugarmount21.com/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2625,12 +3006,12 @@ grep -rL --include='*Test.kt' -e 'assert' -e 'check(matches' app/src/</code></pr
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2770,9 +3151,9 @@ git log --until=2026-10-20 --format='%(trailers:key=Co-authored-by,valueonly)' \
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2874,12 +3255,12 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text: make it print how much it measured</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3044,9 +3425,9 @@ after_hint = win(board after the correct first move, 2 pieces left, lines it cle
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3160,12 +3541,12 @@ Schedule expires: YYYY-MM-DD / register again on: YYYY-MM-DD
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/agent-review-refutation/">84 agents reviewed a release: three refuters per finding, and only the 20 survivors got fixed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3305,9 +3686,9 @@ curl -s "$POLICY_URL" | grep -o 'data-policy-version="[0-9-]*"'</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3452,12 +3833,12 @@ font.save(dst)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3545,12 +3926,12 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3635,12 +4016,12 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3756,12 +4137,12 @@ flutter test test/theme_matrix/ --dart-define=Y2_NO_SETTLE=true
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3880,12 +4261,12 @@ FlowRow(
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3964,12 +4345,12 @@ Mem:              13           8           2           0           2           4
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4095,10 +4476,10 @@ if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFract
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4218,12 +4599,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4321,12 +4702,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4390,9 +4771,9 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4784,9 +5165,9 @@ room  = is there space for a 3×3 square, a 1×4 bar, a 4×1 bar (0–3)</code><
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4892,12 +5273,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5003,12 +5384,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6354,299 +6735,11 @@ done</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>How to write AGENTS.md for an AI coding agent – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/agents-md/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/agents-md/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/agents-md-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · Measured case</span>
-      <h1>How to write AGENTS.md: only the rules an AI coding agent gets wrong</h1>
-      <p class="lead">AGENTS.md is the instruction file an AI coding agent reads before it starts working in a repository. Write down only what the agent tends to get wrong, with the reason, and turn the important rules into tests.</p>
-      <p>SugarMount shipped four Android apps with one 96-line AGENTS.md, revised 19 times since it was created.</p>
-      <p class="note">Examples are taken from the AGENTS.md of SugarMount's app repository (sugar-utils) and shortened, as of October 18, 2026.</p>
-    </section>
-    <section aria-labelledby="what-is-agents-md">
-      <h2 id="what-is-agents-md">What is AGENTS.md?</h2>
-      <p>A Markdown file at the top of the repository. Many AI coding agents read a file by this name as their instructions. Claude Code reads CLAUDE.md, so SugarMount keeps the same content in both files. Unlike a README, its reader is an agent. An agent reads the repository as if for the first time, every time, so even things a person would remember after hearing once need to be written down.</p>
-    </section>
-    <section aria-labelledby="what-goes-in">
-      <h2 id="what-goes-in">What goes in?</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Section</th><th scope="col">Contents</th><th scope="col">Why</th></tr></thead>
-          <tbody>
-            <tr><td>What this is</td><td>The apps, where each one stands (public on Play, internal testing), stack and SDK levels</td><td>So the agent never guesses that something "shipped"</td></tr>
-            <tr><td>Layout</td><td>One line per directory: what it owns</td><td>So the same feature is not built twice in different places</td></tr>
-            <tr><td>Build and test</td><td>Commands that can be copied and run as is</td><td>So the agent does not rediscover how to verify</td></tr>
-            <tr><td>Rules that are easy to get wrong</td><td>Twelve of them: the rule, the reason, the scope of any exception</td><td>The heart of the file</td></tr>
-            <tr><td>QA</td><td>Emulator and device test scripts, in order</td><td>So "it builds" is not reported as "done"</td></tr>
-            <tr><td>Adding the next app</td><td>The scaffolding script and what to change by hand afterwards</td><td>So each app does not repeat the same mistakes</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-    <section aria-labelledby="what-stays-out">
-      <h2 id="what-stays-out">What stays out?</h2>
-      <ul>
-        <li><strong>History</strong>: The top of the file says "This file holds current facts only; history goes to CHANGELOG.md." Mix in old versions and the agent reads old rules as current ones.</li>
-        <li><strong>Secrets</strong>: Key files get a location and "never commit"; their contents never appear.</li>
-        <li><strong>General advice</strong>: The agent already knows "keep the code clean". Keep only what is true of this repository.</li>
-      </ul>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/agents-md-1-en.webp" width="1200" height="988" alt="Comparison: the six sections that go into a 96-line AGENTS.md, including 12 easy-to-get-wrong rules, against the three things kept out: history, secrets and general advice." loading="lazy"><figcaption>AGENTS.md keeps only what is true of this one repository.</figcaption></figure>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20How%20to%20write%20AGENTS.md%3A%20only%20the%20rules%20an%20AI%20coding%20agent%20gets%20wrong">Email us</a></p></aside>
-    <section aria-labelledby="writing-rules">
-      <h2 id="writing-rules">How do you write a rule that is easy to get wrong?</h2>
-      <p>Each rule says what not to do, why, and how far any exception reaches. A few of the actual rules:</p>
-      <ol>
-        <li><strong>Identifiers are per app.</strong> Package name, ad IDs, Firebase project and billing product live only in the app's config file. Reusing code never means reusing IDs.</li>
-        <li><strong>Debug uses ad test IDs only; release must not.</strong> Both directions are checked.</li>
-        <li><strong>No user content in analytics or logs.</strong> Events have no free-form parameters on purpose, and the file says "never add a <code>Map&lt;String, Any&gt;</code> escape hatch".</li>
-        <li><strong>Report what was verified on a device versus only compiled.</strong> Never describe unshipped features as shipped.</li>
-      </ol>
-      <p>Exceptions are written narrowly. The rule "temp files only in the cache" carries the exception "the document viewer (<a href="https://sugarmount21.com/en/apps/doc-viewer/">HWP Viewer SugarDoc</a>) alone keeps a received-documents inbox. Do not fix this back to temp files." Without that sentence, an agent sees the exception as a bug and "fixes" it.</p>
-      <p>Decisions made by the person carry a date (for example "owner decision 2026-10-05"). The current AGENTS.md has six dated decisions. With a date, an agent can tell which side is newer when it conflicts with an older document.</p>
-    </section>
-    <section aria-labelledby="enforce-with-checks">
-      <h2 id="enforce-with-checks">Enforce rules with checks, not prose</h2>
-      <p>Agents mostly follow instructions, but they can lose track in a long task. So the rules that must never be broken become tests or build checks.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Rule</th><th scope="col">What enforces it</th></tr></thead>
-          <tbody>
-            <tr><td>Per-app identifiers; no ad test IDs in release</td><td>A <code>ConfigGateTest</code> in every app; <code>release_gate.sh</code> stops the build on PLACEHOLDER or a test ID</td></tr>
-            <tr><td>No Android dependency in the shared document logic</td><td><code>NoAndroidImportsTest</code></td></tr>
-            <tr><td>Every string in both Korean and English</td><td>Lint's <code>MissingTranslation</code> and <code>ExtraTranslation</code> raised from warnings to errors</td></tr>
-            <tr><td>Full-screen ad spacing and caps</td><td><code>AdPacerTest</code>; new numbers go into the config with a test, never at a call site</td></tr>
-            <tr><td>Privacy policy links must be live</td><td><code>release_gate.sh</code> checks that the policy and support URLs return HTTP 200</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="muted">The URLs in the last row are this site's per-app privacy policies. Move the site, and app releases stop.</p>
-    </section>
-    <section aria-labelledby="keeping-it-current">
-      <h2 id="keeping-it-current">How is it kept up to date?</h2>
-      <ol class="steps">
-        <li><strong>Add a line where the mistake happened</strong>: After a release build of the first app, <a href="https://sugarmount21.com/en/apps/image-compress/">Compress Image</a>, crashed on launch, a line was added: "run <code>release_launch.sh</code> before every upload", with the reason (which version crashed, and on what).</li>
-        <li><strong>Change facts in the same commit</strong>: When an app goes public or a version moves, AGENTS.md changes in that same commit. Nearly all 19 revisions sit inside feature or release commits.</li>
-        <li><strong>Move long parts out</strong>: Ad policy, design rules and the document viewer design live in their own documents; AGENTS.md keeps only the paths.</li>
-      </ol>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20How%20to%20write%20AGENTS.md%3A%20only%20the%20rules%20an%20AI%20coding%20agent%20gets%20wrong">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">Frequently asked questions</h2>
-      <div class="faq">
-        <details><summary>How is AGENTS.md different from CLAUDE.md?</summary><div><p>Only in which tool reads it. Claude Code reads CLAUDE.md; many other agents read AGENTS.md. If the two drift apart, each agent follows different rules, so SugarMount keeps them identical.</p></div></details>
-        <details><summary>How long should it be?</summary><div><p>There is no fixed length. The repository that ships SugarMount's four apps uses 96 lines. The longer it gets, the easier it is for an agent to miss an important rule, so move details into other documents and keep the paths.</p></div></details>
-        <details><summary>Can I just use a template?</summary><div><p>Use a template for structure only, and record what actually went wrong in your repository. Start short and add a line each time the agent makes a mistake.</p></div></details>
-      </div>
-    </section>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>AX notes: building apps with an AI coding agent – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/</guid>
-    <description><![CDATA[<section class="hero">
-      <span class="eyebrow">AX · AI transformation</span>
-      <h1>AX notes</h1>
-      <p class="lead">AX notes record the rules SugarMount settled on, and the numbers it actually measured, while building and shipping Android apps with an AI coding agent.</p>
-      <p>This is AX (AI transformation) applied to one-person app development. In the 20 days from the first commit on September 20, 2026, four Android apps (<a href="https://sugarmount21.com/en/apps/image-compress/">Compress Image</a>, <a href="https://sugarmount21.com/en/apps/image-flip/">Flip &amp; Rotate Image</a>, <a href="https://sugarmount21.com/en/apps/image-convert/">Convert Image</a> and <a href="https://sugarmount21.com/en/apps/doc-viewer/">HWP Viewer SugarDoc</a>) went live on Google Play.</p>
-      <p class="note">Every number comes from the git history, changelog and on-device QA reports of SugarMount's app repository. What we could not verify, we say so.</p>
-    </section>
-    <section aria-labelledby="find">
-      <h2 id="find">Find a note</h2>
-      <div class="ax-search" role="search"><label for="ax-q">Search AX notes</label><input id="ax-q" type="search" autocomplete="off" placeholder="e.g. tests, R8, release, agents" data-src="https://sugarmount21.com/en/ax/search.json"><p class="muted">Matches titles, summaries, topics and note types.</p><ul id="ax-r" class="ax-results" aria-live="polite" data-none="No notes match. Try another word."></ul></div>
-    </section>
-    <section aria-labelledby="topics">
-      <h2 id="topics">Browse by topic</h2>
-      <ul class="card-list">
-        <li class="card"><h3><a href="https://sugarmount21.com/en/ax/topic/workflow/">Working with agents</a></h3><p class="sub">How work is split between an AI coding agent and a person, how rules reach the agent, and what we changed after several sessions collided in one repository.</p><p class="meta">7 notes</p></li>
-        <li class="card"><h3><a href="https://sugarmount21.com/en/ax/topic/quality/">Testing and release</a></h3><p class="sub">Unit tests, release gates and on-device checks that AI-written code goes through before each release, with the real defects those checks caught along the way.</p><p class="meta">8 notes</p></li>
-        <li class="card"><h3><a href="https://sugarmount21.com/en/ax/topic/android/">Android development</a></h3><p class="sub">Gradle builds, library upgrades, UI and performance problems we ran into while building Android apps with a coding agent, and how each one was solved.</p><p class="meta">12 notes</p></li>
-        <li class="card"><h3><a href="https://sugarmount21.com/en/ax/topic/games/">Game development</a></h3><p class="sub">Generating puzzle game levels with an agent, proving every level can be solved, and tuning difficulty: the rules we settled on and the numbers we measured.</p><p class="meta">4 notes</p></li>
-        <li class="card"><h3><a href="https://sugarmount21.com/en/ax/topic/store/">Play Store and monetization</a></h3><p class="sub">Google Play listings and review, store screenshots and descriptions, and ad setup: the work of shipping and running apps, shared with an AI coding agent.</p><p class="meta">3 notes</p></li>
-        <li class="card"><h3><a href="https://sugarmount21.com/en/ax/topic/web/">Website and search</a></h3><p class="sub">The page structure, Google and Naver search optimization, structured data and design system of this site, built with an agent and explained from the actual code.</p><p class="meta">4 notes</p></li>
-        <li class="card"><h3><a href="https://sugarmount21.com/en/ax/topic/retro/">Retrospectives and numbers</a></h3><p class="sub">Looking back over a period of work: what went fast and what went wrong, with numbers we counted ourselves from the git history and QA reports.</p><p class="meta">4 notes</p></li>
-      </ul>
-    </section>
-    <section aria-labelledby="start">
-      <h2 id="start">Start here</h2>
-      <ol class="steps">
-        <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a><br>The whole run, with the numbers.</li>
-        <li><a href="https://sugarmount21.com/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a><br>How rules reach the agent.</li>
-        <li><a href="https://sugarmount21.com/en/ax/release-gate/">What to check before shipping an AI-built Android app: the release gate and an R8 crash</a><br>The checks AI-written code passes before it ships.</li>
-      </ol>
-    </section>
-    <section aria-labelledby="notes">
-      <h2 id="notes">Latest notes</h2>
-      <ul class="card-list">
-        <li class="card"><h3><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></h3><p class="sub">Five pre-gzipped Android asset packs were 18 bytes each larger than the APK&#x27;s own deflate, and the .gz names vanished, causing FileNotFoundException on launch.</p><p class="meta">Android development · Measurement · October 31, 2026</p></li>
-        <li class="card"><h3><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></h3><p class="sub">On two SKT-sold Samsung phones, three store apps answer a market:// link and Android shows a chooser. Setting the Play package first opened Play directly.</p><p class="meta">Android development · How-to · October 31, 2026</p></li>
-        <li class="card"><h3><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></h3><p class="sub">Our spelling app used addOnCompleteListener(this) for Remote Config; the listener was dropped at onStop, so a screen-off launch never left the splash.</p><p class="meta">Android development · Incident · October 31, 2026</p></li>
-        <li class="card"><h3><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></h3><p class="sub">All 1,100 Arrow Knots levels come from a reverse-construction generator and pass the G2 pack gate. Fixing the move rule first made each board solvable as built.</p><p class="meta">Game development · Method · October 30, 2026</p></li>
-        <li class="card"><h3><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></h3><p class="sub">After an August 2025 redesign, D1 retention of our spelling app&#x27;s organic cohorts fell from 15.2% to 11.2%; 70% of lost daily users were 31-365 days old.</p><p class="meta">Retrospectives and numbers · Measurement · October 30, 2026</p></li>
-        <li class="card"><h3><a href="https://sugarmount21.com/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></h3><p class="sub">A Korean spelling app compared Remote Config content versions as Kotlin strings, so from 6.10 on, devices stored at 6.2 to 6.9 got no quiz or notice updates.</p><p class="meta">Android development · Incident · October 30, 2026</p></li>
-      </ul>
-    </section>
-    <section aria-labelledby="by-the-numbers">
-      <h2 id="by-the-numbers">By the numbers</h2>
-      <div class="table-wrap">
-        <table>
-          <tbody>
-            <tr><th scope="row">First commit → fourth app live</th><td>2026-09-20 → 2026-10-10, 20 days</td></tr>
-            <tr><th scope="row">Commits in that period</th><td>59, of which 52 (88%) are marked as co-authored with the AI agent</td></tr>
-            <tr><th scope="row">Code</th><td>439 Kotlin files (164 of them tests), about 64,000 lines (as of 2026-10-18)</td></tr>
-            <tr><th scope="row">Unit tests</th><td>Whole repo: 410 (2026-10-04, three apps) → 1,091 (2026-10-07, four apps incl. SugarDoc), 0 failures</td></tr>
-            <tr><th scope="row">Agent instruction file</th><td>AGENTS.md, 96 lines, revised 19 times since it was created</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-    <section aria-labelledby="principles">
-      <h2 id="principles">How these notes are written</h2>
-      <ul>
-        <li><strong>Only our own apps.</strong> Every number, screen and script comes from SugarMount apps.</li>
-        <li><strong>Numbers carry a source and a date.</strong> Numbers change over time, so each one says when it was measured.</li>
-        <li><strong>Failures are included.</strong> A defect found right after release, and its cause, is often more useful than a rule.</li>
-      </ul>
-    </section>
-    <aside class="ax-cta" aria-labelledby="hub-cta-h">
-      <p class="ax-cta-title" id="hub-cta-h">Questions or ideas?</p>
-      <p>Send us where you got stuck applying one of these notes, a question about the numbers, or a topic you would like covered.</p>
-      <p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Question">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p>
-    </aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">Frequently asked questions</h2>
-      <div class="faq">
-        <details><summary>What is AX?</summary><div><p>AX stands for AI transformation: changing how work is done so that AI takes part in it. Here it means a way of developing where an AI coding agent writes the code, tests and release scripts, and a person makes the decisions and does the verification.</p></div></details>
-        <details><summary>Which AI tool do you use?</summary><div><p>Anthropic's Claude Code. Rules reach the agent through instruction files at the repository root (AGENTS.md, CLAUDE.md), and large tasks are split across several agents.</p></div></details>
-        <details><summary>Do you ship AI-written code as is?</summary><div><p>No. Before every upload a build goes through a release gate, a launch check of the minified release build, and on-device end-to-end tests. See <a href="https://sugarmount21.com/en/ax/release-gate/">the pre-release checks note</a>.</p></div></details>
-        <details><summary>Where do the numbers come from?</summary><div><p>From the git history, CHANGELOG and QA reports of SugarMount's app repository (sugar-utils, private). Each note gives the date its numbers were taken.</p></div></details>
-      </div>
-    </section>
-    <p class="meta updated">Last updated <time datetime="2026-10-22">October 22, 2026</time></p>]]></description>
-    <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Pre-release checks for an AI-built Android app – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/release-gate/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/release-gate/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/release-gate-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · Measured case</span>
-      <h1>What to check before shipping an AI-built Android app: the release gate and an R8 crash</h1>
-      <p class="lead">An Android app built with an AI coding agent can run fine as a debug build and still crash the moment its release build starts. So every upload first passes a release gate, a release-build launch check and on-device tests.</p>
-      <p>On September 23, 2026, the code shrinker R8 removed a single constructor from SugarMount's first app, <a href="https://sugarmount21.com/en/apps/image-compress/">Compress Image</a>, and every release build crashed at launch. Since then each upload goes through three steps: a release gate, a launch check of the minified release build, and on-device end-to-end tests.</p>
-      <p class="note">Scripts and numbers come from the code, changelog and on-device QA reports of SugarMount's app repository (sugar-utils), as of October 18, 2026.</p>
-    </section>
-    <section aria-labelledby="why-release-crashed">
-      <h2 id="why-release-crashed">Why did it crash when debug was fine?</h2>
-      <p>Debug builds are not shrunk; release builds use R8 to strip code that looks unused. So there are problems that only the release build has, even when every unit test and the debug build pass.</p>
-      <ul>
-        <li><strong>Cause</strong>: The ads SDK pulls in WorkManager 2.7 and Room 2.2.5. Their keep rule keeps <code>RoomDatabase</code> subclasses but not their constructors. R8 full mode, the default in AGP 9, removed the constructor of <code>WorkDatabase_Impl</code>.</li>
-        <li><strong>Symptom</strong>: The app dies right at launch in <code>androidx.startup</code> with "Failed to create an instance of WorkDatabase". The debug build does not reproduce it.</li>
-        <li><strong>Found</strong>: By installing and launching the release APK on a real device (Galaxy S23). Until then no release build had been run on a device.</li>
-        <li><strong>Fix</strong>: One line in the shared ads module's consumer rules. Room 2.3 and later ship this rule themselves.</li>
-      </ul>
-      <div class="table-wrap"><table><tbody><tr><td><code>-keep class * extends androidx.room.RoomDatabase { &lt;init&gt;(); }</code></td></tr></tbody></table></div>
-    </section>
-    <section aria-labelledby="release-gate">
-      <h2 id="release-gate">Step 1: what does the release gate stop?</h2>
-      <p><code>release_gate.sh &lt;app&gt;</code> checks the following in order and builds no AAB if any of them fails.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Check</th><th scope="col">Mistake it stops</th></tr></thead>
-          <tbody>
-            <tr><td>Any PLACEHOLDER left in the config file</td><td>Releasing a freshly scaffolded app without its IDs</td></tr>
-            <tr><td>Any AdMob test ID left</td><td>Shipping test ads (zero revenue)</td></tr>
-            <tr><td>Firebase config file present</td><td>A release without analytics and crash reports</td></tr>
-            <tr><td>Privacy policy and support URLs return HTTP 200</td><td>A 404 behind the policy link in Settings or on the store listing (a policy problem)</td></tr>
-            <tr><td>Tests of the gate rules themselves</td><td>A broken check that silently stops nothing</td></tr>
-            <tr><td>Release config check, release unit tests, lint, AAB build</td><td>Config and translation gaps that exist only in the release variant</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="muted"><a href="https://sugarmount21.com/en/apps/doc-viewer/">HWP Viewer SugarDoc</a>, which has no ads, is checked the other way round: the build fails if an ads SDK enters the release dependencies or an advertising ID permission is merged into the manifest.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20What%20to%20check%20before%20shipping%20an%20AI-built%20Android%20app%3A%20the%20release%20gate%20and%20an%20R8%20crash">Email us</a></p></aside>
-    <section aria-labelledby="launch-check">
-      <h2 id="launch-check">Step 2: launch the minified release build twice</h2>
-      <p><code>release_launch.sh &lt;app&gt; &lt;device&gt;</code> installs the R8-shrunk release APK, force-stops the app and cold-starts it twice. After each launch it counts <strong>only this package's lines</strong> in the crash log since that moment, and checks that the process is alive.</p>
-      <ul>
-        <li>It never clears logcat, so it works on a phone other people use too; other apps' crashes are not counted.</li>
-        <li>If reading logcat fails, the check fails. It never turns into "no crash".</li>
-        <li>The rule to run it before every upload is also written in the agent instruction file (<a href="https://sugarmount21.com/en/ax/agents-md/">the AGENTS.md note</a>).</li>
-      </ul>
-    </section>
-    <section aria-labelledby="device-e2e">
-      <h2 id="device-e2e">Step 3: what did on-device end-to-end tests find?</h2>
-      <p>Results for the three photo apps on a Galaxy S21 (Android 15), October 4, 2026, scenario by scenario:</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">App</th><th scope="col">Passed / failed / skipped</th></tr></thead>
-          <tbody>
-            <tr><td><a href="https://sugarmount21.com/en/apps/image-compress/">Compress Image</a></td><td>24 / 2 / 2</td></tr>
-            <tr><td><a href="https://sugarmount21.com/en/apps/image-flip/">Flip &amp; Rotate Image</a></td><td>25 / 4 / 1</td></tr>
-            <tr><td><a href="https://sugarmount21.com/en/apps/image-convert/">Convert Image</a></td><td>22 / 3 / 2</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>No crashes and no damaged originals; the minified release builds of all three launched cleanly both times. But there were nine major defects with five distinct causes. The biggest, shared by all three apps: if the system killed the app mid-job, the progress screen froze at 0 / 0. Neither the emulator nor the unit tests had shown it.</p>
-      <p>These tests ran after the apps had been submitted for production review, which was the wrong order. Now end-to-end tests come before submission; after the fixes, 410 unit tests, lint and all three release gates passed again before release.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/release-gate-1-en.webp" width="1200" height="770" alt="Three-step diagram: release gate, two launches of the minified release build, and on-device E2E on a Galaxy S21 that found nine major defects." loading="lazy"><figcaption>The three checks every upload goes through; the last one, on a real device, found nine major defects.</figcaption></figure>
-    </section>
-    <section aria-labelledby="checks-by-ai">
-      <h2 id="checks-by-ai">When you let AI run the checks</h2>
-      <ul>
-        <li><strong>"It builds" is not "done".</strong> Agents tend to report completion once code compiles. Make them report which device checked what, and what was not checked.</li>
-        <li><strong>Test the test tools.</strong> A script that waits for a screen once exited with success on timeout, so later checks ran on the wrong screen. It now fails on timeout.</li>
-        <li><strong>Verify with a different agent.</strong> In on-device QA, three per-app agents found defects and a fourth reproduced each one with its own screenshots and traced the cause in the code.</li>
-      </ul>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20What%20to%20check%20before%20shipping%20an%20AI-built%20Android%20app%3A%20the%20release%20gate%20and%20an%20R8%20crash">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">Frequently asked questions</h2>
-      <div class="faq">
-        <details><summary>Can you catch R8 problems in advance?</summary><div><p>The surest way is to actually launch a build shrunk with the release settings on a device. Debug builds and unit tests never go through shrinking, so they cannot catch a missing keep rule.</p></div></details>
-        <details><summary>Is an emulator enough?</summary><div><p>It was not. State loss after process death, and "keep original name" failing because of the file names the photo picker hands over, showed up only in on-device tests. Use the emulator for quick checks and a real device before release.</p></div></details>
-        <details><summary>Are the gate scripts public?</summary><div><p>The repository is private. The table above lists every check shared by all apps, so you can build the same thing in the same order. The HWP viewer adds checks that compare its document engine files and fonts against pinned sources.</p></div></details>
-      </div>
-    </section>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
     <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
   </item>

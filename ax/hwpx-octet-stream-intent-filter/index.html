@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HWPX MIME과 안드로이드 intent-filter – SugarMount</title>
+  <meta name="description" content="같은 hwpx가 삼성 내 파일에서는 한컴 MIME, Chrome과 Files에서는 octet-stream으로 와서 문서 MIME만 받는 앱은 연결 목록에서 빠졌습니다. 인텐트 18행 실측.">
+  <meta name="robots" content="max-image-preview:large">
+  <link rel="canonical" href="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">
+  <link rel="alternate" hreflang="ko" href="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">
+  <link rel="alternate" hreflang="en" href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">
+  <link rel="alternate" hreflang="x-default" href="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="HWPX MIME과 안드로이드 intent-filter – SugarMount">
+  <meta property="og:description" content="같은 hwpx가 삼성 내 파일에서는 한컴 MIME, Chrome과 Files에서는 octet-stream으로 와서 문서 MIME만 받는 앱은 연결 목록에서 빠졌습니다. 인텐트 18행 실측.">
+  <meta property="og:url" content="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">
+  <meta property="og:image" content="https://sugarmount21.com/assets/og/ax-hwpx-octet-stream-intent-filter-ko.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="https://sugarmount21.com/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/svg+xml" href="https://sugarmount21.com/assets/favicon.svg">
+  <link rel="apple-touch-icon" href="https://sugarmount21.com/assets/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://sugarmount21.com/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=d59e763f">
+  <link rel="stylesheet" href="/assets/site.css?v=d59e763f">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=d59e763f">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/#article","headline":"안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계","description":"같은 hwpx가 삼성 내 파일에서는 한컴 MIME, Chrome과 Files에서는 octet-stream으로 와서 문서 MIME만 받는 앱은 연결 목록에서 빠졌습니다. 인텐트 18행 실측.","url":"https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/","mainEntityOfPage":"https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/","inLanguage":"ko","articleSection":"Android 개발","datePublished":"2026-11-01T09:00:00+09:00","dateModified":"2026-11-01T09:00:00+09:00","image":["https://sugarmount21.com/assets/og/ax-hwpx-octet-stream-intent-filter-ko.png","https://sugarmount21.com/assets/ax/cover/hwpx-octet-stream-intent-filter-ko.webp","https://sugarmount21.com/assets/ax/hwpx-octet-stream-intent-filter-1-ko.webp","https://sugarmount21.com/assets/ax/hwpx-octet-stream-intent-filter-2-ko.webp"],"author":{"@id":"https://sugarmount21.com/#org"},"publisher":{"@id":"https://sugarmount21.com/#org"},"isPartOf":{"@id":"https://sugarmount21.com/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"hwpx의 MIME 타입은 무엇인가요?","acceptedAnswer":{"@type":"Answer","text":"보내는 앱마다 다릅니다. 2026년 10월 5일 기록에서 삼성 내 파일은 application/vnd.hancom.hwpx , Chrome 다운로드 목록과 에뮬레이터 Files는 application/octet-stream 으로 넘겼습니다. 한글뷰어 슈가독의 필터에는 application/haansofthwpx , application/vnd.hancom.hwpx , application/x-hwpx , application/hwp+zip 과 octet-stream을 함께 넣었습니다."}},{"@type":"Question","name":"intent-filter에 pathPattern으로 .hwpx를 받으면 안 되나요?","acceptedAnswer":{"@type":"Answer","text":"content URI에서는 맞지 않습니다. 삼성 내 파일이 넘긴 URI( content://media/external/file/N ) 경로에는 확장자가 없었습니다. MIME으로 받고 바이트로 판정하십시오."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://sugarmount21.com/"},{"@type":"ListItem","position":2,"name":"AX 노트","item":"https://sugarmount21.com/ax/"},{"@type":"ListItem","position":3,"name":"Android 개발","item":"https://sugarmount21.com/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=d59e763f">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a class="nav-apps" href="/apps/">앱</a>
+        <a class="nav-ax" href="/ax/" aria-current="page">AX 노트</a>
+        <a class="nav-about" href="/about/">소개</a>
+        <a class="nav-privacy" href="/privacy/">개인정보처리방침</a>
+      </nav>
+      <a class="lang" href="/en/ax/hwpx-octet-stream-intent-filter/" lang="en" hreflang="en">English</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>메뉴</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="전체 메뉴">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">닫기</button>
+      <p class="menu-title" id="m-photo">사진·영상</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>슈가앨범</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 용량 줄이기</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 반전·회전</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>이미지 변환 JPG·PNG·WebP</span></a></li></ul>
+      <p class="menu-title" id="m-document">문서·글</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글 띄어쓰기</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글뷰어 슈가독</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">생활</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>생생카드</span></a></li></ul>
+      <p class="menu-title" id="m-games">게임</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>화살표 매듭풀기</span></a></li><li><a class="app-tile" data-app="blocks" href="/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한판블록</span></a></li></ul>
+      <p><a href="/apps/">모든 앱 보기</a></p>
+      <ul class="menu-links"><li><a href="/ax/" aria-current="page">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-android">
+    <nav class="crumbs" aria-label="이동 경로"><ol><li><a href="/">SugarMount</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/ax/topic/android/">Android 개발</a></li><li><span aria-current="page">안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/hwpx-octet-stream-intent-filter-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX 노트 · 방법</span>
+      <h1>안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</h1>
+      <p class="lead">hwpx를 받는 뷰어는 문서 MIME만으로는 부족합니다. octet-stream을 받는 alias 하나를 두고, 판정은 파일 이름 대신 바이트로 하십시오.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/about/">작성 SugarMount</a> <span aria-hidden="true">·</span> <span>Android 개발</span> <span aria-hidden="true">·</span> <span>읽는 시간 15분</span> <span aria-hidden="true">·</span> 최종 업데이트 <time datetime="2026-11-01">2026년 11월 1일</time></p><!-- /build:meta -->
+      <p>Galaxy S21(Android 15)의 Chrome 다운로드 목록에서 hwpx를 누르자 뷰어에 도착한 MIME은 <code>application/octet-stream</code>이었습니다. 같은 휴대폰에서 삼성 내 파일로 hwpx를 열면 <code>application/vnd.hancom.hwpx</code>가 왔습니다. 2026년 10월 5일, 한글뷰어 슈가독의 릴리스 빌드로 보낸 앱과 동작을 바꿔 가며 18행짜리 인텐트 행렬을 만들었고, 매니페스트는 그 행렬과 이어진 E2E 결과에 맞춰 고쳐 나갔습니다. 행렬을 채우는 동안 권한 없이 공유된 문서에서 크래시가 1건 나왔고, 하루 뒤에는 고친 매니페스트 때문에 <code>*/*</code>로 공유할 때 선택 창에 앱이 두 번 뜨는 결함이 생겼습니다.</p>
+      <p class="note">근거는 앱 저장소의 인텐트 행렬 QA 문서(2026-10-05), 기기 E2E 보고서(10-05~10-07), 1.0.0 출시 기록(10-08~10-09), 매니페스트와 SendEntryActivity 코드(커밋 ca1ade4)입니다. 기기 시리얼과 문서 이름은 적지 않았습니다.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>목차 (9)</summary><ol><li><a href="#mime-by-sender">같은 hwpx가 보낸 앱에 따라 MIME 두 가지로 왔습니다</a></li><li><a href="#one-alias">octet-stream을 받는 alias 하나에 판정은 바이트로</a></li><li><a href="#send-crash">권한 없이 공유된 문서에 SendEntryActivity가 죽었습니다</a></li><li><a href="#listed-twice">SEND alias를 더하자 선택 창에 앱이 두 번 나왔습니다</a></li><li><a href="#not-chosen">*/* 필터, pathPattern, 기본 OFF를 버린 이유</a></li><li><a href="#kakao">카톡에서 HWPX는 열렸지만 MIME은 적지 못했습니다</a></li><li><a href="#how-to">adb로 내 앱의 인텐트 행렬을 만드는 순서</a></li><li><a href="#next">남은 일: 메일 앱 MIME, 열린 리더와 스위치</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">목차</p><ol><li><a href="#mime-by-sender">같은 hwpx가 보낸 앱에 따라 MIME 두 가지로 왔습니다</a></li><li><a href="#one-alias">octet-stream을 받는 alias 하나에 판정은 바이트로</a></li><li><a href="#send-crash">권한 없이 공유된 문서에 SendEntryActivity가 죽었습니다</a></li><li><a href="#listed-twice">SEND alias를 더하자 선택 창에 앱이 두 번 나왔습니다</a></li><li><a href="#not-chosen">*/* 필터, pathPattern, 기본 OFF를 버린 이유</a></li><li><a href="#kakao">카톡에서 HWPX는 열렸지만 MIME은 적지 못했습니다</a></li><li><a href="#how-to">adb로 내 앱의 인텐트 행렬을 만드는 순서</a></li><li><a href="#next">남은 일: 메일 앱 MIME, 열린 리더와 스위치</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="mime-by-sender">
+      <h2 id="mime-by-sender">같은 hwpx가 보낸 앱에 따라 MIME 두 가지로 왔습니다</h2>
+      <p>18행 가운데 11행은 실제 앱에서 보낸 기록입니다(삼성 내 파일 4, Chrome 4, Files 3). 나머지는 디버그 송신 앱 2행과 adb 5행입니다. 리더가 떠 있는 동안 <code>dumpsys activity activities</code>에서 <code>typ=</code>과 <code>flg=</code>를 읽어 적었습니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>보낸 앱 (기기)</th><th>hwpx</th><th>hwp</th><th>pdf</th><th>NEW_TASK</th></tr></thead>
+        <tbody>
+          <tr><td>삼성 내 파일 (S21)</td><td><code>vnd.hancom.hwpx</code></td><td><code>x-hwp</code></td><td><code>pdf</code></td><td>없음 (0x3000001)</td></tr>
+          <tr><td>Chrome 다운로드 목록 (S21)</td><td><code>octet-stream</code></td><td><code>x-hwp</code></td><td>Chrome 자체 뷰어</td><td>있음 (0x13000003)</td></tr>
+          <tr><td>Files (에뮬레이터 API 35)</td><td><code>octet-stream</code></td><td><code>x-hwp</code></td><td><code>pdf</code></td><td>없음 (0x23000003)</td></tr>
+        </tbody>
+      </table></div>
+      <p>MIME이 갈린 것은 보낸 앱마다 MIME을 정하는 곳이 달라서입니다. Chrome은 다운로드 서버가 보낸 값을 그대로 넘겼고, Files(DocumentsUI)가 쓰는 에뮬레이터 이미지의 MIME 표에는 hwpx가 없었습니다(10월 4일에 본 AOSP MIME 표도 <code>x-hwp</code>만 있고 hwpx는 없습니다). 한컴 MIME을 붙인 것은 삼성 내 파일뿐입니다. 10월 3일 엔진 실험에서는 MediaStore에 <code>application/octet-stream</code>으로 기록된 hwpx를 내 파일이 <code>vnd.hancom.hwpx</code>로 넘겼습니다.</p>
+      <p>조사 초기에 적어 둔 가정은 ".hwp도 octet-stream으로 온다"였습니다. 행렬에서 hwp는 세 앱 모두 <code>application/x-hwp</code>로 왔고, 이름 모를 파일로 넘어오는 것은 hwpx뿐이었습니다. 그래서 문서 MIME만 등록한 뷰어는 사용자 화면에서 "hwp는 열리는데 hwpx를 열 때만 목록에 없는" 모양이 됩니다. 사용자가 할 수 있는 대처는 <a href="/apps/doc-viewer/hwpx-open/">카톡·휴대폰에서 HWPX 파일이 안 열릴 때</a>에 따로 정리했습니다.</p>
+      <figure class="ax-fig"><img src="/assets/ax/hwpx-octet-stream-intent-filter-1-ko.webp" width="1200" height="638" alt="비교 그림: 같은 hwpx를 삼성 내 파일은 application/vnd.hancom.hwpx로, Chrome 다운로드 목록과 에뮬레이터 Files는 application/octet-stream으로 넘겼고, hwp는 세 앱 모두 application/x-hwp였습니다." loading="lazy"><figcaption>hwp는 세 앱 모두 x-hwp였고, octet-stream으로 온 것은 hwpx뿐이었습니다.</figcaption></figure>
+      <p>PDF는 Chrome이 자기 뷰어로 열어 우리 앱까지 오지 않았고, 다운로드 완료 메시지의 '열기'도 다운로드 목록만 띄웠습니다. 필터로는 바꿀 수 없는 경로라 행렬 결론에는 "Chrome의 PDF는 내 파일을 거쳐야 온다"고만 적었습니다.</p>
+    </section>
+
+    <section aria-labelledby="one-alias">
+      <h2 id="one-alias">octet-stream을 받는 alias 하나에 판정은 바이트로</h2>
+      <p>VIEW를 받는 컴포넌트는 <code>activity-alias</code> 하나입니다. 이름은 <code>.reader.OpenUnknownFile</code>이고, 한 필터에 문서 MIME 11종과 범용 MIME 5종을 같이 넣었습니다. 필터가 하나여야 선택 창에 항목도 하나만 생깁니다.</p>
+      <pre><code>&lt;activity-alias android:name=".reader.OpenUnknownFile"
+    android:enabled="true" android:exported="true"
+    android:targetActivity=".reader.ReaderActivity"&gt;
+  &lt;intent-filter&gt;
+    &lt;action android:name="android.intent.action.VIEW" /&gt;
+    &lt;category android:name="android.intent.category.DEFAULT" /&gt;
+    &lt;data android:scheme="content" /&gt;
+    &lt;!-- 문서 11종: pdf, x-pdf, x-hwp, haansofthwp, vnd.hancom.hwp,
+         vnd.haansoft-hwp, hwp+zip, x-hwp+zip, haansofthwpx,
+         vnd.hancom.hwpx, x-hwpx --&gt;
+    &lt;data android:mimeType="application/vnd.hancom.hwpx" /&gt;
+    &lt;!-- 범용 5종 --&gt;
+    &lt;data android:mimeType="application/octet-stream" /&gt;
+    &lt;data android:mimeType="binary/octet-stream" /&gt;
+    &lt;data android:mimeType="application/x-download" /&gt;
+    &lt;data android:mimeType="application/download" /&gt;
+    &lt;data android:mimeType="application/force-download" /&gt;
+  &lt;/intent-filter&gt;
+&lt;/activity-alias&gt;</code></pre>
+      <p><code>x-download</code>가 들어간 것은 10월 4일 확인에서 korea.kr 첨부가 이 MIME으로 왔고 Chrome이 그 값을 다시 매핑하지 않았기 때문입니다. MIME은 모두 소문자로 적었습니다. Android 문서에 따르면 프레임워크는 MIME을 대소문자를 구분해 비교합니다.</p>
+      <p>octet-stream을 받으면 이름 모를 파일 전부의 선택 창에 우리 앱이 나옵니다. 그래서 들어온 파일은 리더가 첫 64KB를 읽어 형식을 정하고, 증거가 그 뒤에 있으면 전체를 복사한 다음 정합니다. PDF는 첫 1KB 안의 <code>%PDF-</code>, HWP 5는 CFB 컨테이너의 FileHeader에 있는 "HWP Document File", HWPX는 ZIP 첫 항목이 압축 없이 저장된 <code>mimetype</code>이고 내용이 <code>application/hwp+zip</code>인지, HWP 3는 그 형식의 서명을 봅니다. MIME과 파일 이름은 판정을 누그러뜨리는 데만 쓰고, 문서라고 정하는 근거로는 쓰지 않습니다. 로컬 문서 묶음 635파일(문서 255개와 거절해야 하는 파일)에서 오판은 0건이었습니다.</p>
+      <p>행렬의 마지막 두 행이 이 판정을 기기에서 확인한 기록입니다. m4a 헤더(<code>ftyp M4A</code>)로 만든 4 KiB 파일을 .hwp 이름과 <code>application/x-hwp</code>로 보내자, S21에서는 VIEW 시작 뒤 197~215ms에 선택 창이 시작됐습니다. 받을 다른 앱이 하나뿐이라 시스템은 그 기기의 다른 오피스 뷰어를 바로 띄웠고, 우리 앱에는 사본이 남지 않았습니다. 에뮬레이터에는 HWP를 받는 다른 앱이 없어 같은 파일을 <code>application/pdf</code>로 보냈고, 435ms 뒤 Google Drive PDF 뷰어로 넘어갔습니다.</p>
+    </section>
+
+    <section aria-labelledby="send-crash">
+      <h2 id="send-crash">권한 없이 공유된 문서에 SendEntryActivity가 죽었습니다</h2>
+      <p>SEND(공유)는 <code>SendEntryActivity</code>가 받아 리더로 넘깁니다. 화면 없이 onCreate에서 넘기고 바로 끝나는 Activity입니다. 10월 5일 행렬의 adb 행에서 <code>--grant-read-uri-permission</code> 없이 <code>EXTRA_STREAM</code>만 담아 pdf를 공유하자, 이 Activity가 SecurityException으로 프로세스째 죽었습니다.</p>
+      <ol>
+        <li>보낸 쪽이 URI는 넘기면서 읽기 권한은 주지 않았습니다.</li>
+        <li>에이전트가 작성한 코드는 리더로 넘기는 인텐트에 <code>FLAG_GRANT_READ_URI_PERMISSION</code>을 붙여, 우리 앱이 받은 적 없는 읽기 권한을 다시 넘기려 했습니다.</li>
+        <li>시스템은 그 <code>startActivity</code>를 SecurityException으로 거절했고, 예외가 onCreate 밖으로 나가 프로세스가 내려갔습니다.</li>
+      </ol>
+      <p>고친 코드(<code>SendForward</code>)는 그 예외만 잡아 권한 플래그와 ClipData를 지운 인텐트로 한 번 더 넘깁니다. 리더는 URI를 읽어 보고, 읽을 수 없으면 '접근 불가' 화면(E1)을 보여 줍니다.</p>
+      <pre><code>fun start(forward: Intent, start: (Intent) -&gt; Unit) {
+    try {
+        start(forward)
+    } catch (e: SecurityException) {
+        start(withoutGrant(forward))  // 권한 플래그와 ClipData 제거
+    }
+}</code></pre>
+      <p>같은 경로를 JVM 테스트(<code>SendForwardTest</code>)가 막고, 기기 점검 스크립트의 <code>send_twice</code>가 권한 없는 SEND를 매번 다시 보냅니다. 10월 8일 1.0.0 (3) 회귀에서 이 단계를 포함한 점검 8항목이 S21(Android 15)과 S20(Android 13) 모두 8 PASS, 0 FAIL이었습니다. 행렬에서 이 크래시를 낸 것은 adb로 일부러 권한을 빼고 보낸 행 하나였고, 실제 앱 행에는 없었습니다. 어느 앱이 이렇게 보내는지는 모릅니다.</p>
+    </section>
+
+    <section aria-labelledby="listed-twice">
+      <h2 id="listed-twice">SEND alias를 더하자 선택 창에 앱이 두 번 나왔습니다</h2>
+      <p>10월 5~6일 E2E의 entry-intents-10(메일 공유를 흉내 낸 시나리오)은 마지막 라운드에서 25건 중 S21 21건, S20 20건만 첫 쪽을 그렸습니다. 실패는 모두 hwpx를 octet-stream으로 공유한 경우였습니다. 처음 설계는 SEND를 문서 MIME 11종으로만 받았기 때문입니다. E2E 보고서는 메일 앱 실측 뒤에 판단하라고 권했지만, 10월 6일 운영자는 octet-stream 공유도 먼저 받기로 정했고, 코드 주석에는 그 이유가 "메일 앱이 hwpx를 그렇게 공유한다"로 남았습니다.</p>
+      <p>에이전트는 octet-stream SEND를 받는 alias <code>SendUnknownFile</code>을 새로 더했습니다. 그러자 <code>*/*</code>로 보낸 공유가 기존 <code>SendEntryActivity</code>의 필터와 새 alias 두 곳에 걸렸습니다. Android는 <code>*/*</code> 인텐트를 타입 필터 어느 것에나 맞추기 때문입니다. S20 선택 창에는 같은 아이콘의 우리 앱 항목이 2개 나왔고, S21에서는 항목 하나짜리 선택 단계가 하나 더 생겼습니다.</p>
+      <p>10월 7일에는 같은 인텐트에 걸리는 컴포넌트가 하나만 켜지도록 고쳤습니다. <code>SendEntryActivity</code>의 필터를 지우고 <code>exported=false</code>로 바꾸었고, SEND는 alias 둘 중 하나만 사용합니다. 스위치가 켜져 있으면 <code>SendUnknownFile</code>(문서 11종과 octet-stream), 꺼져 있으면 <code>SendDocument</code>(문서 11종)입니다. SEND를 고친 뒤 재검증에서 VIEW <code>*/*</code>도 <code>ReaderActivity</code>와 <code>OpenUnknownFile</code> 두 곳에 걸린다는 것이 드러났습니다. 10월 5일 행렬 때부터 있던 구조였고, 테스트가 <code>ReaderActivity</code> 필터를 전제로 짜여 있어 처음에는 따로 남겼다가 같은 날 같은 방식으로 고쳤습니다. 스위치를 바꿀 때는 넘겨받는 alias를 먼저 켜고, 다른 쪽은 그 뒤에 끄도록 했습니다. 잠깐 두 개일 수는 있어도 0개인 순간은 생기지 않습니다.</p>
+      <p><code>cmd package query-activities</code>로 보면 S21 릴리스 빌드에서 스위치를 켤 때 <code>*/*</code>, pdf, hwpx, octet-stream VIEW가 모두 <code>OpenUnknownFile</code> 하나로, 끌 때 <code>ViewDocument</code> 하나로 나왔고 octet-stream은 0개였습니다. 같은 날 재검증에서는 '연결 프로그램'과 '공유' 선택 창에 보이는 우리 앱 항목도 하나씩이었습니다.</p>
+      <p>VIEW와 SEND 각각, 같은 MIME을 받는 컴포넌트는 하나만 켜 두십시오.</p>
+      <figure class="ax-fig"><img src="/assets/ax/hwpx-octet-stream-intent-filter-2-ko.webp" width="1200" height="882" alt="단계 그림: 10월 5일 행렬에서 권한 없는 SEND 크래시 1건, 10월 5~6일 E2E에서 octet-stream 공유 hwpx 실패, 10월 6일 octet-stream SEND alias 추가 뒤 S20 선택 창에 앱 2개, 10월 7일 SEND와 VIEW를 켜진 컴포넌트 하나로 수정, 10월 9일 운영자가 S23 카톡으로 4개 폴더를 열어 정상." loading="lazy"><figcaption>SEND를 고친 뒤 재검증에서 VIEW에도 같은 원인의 중복이 있다는 것을 찾았고, 같은 날 같은 방식으로 고쳤습니다.</figcaption></figure>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EC%95%88%EB%93%9C%EB%A1%9C%EC%9D%B4%EB%93%9C%EC%97%90%EC%84%9C%20HWPX%EB%8A%94%20octet-stream%EC%9C%BC%EB%A1%9C%EB%8F%84%20%EC%98%A8%EB%8B%A4%3A%20%EB%B3%B4%EB%82%B8%20%EC%95%B1%EB%B3%84%20%EC%9D%B8%ED%85%90%ED%8A%B8%2018%ED%96%89%EA%B3%BC%20intent-filter%20%EC%84%A4%EA%B3%84">메일로 문의하기</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="not-chosen">
+      <h2 id="not-chosen">*/* 필터, pathPattern, 기본 OFF를 버린 이유</h2>
+      <p><code>*/*</code> 필터는 처음부터 선언하지 않았습니다. 사진이든 녹음이든 모든 파일의 목록에 뜨는 뷰어가 되기 때문입니다. octet-stream도 같은 위험이 있지만 범위가 이름 모를 파일로 좁고, 바이트 판별이 문서가 아닌 파일을 바로 넘깁니다. <code>application/zip</code>과 <code>application/unknown</code>은 실제 앱에서 그 MIME으로 오는 것을 보기 전까지 넣지 않았습니다.</p>
+      <p>확장자 <code>pathPattern</code>으로 .hwpx만 받는 방법은 content URI에서 맞지 않습니다. 삼성 내 파일이 넘긴 URI는 <code>content://media/external/file/N</code> 꼴이라 경로에 파일 이름이 없습니다. Android 문서도 <code>&lt;data&gt;</code>의 path 속성은 host가 함께 지정된 필터에서만 의미가 있다고 적습니다. host를 <code>*</code>로 넓히면 보낸 앱과 상관없이 path 조건을 걸 수는 있지만, 이런 URI에는 맞을 확장자가 없습니다. 10월 4일 경쟁 앱 매니페스트를 보니 한 앱이 octet-stream을 pathPattern 조건으로만 받았고, 그 앱 리뷰에는 "hwpx가 연결 목록에 안 뜬다"는 글이 있었습니다(리뷰와 매니페스트의 연결은 추정입니다).</p>
+      <p>범용 alias를 기본으로 끄는 안도 있었습니다. 행렬에서 스위치를 끄고 octet-stream VIEW를 보내자 선택 창에서 우리 앱이 사라졌습니다. 기본 OFF면 Chrome과 Files에서 받은 hwpx가 처음부터 목록에 없는 셈입니다. 10월 5일 운영자가 기본 ON을 승인한 결정표의 영향 칸에는 "연결 목록 노출 vs 가로채기 반감"이 함께 적혀 있었습니다. 설정의 '모든 파일 형식 목록에 표시' 스위치로 사용자가 끌 수 있고, PRD에는 범용 alias의 거절률이 높으면 기본 OFF나 MIME 축소로 되돌린다는 규칙을 적었습니다.</p>
+    </section>
+
+    <section aria-labelledby="kakao">
+      <h2 id="kakao">카톡에서 HWPX는 열렸지만 MIME은 적지 못했습니다</h2>
+      <p>카카오톡 경로는 에이전트가 시험할 수 없었습니다. 다른 계정이 파일을 보내야 받은 쪽에서 열 수 있어서, 행렬 문서는 카톡·네이버 메일·Gmail을 '소유자 몫' 표에 따로 적었습니다. 10월 9일 출시 기록에는 운영자가 Galaxy S23에서 다른 카톡 계정이 보낸 테스트 폴더 4개(HWPX 공문, HWP5 공문, PDF, HWP3 옛 버전)를 '한글뷰어'로 열어 모두 정상이었다는 실측이 남아 있습니다. 다만 이 기록에는 카톡이 보낸 MIME과 NEW_TASK 여부가 없습니다. 지금 필터는 문서 MIME과 octet-stream을 함께 받으므로, 열린 것만으로는 카톡이 어느 쪽으로 보냈는지 알 수 없습니다.</p>
+      <p>행렬의 기기 범위도 좁습니다. 행렬은 S21(Android 15)과 에뮬레이터 API 35, 회귀는 S20(Android 13)까지입니다. 다른 제조사의 파일 앱은 보지 않았고, Files by Google은 시험 기기 어디에도 깔려 있지 않아 확인하지 못했습니다.</p>
+    </section>
+
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">adb로 내 앱의 인텐트 행렬을 만드는 순서</h2>
+      <ol>
+        <li>보낸 앱마다 hwpx, hwp, pdf를 엽니다. 리더가 떠 있는 동안 받은 MIME, 플래그, authority를 적습니다. 파일 이름은 적지 않습니다.<pre><code>adb shell dumpsys activity activities | grep -A3 &lt;패키지&gt;</code></pre></li>
+        <li>타입별로 내 패키지가 몇 번 잡히는지 셉니다. VIEW와 SEND 모두, <code>*/*</code>, 문서 MIME, octet-stream에서 하나여야 합니다.<pre><code>adb shell cmd package query-activities --brief \
+  -a android.intent.action.VIEW -t '*/*' -d content://x/y</code></pre></li>
+        <li>읽기 권한 없이 공유합니다. 앱이 죽지 않고 '접근 불가' 화면으로 끝나야 합니다.<pre><code>adb shell am start -a android.intent.action.SEND \
+  -t application/pdf --eu android.intent.extra.STREAM &lt;content URI&gt;</code></pre></li>
+        <li>m4a 같은 다른 파일을 .hwp 이름과 문서 MIME으로 VIEW합니다. 선택 창으로 넘어가는지, 앱 저장소에 사본이 남지 않는지 봅니다.</li>
+        <li>범용 MIME 스위치를 끄고 octet-stream VIEW를 보냅니다. 선택 창에 내 앱이 없어야 하고, 다시 켜면 돌아와야 합니다.</li>
+        <li>카톡과 메일 앱은 두 번째 계정에서 보내야 합니다.</li>
+      </ol>
+      <p>엔진 쪽 실험은 <a href="/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a>에, 같은 앱의 PDF 경로 문제는 <a href="/ax/androidx-pdf-isolated-process/">androidx.pdf beta01: 격리 프로세스에서 Application.onCreate가 한 번 더 돌아 PDF가 조용히 안 열렸다</a>에 적었습니다.</p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">남은 일: 메일 앱 MIME, 열린 리더와 스위치</h2>
+      <p>네이버 메일과 Gmail 첨부는 아직 열어 보지 않았습니다. octet-stream SEND를 받기로 한 근거가 메일 앱이었으니, 이 두 앱의 MIME을 dumpsys로 적는 것이 먼저입니다. 리더가 열려 있는 동안 설정에서 스위치를 바꿔 그 리더를 연 alias가 꺼지는 경우도 기기에서 보지 않았습니다. 시스템이 리더를 정리하거나 최근 앱에서 다시 들어오지 못할 수 있습니다. 거절률이 높으면 기본값을 되돌린다는 규칙은 적어 두었지만, 그 숫자를 본 기록은 아직 없습니다.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EC%95%88%EB%93%9C%EB%A1%9C%EC%9D%B4%EB%93%9C%EC%97%90%EC%84%9C%20HWPX%EB%8A%94%20octet-stream%EC%9C%BC%EB%A1%9C%EB%8F%84%20%EC%98%A8%EB%8B%A4%3A%20%EB%B3%B4%EB%82%B8%20%EC%95%B1%EB%B3%84%20%EC%9D%B8%ED%85%90%ED%8A%B8%2018%ED%96%89%EA%B3%BC%20intent-filter%20%EC%84%A4%EA%B3%84">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>hwpx의 MIME 타입은 무엇인가요?</summary><div><p>보내는 앱마다 다릅니다. 2026년 10월 5일 기록에서 삼성 내 파일은 <code>application/vnd.hancom.hwpx</code>, Chrome 다운로드 목록과 에뮬레이터 Files는 <code>application/octet-stream</code>으로 넘겼습니다. 한글뷰어 슈가독의 필터에는 <code>application/haansofthwpx</code>, <code>application/vnd.hancom.hwpx</code>, <code>application/x-hwpx</code>, <code>application/hwp+zip</code>과 octet-stream을 함께 넣었습니다.</p></div></details>
+        <details><summary>intent-filter에 pathPattern으로 .hwpx를 받으면 안 되나요?</summary><div><p>content URI에서는 맞지 않습니다. 삼성 내 파일이 넘긴 URI(<code>content://media/external/file/N</code>) 경로에는 확장자가 없었습니다. MIME으로 받고 바이트로 판정하십시오.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
+        <li><a href="/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li>
+        <li><a href="/ax/hwp-hancom-resave-check/">고친 HWP 7개 한컴 호환성 테스트: 열기 7/7, 다른 이름으로 저장은 로그인 뒤 2/2</a></li>
+        <li><a href="/ax/integration-review-defects/">AI 에이전트 병렬 브랜치 13개를 합친 뒤 통합 리뷰가 확정 결함 12건을 찾았다</a></li>
+      </ul>
+      <p><a href="/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="/ax/">AX 노트 전체 보기</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>한 가지 일을 간단하게 하는 Android 앱</p>
+        <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">앱</p>
+        <ul><li><a href="/apps/sugaralbum/">슈가앨범</a></li><li><a href="/apps/image-compress/">사진 용량 줄이기</a></li><li><a href="/apps/image-flip/">사진 반전·회전</a></li><li><a href="/apps/image-convert/">이미지 변환 JPG·PNG·WebP</a></li><li><a href="/apps/sugarspeller/">한글 띄어쓰기</a></li><li><a href="/apps/sugarclip/">SugarClip</a></li><li><a href="/apps/doc-viewer/">한글뷰어 슈가독</a></li><li><a href="/apps/sugarcard/">생생카드</a></li><li><a href="/apps/arrow-knots/">화살표 매듭풀기</a></li><li><a href="/apps/blocks/">한판블록</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">사이트</p>
+        <ul><li><a href="/apps/">모든 앱</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li><li><a href="/sitemap/">사이트맵</a></li><li><a href="/rss.xml">RSS 피드</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play 개발자 페이지</a></div>
+    </div>
+  </footer>
+</body>
+</html>

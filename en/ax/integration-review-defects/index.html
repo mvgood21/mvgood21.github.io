@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Parallel AI agent branches: 12 integration defects – SugarMount</title>
+  <meta name="description" content="13 branches passed agent review and CI; a review of the merged code still confirmed 12 defects. By our count, 10 broke contracts between two packages.">
+  <meta name="robots" content="max-image-preview:large">
+  <link rel="canonical" href="https://sugarmount21.com/en/ax/integration-review-defects/">
+  <link rel="alternate" hreflang="ko" href="https://sugarmount21.com/ax/integration-review-defects/">
+  <link rel="alternate" hreflang="en" href="https://sugarmount21.com/en/ax/integration-review-defects/">
+  <link rel="alternate" hreflang="x-default" href="https://sugarmount21.com/ax/integration-review-defects/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Parallel AI agent branches: 12 integration defects – SugarMount">
+  <meta property="og:description" content="13 branches passed agent review and CI; a review of the merged code still confirmed 12 defects. By our count, 10 broke contracts between two packages.">
+  <meta property="og:url" content="https://sugarmount21.com/en/ax/integration-review-defects/">
+  <meta property="og:image" content="https://sugarmount21.com/assets/og/ax-integration-review-defects-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="https://sugarmount21.com/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/svg+xml" href="https://sugarmount21.com/assets/favicon.svg">
+  <link rel="apple-touch-icon" href="https://sugarmount21.com/assets/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://sugarmount21.com/en/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=d59e763f">
+  <link rel="stylesheet" href="/assets/site.css?v=d59e763f">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=d59e763f">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://sugarmount21.com/en/ax/integration-review-defects/#article","headline":"13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects","description":"13 branches passed agent review and CI; a review of the merged code still confirmed 12 defects. By our count, 10 broke contracts between two packages.","url":"https://sugarmount21.com/en/ax/integration-review-defects/","mainEntityOfPage":"https://sugarmount21.com/en/ax/integration-review-defects/","inLanguage":"en","articleSection":"Working with agents","datePublished":"2026-11-01T09:00:00+09:00","dateModified":"2026-11-01T09:00:00+09:00","image":["https://sugarmount21.com/assets/og/ax-integration-review-defects-en.png","https://sugarmount21.com/assets/ax/cover/integration-review-defects-en.webp","https://sugarmount21.com/assets/ax/integration-review-defects-1-en.webp","https://sugarmount21.com/assets/ax/integration-review-defects-2-en.webp"],"author":{"@id":"https://sugarmount21.com/#org"},"publisher":{"@id":"https://sugarmount21.com/#org"},"isPartOf":{"@id":"https://sugarmount21.com/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"If every branch had an AI review, do I still need an integration review?","acceptedAnswer":{"@type":"Answer","text":"You still need one. In AXFamily every branch was reviewed by three agents, and the merged code still had 12 blocker or major defects, 10 of them spanning two packages by our count. A branch review reads only that branch's diff, so it misses the other side of a contract whenever that side is not in the diff."}},{"@type":"Question","name":"Will Firestore emulator tests catch a missing composite index?","acceptedAnswer":{"@type":"Answer","text":"The emulator does not enforce composite indexes, so tests pass with the index missing. Add a static check that matches the app's sorted queries against the index file, or run the queries against a real project."}},{"@type":"Question","name":"How long did the integration review take?","acceptedAnswer":{"@type":"Answer","text":"Review took 6 to 9 minutes and refutation under a minute; the fix took about 49 minutes to its commit and about 55 minutes to the PR merge after CI. Counting the merges and wiring before it, the whole run from the 01:51 merges to the 05:34 PR merge took 3 hours 43 minutes."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://sugarmount21.com/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://sugarmount21.com/en/ax/"},{"@type":"ListItem","position":3,"name":"Working with agents","item":"https://sugarmount21.com/en/ax/topic/workflow/"},{"@type":"ListItem","position":4,"name":"13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=d59e763f">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/integration-review-defects/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-workflow">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/workflow/">Working with agents</a></li><li><span aria-current="page">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/integration-review-defects-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</h1>
+      <p class="lead">Every branch had its own agent review and green CI. A separate review of the merged code still confirmed 12 defects the existing tests had not caught; by our count, 10 sat between two packages.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Working with agents</span> <span aria-hidden="true">·</span> <span>12 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-11-01">November 1, 2026</time></p><!-- /build:meta -->
+      <p>Six review agents that read only the merged code reported 2 blockers and 10 majors, and the agents assigned to refute them could not knock down a single one. Before that, each of the 13 feature branches had been reviewed by three adversarial agents and had green CI. This happened in the early hours of October 10, 2026 (Korea time), while merging the first parallel wave (Wave 1) of AXFamily, our family calendar app. None of the 12 were caught by the existing tests or showed up as a git conflict. By our classification, 10 of the 12 were broken agreements between code written by two different packages.</p>
+      <p class="note">Sources: git history (merges 58920b9 to ff0c975, a0351cf, 941d79e, c153fae, 74d3685, 5d51b5b, cee9d0f), the descriptions of the integration PR and the billing package PR, the fix report, and the integration workflow script with its run log (each agent's findings and refutation verdict). Times are KST. Rechecked on 2026-10-31.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (11)</summary><ol><li><a href="#timeline">From the 01:51 merges to the 05:34 PR merge</a></li><li><a href="#first-guess">The first assumption: green tests meant the integration was done</a></li><li><a href="#findings">32 findings from six lenses; 12 survived refutation</a></li><li><a href="#contracts">By our count, 10 of the 12 sat between two packages</a></li><li><a href="#why-missed">Each branch review read only its own diff</a></li><li><a href="#checks">The check we kept: a sorted-query-to-index table</a></li><li><a href="#alternatives">Other routes: a staging project, shared test vectors</a></li><li><a href="#limits">What a read-only review missed: three device E2E rounds</a></li><li><a href="#how-to">How to run integration review as its own step</a></li><li><a href="#next">Next to check: server queries and gaps in the table</a></li><li><a href="#faq">FAQ</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#timeline">From the 01:51 merges to the 05:34 PR merge</a></li><li><a href="#first-guess">The first assumption: green tests meant the integration was done</a></li><li><a href="#findings">32 findings from six lenses; 12 survived refutation</a></li><li><a href="#contracts">By our count, 10 of the 12 sat between two packages</a></li><li><a href="#why-missed">Each branch review read only its own diff</a></li><li><a href="#checks">The check we kept: a sorted-query-to-index table</a></li><li><a href="#alternatives">Other routes: a staging project, shared test vectors</a></li><li><a href="#limits">What a read-only review missed: three device E2E rounds</a></li><li><a href="#how-to">How to run integration review as its own step</a></li><li><a href="#next">Next to check: server queries and gaps in the table</a></li><li><a href="#faq">FAQ</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="timeline">
+      <h2 id="timeline">From the 01:51 merges to the 05:34 PR merge</h2>
+      <p>Wave 1 ran one workflow that put every package through the same steps: one agent implemented it, three agents reviewed the branch through security, cost and correctness lenses, and a fix agent addressed their findings and got the PR to green CI. The two-minute merge of all 13 branches starting at 01:51, and the minimal fixes for 6 package pairs in a0351cf at 02:09, are covered in <a href="/en/ax/file-owner-table/">Claude Code sessions in one repo: file owner table</a>.</p>
+      <p>Three wiring commits followed to apply the lead session's cross-package decisions, in the order contract, server, app (941d79e at 02:53, c153fae at 03:42, 74d3685 at 04:23). The code the review read included those wiring commits.</p>
+      <figure class="ax-fig"><img src="/assets/ax/integration-review-defects-1-en.webp" width="1200" height="1192" alt="Step diagram: 13 branches pass their own review and CI, merge at 01:51, 6 broken pairs fixed and tests pass at 02:09, three wiring commits, a six-lens review at 04:29 finds 32 issues, 12 survive refutation, fixed at 05:28, PR merged at 05:34." loading="lazy"><figcaption>After every test was green again, a review that read only the merged code found 12 blocker or major defects.</figcaption></figure>
+      <p>The six reviewers started together at 04:29 and finished within 6 to 9 minutes, making 30 to 95 tool calls each. At 04:38 each of the 12 blocker and major findings went to its own refuting agent, and within a minute all 12 came back as real. The fix agent pushed 5d51b5b at 05:28 (115 files, 2,088 lines added). Once all 11 CI jobs passed, the integration PR was merged into develop at 05:34.</p>
+    </section>
+
+    <section aria-labelledby="first-guess">
+      <h2 id="first-guess">The first assumption: green tests meant the integration was done</h2>
+      <p>The plan described Wave 1 as "parallel feature work (separate files only)", and its conflict rules were written per shared file. The integration step was told to resolve conflicts keeping both sides' intent, run every test suite, and fix integration breakage minimally.</p>
+      <p>The integration agent finished by that standard. Its PR description said it had fixed only what the integration broke, and listed the numbers: 977 Flutter tests, 274 function unit tests and 291 emulator tests, 441 Rules tests (5 skipped) and 132 media Worker tests, all passing. None of the 12 defects found later changed any of those numbers. The lead session had put a review step at the end of the workflow, and that step is where the defects appeared.</p>
+    </section>
+
+    <section aria-labelledby="findings">
+      <h2 id="findings">32 findings from six lenses; 12 survived refutation</h2>
+      <p>The six lenses were Rules and contract, function security, cost, app security and privacy, app UX, and flow tracing, which followed the core user flow in code from sign-in to account deletion. They reported 32 findings: 20 minor and 12 blocker or major. The cost lens reported only 3 minor findings. One finding from Rules and contract and one from function security were the same defect, found from both sides, so there were 11 distinct defects.</p>
+      <figure class="ax-fig"><img src="/assets/ax/integration-review-defects-2-en.webp" width="1200" height="728" alt="Bar chart: blocker and major findings were 2 from Rules and contract, 2 from function security, 2 from app security and privacy, 4 from app UX, 2 from flow tracing and 0 from cost, 12 in all." loading="lazy"><figcaption>Five of the six lenses produced a blocker or major finding; the cost lens produced only minor ones.</figcaption></figure>
+      <p>The refutation prompt told each agent to read the code and refute the finding, defaulting to "not real" unless the defect could be shown. Each refuter made 3 to 6 tool calls and returned a verdict in 16 to 25 seconds. The verdicts cited files and line numbers; the one on the missing index pointed out that comments and assets, queried the same way, already had their composite indexes.</p>
+    </section>
+
+    <section aria-labelledby="contracts">
+      <h2 id="contracts">By our count, 10 of the 12 sat between two packages</h2>
+      <p>Rewriting each confirmed defect as "which two pieces of code believed different things" gives the table below. The classification is ours, made while writing this note; it is not in the original records. App feature details are kept short.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Lens (severity)</th><th>The two sides</th><th>The mismatch</th></tr></thead>
+        <tbody>
+          <tr><td>Rules and contract, function security (major, same defect twice)</td><td>Rules vs. a function added during wiring</td><td>Rules let any adult in the household edit a list field that the function trusted as proof of consent eligibility</td></tr>
+          <tr><td>Rules and contract (major)</td><td>Records screen query vs. index file</td><td>No composite index for a sorted query</td></tr>
+          <tr><td>Function security (major)</td><td>Revocation check vs. ownership transfer</td><td>A revocation was re-evaluated against the revoker's current role, so a role change undid it</td></tr>
+          <tr><td>App security and privacy (major)</td><td>Records device cleanup vs. sign-out cleanup registry</td><td>Cleanup never registered; it ran only asynchronously and never retried</td></tr>
+          <tr><td>App security and privacy (major)</td><td>Inside the share inbox store</td><td>Copied files left behind when the queue passed 100 items or got corrupted</td></tr>
+          <tr><td>App UX (blocker)</td><td>Billing entry widget vs. family screen</td><td>Zero production callers of the widget</td></tr>
+          <tr><td>App UX (major)</td><td>Household deletion function vs. settings screen</td><td>The app never sent the server's cancel flag and parsed the cancelled reply as an error</td></tr>
+          <tr><td>App UX (major)</td><td>UI spec vs. bottom action button</td><td>Button shown on tabs the spec excluded, with the wrong label</td></tr>
+          <tr><td>App UX (major)</td><td>Banner slot vs. screen state reports</td><td>One failure blocked banners for the whole session (spec says per screen); cached offline screens reported ready</td></tr>
+          <tr><td>Flow tracing (blocker)</td><td>App capture vs. AI extraction function</td><td>For PDF sources the app sent <code>image/webp</code>; the server accepted only <code>application/pdf</code></td></tr>
+          <tr><td>Flow tracing (major)</td><td>Household picker vs. today/calendar screens and billing</td><td>The picker wrote a new key, the screens read an old key nothing wrote, billing used the first household</td></tr>
+        </tbody>
+      </table></div>
+      <p>Only two stayed inside one package: the share inbox files and the bottom button. In the other 10 (9 distinct defects), each side was correct on its own. In the PDF case, the app sent a first-page thumbnail exactly as its own code comment said, and the server counted pages from PDF bytes exactly as the contract said at the time.</p>
+    </section>
+
+    <section aria-labelledby="why-missed">
+      <h2 id="why-missed">Each branch review read only its own diff</h2>
+      <p>The branch review prompt had each reviewer read <code>git diff origin/develop...origin/&lt;branch&gt;</code>. The index file already existed on develop, and the Rules package was changing it on its own branch, but it never appeared in the diff read by the agent reviewing the records screen's sorted query. The same held for app capture: the server check that accepts only <code>application/pdf</code> for PDF sources was already on develop, but not in that reviewer's diff.</p>
+      <p>The billing package's review had already found one of these defects. In that branch review, the correctness lens had been told to grep for production callers of every new API, the same rule the operator now keeps in the global instructions for all projects. That review did find that nothing called the billing entry widget, but rated it minor; the billing re-review just before integration raised it to major. The call belonged in the family screen file, which the file owner rules kept the billing fix agent from touching, so the agent put the item in the PR description's "to align with other packages" section, marked as required at integration. The integration workflow's wiring task list was already written into the script when it launched at 01:28, before the billing re-review finished. The item came back as a blocker in the integration review that started at 04:29.</p>
+      <p>Tests ran per package against that package's own fakes and the Firestore emulator. As the comment at the top of the index test file already said, the Firestore emulator does not enforce composite indexes. The contract's query table listed sources among the list queries, but the required composite index list in the same section left sources out. CI passed, and only the production Firestore would have answered with <code>FAILED_PRECONDITION</code>. (The review caught it before any production deploy, so it never actually happened.)</p>
+      <p>Agent-written code and tests also hid mismatches. A comment in the today/calendar code said the active-household key was "written by A1's household switcher" (A1 being the family screen package), but <code>git grep</code> found no code anywhere that wrote that key. The bottom button test was named "the FAB is on every tab"; it locked in the placement and label the spec had ruled out.</p>
+      <p>After merging parallel branches, run a review that reads only the merged code, however many branch reviews came before.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%2013%20parallel%20AI%20agent%20branches%20passed%20review%20and%20CI%3B%20a%20review%20of%20the%20merged%20code%20still%20confirmed%2012%20defects">Email us</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="checks">
+      <h2 id="checks">The check we kept: a sorted-query-to-index table</h2>
+      <p>According to the fix report, 5d51b5b added for each defect a test written to fail on the code before the fix; the Rules, index and consent fixes were actually reverted to watch the tests fail. (The revert technique is in <a href="/en/ax/guard-removal-test/">Finding fake tests by deleting their guards</a>.) Two of the fixes were turned into checks for the next mismatch of the same kind.</p>
+      <p>For indexes, the Rules test suite gained a table of app queries that use orderBy. Each row names the app file, the query and the index it needs, and the test looks for that index in the index file. A final test counts how often <code>orderBy: '</code> appears in each listed file and compares that with the number of table rows, then compares the list of app files containing the string with the table's files. Anyone adding a sorted query has to add a row first.</p>
+      <pre><code>const count = (rel) =&gt; (readFileSync(resolve(appRoot, rel), 'utf8').match(/orderBy:\s*'/g) ?? []).length;
+// …
+expect(actual).toEqual(expected);
+// fail if a file outside the table uses orderBy: '&lt;field&gt;'
+const all = execSync(`grep -rlE "^\\s*orderBy: '" lib || true`, { cwd: appRoot, encoding: 'utf8' })
+  .split('\n').filter(Boolean).map((f) =&gt; f.trim());
+expect(all.sort()).toEqual(files.sort());</code></pre>
+      <p>By October 13, three more app files with sorted queries had been added to the table. The history does not show whether the table check failed first and forced those rows. For household selection, the fix made the app session's current household the single source of truth; with two or more households and no valid selection, the picker returns null instead of falling back to the first one. Three tests pin that rule.</p>
+    </section>
+
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">Other routes: a staging project, shared test vectors</h2>
+      <p>A real Firestore project would have exposed the missing index at once. The plan had postponed a staging project until after launch, citing low benefit for the risk and one more place that could incur charges. The device end-to-end runs that same morning used an emulator backend to keep costs at zero, so they would not have shown it either.</p>
+      <p>One method had already worked. The billing package's tests were written to read a shared vector file (expected results for whether a subscription counts as active) that the billing server package would add, and skipped themselves with "runs automatically once merged" while the file was missing from develop. Right after the merge, that test ran and caught the app and server disagreeing on the entitlement check, which a0351cf fixed. Contracts without a vector file, like consent eligibility or household selection, could not be caught by that test.</p>
+    </section>
+
+    <section aria-labelledby="limits">
+      <h2 id="limits">What a read-only review missed: three device E2E rounds</h2>
+      <p>Three rounds of device E2E, run after the E2E harness commit at 07:37 the same day, found more runtime defects. One of them, d3fde30, fixed Firestore triggers that crashed without a default Admin app, and the 5d51b5b fix report itself says the Android side got Kotlin unit tests only. Why device checks run separately even after a review converges on zero is covered in <a href="/en/ax/agent-review-refutation/">Agent code review: fix what survives refutation</a>.</p>
+      <p>Each finding got one refuter for 16 to 25 seconds, so 12 out of 12 surviving is not evidence that refutation can be dropped. The app UX lens was told to compare screens against the written UI spec, and the button and banner findings cited spec clauses. In a project without a written spec, that lens has nothing to compare against.</p>
+    </section>
+
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">How to run integration review as its own step</h2>
+      <ol>
+        <li>Collect every branch PR's "to align with other packages" list into the integration task list. Finalize the wiring list only after every branch review is done.</li>
+        <li>Once everything is merged and all suites are green, hand the integration diff to one read-only agent per area, asking for concrete defects with evidence only and for each one to be refuted by the reviewer before it is reported. AXFamily's six lenses were Rules and contract, function security, cost, app security and privacy, app UX (screens vs. the UI spec), and flow tracing (sign-in to account deletion).<pre><code>git diff --stat origin/develop...origin/&lt;integration-branch&gt;</code></pre></li>
+        <li>Count production callers for every new widget, function and parameter, excluding the file that defines it. Zero is a finding by itself.<pre><code>git grep -n "BillingPlanRow(" -- apps/app/lib ':!apps/app/lib/features/billing/plan_row.dart'</code></pre></li>
+        <li>Send each blocker and major to a different agent to refute, and drop anything it cannot be shown (the procedure is in <a href="/en/ax/agent-review-refutation/">Agent code review: fix what survives refutation</a>).</li>
+        <li>For each confirmed defect, add a test that fails on the old code, and revert the fix once to watch it fail.</li>
+        <li>Turn each defect type into a check: a table check when both sides can be counted, like queries and indexes; a shared vector file read by both sides' tests when it is a decision rule.</li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">Next to check: server queries and gaps in the table</h2>
+      <p>The sorted-query table counts only the <code>orderBy: '</code> string in app code. Server function queries were still added to the required index list by hand on October 13, and the shape of each where clause depends on whoever writes the row. Whether server queries can be counted the same way is the next thing to try.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%2013%20parallel%20AI%20agent%20branches%20passed%20review%20and%20CI%3B%20a%20review%20of%20the%20merged%20code%20still%20confirmed%2012%20defects">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>If every branch had an AI review, do I still need an integration review?</summary><div><p>You still need one. In AXFamily every branch was reviewed by three agents, and the merged code still had 12 blocker or major defects, 10 of them spanning two packages by our count. A branch review reads only that branch's diff, so it misses the other side of a contract whenever that side is not in the diff.</p></div></details>
+        <details><summary>Will Firestore emulator tests catch a missing composite index?</summary><div><p>The emulator does not enforce composite indexes, so tests pass with the index missing. Add a static check that matches the app's sorted queries against the index file, or run the queries against a real project.</p></div></details>
+        <details><summary>How long did the integration review take?</summary><div><p>Review took 6 to 9 minutes and refutation under a minute; the fix took about 49 minutes to its commit and about 55 minutes to the PR merge after CI. Counting the merges and wiring before it, the whole run from the 01:51 merges to the 05:34 PR merge took 3 hours 43 minutes.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
+        <li><a href="/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+      </ul>
+      <p><a href="/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/sitemap/">Site map</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>
