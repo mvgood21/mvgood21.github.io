@@ -32,7 +32,8 @@ NOINDEX_PATHS = frozenset({"404.html", "design/index.html"})
 ACCENT_DEMO_PAGES = frozenset({"design/index.html"})  # SDS demo (noindex): data-app samples allowed inside <main>
 ADS_ORIGIN = "pagead2.googlesyndication.com"  # async AdSense loader, AX notes only (see the script check)
 ALLOWED_ORIGINS = frozenset()          # e.g. {"gc.zgo.at"} once the owner approves one analytics origin
-OWNERSHIP_FILES = ("google83e3e62aee87a145.html", "naverc6d2c9710a0b598bb0562751a0d005b7.html")
+OWNERSHIP_FILES = ("google83e3e62aee87a145.html", "naverc6d2c9710a0b598bb0562751a0d005b7.html",
+                   "naver336622988ccb96edbbdc3ad02fd2f6eb.html")
 LINK_FILE_EXCEPTIONS = frozenset({"/sitemap.xml", "/rss.xml", "/en/rss.xml", "/llms.txt", "/404.html"})
 FEEDS = ("rss.xml", "en/rss.xml")
 ROBOTS_DISALLOW = ("/tools/", "/data/", "/AGENTS.md", "/404.html")
