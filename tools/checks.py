@@ -1066,8 +1066,10 @@ def check_orphans(site, report, pages, listed):
 def check_assets(site, report):
     for rp, key in (("assets/site.css", "site_css"), ("assets/sds-apps.css", "sds_apps_css"),
                     ("assets/fonts/pretendard.css", "font_css")):
-        s = site.size(rp)
-        if s is not None and s > BUDGET[key]:
+        if site.size(rp) is None: continue
+        # LF bytes, as served: a Windows checkout with core.autocrlf adds one CR per line
+        s = len(site.read_bytes(rp).replace(b"\r\n", b"\n"))
+        if s > BUDGET[key]:
             report.error("BUDGET-CSS", rp, f"{s} B > {BUDGET[key]} B")
     for rp in site.files_under("assets/apps"):
         if not rp.endswith(".webp") or rp.endswith("/icon.webp"): continue

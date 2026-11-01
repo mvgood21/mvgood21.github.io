@@ -562,6 +562,15 @@ class Budgets(Base):
         f = self.files(); f["assets/sds-apps.css"] = "/*" + "x" * 5 * 1024 + "*/"
         self.assertGate(f, "BUDGET-CSS")
 
+    def test_css_budget_counts_lf_bytes(self):
+        """A CRLF checkout (core.autocrlf) must not push site.css over the budget; Pages serves the LF blob."""
+        line = "a{color:red}" + "x" * 50
+        f = self.files(); f["assets/site.css"] = (line + "\r\n") * (40500 // (len(line) + 1))  # 40,446 B LF, 41,088 B CRLF
+        self.assertGreater(len(f["assets/site.css"].encode()), 40960)
+        self.assertNotIn("BUDGET-CSS", run(f).codes())
+        f["assets/site.css"] = (line + "\n") * (41500 // (len(line) + 1))
+        self.assertGate(f, "BUDGET-CSS")
+
     def test_screenshot_size(self):
         f = self.files(); f["assets/apps/foo/shot1-ko.webp"] = webp(b"VP8 ", 81 * 1024)
         self.assertGate(f, "BUDGET-SHOT")
