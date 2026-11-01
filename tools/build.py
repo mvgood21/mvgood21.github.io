@@ -741,7 +741,7 @@ def build_apps_hub(lang):
             {"@type": "ListItem", "position": i + 1, "url": SITE + app_url(a, lang)} for i, a in enumerate(x for x in live if x.get("app_path"))]},
     ]}, bc]
     h = head(lang, title, desc, path, alt, og_image=f"/assets/og/hub-apps-{lang}.png", lds=lds)
-    return page(lang, h, ' class="page-read"', header(lang, "apps", alt), main, footer(lang))
+    return page(lang, h, ' class="page-hub"', header(lang, "apps", alt), main, footer(lang))
 
 # ---------------------------------------------------------------- privacy index
 def effective_date(a, lang):
@@ -809,7 +809,7 @@ def build_privacy_index(lang):
                 {"@type": "ListItem", "position": i + 1, "url": SITE + privacy_url(a, lang)}
                 for i, a in enumerate(x for x in APPS if x.get("privacy_path"))]}}, bc]
     h = head(lang, t["privacy_title"], t["privacy_desc"], path, alt, og_image=f"/assets/og/privacy-{lang}.png", lds=lds)
-    return page(lang, h, ' class="page-read"', header(lang, "privacy", alt), main, footer(lang))
+    return page(lang, h, ' class="page-hub"', header(lang, "privacy", alt), main, footer(lang))
 
 # ---------------------------------------------------------------- app page parts shared by generated and hand pages
 def tasks_block(a, lang):
@@ -1062,7 +1062,7 @@ def build_ax_topic(tp, lang):
             {"@type": "ListItem", "position": i + 1, "url": SITE + u} for i, (u, _, _) in enumerate(arts)]},
     ]}, bc]
     h = head(lang, title, d["desc"], path, alt, og_image=f"/assets/og/ax-{lang}.png", lds=lds)
-    return page(lang, h, ' class="page-read"', header(lang, "ax", alt or url(other(lang), "/ax/")), main, footer(lang))
+    return page(lang, h, ' class="page-hub"', header(lang, "ax", alt or url(other(lang), "/ax/")), main, footer(lang))
 
 BLOCK_RE = lambda name: re.compile(r"<!-- build:" + name + r" -->.*?<!-- /build:" + name + r" -->", re.S)
 
@@ -1205,6 +1205,8 @@ def wrap_hand(relpath):
             lds.append(ld); og = app_og(a, lang)
             main = set_block(main, "tasks", tasks_block(a, lang), after_hero(main))
             main = set_block(main, "extra", app_extra(a, lang, relpath))
+        if re.search(r'^\s*<section class="facts"', dates.strip_build_blocks(main), re.M):
+            main_cls = "app-layout"
     elif parts[0] == "apps" and len(parts) == 3:
         a = BY_APP_PATH.get(parts[1]); current = "apps"; app_scope = a; og_type = "article"
         items = [(t["apps"], url(lang, "/apps/"))]
@@ -1237,6 +1239,13 @@ def wrap_hand(relpath):
         isolated = legal_chrome.is_isolated(a, parts)
         # isolated: no related links either (the app page leads to pricing); an empty block keeps <main> stable
         main = set_block(main, "extra", "" if isolated else policy_extra(a, lang, parts[1:]))
+        # side TOC like /about/, unless the policy carries its own contents list (cardrawer, axfamily)
+        own = re.search(r'<nav\b(?:(?!</nav>).)*?href="#', dates.strip_build_blocks(main), re.S)
+        toc = "" if own else toc_inner(main, lang)
+        # a body link with the same text as a TOC entry (axfamily "9-4. Ads" -> #ads) keeps its anchor: one text, one URL
+        for href, text in re.findall(r'<a href="(#[^"]+)">(.*?)</a>', dates.strip_build_blocks(main)):
+            toc = re.sub(r'href="#[^"]+">' + re.escape(text) + '</a>', lambda _: f'href="{href}">{text}</a>', toc)
+        main = set_block(main, "toc", toc, after_hero(main))
     elif parts[0] == "ax" and len(parts) == 1:
         current = "ax"; og = f"/assets/og/ax-{lang}.png"
         items = [(t["ax"], None)]
@@ -1338,7 +1347,10 @@ def wrap_hand(relpath):
     if main_cls.startswith("ax-note"):
         h = h.replace("</head>", f'  <link rel="stylesheet" href="/assets/ax.css?v={CSSV}">\n'
                                  + (f"  {ax_extras.ads_head(ADS)}\n" if ADS["on"] else "") + "</head>")
-    return page(lang, h, ' class="page-read"', header(lang, current, other_href), nav + main, footer(lang), app=app_scope,
+    # body class (site.css "layout"): hubs use the full width like home; app pages grid main themselves (app-layout);
+    # everything else is a reading page (text column, side TOC when there is one)
+    body = ' class="page-hub"' if parts == ["ax"] else "" if main_cls == "app-layout" else ' class="page-read"'
+    return page(lang, h, body, header(lang, current, other_href), nav + main, footer(lang), app=app_scope,
                 main_cls=main_cls)
 
 def build_404():
@@ -1433,7 +1445,7 @@ def build_sitemap_page(lang, outputs, pages):
             "description": st["lead"], "inLanguage": lang, "isPartOf": SITE_REF, "publisher": ORG_REF,
             "dateModified": dates.iso_datetime(modified(relpath_of(path)))}, bc]
     h = head(lang, title, st["lead"], path, url(other(lang), "/sitemap/"), lds=lds)
-    return page(lang, h, ' class="page-read"', header(lang, None, url(other(lang), "/sitemap/")), main, footer(lang))
+    return page(lang, h, ' class="page-hub"', header(lang, None, url(other(lang), "/sitemap/")), main, footer(lang))
 
 # ---------------------------------------------------------------- sitemap, feeds, robots, llms.txt
 MAIN_RE = re.compile(r"<main\b[^>]*>(.*)</main>", re.S)
