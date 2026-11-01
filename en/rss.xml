@@ -6,7 +6,365 @@
   <description>Small Android apps that each do one thing simply, from shrinking photos and opening Korean HWP documents to checking Korean spelling and playing puzzle games.</description>
   <language>en</language>
   <atom:link href="https://sugarmount21.com/en/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Sun, 01 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Mon, 02 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Sitemap &#x27;Couldn&#x27;t fetch&#x27; for 10 days in GSC – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/gsc-sitemap-couldnt-fetch-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>Search Console showed 'Couldn't fetch' for ten days; a new domain property processed the same sitemaps in seconds</h1>
+      <p class="lead">Behind the 'Couldn't fetch' label the API said isPending=True with no lastDownloaded. For those ten days, almost every page that got indexed was one we had requested by hand.</p>
+      <p>Google never downloaded the sitemap.xml we submitted to Search Console, not once in the ten days before the site moved. It was first submitted on October 21, 2026 (API date). On October 25 a live URL test fetched the same file without trouble, and Bing processed our sitemap.xml that same day. On October 31 the site moved to its own domain; we submitted the same four sitemaps to a new domain property, and Google downloaded all four within seven seconds of submission.</p>
+      <p class="note">Sources: our Search Console API reads (sitemaps and URL Inspection), the output of the site's sitemap audit script, Bing Webmaster Tools screens and the site repository's git history. Times are Korea Standard Time (UTC+9); figures are as of November 1, 2026.</p>
+    </section>
+    <section aria-labelledby="two-properties">
+      <h2 id="two-properties">Old property: still pending on November 1. New property: seconds</h2>
+      <p>On the morning of November 1 we read both properties' sitemap lists again. The URL-prefix property for the old github.io address still lists sitemap.xml and its three child sitemaps as isPending=True, no lastDownloaded, errors=0. All four were last submitted on October 30 (sitemap.xml at 03:43, the children at 15:43). In the new domain property the same four read isPending=False, errors=0, with lastDownloaded between 17:05:08 and 17:05:14 on October 31. They were submitted at 17:05:07 to 17:05:08, so all four were downloaded within seven seconds (the fastest in under one second).</p>
+      <p>The move rewrote the old address to the new domain across the site; the sitemap layout (one index, three children) and the rules that generate it did not change. Every old URL redirects with a single 301 to the same path on the new domain, and the audit run against the new domain found all 196 URLs returning 200 with self-referencing canonicals. Eleven hours after the move, a full URL Inspection run in the new property (198 URLs) showed 114 as 'Discovered - currently not indexed'.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/gsc-sitemap-couldnt-fetch-1-en.webp" width="1200" height="763" alt="Comparison: in the old github.io URL-prefix property the sitemaps stayed isPending=True with no lastDownloaded through November 1 despite four resubmissions and direct child submissions; in the new domain property all four were downloaded within seven seconds of submission on Oct 31 with 0 errors." loading="lazy"><figcaption>The same set of sitemaps was still undownloaded on November 1 in the old property, and was processed within seven seconds of submission in the new one.</figcaption></figure>
+    </section>
+    <section aria-labelledby="live-test">
+      <h2 id="live-test">Googlebot fetched the file in a live test</h2>
+      <p>On the afternoon of October 25 the operator pointed out that the sitemap wasn't showing up in Search Console and that robots.txt seemed to be missing. The agent found that robots.txt returned 200 with <code>Allow: /</code> and a Sitemap line. sitemap.xml was a standard sitemaps.org 0.9 urlset with the hreflang and image extensions; it rendered as a table in the browser only because of an xml-stylesheet meant for people. The audit script opened all 154 URLs: every one returned 200 with a self canonical, no noindex, reciprocal hreflang and valid lastmod, and all 261 images returned 200.</p>
+      <p>At 14:38 we ran the live URL test in URL Inspection on the sitemap.xml address. Googlebot fetched it and reported that the URL was available to Google. That afternoon the Sitemaps report said 'Couldn't fetch', and the API said isPending=True, no lastDownloaded, 0 errors. There was no record of a fetch attempt at all.</p>
+    </section>
+    <section aria-labelledby="what-we-tried">
+      <h2 id="what-we-tried">New format, four resubmissions, child sitemaps: still pending</h2>
+      <p>The operator suspected the structure, so around 17:00 the agent turned sitemap.xml into a plain sitemapindex (commits 3d93937, c18cf30, 4879355). The three child sitemaps keep only loc, lastmod, priority and changefreq; the XSL, hreflang and image tags were removed. lastmod follows the rule in <a href="https://sugarmount21.com/en/ax/sitemap-lastmod-content-hash/">our note on setting sitemap lastmod from a content hash</a>. We also added an <a href="https://sugarmount21.com/en/sitemap/">HTML site map</a>, which puts all 156 URLs within two clicks of the home page. In the same hour the operator added the site to Bing Webmaster Tools by importing it from Search Console. Bing fetched the new sitemap.xml that day, marked it Success and found the three child sitemaps. Google was still pending that evening.</p>
+      <p>We resubmitted sitemap.xml through the API twice on October 25 and once each on October 27 and in the early hours of October 30, and got 204 every time. On the afternoon of October 30 the API reported sitemap.xml as <code>isSitemapsIndex=False</code>: Google had never downloaded it, so it did not even know the file was an index. If only the first pass through an index were slow, a child sitemap should get processed first, so we submitted the three children directly (94, 44 and 48 URLs). All four stayed pending.</p>
+      <p>The agent's first note, on the morning of October 25, called the state "a normal delay for a new property" and proposed waiting a week; the old property was still pending on November 1. When it resubmitted on October 25 it also resubmitted rss.xml and en/rss.xml as sitemaps, which breaks this site's own rule that RSS feeds are never submitted as sitemaps, and it submitted <code>sitemap.xml?v=20261025</code> as a separate duplicate. The duplicate was deleted at around 17:00 that day; the two feeds were deleted with the operator's approval, leaving sitemap.xml alone.</p>
+      <p>When you see 'Couldn't fetch', don't start by rewriting the file. Check lastDownloaded in the API and run the live URL test first. On this site, with lastDownloaded empty and the live test passing, changing the format did not end the wait.</p>
+    </section>
+    <section aria-labelledby="cause-chain">
+      <h2 id="cause-chain">Host, property type and submission date all changed at once</h2>
+      <p>URLs we requested by hand were mostly crawled within one to four hours, so Googlebot could reach the site. The explanation that remains is that the property's sitemap never reached the front of Google's processing queue; we could not confirm that, because Google does not show why. Google's <a href="https://support.google.com/webmasters/answer/7451001">Sitemaps report help</a> lists five causes of 'Couldn't fetch': a robots.txt block, an unresolved manual action, a 404, a general error such as an unavailable server, and low crawl demand for the sitemap. Of the first four, we ruled out the robots block, the 404 and server errors above; we did not check the Manual actions report (the URLs we requested were indexed within hours). Low crawl demand stays a hypothesis we cannot check.</p>
+      <p>Three things changed at once with the new property: the host went from github.io to our own domain, the property type went from URL prefix to a domain property verified by DNS TXT, and the submission came ten days later. This observation cannot separate the three, so this note does not name github.io as the cause.</p>
+      <p>While the sitemap had never been read, URL Inspection in the old property still showed coverageState as 'Submitted and indexed' (the October 25 full run, and again on November 1). On this site, 'Submitted' did not mean the sitemap had been processed.</p>
+    </section>
+    <section aria-labelledby="manual-requests">
+      <h2 id="manual-requests">For ten days, indexing grew mostly through manual requests</h2>
+      <p>The full URL Inspection run on the morning of October 25 found 7 of 148 URLs indexed (4.7%) and 141 as 'URL is unknown to Google'. That day the operator handed Search Console write tasks to the agent, which started requesting indexing in the Search Console UI. At 14:29 an API check showed 7 of 10 requested URLs as 'Submitted and indexed', one to two hours after the requests. URLs we had not requested stayed where they were: the 03:00 run on October 26 still counted 22 indexed, the same as the previous afternoon, and 133 unknown.</p>
+      <p>From then on we requested new notes and a queue every day. The indexed count went to 44 (October 27), 73 (October 28), 146 (October 30) and 162 (October 31). The October 27 run showed nearly every requested URL indexed and most unrequested ones unknown. A few notes stayed unknown even after several requests.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/gsc-sitemap-couldnt-fetch-2-en.webp" width="1200" height="728" alt="Bar chart: indexed URLs in the old property went from 7 on the morning of Oct 25 to 22, 44, 73, 146 and 162 by Oct 31, while the sitemap stayed pending." loading="lazy"><figcaption>Indexed pages went from 7 to 162 without Google ever reading the sitemap; most of the gain came from manual indexing requests.</figcaption></figure>
+      <p>The agent misread the request limit at first. On October 25 a 'Quota exceeded' message appeared after 15 accepted requests, and it wrote down "15 to 16 per day". On October 27 forty requests went through without that message. On October 29, 49 clicks produced 44 accepted requests; 'Quota exceeded' appeared five times in between, and each time the very next request was accepted. We now read it as a short-interval rate limit. These are observations from one property, not limits Google has published. Driving the UI from a browser took about two and a half minutes per request.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Search%20Console%20showed%20%27Couldn%27t%20fetch%27%20for%20ten%20days%3B%20a%20new%20domain%20property%20processed%20the%20same%20sitemaps%20in%20seconds">Email us</a></p></aside>
+    <section aria-labelledby="after-move">
+      <h2 id="after-move">After the move, 5 of 7 requests indexed within four hours</h2>
+      <p>The domain move had been decided for reasons unrelated to the sitemap, and it happened at 17:00 on October 31. New URLs showed up as 'Discovered - currently not indexed' within minutes, and the home page was indexed at its new address three hours after the move. From 19:47 we requested the seven pages that had impressions in the old property; four hours later five were 'Submitted and indexed'. That request-to-index time is about what we saw in the old property (one to four hours).</p>
+      <p>One of the seven, <code>/ax/hwp-viewer-rhwp-webview/</code>, came back as 'Duplicate, Google chose different canonical than user'. Inspecting the old URL in the old property showed 'Submitted and indexed', with the old URL itself as Google's canonical and a last crawl on October 27, before the 301 existed. The 03:00 full run in the new property on November 1 found 10 such Duplicate pages, many of them pages that had impressions in the old property. On the morning of November 1 we inspected five of them again: all five were still Duplicate, and googleCanonical was empty for three and showed the github.io URL for two.</p>
+      <p>For Duplicate pages we request indexing for the old URL in the old property. The new address has already been crawled and the old URL is still the canonical, so we expect the canonical to move only after Google recrawls the old URL and sees the 301. We sent one such request on the night of October 31 and ten on the morning of November 1.</p>
+      <p>The new property still had zero rows of search performance data on the morning of November 1, and as of that morning the old property's last daily row was October 29, with 84 impressions, its highest day until then. Search performance data usually lands two to three days late, so this cannot yet be told apart from reporting lag.</p>
+    </section>
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">For Google, only the UI indexing request was left</h2>
+      <p>We waited ten days, but with six new pages (Korean and English) going out every day we could not wait another week. The Indexing API covers only job postings and livestream video pages, so our notes don't qualify. IndexNow pings went out with every publish, but its receivers are engines such as Bing and Naver (Korea's largest portal); Google does not use it. That left the URL Inspection indexing request, which only exists in the UI, so the agent drove it through a browser.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">If lastDownloaded is set, this is a different problem</h2>
+      <p>If lastDownloaded has a value and errors is above zero, Google downloaded the file and failed while reading it; fix the reported errors. If the live URL test fails with a 404, a robots block or a redirect, the fetch is really failing. This is one site and two properties, so we can't say whether other sites on github.io see the same wait.</p>
+    </section>
+    <section aria-labelledby="checklist">
+      <h2 id="checklist">What to check when a sitemap says 'Couldn't fetch'</h2>
+      <ol>
+        <li>Read the sitemap list from the Search Console API and look at isPending, lastDownloaded, errors, isSitemapsIndex and lastSubmitted. No lastDownloaded and zero errors means Google has never downloaded it; the live test in the next step tells pending from failure.</li>
+        <li>Run the live URL test in URL Inspection on the sitemap.xml address. If it says the URL is available to Google, fetching works.</li>
+        <li>Open every URL in the sitemap and confirm 200, a self canonical, no noindex, reciprocal hreflang and valid lastmod.</li>
+        <li>Submit the same sitemap to Bing Webmaster Tools. If Bing processes it, that is one more sign the file's format and access are fine.</li>
+        <li>If it is pending, request indexing for every new page. On 'Quota exceeded', retry the same URL a little later.</li>
+        <li>Once a day, run URL Inspection over every URL and record coverageState and lastCrawlTime.</li>
+        <li>After a domain move, take the Duplicate pages in the new property and request indexing for their old URLs in the old property.</li>
+      </ol>
+      <pre><code># sitemap status (read only)
+GET https://www.googleapis.com/webmasters/v3/sites/&lt;property&gt;/sitemaps
+  → path, isPending, lastDownloaded, isSitemapsIndex, errors, lastSubmitted
+# index status of one URL
+POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect
+  {"inspectionUrl": "&lt;URL&gt;", "siteUrl": "&lt;property&gt;"}
+  → coverageState, lastCrawlTime, googleCanonical
+# &lt;property&gt;: URL prefix https://example.github.io/ (URL-encoded), domain property sc-domain:example.com</code></pre>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Ten Duplicate pages and four old sitemaps</h2>
+      <p>On the morning of November 1 the old URL <code>/ax/hwp-viewer-rhwp-webview/</code> still had October 27 as its last crawl. The next URL Inspection run will show whether the ten old-property requests sent that morning get the 301 read. We are also watching whether the old property's four sitemaps ever get processed, and whether daily rows from October 30 on show up in the old property.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Search%20Console%20showed%20%27Couldn%27t%20fetch%27%20for%20ten%20days%3B%20a%20new%20domain%20property%20processed%20the%20same%20sitemaps%20in%20seconds">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Does 'Couldn't fetch' in the Search Console Sitemaps report mean the file is broken?</summary><div><p>Not on this site. The API said isPending=True, no lastDownloaded and zero errors, and the live URL test fetched the file.</p></div></details>
+        <details><summary>If the sitemap is never processed, do new pages get indexed?</summary><div><p>Requesting indexing by hand worked. During the ten pending days most requested URLs were indexed within one to four hours.</p></div></details>
+        <details><summary>Does moving from github.io to a custom domain get the sitemap processed right away?</summary><div><p>For this site Google downloaded it within seven seconds of submission. That is one observation in which the host, the property type and the submission date all changed together.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Mon, 02 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Interstitial ad frequency: tutorials don&#x27;t count – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/interstitial-frequency-timeline/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/interstitial-frequency-timeline/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/interstitial-frequency-timeline-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX note · Measurement</span>
+      <h1>We set interstitial frequency from device timelines, and tutorials don't count</h1>
+      <p class="lead">Once the three tutorial puzzles stopped counting toward ads, the first interstitial in puzzle mode moved to after the third real puzzle. We chose what to count by reading ad logs from fresh installs in time order.</p>
+      <p>A fresh install that had not played a single real puzzle got a full-screen interstitial 91 seconds after launch. It happened on October 4, 2026, on a Galaxy S21, when a scripted, human-paced run on a test-ad release build finished the three tutorial puzzles in <a href="https://sugarmount21.com/en/apps/blocks/">Block Turn</a> and tapped Next. The operator decided the same day that tutorials would no longer count toward ads, and according to the commit message the first interstitial on the emulator moved from 181 s to 314 s. The same runs showed classic mode at 1.4 full-screen ads per 10 minutes against 3.3 for the puzzle mode, so a classic game over now counts as two runs toward the interstitial.</p>
+      <p class="note">Sources: the game repository's ad plan and launch rehearsal documents, PRD v2.1 §11.2, git commits 2a4b820, df52a51, 575aaa1, 73a12ad, e430133 and 85e3685, the session script <code>block_session_sim.py</code> and the simulator <code>block_revenue_sim.py</code>. Checked on November 1, 2026.</p>
+    </section>
+    <section aria-labelledby="first-ad">
+      <h2 id="first-ad">On a fresh install, the first interstitial came before any real puzzle</h2>
+      <p>Block Turn shows an interstitial only when a player taps Next, Play again or Home after a finished run. The numbers lived in one place (<code>Money.RULES</code>): at least 3 finished runs, 2 runs since the last interstitial, 90 s since the session started, 120 s since the previous full-screen ad, at most 5 per session and 20 per day, and only if an ad was already loaded. Here "full-screen ad" means interstitials, rewarded ads and app open ads together. The PRD (v2.1 §11.2) rules out an interstitial within the first three finished runs and the first 90 seconds of a session, and hides the banner on the tutorial puzzles and the first three runs.</p>
+      <p>Every run on October 4 started from cleared app data. The session script (<code>block_session_sim.py</code>) plays scripted runs, or personas, each with a fixed mode and pace range, and reads ad impressions from the SDK log. On the S21, the first interstitial came at 91 s, on Next after tutorial R003. The emulator finished the tutorials in 64 s; its first interstitial came after R004, at 181 s. Two other emulator personas (mixed and return) got their first one at 158 s and 134 s.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/interstitial-frequency-timeline-1-en.webp" width="1200" height="682" alt="Bar chart: from a fresh install to the first interstitial, 91 s on the Galaxy S21 before the change with no real puzzle played, 181 s on the emulator before, and 314 s on the emulator once tutorials stopped counting (conditions not recorded)." loading="lazy"><figcaption>Once the tutorials stopped counting, the emulator's first interstitial moved to after the third real puzzle.</figcaption></figure>
+    </section>
+    <section aria-labelledby="cause">
+      <h2 id="cause">The three tutorials had already met the 3-run gate</h2>
+      <p>The function that counted finished runs did not tell tutorials apart. In the first version of the app, written with the coding agent (cd62087), <code>Money.onRunEnded()</code> added every tutorial solve to the banner's run count and to the interstitial's win count, exactly like a real run. By the time the third tutorial ended, "3 finished runs" was already true.</p>
+      <p>Both the 3-run gate and the 90-second grace were meant to protect a new player. The three tutorials take 64 to 90 seconds, so the two guards opened at nearly the same time instead of adding up. The first ad's timing then depended on how fast the tutorials were cleared. The emulator met the 3-run gate at 64 s but was still inside the 90-second grace, so its ad waited for the next run, R004; on the S21 the grace was nearly over when R003 ended, so the ad came right after the tutorials.</p>
+      <p>The numbers came from documents. The monetization design for our other game in the same repository, Arrow Knots, cited industry advice to hold the first interstitial back from the session start and picked a 90-second grace; Block Turn's PRD wrote the same 90 s and passed it to the shared pacing module (<code>Pacer</code>). The session script first arrived in the launch prep commit 575aaa1 on October 4. Before it, the repository has no record of anyone looking at the first few minutes on a time axis.</p>
+      <p>A test written with the agent had locked the behavior in. The device E2E suite committed that morning (4fa0dfa) checked "banner shown from R004" as a pass condition in scenario S1. Under the PRD, R004 is the first real puzzle and should have no banner. The first draft of the launch plan raised the tutorial problem from a simulation only, and the cross-check disputed it. Once the device logs came in, the ad plan marked the issue as confirmed by measurement.</p>
+    </section>
+    <section aria-labelledby="run-length">
+      <h2 id="run-length">Run length decided which rule set the pace</h2>
+      <p>In a 12-minute run of the three-move puzzle persona on the emulator, interstitials appeared at 181, 322, 465 and 611 s: gaps of 141 to 146 s, or 3.3 per 10 minutes. A puzzle takes about a minute, so "every 2 runs" was always met first, and the 120-second gap was what held the pace.</p>
+      <p>Classic went the other way. In a 14-minute S21 session, tutorials included, classic produced 2 runs (150 moves); the ad plan puts a run at about five minutes. The only interstitial was the one right after the tutorials. Counting the one rewarded revive the script accepted, the session still had just 1.4 full-screen ads per 10 minutes. Two classic runs take about ten minutes, so in classic the every-2-runs gate, not the 120 s gap, set the pace.</p>
+      <p>The launch plan's simulator (<code>block_revenue_sim.py</code>) assumed a 90-second classic run, while the comment on that same line quoted the classic supply experiment's human target of 4 to 10 minutes. It also kept each interstitial on screen for 15 s; the session script closed them after 5 to 8 s, like a person. Replaying the puzzle persona in the simulator gave 4.09 interstitials in 12 minutes, matching the 4 measured, but a median gap of 162 s against the measured 141 to 146 s. Running the same <code>persona</code> command again on November 1 gave 4.09 and 162 s.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/interstitial-frequency-timeline-2-en.webp" width="1200" height="708" alt="Bar chart: full-screen ads per 10 minutes before the change, 3.3 in puzzle mode, 3.85 in the return run, 2.5 in the mixed run and 1.4 in classic mode." loading="lazy"><figcaption>A classic run lasts about five minutes, so the every-two-runs gate held classic players to less than half the puzzle rate.</figcaption></figure>
+    </section>
+    <section aria-labelledby="decisions">
+      <h2 id="decisions">Tutorials excluded, classic counted twice, a 6-run gate dropped</h2>
+      <p>Commit e430133, on the evening of October 4, carries the operator's three frequency decisions (the fourth item in that list is the banner slot rule below). Its message files them as "user decisions, from device measurements". The store listing's ad notice was changed in the same commit to say there is no banner and no between-run ad on the tutorials and the first three runs.</p>
+      <ul>
+        <li>Tutorials no longer count toward the banner or the interstitial. In puzzle mode a new player sees neither before three real runs.</li>
+        <li>A classic game over counts as two runs toward the interstitial: the code adds two wins. So in classic the interstitial can come from the second game over for a new player, then after every game over, while the banner still waits for three runs. The 120 s gap and the session and daily caps stay, and the ad plan estimated that classic players would go from 1.4 to about 2 per 10 minutes.</li>
+        <li>No app open ad when the player returns in the middle of a run (a classic move made, or a puzzle piece placed and the puzzle not yet over).</li>
+      </ul>
+      <pre><code>fun onRunEnded(tutorial: Boolean = false, classic: Boolean = false) {
+    if (tutorial) return
+    runsEnded++
+    prefs.edit().putInt(K_RUNS, runsEnded).apply()
+    if (!enabled) return
+    ads.onWin()
+    if (classic) ads.onWin()
+}</code></pre>
+      <p>Raising the first-interstitial threshold from 3 runs to 6 would have been a one-constant change. The ad plan advised against it: once players who skip tutorials or abandon runs are in the mix, a raw count gives a grace of uneven length, so it recommended excluding tutorial solves instead. An interstitial after every run was ruled out because the 120 s gap already set the pace; only classic, with its long runs, moved to every game over. Removing the interstitial on the classic result screen's Home button was considered; the ad plan recommended keeping it, treating the break after a score screen as an allowed placement, and the code was left as is. The genre habit of an ad after every game over, as in Block Blast, was one input to the classic change.</p>
+      <p>When you set numbers meant to protect new players, leave tutorial levels out of the ad counters. Then check on a freshly installed device, from the log, at which second and after which run the first ad actually appears.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20We%20set%20interstitial%20frequency%20from%20device%20timelines%2C%20and%20tutorials%20don%27t%20count">Email us</a></p></aside>
+    <section aria-labelledby="banner">
+      <h2 id="banner">The banner slot rule changed five times, between an empty strip and a shifting layout</h2>
+      <p>From October 3 to 5, each change fixed what the previous rule left behind, and the first one (2a4b820) was made in the shared module before Block Turn existed.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Time (KST)</th><th>Commit</th><th>Banner slot rule</th><th>What it left</th></tr></thead>
+        <tbody>
+          <tr><td>Oct 3 16:38</td><td>2a4b820</td><td>No space until ads may be requested (consent pending or refused)</td><td>Empty strip on an offline device with consent already stored</td></tr>
+          <tr><td>Oct 4 02:05</td><td>df52a51</td><td>Zero height until the first ad actually arrives</td><td>A late fill pushed the board down (S21 classic, y 416 to 620)</td></tr>
+          <tr><td>Oct 4 17:14</td><td>575aaa1</td><td>Slot reserved up front</td><td>Offline empty strip (listed as a drawback in the ad plan)</td></tr>
+          <tr><td>Oct 4 19:07</td><td>e430133</td><td>Reserved only after a banner has filled in this process</td><td>The first fill in each process pushed the HUD down and put the banner where the home chip was</td></tr>
+          <tr><td>Oct 5 12:52</td><td>85e3685</td><td>Reserved from the first frame on every screen; collapses only on a failed load</td><td>Offline, an empty strip shows briefly, then folds</td></tr>
+        </tbody>
+      </table></div>
+      <p>The last change (85e3685) lets the layout move only away from the ad: when the banner collapses, content moves up, and the ad never slides down onto the home and undo chips a finger is reaching for. The same commit stops reserving the slot and requesting ads after a failed load for 1, 2, 4 and up to 10 minutes, so the empty strip shows up less often.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">Block Turn launched without Firebase, so D1 and D7 went unmeasured at launch</h2>
+      <p>A device timeline shows when ads appear and how often, not whether players stay. Analytics arrived only on October 11, in the vc4 commit ae9cd16, and there is still no remote config as of November 1. GA4 has tracked D1 since, but no one has compared it across the rule change yet. The ad plan gives PRD compliance and first impressions as the reasons for excluding tutorials, noting there is no number for how much retention would improve.</p>
+      <p>An app with remote config, analytics and enough players has a better basis: a 50/50 A/B test that changes frequency alone. Our PRD (§11.3) planned a 5% holdback of new players with no interstitials, but the ad plan dropped it because telling a 12% D7 from a 10% D7 at a 1:19 split would take about 42,000 installs; it plans a 50/50 single-variable A/B once there is scale. Without remote config, every frequency change in Block Turn needs an app update and a store review.</p>
+      <p>Each persona ran once, at a pace drawn from fixed ranges. That is not the spread of real player speeds, and the same rules already gave first ads at 91 s and 181 s. The builds used test ads, so fill rates may differ from live ads. The code shows an interstitial only when one is preloaded, so live counts can match these numbers or fall below them. What real players did in the first chapter is in <a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: the walls in chapter 1</a>.</p>
+    </section>
+    <section aria-labelledby="howto">
+      <h2 id="howto">After pm clear, 12 to 15 minutes of logs, with S11 before S10</h2>
+      <ol>
+        <li>Build with test ad IDs only. For a release build, keep minification on and keep only the ad and run-end log lines. Count the test and real IDs in the dex as in <a href="https://sugarmount21.com/en/ax/release-ad-id-grep/">Why R8 kept 5 AdMob test IDs in a release AAB</a>. Never drive a real-ID build with automated taps; those are invalid clicks.</li>
+        <li>Have the app log one line each time it shows a full-screen ad (something like <code>ads: show interstitial</code>) and one line each time a run ends.</li>
+        <li>Clear the app data for a fresh-install state, clear the log, and note the start time from the device clock.</li>
+        <li>Play 12 to 15 minutes at human speed. Our session script spent 20 to 60 s thinking per puzzle, took 1.5 to 3.5 s per classic move, watched each interstitial for 5 to 8 s and accepted half of the revive offers. Run each mode separately.</li>
+        <li>Read off the first full-screen ad, the gaps between interstitials, and the full-screen ads per 10 minutes (count / minutes x 10).</li>
+        <li>Check the mid-run return rule by order. Make one move, go home, wait 250 s (longer than the 4-minute threshold) and come back: no app open ad (S11). Then make the same return from the home screen: one should appear (S10). Run S11 first: the day's app open cap (2 a day) is still unused then, which leaves the mid-run rule as the only reason no ad appeared.</li>
+        <li>After changing a rule, rerun the same persona and compare.</li>
+      </ol>
+      <pre><code>adb shell pm clear &lt;package&gt;
+adb logcat -c
+adb shell date +%s.%N        # start time, device clock
+adb logcat -v epoch -s ads:D GAME:D &gt; session.log
+# python timeline.py session.log &lt;start time&gt; &lt;minutes played&gt;
+import re, sys
+log, t0, minutes = sys.argv[1], float(sys.argv[2]), float(sys.argv[3])
+rx = re.compile(r"\s*([\d.]+)\s+\d+\s+\d+\s+\w\s+ads\s*:\s+show (\w+)")
+shows = [(round(float(m[1]) - t0), m[2]) for m in map(rx.match, open(log, errors="ignore")) if m]
+inter = [t for t, kind in shows if kind.lower() == "interstitial"]
+print("first", shows[:1], "gaps", [b - a for a, b in zip(inter, inter[1:])],
+      "per10min", round(len(shows) / (minutes / 10), 2))</code></pre>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">The S21 and classic numbers after the change are still missing</h2>
+      <p>As of November 1, the repository has no device re-measurement of the S21's first interstitial after tutorials stopped counting, and none of the classic rate after a game over started counting twice. The 314 s figure exists only in the commit message; its raw log was not kept in the repository, and neither the persona nor the build it used is recorded. The commit comment says there is no between-run ad in the first three runs, but in the code a classic-only player becomes eligible after the second game over. On November 1 the operator kept the code and decided to drop that sentence from the store notice. Checking the first interstitial by hand on a real-ID build is still listed for the operator in the launch rehearsal document.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20We%20set%20interstitial%20frequency%20from%20device%20timelines%2C%20and%20tutorials%20don%27t%20count">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">Frequently asked questions</h2>
+      <div class="faq">
+        <details><summary>When should a puzzle game show its first interstitial?</summary><div><p>In Block Turn's puzzle mode, with tutorials excluded, the first interstitial can come after three real runs once 90 s of the session have passed; in classic, where a game over counts twice, after the second game over. On the emulator on October 4, 2026, it came at 314 s, per the commit message.</p></div></details>
+        <details><summary>Does the ad gap or "every N levels" decide how often interstitials show?</summary><div><p>Run length decides. If two runs take longer than the 120 s gap, the every-2-runs gate sets the pace; otherwise the gap does. In the puzzle mode, where a run takes about a minute, the 120 s gap set the pace; in classic, where a run takes about five minutes, the every-2-runs gate did, so Block Turn now counts a classic game over twice.</p></div></details>
+        <details><summary>How do I avoid an empty banner space when the device is offline?</summary><div><p>Collapse the slot in the failed-load callback, then hold off on both the slot and the request for a while. Block Turn waits 1 minute, doubling up to 10 minutes. We dropped the zero-height-until-filled approach because a late fill pushed the board down.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Mon, 02 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Subagent prompt rules and five cut-off agents – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/subagent-brief-rules/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/subagent-brief-rules/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/subagent-brief-rules-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX note · How-to</span>
+      <h1>Six hard rules in one subagent brief, and five agents cut off by usage limits</h1>
+      <p class="lead">In the four cases we can check, the report each cut-off subagent had been told to create first was still empty. The next agent picked up the work from the logs, screenshots and edited files left on disk.</p>
+      <p>Five subagents working on the store release of our Flutter P2P chat app stopped before finishing. It happened between September 7 and 10, 2026: three hit the session limit, one hit the weekly usage limit, and one stopped for a reason nobody wrote down. Rule 6 of the shared brief said to create the report early and update it as the work went on. In all four cases where a committed copy of the report exists, every body section was still empty apart from the after-fix test's environment section. The agents that took over read git diffs, logcat files and screenshots instead, and the one task with no files on record, a full inventory of UI strings, was measured again from scratch.</p>
+      <p class="note">Sources: the app repository's git history (e450c09, d464dc4, 7f52466, 9f03e7a, dca6cf9, af912bf, e9d882f, 67edc8d, 8dacf19), the shared brief and the three briefs that followed it, 17 analysis reports and 42 fix reports. Times are commit times in KST, except the start and end of handover work, which come from the reports. Report line counts and finding counts were recounted from git on November 1, 2026.</p>
+    </section>
+    <section aria-labelledby="five-stops">
+      <h2 id="five-stops">Five agents stopped between September 7 and 10</h2>
+      <p>The analysis round landed at 23:10 on September 7 as commit e450c09: one shared brief of 33 lines and 17 analysis reports. Report 14, the emulator lab, was a 19-line skeleton. Its header said it was in progress with partial results, and every section read "(in progress)". Forty-seven minutes later, in d464dc4, the same file had 71 lines and a new header: the first agent had left device scripts and two install screenshots and stopped, and a second agent had carried on from there.</p>
+      <p>At 09:08 on September 8, commit dca6cf9 went in with the message "agent interrupted by session limit; to be continued". The agent consolidating the docs had stopped at the session limit with a 19-line skeleton report. The four docs it had already edited (the project's CLAUDE.md, the release plan, the security notes and the threat model) went into that commit as partial work. The same commit carried the result folders of the lab agent that, by its report, had started the after-fix end-to-end test at 00:24 that day. It had also hit the session limit, and its report had the environment table filled in and sections 2 to 8 marked "(in progress)".</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/subagent-brief-rules-1-en.webp" width="1200" height="1038" alt="Step diagram: on Sep 7 the emulator lab report is a 19-line skeleton, on Sep 8 the after-fix E2E started at 00:24 and the docs consolidation agent stop at the session limit, on Sep 9 the device recheck stops at the weekly limit, and on Sep 10 the string inventory leaves an 8-line skeleton and 2,864 literals are measured again." loading="lazy"><figcaption>In every case where a committed copy of the report exists, the body was empty apart from one environment section.</figcaption></figure>
+      <p>On September 9 the device recheck (H1) stopped at the weekly limit, and the orchestrator finished it by reading the raw evidence itself. On September 10 the string inventory (X1) was committed at 01:45 as an 8-line skeleton and came back at 04:34 with 1,046 lines. Its new header said the previous agent had stopped at the session limit without leaving any measurements, so everything had been measured again.</p>
+    </section>
+    <section aria-labelledby="brief">
+      <h2 id="brief">The 33-line brief lists no per-agent tasks</h2>
+      <p>The brief has four parts: a one-line goal, verified facts about the environment, six hard rules, and a report format. Each agent's topic came separately; those prompts are not in the repository. The environment part names the Flutter version and which binary to run, the two Android emulators, and "no physical device, no Xcode or macOS". The six rules, paraphrased:</p>
+      <ol>
+        <li>Install no system packages and add no new packages. If one is needed, write "approval needed" in the report.</li>
+        <li>Upload nothing anywhere. Outputs stay as files in the repository.</li>
+        <li>During analysis, do not edit code under <code>lib/</code>, <code>android/</code> or <code>ios/</code>. Write scripts and documents only.</li>
+        <li>No blanket sed replacements. Move files to a scratch folder instead of <code>rm -rf</code>.</li>
+        <li>When checking an outside policy, give the URL and the date you checked it. Mark guesses as guesses.</li>
+        <li>Write the report in Korean, at the assigned path, create it early and update it as you go, "so that partial results survive if the session is cut off".</li>
+      </ol>
+      <p>The report format has five sections: summary, what was checked, findings, fixes that can be applied now, and remaining unknowns. The findings table has six columns: ID, severity (Blocker, High, Medium or Low), description, evidence (file:line or URL), proposed fix, and how to verify it. IDs carry a prefix per topic, such as AND-, IOS-, SEC- or LAB-.</p>
+      <p>The prohibitions were used. At e450c09, 13 analysis reports contain "approval needed". The store readiness analysis listed an icon generator package as "approval needed (rule 1)", and the iOS project analysis noted that using it would mean adding a dev dependency that needs approval. The fix stage skipped the package and generated the icons with a script on the Python imaging library that was already installed. The release workflows were written but not run. The brief left running them to the main session, and the first successful iOS compile run is recorded in commit 9f03e7a at 00:27 the next day. Eight UI findings were left as 11 deliberately failing tests rather than code changes. Keeping the prohibitions in one file the agent reads every time is the same idea as <a href="https://sugarmount21.com/en/ax/agent-permission-table/">A permission table for a scheduled AI agent</a>.</p>
+      <p>The format held too. All 17 reports have the six-column table and the unknowns section, and the 16 that had a body listed 233 findings, 15 of them Blockers. The fix reports took their work by those IDs; the iOS platform fix report alone cites 38 of them. The severity scale did not hold. The iOS project analysis used Info, which the brief never defined, four times, and the dependency and lab analyses invented "Low (confirmed false positive)" and "Low~Medium".</p>
+    </section>
+    <section aria-labelledby="empty-report">
+      <h2 id="empty-report">Rule 6 left empty report bodies</h2>
+      <p>The brief assumed that a report created early would hold partial results if the agent was cut off. In the four cases where a committed copy exists (the lab analysis, the after-fix test, the docs consolidation and the string inventory), every body section read "(in progress)", except the environment section of the after-fix test.</p>
+      <p>The after-fix test report came closest to the rule. Its header told readers that blank cells meant "not measured" if the session ended. When the session did end, every result table was blank. The raw and screens folders in the same commit held two logcat files (103,813 and 89,023 lines), the signalling server log, 43 screenshots and the raw timings of 11 messages. The template script, anchored on the wrong log line, paired only one of them and reported n=1, 11 ms.</p>
+      <p>Rule 6 asked agents to create the report and to update it, but never said how often, and the findings were never written to a file. As far as the record shows, they lived only in the agent's conversation context. None of the agents cut off in this round got to tidy up its report before it stopped. What was left on disk were the files that running commands and editing docs had produced along the way.</p>
+    </section>
+    <section aria-labelledby="handover">
+      <h2 id="handover">The next agent read git diff and the raw folder</h2>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/subagent-brief-rules-2-en.webp" width="1200" height="574" alt="Comparison: in the commits, the reports held a 19-line skeleton, an environment section, another 19-line skeleton and an 8-line skeleton; on disk there were device scripts and 2 screenshots, 2 logcat files and 43 screenshots, 4 edited docs, and nothing at all for the string inventory." loading="lazy"><figcaption>The report bodies were empty; apart from the string inventory, every handover started from the files the work itself had produced.</figcaption></figure>
+      <p>Four of the five handovers continued on files the earlier session had left; the second lab analysis agent, too, started from the first one's device scripts and two install screenshots. The docs agent stopped with its edits uncommitted, because the fix-stage brief let only the main session commit. The main session committed that state as dca6cf9. The finished report, in af912bf at 00:06 on September 9, shows the next agent starting with <code>git diff 7f52466..dca6cf9</code> to see what had been done. CLAUDE.md had every requested change, the security notes had 7 of 8, and nine other docs plus the store drafts were untouched. The new agent left the finished parts alone and completed 19 files.</p>
+      <p>The after-fix test was picked up by another lab agent at 23:15 on September 8, by its report, and finished 50 minutes later. It kept the raw files for build, install, connection and messaging, and ran only the remaining tests (lifecycle, blocking, data reset and so on). It did not measure the round trip again; it recalculated it from the burst of 10 messages the earlier session had already sent, using the correct log anchor (p50 61 ms, p95 74 ms). The report grew from 41 lines to 338. The device recheck had stopped after its evidence was essentially collected, so 85 screenshots and 8 kinds of logs on disk were enough for the orchestrator to write the verdict.</p>
+      <p>The string inventory was reading and judging, and the record shows no files left behind. Starting from the 8-line skeleton, the next agent parsed all 2,864 string literals in 93 files under <code>lib/</code> again and judged the 464 that can appear on screen. The brief for that round still carried the update-as-you-go rule. The contrast checker recount from the same commit, 8dacf19, is in <a href="https://sugarmount21.com/en/ax/contrast-checker-missed-40-percent/">Our contrast checker skipped 40% of the text</a>.</p>
+      <p>Put the path and timing for raw evidence in a subagent brief before you ask for a report.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Six%20hard%20rules%20in%20one%20subagent%20brief%2C%20and%20five%20agents%20cut%20off%20by%20usage%20limits">Email us</a></p></aside>
+    <section aria-labelledby="ai-wrong">
+      <h2 id="ai-wrong">The verify column corrected a backup prediction</h2>
+      <p>The platform security analysis read the code and predicted that an app restored from Android auto backup would lose its Keystore key and become permanently unusable (SEC-2). The lab agent did what the row's verify column said: backed up, uninstalled, reinstalled and restored with <code>bmgr</code>. The app did not get stuck. After a key unwrap error it went back to the setup screen and created a new profile, and the old keys and chat history disappeared without a word (LAB-7). The proposed fix, turning backup off (allowBackup=false), was still needed after the test.</p>
+      <p>The fix-stage brief said to verify each proposed diff before applying it. The UI fix agent reported that three of diffs A to H were wrong or incomplete and applied corrected versions: what <code>Theme.of</code> returns inside a bottom sheet, how button labels shrink, and the fact that <code>useSafeArea: true</code> does not handle the bottom inset. The instructions were wrong once too. The port assignment in the after-fix test instructions did not match the direction of the <code>adb forward</code> chain, so each app would have dialled itself; the agent swapped them and noted the swap in its environment table.</p>
+    </section>
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">Letting subagents commit, or always starting over</h2>
+      <p>One way to protect against interruptions is to let each subagent commit its own work. This round ruled that out. Several agents were editing files in the same working tree at once, and a single <code>git stash</code>, or a <code>git checkout</code> that restores files, could wipe someone else's changes. The cost was that interrupted work sat uncommitted until the main session committed it. How sessions collided in one working tree is covered in <a href="https://sugarmount21.com/en/ax/file-owner-table/">Claude Code sessions in one repo: file owner table</a>.</p>
+      <p>The taking-over agent can also always start from scratch. With files left, the device recheck only needed a new verdict from 85 screenshots and 8 kinds of logs, and the after-fix test was finished in 50 minutes by its report. With nothing left, the string inventory re-parsed all 2,864 literals. Writing the report once at the end is what rule 6 was meant to prevent, and for X1 the outcome was the same as if it had.</p>
+      <p>We found no sign in the record that separate briefs per agent were considered. In practice the three later briefs (fixes, fixes for review findings, and the full inventory) each point back to the shared brief ("applies unchanged", "follow") and add what changed at that stage. Besides rules such as "edit only the files you own", "do not commit" and "write tests that fail when the guard is removed", the review-fix brief added an identity-binding API contract and the inventory brief added a table of expected outputs.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">Read-only tasks and severity values outside the scale</h2>
+      <p>Handing over from files on disk only worked where the work produced files anyway. A task that only reads code and judges it, like the string inventory or a code review, leaves nothing behind.</p>
+      <p>This round's brief listed the four allowed severity values and defined each, and Info and Low~Medium still appeared. If a tool will count or sort by severity, do not stop at listing the values; check the reports when they arrive.</p>
+      <p>The environment section is machine-specific. This round had no physical device and no Mac, so running on iOS and on real hardware all went to the unknowns. You can reuse the brief's structure, but check that section again on your own machine. We cannot say how many defects these rules prevented, because there is no comparable round without them.</p>
+    </section>
+    <section aria-labelledby="template">
+      <h2 id="template">A brief template and the commands for a handover</h2>
+      <p>This template merges the rules of the shared brief and the fix-stage brief, and adds a path for raw output and a unit of update.</p>
+      <pre><code># &lt;round&gt; shared brief (&lt;date&gt;)
+Goal: &lt;one line&gt;
+## Environment (verified only)
+- Tool paths and versions: &lt;...&gt;
+- Devices available: &lt;...&gt; / not available: &lt;...&gt;
+## Do not
+1. Install or add packages. If one is needed, write "approval needed"
+2. Upload anything. Outputs are files in the repository only
+3. Edit files you do not own. Put requests in "requests to other owners"
+4. commit, stash or checkout (the main session commits)
+5. Guess without saying so. Outside docs get a URL and a check date
+## Output paths
+- Report: &lt;dir&gt;/&lt;NN&gt;_&lt;topic&gt;.md
+  Create it first; the first line is exactly "Status: in progress"
+- Raw: &lt;dir&gt;/raw/&lt;NN&gt;_*
+  Save command output, logs and screenshots as soon as you get them
+- Add a table row each time one finding or one measurement is done
+## Report format
+Summary / What was checked / Findings / Remaining unknowns
+| ID | Severity | Description | Evidence (file:line / URL) | Proposed fix | How to verify |
+Severity is exactly one of Blocker, High, Medium, Low</code></pre>
+      <p>When taking over, read git and the raw folder before the report.</p>
+      <ol>
+        <li>Find unfinished reports by the status line or by the placeholder line that opens an empty section. In this round each report wrote its status differently, so the search found the placeholder lines, which used the Korean words for "writing" and "in progress". At dca6cf9, over the two folders (analysis and fix reports, device tests), this finds three: the docs consolidation, review and after-fix test reports.<pre><code>git grep -lE "^(Status: in progress|\((&lt;writing&gt;|&lt;in progress&gt;))" &lt;commit&gt; -- &lt;report dirs&gt;</code></pre></li>
+        <li>See what the previous session changed.<pre><code>git diff --stat &lt;start commit&gt;..&lt;partial commit&gt; -- &lt;owned files&gt;</code></pre></li>
+        <li>List the raw folder. If a measurement has a suspiciously small n, check the calculation script before measuring again.</li>
+        <li>Set the report's status to done and add one line on who took over what.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Per-judgment rows are not measured yet</h2>
+      <p>We have not measured how many rows survive an interruption when a read-only task like the string inventory writes one row per judgment.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Six%20hard%20rules%20in%20one%20subagent%20brief%2C%20and%20five%20agents%20cut%20off%20by%20usage%20limits">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Does a subagent's work survive when it hits a session limit?</summary><div><p>On this app, only the files it had already written to disk survived. Of the five agents cut off, all four with a committed report had empty bodies apart from one environment section; four of the five handovers ran on logs, screenshots and edited files, and the fifth had nothing and started over.</p></div></details>
+        <details><summary>What should a subagent prompt state first?</summary><div><p>What not to do, where outputs go, and the report format. The shared brief here spent its 33 lines on those three and on environment facts, and each agent's topic was given separately.</p></div></details>
+        <details><summary>Does letting subagents commit solve the interruption problem?</summary><div><p>We did not try it. Several agents edited the same working tree at once, so only the main session committed; when an agent was cut off, the main session committed its partial work and said so in the commit message.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Mon, 02 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>HWP compatibility test: Save As in Hancom Docs – SugarMount</title>
     <link>https://sugarmount21.com/en/ax/hwp-hancom-resave-check/</link>
@@ -125,8 +483,8 @@ def diff(a_png, b_png, top=300, bottom=330):
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -259,8 +617,8 @@ def diff(a_png, b_png, top=300, bottom=330):
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
         <li><a href="https://sugarmount21.com/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -377,12 +735,12 @@ expect(all.sort()).toEqual(files.sort());</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -670,8 +1028,8 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
         <li><a href="https://sugarmount21.com/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -757,8 +1115,8 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
         <li><a href="https://sugarmount21.com/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -851,8 +1209,8 @@ git grep -nE "addOn(Complete|Success|Failure|Canceled)Listener\((this|requireAct
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -968,9 +1326,9 @@ depth(board):                   # peel
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1103,9 +1461,9 @@ depth(board):                   # peel
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1222,8 +1580,8 @@ if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1325,12 +1683,12 @@ git diff --name-only $(git merge-base &lt;base&gt; &lt;branch&gt;) &lt;branch&gt
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1421,8 +1779,8 @@ unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$TEST_PUB[~/][0-9]*" | sort -u | wc
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1554,12 +1912,12 @@ lifecycleScope.launch {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1673,8 +2031,8 @@ lifecycleScope.launch {
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1776,9 +2134,9 @@ three_star = cleared and time &lt;= par(base, scale, floor) and mistakes &lt;= a
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1890,12 +2248,12 @@ print(pages.most_common(), "FAQ questions:", questions)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
         <li><a href="https://sugarmount21.com/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2008,12 +2366,12 @@ NOT_TEST = {"notExpression": {"orGroup": {"expressions": [
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2118,8 +2476,8 @@ export function cacheKey(api, group, original, corrected, model) {
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2245,12 +2603,12 @@ const gaps = await agent(CTX + CHECKLIST + final + dossier, { schema: CRIT })</c
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2365,8 +2723,8 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(":core
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2485,12 +2843,12 @@ git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --gre
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/agent-permission-table/">Running an AI marketer on a schedule four times a day: the permission table that leaves money, accounts and policy to a person</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2630,8 +2988,8 @@ adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2762,9 +3120,9 @@ print("my app in results:", MY_APP in ids)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2887,12 +3245,12 @@ out of date:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
         <li><a href="https://sugarmount21.com/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3010,8 +3368,8 @@ grep -rL --include='*Test.kt' -e 'assert' -e 'check(matches' app/src/</code></pr
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-edit-save-gate/">We built an edit feature and shipped it switched off: the HWP save gate that caught a form-field bug</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3151,9 +3509,9 @@ git log --until=2026-10-20 --format='%(trailers:key=Co-authored-by,valueonly)' \
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3259,8 +3617,8 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3425,9 +3783,9 @@ after_hint = win(board after the correct first move, 2 pieces left, lines it cle
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3541,12 +3899,12 @@ Schedule expires: YYYY-MM-DD / register again on: YYYY-MM-DD
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3683,12 +4041,12 @@ curl -s "$POLICY_URL" | grep -o 'data-policy-version="[0-9-]*"'</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3837,8 +4195,8 @@ font.save(dst)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3926,12 +4284,12 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4020,8 +4378,8 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4141,8 +4499,8 @@ flutter test test/theme_matrix/ --dart-define=Y2_NO_SETTLE=true
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4265,8 +4623,8 @@ FlowRow(
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4345,12 +4703,12 @@ Mem:              13           8           2           0           2           4
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4474,12 +4832,12 @@ if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFract
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4603,8 +4961,8 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4706,8 +5064,8 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4768,12 +5126,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5165,9 +5523,9 @@ room  = is there space for a 3×3 square, a 1×4 bar, a 4×1 bar (0–3)</code><
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5277,8 +5635,8 @@ done</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5388,8 +5746,8 @@ done</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6403,344 +6761,6 @@ done</code></pre>
       <h2 id="contact-heading">Contact</h2>
       <p>If something isn't working or you have a question, send us an email.</p>
       <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
-    </section>]]></description>
-    <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Korean Christmas greeting card messages – SugarMount</title>
-    <link>https://sugarmount21.com/en/apps/sugarcard/christmas-greetings/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/apps/sugarcard/christmas-greetings/</guid>
-    <description><![CDATA[<section class="hero">
-      <span class="eyebrow">Help · Android</span>
-      <h1>Korean Christmas greeting card messages</h1>
-      <p class="lead">A Korean Christmas greeting only needs one or two sentences that fit the person. You can send the words on their own, or use SugarCard to put them on a card and send it as an image or a snowfall video.</p>
-      <p class="note">This guide is based on SugarCard 1.0.002, an Android app made by SugarMount. The app is in Korean. The example messages below were written for this page; the app has no built-in messages, so you type your own.</p>
-    </section>
-    <section aria-labelledby="messages">
-      <h2 id="messages">Example messages by recipient</h2>
-      <p>Each line is Korean first, then what it means. Adding a name or one thing from this year makes it feel less formal. If the message goes on a card, two short lines read best.</p>
-      <h3>Parents and family</h3>
-      <ul>
-        <li lang="ko">올 한 해도 늘 먼저 챙겨 주셔서 고마워요. 따뜻한 성탄절 보내세요.</li>
-        <li>Thank you for always looking after us this year. Have a warm Christmas.</li>
-        <li lang="ko">가족 모두 건강하게 한 해를 마무리할 수 있어서 감사한 성탄이에요.</li>
-        <li>I'm grateful we're all ending the year in good health. Merry Christmas.</li>
-      </ul>
-      <h3>Friends</h3>
-      <ul>
-        <li lang="ko">올해도 내 편 해 줘서 고마워. 즐거운 크리스마스 보내!</li>
-        <li>Thanks for being on my side again this year. Have a fun Christmas! (casual)</li>
-        <li lang="ko">바빠서 자주 못 봤지만 늘 생각했어. 연말에 꼭 얼굴 보자.</li>
-        <li>We were too busy to meet, but I thought of you. Let's catch up before the year ends. (casual)</li>
-      </ul>
-      <h3>Colleagues and clients</h3>
-      <ul>
-        <li lang="ko">한 해 동안 함께 일해 주셔서 감사합니다. 평안한 성탄절 보내시기 바랍니다.</li>
-        <li>Thank you for working with us this year. Wishing you a peaceful Christmas. (formal)</li>
-        <li lang="ko">성탄의 기쁨이 가정에 가득하시길 바랍니다. 내년에도 잘 부탁드립니다.</li>
-        <li>May your home be full of Christmas joy. We look forward to next year. (formal)</li>
-      </ul>
-      <h3>Teachers and elders</h3>
-      <ul>
-        <li lang="ko">선생님 덕분에 올 한 해 많이 배웠습니다. 행복한 성탄절 보내세요.</li>
-        <li>I learned a lot this year thanks to you. Have a happy Christmas. (polite)</li>
-      </ul>
-      <h3>Partner, or one short line</h3>
-      <ul>
-        <li lang="ko">올해 가장 좋은 선물은 너였어. 메리 크리스마스.</li>
-        <li>You were the best gift this year. Merry Christmas.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="without-app">
-      <h2 id="without-app">Without an app, and the limits</h2>
-      <ul>
-        <li><strong>Text only</strong> — Edit an example above and send it. Fastest, but with no picture it blends into everyday chat.</li>
-        <li><strong>A gallery photo plus text</strong> — Send your own photo and the message. They arrive as two separate messages, and the words are not on the picture.</li>
-        <li><strong>A card image found online</strong> — Plenty to choose from, but someone may hold the rights, and you need an editing app to put text on it.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="app-steps">
-      <h2 id="app-steps">Send a Christmas card with SugarCard</h2>
-      <ol class="steps">
-        <li><strong>Pick Christmas</strong> — Tap the title at the top (for example 생생카드: 설날 ›) and choose 크리스마스 (Christmas). In November and December the app opens on Christmas.</li>
-        <li><strong>Pick a style</strong> — Tap one of 골드 (gold), 캐릭 (characters), 심플 (simple) or 전통 (classic), then swipe to choose a card. 전체 (all) shows all 29 Christmas cards in a two-column grid.</li>
-        <li><strong>Type the message</strong> — Type in the box at the bottom and the text appears on the card right away in a handwriting-style font. Text colour and position are set per card.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugarcard/christmas-greetings-1-en.webp" width="360" height="678" loading="lazy" alt="A Christmas card in the character style shows a snowman, Santa and a reindeer, and the typed message 메리 크리스마스! appears in red in the box at the bottom of the card."><figcaption class="muted">SugarCard 1.0.001 in Korean (captured February 2026). The ad banner and keyboard are cropped out.</figcaption></figure></li>
-        <li><strong>Tap send, then pick a format</strong> — The send button next to the box asks you to choose 눈 내리는 영상 (snowfall video) or 이미지로 공유 (share as image). The video is made on the phone, with a progress bar.</li>
-        <li><strong>Pick the app</strong> — Your phone's share screen opens. Choose KakaoTalk, Messages or another app.</li>
-      </ol>
-      <p>That last screen is Android's own share screen. The Android developer documentation describes it like this:</p>
-      <blockquote cite="https://developer.android.com/training/sharing/send"><p>"The Android Sharesheet is primarily designed for sending content outside your app or directly to another user."</p></blockquote>
-      <p class="muted">So the list of apps you can send to depends on what is installed on your phone. Source: <a href="https://developer.android.com/training/sharing/send" rel="noopener">Android Developers, Send data to other apps</a></p>
-    </section>
-    <section aria-labelledby="sets">
-      <h2 id="sets">Christmas card styles and the video</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Style</th><th scope="col">Cards</th></tr></thead>
-          <tbody>
-            <tr><th scope="row">Gold (골드)</th><td>9</td></tr>
-            <tr><th scope="row">Characters (캐릭)</th><td>9</td></tr>
-            <tr><th scope="row">Simple (심플)</th><td>5</td></tr>
-            <tr><th scope="row">Classic (전통)</th><td>6</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>The <strong>snowfall video</strong> is a 9-second MP4 (1024×1536, 30 frames per second) with snow falling over your finished card. One of 7 Christmas tunes bundled with the app is picked at random. The video option is only for Christmas cards; Lunar New Year and Chuseok cards are sent as images.</p>
-    </section>
-    <section aria-labelledby="compare">
-      <h2 id="compare">Comparison</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Method</th><th scope="col">Picture</th><th scope="col">Text on the picture</th><th scope="col">Motion and music</th><th scope="col">Best for</th></tr></thead>
-          <tbody>
-            <tr><th scope="row">Text only</th><td>None</td><td>Not applicable</td><td>None</td><td>Quick greetings to many people</td></tr>
-            <tr><th scope="row">Gallery photo + text</th><td>Your photo</td><td>No (sent separately)</td><td>None</td><td>Family and close friends, with news</td></tr>
-            <tr><th scope="row">SugarCard image</th><td>1 of 29 Christmas cards</td><td>Yes</td><td>None</td><td>A clean one-card greeting</td></tr>
-            <tr><th scope="row">SugarCard snowfall video</th><td>Same</td><td>Yes</td><td>Snow and music, 9 s</td><td>Parents or a partner, when you want a little more</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p><strong>Verdict:</strong> For group or work greetings, text alone is the safe choice. For one person, a SugarCard image feels like a real card, and the snowfall video adds a moment when they open it. Cards made with SugarCard carry the app name, so for formal contacts send text only.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">What it can't do</h2>
-      <ul>
-        <li><strong>The app name is stamped on.</strong> Images and videos get a small "SugarCard" and "생생카드: 인사말 카드" mark in the top-right corner. The current version has no way to turn it off.</li>
-        <li><strong>Promo text goes along.</strong> Sharing also passes a short Korean note saying the card was made with SugarCard, a Google Play link and hashtags. Some apps put this into the message, so check before you send and delete it if you don't want it.</li>
-        <li><strong>No font, size, colour or position changes.</strong> Each card has a fixed text spot and size, so one or two short lines fit better than a long message.</li>
-        <li><strong>No cards from your own photos.</strong> Only the card pictures bundled with the app.</li>
-        <li><strong>No choice of video music.</strong> One of 7 tunes is picked at random; make the video again to get a different one.</li>
-        <li><strong>The box clears after sharing.</strong> Your message is kept in the history (clock button, top right).</li>
-        <li><strong>No birthday or wedding cards.</strong> The occasions are Lunar New Year, Chuseok and Christmas.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Is SugarCard free?</summary><div><p>Yes. You can make and send cards without paying. The app shows ads.</p></div></details>
-        <details><summary>Can I remove the app name from the card?</summary><div><p>Not in the current version. It appears small in the top-right corner of both images and videos.</p></div></details>
-        <details><summary>How long is the snowfall video?</summary><div><p>9 seconds, with one Christmas tune, and it is made on your phone.</p></div></details>
-        <details><summary>Is my message uploaded anywhere?</summary><div><p>The card is made on your phone and goes only to the app you pick when sharing. See the <a href="https://sugarmount21.com/en/privacy/sugarcard/">SugarCard privacy policy</a> for details.</p></div></details>
-        <details><summary>Can I write the message in English?</summary><div><p>Yes, the box takes any text you type. The app's menus are in Korean only.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="related">
-      <h2 id="related">Related guides</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/apps/sugarspeller/long-text-check/">Check the spelling of long Korean text on a phone</a></li>
-        <li><a href="https://sugarmount21.com/en/apps/image-compress/photo-under-100kb/">Compress a photo to under 100 KB on Android</a></li>
-        <li><a href="https://sugarmount21.com/en/apps/image-convert/heic-to-jpg/">Convert HEIC to JPG on a Samsung Galaxy phone</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="app">
-      <h2 id="app">Get SugarCard</h2>
-      <p>An Android app that puts your own greeting on Lunar New Year, Chuseok and Christmas cards and sends it to KakaoTalk or text messages. The card pictures are bundled with the app, no account is needed, and the app is in Korean.</p>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugarcard&amp;referrer=utm_source%3Dsugarmount21.com%26utm_medium%3Dhowto%26utm_campaign%3Dsugarcard&amp;hl=en" rel="noopener">Get SugarCard on Google Play</a><a class="button button--outline" href="https://sugarmount21.com/en/apps/sugarcard/">About SugarCard</a></div>
-    </section>]]></description>
-    <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Spell-check long Korean text on Android – SugarMount</title>
-    <link>https://sugarmount21.com/en/apps/sugarspeller/long-text-check/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/apps/sugarspeller/long-text-check/</guid>
-    <description><![CDATA[<section class="hero">
-      <span class="eyebrow">Help · Android</span>
-      <h1>Spell-check long Korean text on Android</h1>
-      <p class="lead">The common Korean web spell checkers take 300 or 1,000 characters at a time. On Android, SugarSpeller checks up to 3,000 free, or 7,000 with a subscription, in one pass.</p>
-      <p class="note">This guide is based on the source of SugarSpeller 1.6.031, an Android app by SugarMount (its home-screen name is Hangul Checker). It is not unlimited: text over 7,000 characters still has to be split.</p>
-    </section>
-    <section aria-labelledby="without-app">
-      <h2 id="without-app">Without an app, and the limits</h2>
-      <p>Most people paste text into a portal's web spell checker. When we checked on October 18, 2026, the checker on Naver's search results showed a <strong>0/300</strong> counter, and Daum's spell checker page showed <strong>0/1000</strong>. Spaces count as characters.</p>
-      <ul>
-        <li><strong>Long text must be split.</strong> A 2,000-character cover letter takes 7 rounds in a 300-character checker and 2 in a 1,000-character one. Cutting mid-paragraph can change how spacing is judged.</li>
-        <li><strong>You stitch the results back together.</strong> Each corrected piece has to be copied back in order by hand.</li>
-        <li><strong>Fine on a PC, tedious on a phone.</strong> Selecting and splitting long text on a small screen is the slow part.</li>
-      </ul>
-      <p>If you check spacing by hand, the basic rule is in the official Korean spelling standard, Chapter 1, Article 2, from the National Institute of Korean Language:</p>
-      <blockquote cite="https://korean.go.kr/kornorms/regltn/regltnView.do?regltn_code=0001&amp;regltn_no=2" lang="ko"><p>"문장의 각 단어는 띄어 씀을 원칙으로 한다."</p></blockquote>
-      <p class="muted">"As a rule, each word in a sentence is written with a space." Source: <a href="https://korean.go.kr/kornorms/regltn/regltnView.do?regltn_code=0001&amp;regltn_no=2" rel="noopener">National Institute of Korean Language, Korean Orthography, Chapter 1, Article 2</a></p>
-    </section>
-    <section aria-labelledby="app-steps">
-      <h2 id="app-steps">Check long text with SugarSpeller</h2>
-      <ol class="steps">
-        <li><strong>Add your text</strong> — Paste it into the input box at the bottom, or pick <strong>Hangul Checker</strong> from another app's <strong>Share</strong> menu. Shared text goes into the input box first; it is not checked until you send it.</li>
-        <li><strong>Watch the count</strong> — While you type, the app shows the count against your limit, like "1234/3000". Anything past the limit does not go into the box, so if the count equals the limit, your text was cut. Check the rest separately.</li>
-        <li><strong>Send</strong> — Tap the send button. The app splits the text into pieces of about 300 characters, at a space, period or line break, checks them, and shows the result as one text again.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugarspeller/long-text-check-1-ko.webp" width="360" height="763" loading="lazy" alt="In the app (Korean screen), a checked sentence shows its corrections underlined in red, with the number of spelling errors and the word, character, sentence and space counts below."></figure></li>
-        <li><strong>Review corrections</strong> — Tap an underlined part to see the original and the correction side by side. Tap <strong>Why is it wrong?</strong> for a short AI explanation.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugarspeller/long-text-check-2-ko.webp" width="360" height="763" loading="lazy" alt="Tapping a correction opens a sheet (Korean screen) showing the original words, the corrected words and a short explanation of the rule."></figure></li>
-        <li><strong>Copy or share</strong> — Use the copy and share buttons under the result to move the corrected text where you need it.</li>
-      </ol>
-      <p class="muted">Screens: Galaxy S21 (real device), SugarSpeller 1.6.025 with the Korean interface, captured October 1, 2026, status bar cropped. The character limits and piece size were checked in the 1.6.031 source. The layout may differ slightly between versions.</p>
-    </section>
-    <section aria-labelledby="limits-table">
-      <h2 id="limits-table">Characters per check, compared</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Method</th><th scope="col">Per check</th><th scope="col">A 2,000-character text</th><th scope="col">Cost</th><th scope="col">Use it when</th></tr></thead>
-          <tbody>
-            <tr><th scope="row">Web checker (search results)</th><td>300</td><td>7 rounds</td><td>Free</td><td>You need a sentence or two checked fast</td></tr>
-            <tr><th scope="row">Web checker (dictionary page)</th><td>1,000</td><td>2 rounds</td><td>Free</td><td>You're on a PC with medium-length text</td></tr>
-            <tr><th scope="row">SugarSpeller Free</th><td>3,000</td><td>One pass</td><td>Free (with ads)</td><td>You want a whole essay answer checked on your phone</td></tr>
-            <tr><th scope="row">SugarSpeller Basic</th><td>4,000</td><td>One pass</td><td>Subscription (banner ads)</td><td>Your texts often run a little over 3,000</td></tr>
-            <tr><th scope="row">SugarSpeller Premium</th><td>7,000</td><td>One pass</td><td>Subscription (no ads)</td><td>You check several answers together</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p><strong>Verdict:</strong> for text up to 3,000 characters on a phone, the free app is enough. For longer text, split it by question for free, or subscribe if you do this often. For one or two sentences, a web checker is fine and needs no install.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">Limits and when it fails</h2>
-      <ul>
-        <li><strong>It is not unlimited.</strong> Free 3,000, Basic 4,000, Premium 7,000 characters. Spaces and line breaks count.</li>
-        <li><strong>It needs the internet.</strong> The app does not judge spelling itself. It sends the text to the Naver or Daum (Kakao) spell checker. Which one is used is set by the app's configuration server; if one fails, the app retries once with the other.</li>
-        <li><strong>Slow checks fail.</strong> If not every piece comes back within 30 seconds, the app stops and asks you to try again.</li>
-        <li><strong>Shared text loses line breaks.</strong> Text received through Share has runs of spaces and line breaks merged into single spaces. If paragraphs matter, paste into the box instead.</li>
-        <li><strong>The text-selection menu is for short text.</strong> Select text in another app and pick <strong>Spell check</strong>: up to 300 characters are checked in a small sheet; longer text is passed to the main screen.</li>
-        <li><strong>It fixes only what the checker catches.</strong> It does not judge whether a sentence reads well or is correct. Read it aloud once before you submit.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="privacy">
-      <h2 id="privacy">Where your text goes</h2>
-      <p>Text you check is sent to the Naver or Daum (Kakao) spell checker. Only when you tap <strong>Why is it wrong?</strong>, the original words, the corrected words and the error type go through SugarMount's server (Google Firebase) to Google Vertex AI. Surrounding sentences are not sent. Keep this in mind for text with personal details, such as a cover letter. See the <a href="https://sugarmount21.com/en/privacy/sugarspeller/">SugarSpeller privacy policy</a> for details.</p>
-      <p>The text-selection menu is a standard Android feature that hands selected text to an app. The Android developer reference describes it as:</p>
-      <blockquote cite="https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT"><p>"Activity Action: Process a piece of text."</p></blockquote>
-      <p class="muted">Source: <a href="https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT" rel="noopener">Android Developers, Intent.ACTION_PROCESS_TEXT</a></p>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Is there a Korean spell checker with no character limit?</summary><div><p>SugarSpeller has limits too: 3,000 characters free, 4,000 with Basic and 7,000 with Premium. Split longer text by paragraph or question.</p></div></details>
-        <details><summary>Do spaces count?</summary><div><p>Yes. The app's count and limit include spaces and line breaks, so it can differ from a "without spaces" count on an application form.</p></div></details>
-        <details><summary>What happens if I paste more than 3,000 characters?</summary><div><p>The part past the limit does not go into the box. If the count reads "3000/3000", your text was cut; paste the rest and check it separately.</p></div></details>
-        <details><summary>Is my checked text saved?</summary><div><p>Originals and corrections are kept in the check history on your phone. Turn off the "Save check history" setting if you don't want new checks saved.</p></div></details>
-        <details><summary>Do I need an account?</summary><div><p>No sign-up is needed. Checking does need an internet connection.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="related">
-      <h2 id="related">Related articles</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/apps/doc-viewer/hwp-to-pdf/">Convert an HWP file to PDF on Android</a></li>
-        <li><a href="https://sugarmount21.com/en/apps/doc-viewer/hwpx-open/">How to open an HWPX or HWP file on Android</a></li>
-        <li><a href="https://sugarmount21.com/en/apps/image-compress/id-photo-size/">Resize an ID photo for Korean application uploads</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="app">
-      <h2 id="app">Get SugarSpeller</h2>
-      <p>An Android app that fixes Korean spelling and word spacing in one pass, from pasted text, text shared from another app, or text picked from the selection menu. Free checks take up to 3,000 characters at a time.</p>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugarspeller&amp;referrer=utm_source%3Dsugarmount21.com%26utm_medium%3Dhowto%26utm_campaign%3Dsugarspeller&amp;hl=en" rel="noopener">Get SugarSpeller on Google Play</a><a class="button button--outline" href="https://sugarmount21.com/en/apps/sugarspeller/">About SugarSpeller</a></div>
-    </section>]]></description>
-    <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Four Android apps in 20 days with an AI agent – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/20-days-4-apps/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/20-days-4-apps/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/20-days-4-apps-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · Measured case</span>
-      <h1>How we shipped four Android apps in 20 days with an AI coding agent</h1>
-      <p class="lead">Working with an AI coding agent (Claude Code), a solo developer published four Android apps on Google Play in the 20 days from the first commit on September 20, 2026 to October 10.</p>
-      <p>In that period 52 of 59 commits (88%) are marked as co-authored with the agent. Besides the AI writing code fast, each app was stamped out from the same template, one at a time, and pre-release checks and Play Console work were turned into scripts.</p>
-      <p class="note">The numbers come from the git history, CHANGELOG and on-device QA reports of SugarMount's app repository (sugar-utils), as of October 18, 2026.</p>
-    </section>
-    <section aria-labelledby="timeline">
-      <h2 id="timeline">What happened in those 20 days?</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Date</th><th scope="col">What was done</th></tr></thead>
-          <tbody>
-            <tr><td>09-20</td><td>Repository started. The skeleton of the first app, <a href="https://sugarmount21.com/en/apps/image-compress/">Compress Image</a>, and the shared file, image, ads and analytics modules written in parallel by several agents in separate git worktrees</td></tr>
-            <tr><td>09-21</td><td>First signed AAB (1.0.0). A script that uploads builds and store listings through the Play Developer API</td></tr>
-            <tr><td>09-23</td><td>An R8 problem that crashed the release build right after launch found on a real device (Galaxy S23) and fixed</td></tr>
-            <tr><td>09-24</td><td>The second app, <a href="https://sugarmount21.com/en/apps/image-flip/">Flip &amp; Rotate Image</a>, and the third, <a href="https://sugarmount21.com/en/apps/image-convert/">Convert Image</a>, generated from the scaffolding script and uploaded to the internal test track</td></tr>
-            <tr><td>09-25</td><td>On-device QA of all three apps on a Galaxy S21 by four agents in turn (one per app, then one independent cross-check)</td></tr>
-            <tr><td>10-03</td><td>First app's store page live</td></tr>
-            <tr><td>10-04</td><td>Defects from end-to-end tests on a Galaxy S20 and S21 fixed; all three apps released to production</td></tr>
-            <tr><td>10-10</td><td>Fourth app, <a href="https://sugarmount21.com/en/apps/doc-viewer/">HWP Viewer SugarDoc</a>, store page live</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="muted">41 of the 59 commits (69%) were made between 9 p.m. and 2 a.m.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/20-days-4-apps-1-en.webp" width="1200" height="498" alt="Bar chart: of 59 commits, 52 (88%) are marked as co-authored with the agent and 41 (69%) were made between 9 p.m. and 2 a.m." loading="lazy"><figcaption>52 of the 59 commits in those 20 days were made with the agent, and 41 were made in the evening.</figcaption></figure>
-    </section>
-    <section aria-labelledby="who-did-what">
-      <h2 id="who-did-what">How was the work split between the person and the AI?</h2>
-      <div class="two-col">
-        <div>
-          <h3>AI agent</h3>
-          <ul>
-            <li>Kotlin code and unit tests</li>
-            <li>Build, release and QA scripts</li>
-            <li>Store listing drafts, screenshot capture and framing</li>
-            <li>Emulator and device tests, with written reports</li>
-          </ul>
-        </div>
-        <div>
-          <h3>Person</h3>
-          <ul>
-            <li>Decisions such as ad placement, prices and tone of copy (recorded with a date in the instruction file)</li>
-            <li>Work that only the Play Console can do</li>
-            <li>Connecting real devices and the final check</li>
-            <li>The decision to release to production</li>
-          </ul>
-        </div>
-      </div>
-      <p>The co-author mark means the commit was made together with the agent. It is not a measure of who wrote how many lines.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20How%20we%20shipped%20four%20Android%20apps%20in%2020%20days%20with%20an%20AI%20coding%20agent">Email us</a></p></aside>
-    <section aria-labelledby="four-rules">
-      <h2 id="four-rules">Four rules that made it fast</h2>
-      <ol class="steps">
-        <li><strong>One app at a time, shared code in modules</strong>: File saving, image processing, job state, ads, billing and analytics live in <code>core/</code> modules, not in an app. From the second app on, only the screens and the app's own feature are new.</li>
-        <li><strong>Stamp out the next app with a script</strong>: <code>new_app.sh</code> copies the first app, changes its name, colour and icon, and blanks every per-app identifier to PLACEHOLDER. Its first real run (09-23) exposed four bugs, which were fixed; the next day the third app was generated without a single change.</li>
-        <li><strong>Let a gate stop easy mistakes</strong>: A release build is not produced while an ad test ID remains or an identifier is empty. Rules do not stop at the instruction file; tests enforce them (<a href="https://sugarmount21.com/en/ax/agents-md/">the AGENTS.md note</a>).</li>
-        <li><strong>Console work through APIs</strong>: AAB uploads, ko and en store listings, 30 screenshots per app, in-app products, Firebase projects and GA4 properties are all created by scripts. What a person does in the console is only what the APIs do not expose.</li>
-      </ol>
-      <p class="muted">A new app refused API requests until it had been touched in the console first (the first AAB upload, or granting the service account access), and AdMob's app-creation API is limited-access and returned 403. So AdMob apps and ad units are created in the console, and a script reads their IDs into the config file.</p>
-    </section>
-    <section aria-labelledby="what-went-wrong">
-      <h2 id="what-went-wrong">What went wrong?</h2>
-      <ul>
-        <li><strong>Debug was fine, the release build crashed.</strong> The code shrinker R8 removed one constructor, and every release build crashed right at startup. Since then the minified release build is launched twice on a device before every upload (<a href="https://sugarmount21.com/en/ax/release-gate/">the pre-release checks note</a>).</li>
-        <li><strong>On-device tests ran after submitting for review.</strong> End-to-end tests on a Galaxy S21 and S20 on October 4 found nine major defects, five distinct causes. The biggest: if the system killed the app mid-job, the progress screen froze. No crashes and no damaged originals, but the order was backwards. End-to-end tests now come before submission.</li>
-        <li><strong>The test scripts had bugs too.</strong> A script that waits for a screen exited with success (0) on timeout, so later checks kept running on the wrong screen. Tools the AI writes for testing need testing too.</li>
-      </ul>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/20-days-4-apps-2-en.webp" width="1200" height="728" alt="Comparison: at first end-to-end tests ran after submitting for review and found nine major defects with five causes; now they run before submission, and the release build is launched twice on a device before every upload." loading="lazy"><figcaption>On-device end-to-end tests now come before submission; on October 4 the order was backwards.</figcaption></figure>
-    </section>
-    <section aria-labelledby="try-it-yourself">
-      <h2 id="try-it-yourself">If you want to try it</h2>
-      <ol class="steps">
-        <li><strong>Start with the instruction file</strong>: Write down only the rules the agent tends to get wrong, briefly. Keep history elsewhere.</li>
-        <li><strong>Take the first app all the way</strong>: Only after one app reaches a public store page do you see what to automate.</li>
-        <li><strong>Script the pre-release checks</strong>: Make the gate, a release-build launch and an on-device check mandatory before any upload.</li>
-        <li><strong>Record what was and wasn't verified</strong>: In the changelog, write which device checked what, and what was not checked.</li>
-      </ol>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20How%20we%20shipped%20four%20Android%20apps%20in%2020%20days%20with%20an%20AI%20coding%20agent">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">Frequently asked questions</h2>
-      <div class="faq">
-        <details><summary>Did the AI write all the code?</summary><div><p>By commit, 88% carry the AI co-author mark. The person made design decisions, reviewed results, checked on devices and decided on releases. The mark shows collaboration, not a share of lines.</p></div></details>
-        <details><summary>Can one person keep quality up this way?</summary><div><p>Largely, if checks live in scripts and tests rather than in someone's memory. Even so, on-device end-to-end tests found nine major defects.</p></div></details>
-        <details><summary>Four apps in 20 days: are they simple apps?</summary><div><p>Yes, deliberately: each does one thing. Shrinking photos, flipping and rotating, converting formats, viewing Korean documents. The HWP viewer, though, carries a document engine that opens HWP, HWPX and PDF on the device, and it has kept getting updates since.</p></div></details>
-        <details><summary>Which apps are they?</summary><div><p><a href="https://sugarmount21.com/en/apps/image-compress/">Compress Image</a>, <a href="https://sugarmount21.com/en/apps/image-flip/">Flip &amp; Rotate Image</a>, <a href="https://sugarmount21.com/en/apps/image-convert/">Convert Image</a> and <a href="https://sugarmount21.com/en/apps/doc-viewer/">HWP Viewer SugarDoc</a>. All are on Google Play.</p></div></details>
-      </div>
-    </section>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
     <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
   </item>
