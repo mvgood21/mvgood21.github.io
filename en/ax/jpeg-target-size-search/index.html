@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fit a JPEG under a file size limit on Android – SugarMount</title>
+  <meta name="description" content="Fit a JPEG under a byte limit on Android: quality binary search per resolution, a predicted long edge, a 20-encode cap, and why a 107 KB image grew to 150 KB.">
+  <meta name="robots" content="max-image-preview:large">
+  <link rel="canonical" href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">
+  <link rel="alternate" hreflang="ko" href="https://sugarmount21.com/ax/jpeg-target-size-search/">
+  <link rel="alternate" hreflang="en" href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">
+  <link rel="alternate" hreflang="x-default" href="https://sugarmount21.com/ax/jpeg-target-size-search/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Fit a JPEG under a file size limit on Android – SugarMount">
+  <meta property="og:description" content="Fit a JPEG under a byte limit on Android: quality binary search per resolution, a predicted long edge, a 20-encode cap, and why a 107 KB image grew to 150 KB.">
+  <meta property="og:url" content="https://sugarmount21.com/en/ax/jpeg-target-size-search/">
+  <meta property="og:image" content="https://sugarmount21.com/assets/og/ax-jpeg-target-size-search-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="https://sugarmount21.com/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/svg+xml" href="https://sugarmount21.com/assets/favicon.svg">
+  <link rel="apple-touch-icon" href="https://sugarmount21.com/assets/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://sugarmount21.com/en/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/site.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=e2770b30">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://sugarmount21.com/en/ax/jpeg-target-size-search/#article","headline":"Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original","description":"Fit a JPEG under a byte limit on Android: quality binary search per resolution, a predicted long edge, a 20-encode cap, and why a 107 KB image grew to 150 KB.","url":"https://sugarmount21.com/en/ax/jpeg-target-size-search/","mainEntityOfPage":"https://sugarmount21.com/en/ax/jpeg-target-size-search/","inLanguage":"en","articleSection":"Android development","datePublished":"2026-11-03T09:00:00+09:00","dateModified":"2026-11-03T09:00:00+09:00","image":["https://sugarmount21.com/assets/og/ax-jpeg-target-size-search-en.png","https://sugarmount21.com/assets/ax/cover/jpeg-target-size-search-en.webp","https://sugarmount21.com/assets/ax/jpeg-target-size-search-1-en.webp","https://sugarmount21.com/assets/ax/jpeg-target-size-search-2-en.webp"],"author":{"@id":"https://sugarmount21.com/#org"},"publisher":{"@id":"https://sugarmount21.com/#org"},"isPartOf":{"@id":"https://sugarmount21.com/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What JPEG quality gets a photo under 500 KB?","acceptedAnswer":{"@type":"Answer","text":"There is no fixed value. Bytes at a given quality depend on resolution and content, so you have to encode and count. The fake 4000 px photo in this note fit at 2829 px and q43 (486,413 bytes), while at full size even q40 was 902,077 bytes."}},{"@type":"Question","name":"Why does re-compressing a small JPEG make it bigger?","acceptedAnswer":{"@type":"Answer","text":"A re-encode's size is set by the new quality setting and the pixels, not by the old file's size. A 107,093-byte test JPEG saved at quality 70 became 150,170 bytes at q95 (Galaxy S21 report). Comparing with the original and keeping the smaller file prevents it."}},{"@type":"Question","name":"Is 1 KB 1,000 or 1,024 bytes in a target-size search?","acceptedAnswer":{"@type":"Answer","text":"This app uses 1,000 bytes. A file fitted to 500 KB is at most 500,000 bytes, so it also passes a site that counts 500 KB as 512,000 bytes."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://sugarmount21.com/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://sugarmount21.com/en/ax/"},{"@type":"ListItem","position":3,"name":"Android development","item":"https://sugarmount21.com/en/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=e2770b30">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/jpeg-target-size-search/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-android">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/android/">Android development</a></li><li><span aria-current="page">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/jpeg-target-size-search-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX note · How-to</span>
+      <h1>Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</h1>
+      <p class="lead">Binary-search the JPEG quality at each resolution, shrink the long edge by the square root of the byte ratio, and compare the result with the original before you save it.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Android development</span> <span aria-hidden="true">·</span> <span>10 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-11-03">November 3, 2026</time></p><!-- /build:meta -->
+      <p>A 107 KB JPEG went into our photo compressor with a 500 KB limit and came out as a 150,250-byte file. That was a device test on a Galaxy S20 (Android 13) on October 4, 2026, running version 1.0.5 of <a href="/en/apps/image-compress/">Compress Image</a>; a Galaxy S21 and an emulator showed the same 40% growth that day. The output was under the limit, so the search code reported success. The search works within quality 40 to 95, at most 20 encodes and 30 seconds per photo, and a 320 px long-edge floor; a keep-the-original rule shipped the same evening.</p>
+      <p class="note">Sources: <code>TargetSizeSearch.kt</code> and its 12 tests in the app repository (commit 9c040fe, September 20, 2026), three device test reports (October 4, 2026), the fix in commit 7b0e567 (October 4, 2026) and the QA script that generates the test image. Numbers were rechecked against the source on November 2, 2026. Device serials are left out.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (9)</summary><ol><li><a href="#grew">A 107 KB JPEG became 150 KB under a 500 KB limit</a></li><li><a href="#search">Each resolution level tries q95, then q40, then a binary search</a></li><li><a href="#predict">The next long edge comes from the square root of the byte ratio</a></li><li><a href="#cause">The search never saw the original&#x27;s size, and a test locked that in</a></li><li><a href="#keep-original">The fix keeps the original&#x27;s coded image with metadata stripped</a></li><li><a href="#not-covered">PNG originals and photos over the edge limit still get re-encoded</a></li><li><a href="#how-to">From a byte-counting encoder to the check against the original</a></li><li><a href="#next">No device numbers for 1.0.6 yet, and no encode timings</a></li><li><a href="#faq">FAQ</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#grew">A 107 KB JPEG became 150 KB under a 500 KB limit</a></li><li><a href="#search">Each resolution level tries q95, then q40, then a binary search</a></li><li><a href="#predict">The next long edge comes from the square root of the byte ratio</a></li><li><a href="#cause">The search never saw the original&#x27;s size, and a test locked that in</a></li><li><a href="#keep-original">The fix keeps the original&#x27;s coded image with metadata stripped</a></li><li><a href="#not-covered">PNG originals and photos over the edge limit still get re-encoded</a></li><li><a href="#how-to">From a byte-counting encoder to the check against the original</a></li><li><a href="#next">No device numbers for 1.0.6 yet, and no encode timings</a></li><li><a href="#faq">FAQ</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="grew">
+      <h2 id="grew">A 107 KB JPEG became 150 KB under a 500 KB limit</h2>
+      <p>Three test reports used copies of the same test image (test_small.jpg) and got nearly the same result. The Galaxy S21 report lists the original at 107,093 bytes and the output at 150,170 bytes, 40% larger. On a Pixel 8 Pro emulator (API 35) a 107,100-byte copy became 150,162 bytes. The result screen did show a "larger than the original" label, but Save all wrote the larger file anyway.</p>
+      <figure class="ax-fig"><img src="/assets/ax/jpeg-target-size-search-1-en.webp" width="1200" height="652" alt="Bar chart: a 107 KB test JPEG processed with a 500 KB limit came out at 150,170 B on a Galaxy S21 (original 107,093 B), 150,250 B on a Galaxy S20 and 150,162 B on the emulator (original 107,100 B), about 40% larger." loading="lazy"><figcaption>Every device stayed under the limit, and every output was about 40% larger than the original.</figcaption></figure>
+      <p>test_small.jpg is not a real photo. Our QA script makes it by saving an 800x600 noise image at JPEG quality 70. An ID photo that already met the size rule took the same path, so it could also come back larger than it went in, by an amount that depends on the photo. The user-side guide is <a href="/en/apps/image-compress/id-photo-size/">Resize an ID photo for Korean application uploads</a>. The reports rated the bug minor.</p>
+    </section>
+
+    <section aria-labelledby="search">
+      <h2 id="search">Each resolution level tries q95, then q40, then a binary search</h2>
+      <p><code>TargetSizeSearch</code> is a plain Kotlin class with no Android imports. It sees the encoder only as a function from (long edge, quality) to the real byte count, so the whole search runs in JVM unit tests. The default <code>SearchBudget</code> is quality 40 to 95, 20 encodes and 30 seconds per photo, and a 320 px minimum long edge. The 30-second check happens before each encode; an encode already running is not interrupted.</p>
+      <p>At one resolution level the search encodes at q95 first and stops if that fits. If not, it tries q40. When q40 is still too large, it gives up on the level and shrinks the long edge. When q40 fits and q95 does not, it binary-searches 40 to 94 and stops as soon as a fitting result is within 8% of the limit (92% or more of the target). The code comment puts the worst case at 2 + 6 = 8 encodes per level.</p>
+      <p>The tests use a fake encoder: bytes = <code>3 MB x (edge ratio)^2 x (0.15 + 0.85 x (q/95)^2)</code>. We ported the search logic to Python and ran it on that model for a 4000 px photo and a 500 KB target. These are not device numbers; the table only shows the order of steps.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Encode</th><th>Long edge</th><th>Quality</th><th>Bytes</th><th>Decision</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>4000</td><td>95</td><td>3,000,000</td><td>too large</td></tr>
+          <tr><td>2</td><td>4000</td><td>40</td><td>902,077</td><td>too large; predicted scale 0.71</td></tr>
+          <tr><td>3</td><td>2829</td><td>95</td><td>1,500,607</td><td>too large</td></tr>
+          <tr><td>4</td><td>2829</td><td>40</td><td>451,221</td><td>fits; search 40 to 94</td></tr>
+          <tr><td>5 to 7</td><td>2829</td><td>67, 53, 46</td><td>859,528 / 622,091 / 524,148</td><td>all too large</td></tr>
+          <tr><td>8</td><td>2829</td><td>43</td><td>486,413</td><td>fits and is within 8%; stop</td></tr>
+        </tbody>
+      </table></div>
+      <p>The usual sample code that only lowers quality cannot fit this photo. At the full 4000 px, even q40 is 902,077 bytes, and the test comment does the same arithmetic ("q40 is ~0.3 * 3 MB = 900 KB").</p>
+    </section>
+
+    <section aria-labelledby="predict">
+      <h2 id="predict">The next long edge comes from the square root of the byte ratio</h2>
+      <p>When q40 is too large, the next long edge is the current one times <code>sqrt(limit / q40 bytes) x 0.95</code>. If bytes grow roughly with pixel count, the long edge grows with the square root. The factor is clamped to 0.5 to 0.85: 0.85 is the normal step, and 0.5 stops a noisy estimate from throwing away most of the resolution in one jump. The edge never goes below 320 px, never asks for more than the source, and drops by at least 1 px even when rounding would keep it the same, so every level is smaller than the last.</p>
+      <pre><code>val predicted = sqrt(targetBytes.toDouble() / floor.bytes.toDouble()) * 0.95
+val factor = predicted.coerceIn(budget.maxDownscaleJump, budget.downscaleStep)
+val next = max(budget.minLongEdgePx, (edge * factor).roundToInt())
+edge = if (next &lt; edge) next else edge - 1 // strictly decreasing</code></pre>
+      <p>We also ran the same fake photo with a fixed 0.85 step. Counting encodes until the search ended, the 500 KB target took 8 with prediction and 11 without; 200 KB took 9 and 16; 100 KB took 10 and 20. At 100 KB the fixed step first fit on its 16th encode (92,806 bytes at 1283 px and q40), then spent the rest of the 20-encode budget looking for a higher quality and ended on that q40 result.</p>
+      <figure class="ax-fig"><img src="/assets/ax/jpeg-target-size-search-2-en.webp" width="1200" height="808" alt="Bar chart: until the search ended on a fake 4000 px photo, the predicted long edge spent 8, 9 and 10 encodes for 500, 200 and 100 KB targets, and a fixed 0.85 step spent 11, 16 and 20." loading="lazy"><figcaption>The smaller the target, the wider the gap; at 100 KB the fixed step first fit on encode 16 and used all 20.</figcaption></figure>
+      <p>An impossible target still ends. With an encoder that returns 10,000,000 bytes for everything and a 50 KB target, the long edge goes 4000, 2000, 1000, 500, 320, two encodes per level, and the search fails at the resolution floor after 10 encodes. The failure carries the smallest size it saw. The code comment says this is so the screen can show how far off it was, but today the app shows only a fixed "could not be reached" message and the number stays in the error text.</p>
+      <p>On Android, the encoder (<code>LevelEncoder</code>) scales the bitmap once per level and re-encodes only the quality. Each candidate is written to a file and its length is counted, and the winning file is saved as is: the saver copies the exact bytes the user previewed (PRD U01-F05).</p>
+    </section>
+
+    <section aria-labelledby="cause">
+      <h2 id="cause">The search never saw the original's size, and a test locked that in</h2>
+      <p>The 107 KB test image finished on the first encode, because its q95 re-encode, about 150 KB, was under 500 KB. The only success condition in the search is "at or under the limit". The search receives the byte limit, the source long edge, the long-edge cap and an encoder, nothing about the original file, so it does not know how many bytes the original had, or even that it was a JPEG.</p>
+      <p>The tests had already written this down as correct. Commit 9c040fe, written with an AI coding agent, includes a test named "input already under target passes with a single encode at max quality". Its fake encoder returns 100,000 bytes at q95, and the test expects one encode and 100,000 bytes. The fake encoder treats a q95 encode as the size of the original. The end-to-end test added with the fix notes that a q95 re-encode grows a q50 file ("re-encoding at q95 grows a q50 file"). All 12 search tests passed, and two weeks later the bug showed up on real phones.</p>
+      <p>Two of the reports pointed at <code>TargetSizeSearch.kt</code> as the place to fix. That file is still exactly as it was in 9c040fe. The fix went into the app's worker, which calls the search. The rule there uses the original's format and size, which the engine reads from the file, together with the user's long-edge limit and compression mode from the app settings.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Fitting%20a%20JPEG%20under%20a%20file%20size%20limit%3A%20quality%20binary%20search%2C%20a%20predicted%20long%20edge%2C%20and%20a%20final%20check%20against%20the%20original">Email us</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="keep-original">
+      <h2 id="keep-original">The fix keeps the original's coded image with metadata stripped</h2>
+      <p>The Galaxy S20 report left the policy to a person: keep an already-small JPEG byte for byte, or drop or deselect outputs larger than the original. The operator decided that day that a saved result is never larger than its original, and the change shipped in commit 7b0e567 that evening (version 1.0.6, 410 unit tests, 0 failures).</p>
+      <p>Keeping the original byte for byte was rejected. The app removes metadata such as location by default, and an untouched original would keep its GPS tags. Instead, <code>JpegMetadataStripper</code> copies the coded image (quantization and Huffman tables, frame header, every scan) unchanged and drops EXIF, XMP and similar blocks. The decoded pixels match the original. Only the orientation is written back, as a minimal EXIF block, and colour data (the ICC profile and Adobe APP14) stays.</p>
+      <p>The rules for when that copy replaces the result sit in one place, <code>KeepOriginalPolicy</code>:</p>
+      <ul>
+        <li>Only still JPEG originals qualify, because the store listing promises JPEG output.</li>
+        <li>If the user set a long-edge limit, the original must already be within it.</li>
+        <li>The copy must be no larger than the original, the encoded result and, in target-size mode, the limit. For the 107 KB case that cap is 107,000 bytes. On a tie, the lossless original wins.</li>
+        <li>If the search fails to reach the limit but the original already fits, the copy turns the failure into a success.</li>
+      </ul>
+      <p>If you write a target-size search, compare its result with the original before saving. Tests built on a fake encoder will not catch this case.</p>
+    </section>
+
+    <section aria-labelledby="not-covered">
+      <h2 id="not-covered">PNG originals and photos over the edge limit still get re-encoded</h2>
+      <p>The keep-the-original path applies only to JPEG originals. PNG, WebP and HEIC files can grow when they become JPEG (the 10 KB PNG became 36 to 37 KB), and the app still labels them "larger than the original"; the store listing says the same. When an original is larger than the user's long-edge limit, only the encoded result satisfies the request, so that result stays whatever its size.</p>
+      <p>The binary search assumes that higher quality never means fewer bytes. The random-encoder test (300 seeds) proves only that the search ends and stays within budget; we have not looked for real photos that break the assumption. A photo that is still over the limit at 320 px and q40 fails. For passport-style uploads with fixed pixel dimensions, the search does not crop to an aspect ratio, so crop first.</p>
+    </section>
+
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">From a byte-counting encoder to the check against the original</h2>
+      <ol>
+        <li>Wrap the encoder as a function from (long edge, quality) to real bytes: write the <code>Bitmap.compress</code> output to a file and take its length. Keep Android imports out of the search class.</li>
+        <li>At each level, measure q95 and q40 first, then binary-search between them. Stop once a fitting result is within 8% of the limit.</li>
+        <li>If q40 is still too large, set the next long edge with <code>sqrt(limit / q40 bytes) x 0.95</code>, clamped to 0.5 to 0.85, with a 320 px floor, no upscaling and a strict decrease.</li>
+        <li>Stop after 20 encodes or 30 seconds, and return the smallest size seen when you fail.</li>
+        <li>Reuse the scaled bitmap within a level, and save the winning candidate file as is instead of encoding again.</li>
+        <li>After the search, compare with the original. If it is a JPEG within the edge limit and the size limit, use a metadata-stripped copy when that copy is no larger than the original, the result and the limit.</li>
+        <li>Test with a random encoder, an injected clock (an encoder that takes 10 s per call times out after 3 encodes) and the no-upscale rule. Then, on a real phone, process one already-small JPEG with a 500 KB limit and compare output bytes with the original; to reproduce this bug, use an 800x600 noise image saved at quality 70.</li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">No device numbers for 1.0.6 yet, and no encode timings</h2>
+      <p>As of November 2, the repository has no device measurement of the 107 KB case on version 1.0.6. This fix has been checked only by unit tests (KeepOriginalPolicyTest, JpegMetadataStripperTest) and a Robolectric end-to-end test: a q50 JPEG with GPS tags does not grow and keeps the same pixels. The release-build, 1 MB, PNG and WebP rechecks that the Galaxy S20 report deferred have not been done either. We have not measured how much real photos (camera or messenger JPEGs that are already compressed) grow when re-encoded at q95, nor how many encodes, or how many seconds, a real photo takes. The 30-second cap comes from the PRD's suggestion, and neither cap has a device measurement behind it in the repository.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Fitting%20a%20JPEG%20under%20a%20file%20size%20limit%3A%20quality%20binary%20search%2C%20a%20predicted%20long%20edge%2C%20and%20a%20final%20check%20against%20the%20original">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>What JPEG quality gets a photo under 500 KB?</summary><div><p>There is no fixed value. Bytes at a given quality depend on resolution and content, so you have to encode and count. The fake 4000 px photo in this note fit at 2829 px and q43 (486,413 bytes), while at full size even q40 was 902,077 bytes.</p></div></details>
+        <details><summary>Why does re-compressing a small JPEG make it bigger?</summary><div><p>A re-encode's size is set by the new quality setting and the pixels, not by the old file's size. A 107,093-byte test JPEG saved at quality 70 became 150,170 bytes at q95 (Galaxy S21 report). Comparing with the original and keeping the smaller file prevents it.</p></div></details>
+        <details><summary>Is 1 KB 1,000 or 1,024 bytes in a target-size search?</summary><div><p>This app uses 1,000 bytes. A file fitted to 500 KB is at most 500,000 bytes, so it also passes a site that counts 500 KB as 512,000 bytes.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
+        <li><a href="/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
+        <li><a href="/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+      </ul>
+      <p><a href="/en/ax/topic/android/">All notes on Android development</a> · <a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/sitemap/">Site map</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>
