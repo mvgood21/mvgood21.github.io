@@ -6,7 +6,372 @@
   <description>Small Android apps that each do one thing simply, from shrinking photos and opening Korean HWP documents to checking Korean spelling and playing puzzle games.</description>
   <language>en</language>
   <atom:link href="https://sugarmount21.com/en/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Tue, 03 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Wed, 04 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Gemini in an Android app: cost, eval, daily caps – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/llm-explain-cost-limits/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/llm-explain-cost-limits/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/llm-explain-cost-limits-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX Notes · Measurement</span>
+      <h1>The first LLM feature in a spell-check app: cost, model evaluation and daily caps for "Why is this wrong?"</h1>
+      <p class="lead">A 59-case eval picked the model at $0.93 per 1,000 calls (about $1.1 after the v3 prompt the next day). Spend is capped by the function itself, which refuses LLM calls past 3,000 a day.</p>
+      <p>The first eval run on the night of September 27, 2026 failed on all 59 calls with HTTP 402. It used an AI Studio key that the coding agent had said around noon that day would be billed against our Firebase credit, and we were in the middle of giving our Korean spelling app <a href="https://sugarmount21.com/en/apps/sugarspeller/">SugarSpeller</a> its first server function and LLM. After the key was replaced with Vertex AI, gemini-3.8-flash gave a correct reason for all 59 corrections (the right rule for 54), with a p95 latency of 4.3 seconds and a cost of $0.93 per 1,000 calls. In the two weeks after the October 1 release, 3.7% of users who ran a check tapped the button; among users who had opened the correction sheet, it was 41%.</p>
+      <p class="note">Sources: the design doc in the app repository (approved 2026-09-27), commits de79cfd, 350a6c6, df8f740 and 4c99287, the WATCH.md decision log (rows for Oct 17 and Oct 28), and the agent session log. Usage comes from GA4; cost comes from the usage documents the function writes to Firestore. Rechecked against the repository on 2026-11-02. Times are Korea Standard Time (UTC+9). Cloud project and account identifiers are left out.</p>
+    </section>
+    <section aria-labelledby="eval">
+      <h2 id="eval">The 59-case eval: flash-lite at 78%, 3.8-flash at 100%</h2>
+      <p>The feature explains one correction at a time: the user taps a corrected word and gets a one-line reason plus the name of the Korean orthography rule behind it. We picked the model with 59 corrections taken from real checker responses stored as test fixtures in the app: 38 from Naver's spell checker and 21 from Daum's (Naver and Daum are the two big Korean portals, and the app uses their checkers). The pass mark was written into the design doc before the run: at least 90% correct and a p95 of 2.5 seconds or less. Every call went to the Vertex AI global endpoint.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Model (prompt)</th><th>Reason correct</th><th>Rule also correct</th><th>p50 / p95</th><th>Per 1,000</th></tr></thead>
+        <tbody>
+          <tr><td>gemini-3.5-flash-lite (v1)</td><td>43/59 (73%)</td><td>30/59</td><td>1.06 s / 1.26 s</td><td>$0.27</td></tr>
+          <tr><td>gemini-3.5-flash-lite (v2)</td><td>46/59 (78%)</td><td>38/59</td><td>1.08 s / 4.6 s</td><td>$0.42</td></tr>
+          <tr><td>gemini-3.8-flash (v2)</td><td>59/59 (100%)</td><td>54/59 (92%)</td><td>2.0 s / 4.3 s</td><td>$0.93</td></tr>
+        </tbody>
+      </table></div>
+      <p>Prompt v2 added an order of checks for spacing errors and a table of reasons for the most common corrections. It moved flash-lite from 73% to 78% and no further. Its wrong answers included explaining a noun fused with <i>hada</i> ("to do") as an ending or particle, garbled syllables, and calling an archaic spelling of a polite ending a past tense. 3.8-flash made no typos; its five misses were all wrong rule citations. It costs more than twice as much as flash-lite v2 per 1,000 calls, and it was the only model over the 90% bar, so it became the default.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/llm-explain-cost-limits-1-en.webp" width="1200" height="634" alt="Bar chart: cost per 1,000 calls was $0.27 for 3.5-flash-lite with prompt v1 (73% correct), $0.42 with v2 (78%), and $0.93 for 3.8-flash with v2 (100%)." loading="lazy"><figcaption>Only 3.8-flash cleared the 90% bar, at $0.93 per 1,000 calls.</figcaption></figure>
+      <p>The first 3.8-flash run returned 59 empty answers. The model's thinking tokens used up the 160-token output limit before any JSON came out; setting <code>thinkingBudget: 0</code> fixed it. The 2.5-second target was missed. This model is served only from the global endpoint (the Seoul and Tokyo regions returned 404), and each call took 2.1 to 2.8 seconds. Because that was still inside the app's 8-second timeout and the button shows a progress indicator, the design doc moved the target to a p95 of 5 seconds.</p>
+    </section>
+    <section aria-labelledby="billing">
+      <h2 id="billing">The AI Studio key never touched the $300 credit</h2>
+      <p>The 402 came from billing. The error read <code>Your prepayment credits are depleted</code>, and authentication had succeeded. In this project, AI Studio billing was prepaid only, so it had no link to the 90-day $300 free-trial credit (held in Cloud Billing) that came with moving the Firebase project to the pay-as-you-go Blaze plan.</p>
+      <p>At 12:01 the agent wrote that with the $300 credit, paid-tier Gemini API usage would be billed to the same project, and ten minutes later it produced a table showing the credit applied to both. The spec switched to keyless Vertex AI at 12:18 (220b267), then at 12:21 went back to an AI Studio key the operator had already created, on the grounds that it shared the billing account (740b9d5).</p>
+      <p>The function, the quota code and the cache were all tested against a fake provider during the day, so the first real Gemini call was the eval run around 10 p.m. When the agent reported the 402 at 22:04, its first recommendation was to buy AI Studio prepaid credit (minimum $5). At 22:06 the operator asked why, if the $300 was supposed to cover it. The agent then said its earlier explanation was wrong: AI Studio keys used to bill a project's Cloud billing account after the fact, and this project didn't work that way.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/llm-explain-cost-limits-2-en.webp" width="1200" height="822" alt="Steps: at 12:01 the agent says Gemini bills to the same account, at 12:21 the spec picks an AI Studio key, at 22:04 all 59 eval calls get 402, the operator questions it, and at 22:10 commit de79cfd moves to Vertex AI." loading="lazy"><figcaption>The midday billing advice went untested until the first real model call that night.</figcaption></figure>
+      <p>Commit de79cfd at 22:10 moved Gemini authentication to Vertex AI with ADC (Application Default Credentials, the service account the code already runs as). Vertex bills through Cloud Billing, which per the design doc is where the credit applies, and there is no API key to store or rotate. The deploy 49 minutes later hit one more snag: declaring an unused secret on the function was enough to make the deploy query Secret Manager and fail with 403, so the secret is now declared only in key mode (e67a4f7).</p>
+      <p>Before building an LLM feature, make one real call and check which bill it lands on. A 200 response does not say which balance paid for it. After the move to Vertex, this app computed its cost from token counts the function records times the list price, and the repository has no record of the credit deduction being checked against a billing report.</p>
+    </section>
+    <section aria-labelledby="cap">
+      <h2 id="cap">The function refuses LLM calls past 3,000 a day</h2>
+      <p><code>explainCorrection</code> is a single callable function on Cloud Functions for Firebase (2nd gen). The app signs in anonymously when its process opens the first screen, and the Firebase SDK attaches the auth token to each call. The function validates input, checks the cache, takes from the quota, calls the LLM, then stores the result. The cache comes before the quota, so an explanation that already exists costs the user nothing.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Control</th><th>Default</th><th>How to change it</th></tr></thead>
+        <tbody>
+          <tr><td>Free quota</td><td>5 a day per anonymous uid</td><td>Firestore doc <code>config/limits</code> (cached 60 s)</td></tr>
+          <tr><td>Subscriber ceiling</td><td>100 a day per uid</td><td>Same doc</td></tr>
+          <tr><td>Global cap</td><td>3,000 LLM attempts a day</td><td>Same doc; 0 closes it</td></tr>
+          <tr><td>App Check enforcement</td><td>Off (measured only); current setting unconfirmed</td><td><code>requireAppCheck</code> in the same doc</td></tr>
+          <tr><td>Button in the app</td><td>On</td><td>Remote Config <code>explain_enabled</code> = false</td></tr>
+        </tbody>
+      </table></div>
+      <p>The day rolls over at midnight Korea time. The day key is computed by adding nine hours to UTC milliseconds rather than trusting the server's time zone. The global cap counts LLM attempts, not requests: retries and hedged duplicates each count, and only attempts that failed before billing (network errors and the like) are given back. Timeouts stay counted, because the provider may already have charged for them.</p>
+      <p>A budget alert sends an email and does not stop charges, which is why the design doc calls the 3,000-call cap the real safeguard. At the eval price ($0.93), a full day at the cap is about $2.8; with the longer v3 prompt from September 28 (about $1.1 per 1,000) it is about $3.3 by our calculation. A call cap works as a money cap only because each call is bounded: the original and corrected words are limited to 60 code points each, and the output to 160 tokens. The agent's morning estimate (under 0.1 won per call, under 1,000 won a month) used flash-lite prices; the chosen model costs 3.4 times flash-lite v1 per 1,000 calls.</p>
+      <p>In the first release stage the function trusts the app's claim that the user subscribes. A forged claim buys 95 extra explanations a day at under 10 won (well under a cent), so receipt checks were deferred. Putting the daily total document in the same transaction as the user's quota made concurrent requests die on lock timeouts, and on September 28 the total moved outside the transaction (73085eb). As a result, the global cap can overshoot by the number of requests in flight.</p>
+      <p>Remote Config refreshed only on the launcher screen, and people who used only the mini window (opened from text selection in another app) never pass through it, so switching off <code>explain_enabled</code> would have left their button in place. The September 29 release review caught it, and the mini window now fetches config before it opens the sheet (4c99287).</p>
+    </section>
+    <section aria-labelledby="cold-start">
+      <h2 id="cold-start">A 7.9-second cold start pushed the app timeout to 15 seconds</h2>
+      <p>The smoke test after the production deploy on the night of September 27 measured 7.9 seconds for the first call and 1.6 to 3.0 seconds after that. The function runs with zero minimum instances, and the app's timeout was 8 seconds, so a cold call came within 0.1 seconds of it. Commit df8f740 raised the app timeout to 15 seconds. Keeping one instance warm (about $3 to $4 a month) stayed in the function docs as a fallback if cold starts became a problem. LLM calls on October 26 and 27 cost $0.020 in total, so the warm instance would cost far more than the feature itself.</p>
+      <p>The next day, one repeated eval call that stretched to 44.5 seconds set the server-side deadlines: 6 seconds per attempt and 12 for the whole request. From October 25 the function hedges: if an attempt is silent for 4 seconds, it sends the same request again and takes whichever answers first. Failures went from 16 of 25 in the October 24 function log to 0 of 16 on October 26 and 27.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20The%20first%20LLM%20feature%20in%20a%20spell-check%20app%3A%20cost%2C%20model%20evaluation%20and%20daily%20caps%20for%20%22Why%20is%20this%20wrong%3F%22">Email us</a></p></aside>
+    <section aria-labelledby="usage">
+      <h2 id="usage">3.7% of checking users, 41% of sheet openers</h2>
+      <p>The decision rule went into WATCH.md before release. Fourteen days in, if 8% or more of users who ran a check tapped the button, keep it; under 3%, test a new position and wording. The October 17 review (October 2 to 16, app 1.6.025 or later) counted 56 of 1,527 checking users, 3.7%, with 77 requests. That sits between the two thresholds.</p>
+      <p>Over the same period, 138 users (9.0%) tapped a corrected word to open the sheet, and 56 of them pressed the button. 41% of people who reached the sheet wanted the reason, so the bottleneck was finding the sheet rather than the button. Version 1.6.031, rolled out in stages from October 18, added a one-time hint that the highlighted words can be tapped.</p>
+      <p>With about 8 requests a day, the 14-day cache hit rate was 11% against a 40% target. How the shared cache key was built is covered in <a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">the blind A/B that let us stop sending context to the LLM</a>.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">Mass-created anonymous accounts hit only the global cap</h2>
+      <p>A uid's quota starts over when the app is reinstalled. A script that keeps creating anonymous accounts makes the per-user limit of 5 meaningless; what remains is the global 3,000 and App Check, which defaults to measuring only. If one explanation were expensive, verify the subscription on the server from day one.</p>
+      <p>The 59 cases came only from the checkers' red, green and blue groups (Naver red 25, green 13; Daum red 14, green 5, blue 2); there was not one purple or violet case, and the September 27 scoring was done by the same agent that wrote the code. No human scored it. A model that lives only on the global endpoint also changes what a privacy policy can say about where data is processed; another of our apps ran into that with the same model, written up in <a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">the privacy-policy note on AI processing location</a>.</p>
+    </section>
+    <section aria-labelledby="steps">
+      <h2 id="steps">Adding the same feature to your app</h2>
+      <ol>
+        <li>Make one real model call through a path that bills to Cloud Billing (Vertex AI here). On 402 or 403, stop and settle the billing path first. On 200, check the billing report for the credit deduction.</li>
+        <li>Pull about 50 cases from your app's test data and put accuracy, p95 and cost per 1,000 calls for each candidate in one table. Write the pass mark first, and set the thinking budget of thinking models to 0.</li>
+        <li>Expose one callable function that requires anonymous auth, with three limits (free per user, subscriber ceiling, global) keyed by day in your users' time zone. Keep the limits in a document you can change without a deploy, with 0 meaning closed.</li>
+        <li>Cap input length and output tokens.</li>
+        <li>Give the app a remote switch that hides the button, and check that every entry screen refreshes it.</li>
+        <li>After the production deploy, time the first call to a cold instance and set the app timeout above it. Before release, write the decision rule: two usage thresholds, cache hit rate, failure rate and daily cost.</li>
+      </ol>
+      <p>The default limits and the thinking switch (<code>MAX_OUTPUT_TOKENS</code> is 160):</p>
+      <pre><code>// functions/src/limits.ts
+export const DEFAULT_LIMITS: Limits = { freePerDay: 5, entitledPerDay: 100, globalPerDay: 3000, requireAppCheck: false };
+// functions/src/llm/gemini.ts, part of the generateContent config
+maxOutputTokens: MAX_OUTPUT_TOKENS,
+thinkingConfig: { thinkingBudget: 0 },</code></pre>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Still open: usage after the tap hint, and a price doubling</h2>
+      <p>The tap hint in 1.6.031 is judged by whether 6% or more of users who saw it request an explanation. The review was due November 1, and as of November 2 the log has no row for it yet. 3.8-flash is scheduled to double in price on January 1, 2027, to $1.50 input and $7.50 output per million tokens; on that day the prices and the worst-day figure need recalculating. We also haven't seen a real bill yet, since the 90-day credit is still running.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20The%20first%20LLM%20feature%20in%20a%20spell-check%20app%3A%20cost%2C%20model%20evaluation%20and%20daily%20caps%20for%20%22Why%20is%20this%20wrong%3F%22">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Can Firebase Blaze credit pay for the Gemini API?</summary><div><p>Per the design doc, only Vertex AI is on the credit path in this project; we haven't confirmed it on an invoice yet. The AI Studio key was on prepaid-only billing, so all 59 eval calls on September 27, 2026 were rejected with 402.</p></div></details>
+        <details><summary>How do you cap the cost of an LLM feature?</summary><div><p>Count LLM calls inside the function and refuse them past a daily limit. A budget alert only sends an email. This app closes at 3,000 calls a day, and one Firestore document can change that number or set it to 0 without a deploy.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 04 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Guarding a game result card against rapid taps – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/result-card-tap-through/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/result-card-tap-through/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/result-card-tap-through-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</h1>
+      <p class="lead">Keep result-card buttons from accepting taps for a short while after they appear (600 ms in this game). If a burst of taps runs on, the next tap can restart the level before the player has seen the result.</p>
+      <p>The operator reported it on the morning of October 2, 2026 as "I still had hearts and it suddenly started over," and the agent reproduced the first part within five minutes on level 50 of <a href="https://sugarmount21.com/en/apps/arrow-knots/">Arrow Knots</a>, our then-unreleased puzzle game, on a Galaxy S21. Eight taps on a blocked arrow, 70 ms apart, drained all three hearts in under 250 ms, and the loss card that appeared half a second later had a Retry button that took taps the instant it showed. In that run the taps ended before the card appeared, so no restart was recorded. A finger still tapping when the button appeared would restart the level, so the card got a tap lock. After that fix, the operator asked for a hard stress run. Its first pass crashed the app 28 times, and the cause reproduced on level 22 was a spring animation pushing an index in the drawing code to -1.</p>
+      <p class="note">Sources: commits 6133e9e (08:50 Korea time, October 2) and 69781a7 (12:23 the same day) in the game repository, the agent session log between them (device logs and stress-run output). The game had 300 levels at the time.</p>
+    </section>
+    <section aria-labelledby="tap-chain">
+      <h2 id="tap-chain">Three hearts gone within 250 ms, and no lock on the card's button</h2>
+      <p>In Arrow Knots you tap an arrow and it slides out head first. If something is in the way, it pokes forward, bounces back, and you lose a heart. On level 50 the navy arrow in the top-left corner was blocked by a purple arrow near the top right. The agent tapped that arrow over adb:</p>
+      <pre><code>adb shell 'for i in 1 2 3 4 5 6 7 8; do input tap 360 534 &amp; sleep 0.07; done; wait'</code></pre>
+      <p>Every tap on that arrow during the bounce back counted as a new mistake. The device log shows three blocked taps within 160 ms; the other five taps arrived after game over. Per the session report, the heart display jumped to the final count in a contact callback, so the hearts were still on screen at the moment the last one was lost. On a loss the code waits 550 ms and shows the loss card, and the card's button had no input lock. In this run the last tap (08:37:11.427) came before the card appeared, and the log shows no restart.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/result-card-tap-through-1-en.webp" width="1200" height="796" alt="Step diagram: the reproduction confirmed eight taps 70 ms apart draining three hearts within 250 ms and the loss card appearing; a next tap pressing the unlocked Retry button was a possible path that the lock now blocks." loading="lazy"><figcaption>The reproduction confirmed steps 1 to 3; step 4 was a possible path through an unlocked button, and the 600 ms lock now blocks it.</figcaption></figure>
+      <p>The operator's own guess in the report, that it seemed to happen on mistakes, pointed the right way. The commit message names this path as the cause: the next tap lands on the loss card's Retry button and restarts the level unseen.</p>
+      <p>The operator's symptom could also be explained by the crash found later. That crash also came from tapping a blocked arrow, which is a mistake, and reopening the app after it starts the level over. A crash can restart the level even with hearts left; a restart through the card means the hearts were already at zero and only the display lagged. What this session reproduced on the device was the crash itself, and we read the card path as a possibility that follows from the button's missing lock in the code. With no log from the operator's S24 we could not tell which one it was, and 6133e9e and 69781a7 closed both paths.</p>
+    </section>
+    <section aria-labelledby="first-fix">
+      <h2 id="first-fix">Ignore the bouncing arrow, drop hearts one at a time, lock the card for 600 ms</h2>
+      <p>Commit 6133e9e made four changes:</p>
+      <ul>
+        <li>A repeat tap on an arrow that is still bouncing back is dropped. The check is <code>fx.isBumping(id) &amp;&amp; !state.canRemove(id)</code>; every other arrow stays tappable.</li>
+        <li>The heart display drops one heart per contact (<code>lives = maxOf(state.lives, lives - 1)</code>).</li>
+        <li>The result card's button ignores taps for 600 ms after it appears: a <code>RESULT_ARM_MS = 600L</code> constant, a <code>LaunchedEffect</code> that waits that long, then <code>clickable(enabled = armed)</code>.</li>
+        <li>When a bounce finishes, it no longer clears animations that an exit has started on the same arrow in the meantime.</li>
+      </ul>
+      <p>The same eight-tap burst now cost two hearts instead of three; the eighth tap arrived after the arrow was home and counted as a new mistake. Hammering the button area right after the loss card appeared left the card in place, and a tap after 600 ms restarted the level as it should.</p>
+    </section>
+    <section aria-labelledby="ai-wrong">
+      <h2 id="ai-wrong">The agent guessed the "crash" was a misreading. The app could crash after all</h2>
+      <p>The report had a second symptom: tap the top-left of level 50 quickly and the app closes. On the build before the fix, the agent mixed rapid taps on that arrow, the pause button and the Retry button for 30 seconds, and ran three fresh-install monkey runs on the fixed build. No crash showed up in the log. In its 08:49 report the agent wrote that the operator may have taken the sudden restart for a crash, and asked for the operator's Galaxy S24 to be plugged in over USB if the app had really closed.</p>
+      <p>The operator had the fix committed, then asked for a hard stress test, coordinated with the other session so nothing was left broken. The crash came out of the suite built for that request. Don't close an unreproduced crash as "the user probably misread it." Run a test that plays the game for well over an hour on the same device first (85 minutes for the first pass here, 99 for the rerun).</p>
+    </section>
+    <section aria-labelledby="stress-run">
+      <h2 id="stress-run">First stress run: 5,091 seconds, 30 failures</h2>
+      <p>The agent started with an engine fuzz test: 20 random games on each of the 300 levels, about 1.8 million taps through the rules engine, with zero rule violations, exceptions or dead ends. Then <code>tools/stress_check.py</code> ran on the S21 in four phases:</p>
+      <ul>
+        <li>campaign: all 300 levels back to back in one process. Removable arrows are tapped in fast batches, deliberate mistakes are mixed in (keeping one heart), and about 6% of levels are lost on purpose, then Retry is tapped as the card appears.</li>
+        <li>burst: on 25 levels, 30 near-simultaneous taps anywhere on screen.</li>
+        <li>lifecycle: on 12 levels, home during an animation, pause-button spam, the back key, and process death in the background followed by a restore.</li>
+        <li>monkey: 12 runs of 3,000 events with pinch, back and app switches.</li>
+      </ul>
+      <p>Each level checks logcat for <code>FATAL EXCEPTION</code> and ANRs and checks that the process is alive with <code>pidof</code> (a foreground check was added after the first pass, because of level 37). The first pass took 5,091 seconds and reported 30 failures. Twenty-eight were what the harness judged a crash or ANR, the first on level 80 and the last on level 298. Cumulative failures were 1 by level 50, 5 by level 100, 11 by level 200 and 30 by level 300. The other two were not app bugs: on level 37 the app went to the background without any crash record (we took it as something outside sending it home), and on level 84 uiautomator could not read the Next button while confetti was animating.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/result-card-tap-through-2-en.webp" width="1200" height="526" alt="Bar chart: the first 300-level stress pass had 28 crashes and 2 harness or environment failures; the rerun after the fix had none." loading="lazy"><figcaption>Of the first pass's 30 failures, 28 were crashes; the rerun after the fix had none.</figcaption></figure>
+      <p>The crash buffer had already been cleared, so the top of the first stack trace was gone and only the draw path was left. That means we could not confirm directly that all 28 were the same exception; we treat them as one cause because the rerun after the fix had zero crashes.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Rapid%20taps%20and%20an%20unlocked%20Retry%20button%3A%20a%20600%20ms%20result-card%20lock%2C%20and%20the%2028%20crashes%20a%20stress%20run%20found%20next">Email us</a></p></aside>
+    <section aria-labelledby="spring-index">
+      <h2 id="spring-index">A spring overshot and the draw code read points[-1]</h2>
+      <p>The agent's next guess was memory. Twenty-five levels from level 76 in a fresh process passed with no failure, and the first pass had only crashed after long play.</p>
+      <p>The 10:28 note gives one clue, that the crashes clustered in the later levels with larger boards (200 and up); the surviving stack was also only the draw path. The agent suspected board size over a leak, guessed that a spring overshoot pushed the index in <code>Track.body()</code> out of range, and at 10:38 tapped an arrow with a far blocker. Memory was checked along the way: a rerun logging memory showed GPU memory moving between 180 and 240 MB rather than climbing.</p>
+      <p>Arrow 6 on level 22 sits 8.55 cells from the arrow that blocks it. One tap closed the app:</p>
+      <pre><code>java.lang.IndexOutOfBoundsException: Index -1 out of bounds for length 23</code></pre>
+      <p>A blocked arrow pokes forward all the way to its blocker, so a longer gap means a longer poke. It springs home with <code>spring(dampingRatio = 0.5f, stiffness = 600f)</code>, which, per the commit message, overshoots behind the start by about 16% of the poke. The commit message puts the line at "a blocker 6+ cells away," and the TrackTest comment notes an arrow with its blocker 8.55 cells away springing back to travel of about -1.4; per the session log, that is arrow 6 on level 22. Below -1, <code>Track.body(t)</code>, which builds the arrow's body polyline, uses <code>floor(t) + 1</code> as an index and reads <code>points[-1]</code>. That code runs inside draw, so one exception takes the whole app down.</p>
+      <p>Level 50 has no such arrow at the start, which is why 30 seconds of scripted adb tapping found nothing. Gaps grow as the board clears, so any level could hit it mid-game, and the larger boards in later levels hit it more often.</p>
+      <p>Commit 69781a7 bounds the spring with <code>anim.updateBounds(lowerBound = -0.12f)</code> and, if the bound is hit (<code>AnimationEndReason.BoundReached</code>), finishes the trip home with a 120 ms tween. <code>Track.body</code> clamps its index with <code>coerceAtLeast(0)</code> and <code>k &lt; points.size</code>, so no travel value can crash it. The regression test <code>TrackTest</code> draws every arrow in the level pack from travel -40 to 40 past the exit in steps of 0.37, and the agent first confirmed that it fails against the old <code>Track.kt</code>. Three taps on each of four far-blocked arrows (levels 22, 72, 92 and 122) no longer crashed, and the full rerun (300-level campaign plus burst, lifecycle and 12 monkey runs) took 5,935 seconds with zero failures, with the fresh-install monkey check at 3/3.</p>
+    </section>
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">We blocked one arrow, not the whole board</h2>
+      <p>Locking all board input for a moment would also have stopped the tap problem. 6133e9e only drops repeat taps on the arrow that is bouncing. The commit just before it (6dfa183) added a combo that rewards removing arrows in quick succession, and we think a global lock on a combo board would block legitimate fast play too; the record doesn't say why it wasn't used. Locking only the result card was another option, but hearts would still drain within 250 ms and the player would land on a loss card without knowing why. 6133e9e ships the tap guard, the one-heart-per-contact display and the card lock together.</p>
+      <p>On the crash side, making the draw code safe would have been enough to stop the app dying. The spring bound went in as well because of a reason in the code comment: the overshoot drags the arrow's tail cells behind its start, so the drawing goes wrong even without a crash.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">1.8 million fuzz taps never touched the draw code</h2>
+      <p>The engine fuzz test passed on the same day the app crashed 28 times. The rules engine only tracks rule state (blocking, removal, hearts); it never sees animation travel or drawing indexes.</p>
+      <p>The stress harness assumes a debug build. It writes the level into the progress file with <code>run-as</code> and computes tap positions from board bounds printed in a debug log. As of 69781a7 the suite had never run on an R8-minified release build, and only one device, the S21, had run it.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">From an eight-tap burst to a 300-level run in six steps</h2>
+      <ol>
+        <li>Pick an object that bounces when blocked and send the eight-tap burst above, 70 ms apart. Check that hearts lost match mistakes made, and that a person can actually see the result screen.</li>
+        <li>Count repeat taps on an animating object as one mistake. Keep a per-object "bouncing" set, and let a tap through once the object can actually leave.</li>
+        <li>Ignore the result card's buttons and the back key for a fixed time after it appears (600 ms here). Use the same constant for every button that changes the level, such as next and retry.</li>
+        <li>Find draw code that turns an animation value into an array index and make it safe for any value. Bound springs with <code>updateBounds</code> and finish with a tween on <code>BoundReached</code>.</li>
+        <li>Write a unit test that draws every shipped object at out-of-range values, and confirm it fails with the fix reverted.</li>
+        <li>Play every level back to back in one process, mixing deliberate mistakes, deliberate losses with a Retry tap as the card appears, simultaneous taps, lifecycle events and monkey. Judge on three signals (crash or ANR in the log, the process alive, the app in the foreground) and write the full trace to a file as soon as a crash is seen. stress_check.py checks these three after each level (replace the package name with your app's):</li>
+      </ol>
+      <pre><code>adb logcat -d | grep -E "FATAL EXCEPTION|ANR in your.package"
+adb shell pidof your.package
+adb shell "dumpsys window | grep mCurrentFocus"</code></pre>
+      <p>The tutorial crash that the fresh-install monkey caught the night before is written up in <a href="https://sugarmount21.com/en/ax/fresh-install-monkey-test/">VIBRATE crash and the fresh-install monkey test</a>.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Next on an R8 release build: the level-22 tap and the eight-tap burst</h2>
+      <p>Next is one tap on arrow 6 of level 22 and the eight-tap burst on level 50, on an R8 release build. Nothing in the record says how 600 ms was chosen, so timing card-to-first-tap in real play recordings and revisiting the value is still open.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Rapid%20taps%20and%20an%20unlocked%20Retry%20button%3A%20a%20600%20ms%20result-card%20lock%2C%20and%20the%2028%20crashes%20a%20stress%20run%20found%20next">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>How do I stop rapid taps from hitting a button that just appeared in Compose?</summary><div><p>This game uses <code>clickable(enabled = armed)</code> plus one state that a <code>LaunchedEffect</code> turns on 600 ms after the screen appears. A typical debounce, which takes the first tap and drops the rest, still accepts a first tap carried over from the previous screen, so the lock is timed from when the screen appeared.</p></div></details>
+        <details><summary>Why didn't the monkey test find it?</summary><div><p>The fresh-install monkey starts in the tutorial and the first levels. The defect needs a tap on an arrow whose blocker is 6 or more cells away, like arrow 6 on level 22 at 8.55 cells, and it first appeared on level 80 of a run that cleared all 300 levels.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 04 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Moving Claude Code from WSL to native Windows – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/wsl-to-windows-claude-code-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Method</span>
+      <h1>Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</h1>
+      <p class="lead">Copying the repos takes three git settings; the session logs also need their cwd rewritten and log retention raised. We called it done after an R8 release build passed 1,500 monkey events.</p>
+      <p>The first R8 release build of the image compressor app in sugar-utils on native Windows took 5 min 50 s, and 1,500 monkey events against that APK produced zero crashes and zero ANRs. The move started at 11:02 on October 18, 2026, and this check closed out the repo copy and tool installs around 4 p.m. the same day. Session logs and Docker were not sorted out until October 22, and along the way the agent got five things wrong.</p>
+      <p class="note">Sources: three Claude Code session logs (jsonl) from the move, the memory file that records it, and the global instruction file before and after. Numbers were rechecked against the logs on November 2, 2026. Times are Korea Standard Time.</p>
+    </section>
+    <section aria-labelledby="checklist">
+      <h2 id="checklist">The checklist, in eight steps</h2>
+      <p>We had used WSL because Claude Code used to be slow in the Windows terminal, with many features not working. On October 18 the operator asked whether Windows was usable now; the agent said yes and suggested trying one project for a day or two first. The operator said to move everything at once, and when approving the tool installs, told it to run a build as well. Keeping the projects in WSL and opening them from Windows through the WSL network path was ruled out because the agent called that path very slow (we never timed it).</p>
+      <p>If you follow this order, most of what went wrong for us gets caught early.</p>
+      <ol>
+        <li>Copy projects from the WSL home to the Windows home. Don't move them. Leave out <code>node_modules</code>, <code>build</code>, <code>.gradle</code>, <code>.dart_tool</code>, <code>.next</code> and <code>.cxx</code>.</li>
+        <li>Run <code>git status --porcelain | wc -l</code> in every repo on both sides and make sure the counts match.</li>
+        <li>Set <code>core.filemode=false</code> (submodules too), switch repos with symlinks to <code>core.symlinks=true</code> and check the links out again, run <code>git worktree repair</code>, and fix <code>sdk.dir</code> in Android's <code>local.properties</code>.</li>
+        <li>Check tool versions and install what's missing per user, without admin rights.</li>
+        <li>Rewrite the environment section of your Claude Code instruction file and delete workarounds that only WSL needed.</li>
+        <li>Raise <code>cleanupPeriodDays</code> before you copy session logs. Then copy them under the new folder names, rewrite <code>cwd</code> inside them, and look for logs in <code>.claude/projects</code> under the WSL root account's home too. Sessions that kept running in WSL after the move need one last sync. Finally, open <code>claude --resume</code> in each project folder and check the old sessions are listed; run it from any other folder and the session is saved under a separate project folder.</li>
+        <li>Turn off whatever wakes Ubuntu, and if you run Docker Desktop, stop only Ubuntu with <code>wsl --terminate &lt;distro&gt;</code>. You're done when <code>wsl -l -v</code> shows Ubuntu as Stopped and docker-desktop as Running. If you change <code>.wslconfig</code>, applying it takes one <code>wsl --shutdown</code>, and Docker stops briefly with it (our containers were back within a minute).</li>
+        <li>Install an R8 release build on an emulator, run 1,500 monkey events, and check the crash buffer and that the process is still alive.</li>
+      </ol>
+      <p>These are the commands we used for steps 1 and 3, gathered into one block, with repo names replaced by placeholders. Links inside a repo were found as the files git records with mode 120000.</p>
+      <pre><code># step 1 (inside WSL)
+rsync -a --no-links --exclude=node_modules --exclude=build --exclude=.dart_tool \
+  --exclude=.gradle --exclude=.next --exclude=.cxx &lt;folders&gt; &lt;Windows home&gt;/
+# step 3 (Git Bash, per repo)
+r=&lt;repo&gt;
+git -C "$r" config core.filemode false
+git -C "$r" submodule foreach --quiet 'git config core.filemode false'
+export MSYS=winsymlinks:nativestrict
+git -C "$r" config core.symlinks true
+git -C "$r" ls-files -s | awk '$1=="120000"{ $1=$2=$3=""; sub(/^ +/,""); print }' &gt; "$TMP/links.txt"
+while IFS= read -r p; do rm -f "${r:?}/${p:?}"; done &lt; "$TMP/links.txt"
+tr '\n' '\0' &lt; "$TMP/links.txt" | xargs -0 git -C "$r" checkout --
+git -C &lt;main repo&gt; worktree repair &lt;worktree paths...&gt;</code></pre>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/wsl-to-windows-claude-code-1-en.webp" width="1200" height="966" alt="Step diagram: on October 18, 35 folders copied and git settings fixed, then a 5 min 50 s release build and 1,500 monkey events with zero crashes; on October 21, cwd rewritten in 31 session logs and five September logs restored; on October 22, nine more logs including eight from root, and Ubuntu terminated." loading="lazy"><figcaption>Repos and tools were moved and verified on October 18; session logs and stopping WSL took until October 22.</figcaption></figure>
+    </section>
+    <section aria-labelledby="git-settings">
+      <h2 id="git-settings">Git settings for the copied repos</h2>
+      <p>From inside WSL, <code>rsync -a --no-links</code> copied 35 folders (16 of them sugar-game worktrees) and one bundle file to the Windows home, about 1.5 GB once build outputs were excluded. The WSL originals stayed where they were as a backup. That was the operator's rule, and we went back to those originals twice to recover session logs the first pass had missed.</p>
+      <p>Because of <code>--no-links</code>, rsync skipped every symlink with "skipping non-regular file". In the three repos that had links, we set <code>core.symlinks=true</code>, exported <code>MSYS=winsymlinks:nativestrict</code> in Git Bash, deleted the placeholder files and ran <code>git checkout</code> on them. In sugar-utils, <code>CLAUDE.md</code> came back as a real link to <code>AGENTS.md</code>. Every repo and submodule got <code>core.filemode=false</code> so permission-bit differences don't show up as changes. sugar-game's 16 worktrees still pointed at Linux paths in their <code>.git</code> files; <code>git worktree repair</code> fixed the "gitdir incorrect" entries.</p>
+      <p>To check the copy, we compared the <code>git status --porcelain</code> line count of each repo against the WSL original: 23 for sugar-game, 0 for sugar-utils, and so on. All matched except one repo, where a browser download marker, <code>…pptx:Zone.Identifier</code>, had been committed by mistake. Windows doesn't allow a colon in file names, so the file couldn't be created; <code>git update-index --skip-worktree</code> told git to ignore it.</p>
+    </section>
+    <section aria-labelledby="toolchain">
+      <h2 id="toolchain">Tool versions, and two workarounds we deleted</h2>
+      <p>The WSL-era instruction file listed node 20 and python 3.10. Windows already had node 22 and python 3.12, so the environment section we rewrote that morning used those (v22.18.0 and 3.12.3 as of November 2). The <code>java</code> on PATH was a Java 8 JRE with no javac, so JDK 21 went into the user folder from a zip and Gradle was pointed at it with <code>org.gradle.java.home</code> in <code>~/.gradle/gradle.properties</code>. The winget install of the Google Cloud CLI stalled on a UAC prompt that was never approved, so we unpacked Google's zip into the user folder and added it to the user PATH. In Git Bash it has to be called as <code>gcloud.cmd</code>. jq, which WSL never had, and rg, which Windows lacked, came from winget with <code>--scope user</code>.</p>
+      <p>Some of our Android projects live on another Windows drive. Under WSL that drive was mounted over the 9p file system, Gradle's lock files broke there, and the instruction file told the agent to pass a separate <code>--project-cache-dir</code> or build from a copy on the Linux side. On native Windows the drive is used directly, so the new file drops that rule. A second line went too: "flutter on PATH is the Windows SDK, so call the Linux SDK by absolute path" no longer applies with only the Windows SDK left. Across the 5 sessions for projects on that drive since the move (81 jsonl files counting subagent logs), <code>Timeout waiting to lock</code> and <code>Could not lock</code> appear zero times, though few full builds ran there in that period.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/wsl-to-windows-claude-code-2-en.webp" width="1200" height="731" alt="Comparison: the WSL-era instructions list node 20, python 3.10, a Gradle lock workaround for the 9p-mounted drive and absolute paths to the Linux SDK; the Windows instructions list node 22, python 3.12, direct builds on the Windows drive and a single Windows SDK." loading="lazy"><figcaption>After the move, the versions in the environment section went up and two WSL-only workarounds disappeared.</figcaption></figure>
+    </section>
+    <section aria-labelledby="session-logs">
+      <h2 id="session-logs">Session logs live outside the project folder</h2>
+      <p>With every project copied, <code>claude --resume</code> on Windows still showed none of the old sessions. Claude Code keeps session logs under <code>~/.claude/projects/</code>, in a folder named after the working directory's absolute path. sugar-utils in the Linux home maps to <code>-home-&lt;user&gt;-sugar-utils</code>, and the same folder in the Windows home maps to <code>C--Users-&lt;user&gt;-sugar-utils</code>. On the night of October 18 we copied the 14 folders that had logs (about 3.1 GB) under their new names.</p>
+      <p>They still didn't show up as of October 21, because every line in a log carries a <code>"cwd"</code> field, and those still held Linux paths. When the agent tried to rewrite them in bulk, Claude Code's automatic permission check blocked it as tampering with session transcripts. We didn't work around the check. The agent wrote a script that changes only <code>cwd</code>, the operator ran it with a <code>!</code> command, and 31 files were rewritten.</p>
+      <p>In each log, the script changes the <code>cwd</code> value from the Linux path to the Windows path and leaves the conversation text and the file's modification time alone. It only rewrites the top-level session files; subagent logs in subfolders are left as they are. Sessions opened outside the home (on another drive, for example) need their own line for that path. Below is the actual script with the second-drive handling and the user name taken out, and the Windows home detected automatically. If you run it with <code>!</code> from Git Bash, pass the script path with forward slashes; the shell strips backslashes, which is why our first run couldn't find the file.</p>
+      <pre><code># Rewrite only cwd in copied session logs (.jsonl) to Windows paths. Keeps mtime.
+import os, re, glob
+LINUX_HOME = '/home/&lt;user&gt;'
+WIN_HOME = os.path.expanduser('~')          # %USERPROFILE%
+root = os.path.join(WIN_HOME, '.claude', 'projects')
+pat = re.compile(r'"cwd":"' + re.escape(LINUX_HOME) + r'((?:/[^"]*)?)"')
+def rep(m):
+    # inside a JSON string, so backslashes are doubled
+    path = (WIN_HOME + m.group(1).replace('/', '\\')).replace('\\', '\\\\')
+    return '"cwd":"%s"' % path
+n = 0
+for f in glob.glob(os.path.join(root, '*', '*.jsonl')):
+    with open(f, encoding='utf-8') as fh:
+        s = fh.read()
+    if '"cwd":"' + LINUX_HOME not in s:
+        continue
+    st = os.stat(f)
+    with open(f, 'w', encoding='utf-8', newline='') as fh:
+        fh.write(pat.sub(rep, s))
+    os.utime(f, (st.st_atime, st.st_mtime))
+    n += 1
+print('rewritten', n)</code></pre>
+      <p>That is when we noticed five logs from September 18 to 20 were gone. The agent had kept the original modification times when copying, and by default Claude Code deletes logs untouched for more than 30 days when it starts. We added <code>"cleanupPeriodDays": 3650</code> to <code>~/.claude/settings.json</code> and copied the five back from WSL.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Leaving%20WSL%20for%20native%20Windows%3A%20a%20checklist%20for%20moving%20a%20Claude%20Code%20dev%20environment">Email us</a></p></aside>
+    <section aria-labelledby="ai-errors">
+      <h2 id="ai-errors">Eight missed root logs, and a shutdown that took Docker down</h2>
+      <p>On the night of October 22 the operator said the session logs didn't seem to have come across properly. The agent had already reported the job finished. A second look found it had missed all 8 logs under the WSL root account, and one session that kept running in WSL after the move was out of date. After those 9 were copied and their <code>cwd</code> rewritten, no log with a Linux path was left.</p>
+      <p>The agent was also wrong about stopping WSL. Six of its reports from October 18 to the afternoon of October 22 told the operator to ask for <code>wsl --shutdown</code>. On the night of October 22 the operator ran it, and Docker went down with it. Two more reports after that still carried the same line. <code>--shutdown</code> stops the whole WSL2 virtual machine, and Docker Desktop runs in a <code>docker-desktop</code> distro on that same VM. The command that stops only Ubuntu is <code>wsl --terminate Ubuntu-22.04</code>. When Ubuntu came back up afterwards, the likely cause was a <code>find</code> the agent had started inside Ubuntu earlier to search for session logs, still running.</p>
+      <p>Asked to remove one plugin, the agent read the request as all installed plugins and removed 22 user-scope plugins without looking at how often they were used. When the operator asked why things in use were being removed, the agent counted MCP calls in the last 60 days of session logs. The separately registered github and context7 MCP servers had 0 calls; among the removed plugins, Notion had 1,437 and playwright 59. Both went back in. Count calls before you remove a plugin.</p>
+    </section>
+    <section aria-labelledby="wake-sources">
+      <h2 id="wake-sources">Four things that kept waking Ubuntu</h2>
+      <p>Keeping WSL as a cold backup only works if Ubuntu stays off. A script in the Startup folder that launched a bot inside WSL, the Ubuntu WSL integration in Docker Desktop's settings, a network drive permanently mapped into Ubuntu, and the leftover <code>find</code> above all started it. The script and the Docker settings were moved to a backup folder or switched off rather than deleted, and the drive was unmapped with <code>net use</code> and <code>/delete</code>. Our personal dashboard server on Docker had already been moved to a Windows path and a Docker volume, so it keeps running with Ubuntu stopped. The Ubuntu distro stays registered and Stopped as a backup; we're not deleting it.</p>
+      <p>The WSL2 VM that Docker Desktop uses stays up, so we shrank it in <code>.wslconfig</code> to memory=3GB, processors=2, swap=1GB and autoMemoryReclaim=dropCache. Opening the Linux entry in File Explorer, or any WSL network path, starts Ubuntu again; <code>--terminate</code> it when that happens.</p>
+    </section>
+    <section aria-labelledby="verify">
+      <h2 id="verify">Calling it done: an R8 build and 1,500 monkey events</h2>
+      <p>The R8 crash in our <a href="https://sugarmount21.com/en/ax/release-gate/">release gate note</a> never showed up in a debug build, so we judged the environment move the same way: <code>assembleRelease</code> with <code>--no-daemon</code> for the image compressor app in sugar-utils. The first attempt lost its result when the session ended. The rerun, logging to a file, went through 337 tasks (298 executed, 39 from cache), including <code>minifyReleaseWithR8</code>, in 5 min 50 s. It was the first build on Windows, with no configuration cache yet.</p>
+      <pre><code>adb -s emulator-5554 install -r app-release.apk
+adb -s emulator-5554 logcat -c
+adb -s emulator-5554 shell monkey -p &lt;package&gt; --throttle 200 --pct-syskeys 0 -v 1500
+adb -s emulator-5554 shell pidof &lt;package&gt;
+adb -s emulator-5554 logcat -d -b crash</code></pre>
+      <p>On a Pixel 8 Pro API 35 emulator, monkey printed "Events injected: 1500" and "Monkey finished", <code>pidof</code> returned a process ID, and the crash buffer was empty. Two real phones were plugged in, but we didn't install on them, since that could overwrite the Play build. This run used <code>install -r</code>, which replaces an existing install, and we didn't check whether the app data was fresh. Defects that only show up on a fresh install are covered in <a href="https://sugarmount21.com/en/ax/fresh-install-monkey-test/">the VIBRATE permission and fresh-install monkey test</a>.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">Step 3 fails on machines that can't create symlinks</h2>
+      <p>On a machine that can't create native symlinks, step 3's <code>core.symlinks=true</code> re-checkout won't work as written (this one could). We didn't copy the Linux Flutter and Android SDKs and use the Windows ones instead.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">No build-time comparison yet; only the operator saw the /resume list</h2>
+      <p>We haven't timed the same build on native Windows and WSL under the same conditions. The agent never opened the <code>/resume</code> list itself; the last check was the operator saying on October 22 that it seemed to work. We also haven't checked whether the emulator lab's shell scripts were rerun on native Windows. The moved sessions still mention the old Linux paths in their conversation text, so on resume the agent may first try those paths. The agent's advice in its report was to tell it the new path once when resuming; we haven't looked for a better fix.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Leaving%20WSL%20for%20native%20Windows%3A%20a%20checklist%20for%20moving%20a%20Claude%20Code%20dev%20environment">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Can Claude Code run on Windows without WSL?</summary><div><p>On this machine it does, using PowerShell and Git Bash side by side, through an Android release build and emulator tests. To paste an image on Windows, use <code>Alt+V</code> instead of <code>Ctrl+V</code>.</p></div></details>
+        <details><summary>Can I move Claude Code session history from WSL to Windows?</summary><div><p>Yes, but copying the folder isn't enough. Rename the folders under <code>~/.claude/projects/</code> to match the Windows paths and rewrite the <code>cwd</code> values inside the logs; after that, the operator reported that <code>/resume</code> seemed to work. Raise <code>cleanupPeriodDays</code> first, or older logs can be deleted.</p></div></details>
+        <details><summary>What is the difference between wsl --shutdown and wsl --terminate?</summary><div><p><code>--shutdown</code> stops the whole WSL2 VM, which also stops Docker Desktop running on it. <code>--terminate &lt;distro&gt;</code> stops just that distro.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 04 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>Claude Code auto-compaction: what 9 summaries kept – SugarMount</title>
     <link>https://sugarmount21.com/en/ax/compaction-summary-memory/</link>
@@ -120,12 +485,12 @@ How to apply: when setting or changing this campaign, the user's instruction bea
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -233,12 +598,12 @@ edge = if (next &lt; edge) next else edge - 1 // strictly decreasing</code></pre
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -375,8 +740,8 @@ git log --diff-filter=A --format="%h %ad %s" --date=iso -- &lt;scoring file&gt;
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -482,8 +847,8 @@ POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
         <li><a href="https://sugarmount21.com/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -606,9 +971,9 @@ print("first", shows[:1], "gaps", [b - a for a, b in zip(inter, inter[1:])],
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -729,12 +1094,12 @@ Severity is exactly one of Blocker, High, Medium, Low</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -858,8 +1223,8 @@ def diff(a_png, b_png, top=300, bottom=330):
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -988,12 +1353,12 @@ def diff(a_png, b_png, top=300, bottom=330):
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1110,12 +1475,12 @@ expect(all.sort()).toEqual(files.sort());</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1399,12 +1764,12 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1486,12 +1851,12 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1580,12 +1945,12 @@ git grep -nE "addOn(Complete|Success|Failure|Canceled)Listener\((this|requireAct
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1698,12 +2063,12 @@ depth(board):                   # peel
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1836,9 +2201,9 @@ depth(board):                   # peel
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1951,12 +2316,12 @@ if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2058,12 +2423,12 @@ git diff --name-only $(git merge-base &lt;base&gt; &lt;branch&gt;) &lt;branch&gt
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2150,12 +2515,12 @@ unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$TEST_PUB[~/][0-9]*" | sort -u | wc
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2290,9 +2655,9 @@ lifecycleScope.launch {
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2402,12 +2767,12 @@ lifecycleScope.launch {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2506,12 +2871,12 @@ three_star = cleared and time &lt;= par(base, scale, floor) and mistakes &lt;= a
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2627,8 +2992,8 @@ print(pages.most_common(), "FAQ questions:", questions)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
         <li><a href="https://sugarmount21.com/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2744,9 +3109,9 @@ NOT_TEST = {"notExpression": {"orGroup": {"expressions": [
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2851,8 +3216,8 @@ export function cacheKey(api, group, original, corrected, model) {
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2978,12 +3343,12 @@ const gaps = await agent(CTX + CHECKLIST + final + dossier, { schema: CRIT })</c
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3094,12 +3459,12 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(":core
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3218,12 +3583,12 @@ git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --gre
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3363,8 +3728,8 @@ adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3495,9 +3860,9 @@ print("my app in results:", MY_APP in ids)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3624,8 +3989,8 @@ out of date:
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
         <li><a href="https://sugarmount21.com/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3743,8 +4108,8 @@ grep -rL --include='*Test.kt' -e 'assert' -e 'check(matches' app/src/</code></pr
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3884,9 +4249,9 @@ git log --until=2026-10-20 --format='%(trailers:key=Co-authored-by,valueonly)' \
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3992,8 +4357,8 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4155,12 +4520,12 @@ after_hint = win(board after the correct first move, 2 pieces left, lines it cle
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4274,12 +4639,12 @@ Schedule expires: YYYY-MM-DD / register again on: YYYY-MM-DD
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4420,8 +4785,8 @@ curl -s "$POLICY_URL" | grep -o 'data-policy-version="[0-9-]*"'</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4566,12 +4931,12 @@ font.save(dst)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4659,12 +5024,12 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4749,12 +5114,12 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4874,8 +5239,8 @@ flutter test test/theme_matrix/ --dart-define=Y2_NO_SETTLE=true
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4994,12 +5359,12 @@ FlowRow(
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5078,12 +5443,12 @@ Mem:              13           8           2           0           2           4
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5210,9 +5575,9 @@ if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFract
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5336,8 +5701,8 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5435,12 +5800,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5505,8 +5870,8 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5895,12 +6260,12 @@ room  = is there space for a 3×3 square, a 1×4 bar, a 4×1 bar (0–3)</code><
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6010,8 +6375,8 @@ done</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6117,12 +6482,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6493,304 +6858,6 @@ done</code></pre>
       <p>An Android app that opens Korean HWP and HWPX documents and PDFs straight from KakaoTalk or email, and reopens them on the page you were reading. No ads and no sign-up, and documents stay on your phone. With Pro you can change body and table cell text in HWP documents and save a new file. Works on Android 10 and later.</p>
       <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugardoc&amp;referrer=utm_source%3Dsugarmount21.com%26utm_medium%3Dhowto%26utm_campaign%3Dsugardoc&amp;hl=en" rel="noopener">Get HWP Viewer SugarDoc on Google Play</a><a class="button button--outline" href="https://sugarmount21.com/en/apps/doc-viewer/">About HWP Viewer SugarDoc</a></div>
       <p class="muted">This product was developed with reference to Hancom's public HWP document file (.hwp) specification. HWP Viewer SugarDoc is not affiliated with or endorsed by Hancom Inc. Hancom and HWP are trademarks of Hancom Inc.</p>
-    </section>]]></description>
-    <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Resize an ID photo for Korean application uploads – SugarMount</title>
-    <link>https://sugarmount21.com/en/apps/image-compress/id-photo-size/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/apps/image-compress/id-photo-size/</guid>
-    <description><![CDATA[<section class="hero">
-      <span class="eyebrow">Help · Android</span>
-      <h1>Resize an ID photo for Korean application uploads</h1>
-      <p class="lead">Korean upload forms often cap ID photos at a file size such as 500 KB. Compress Image saves your photo as a JPEG under the limit you set. It does not crop to a ratio, so crop first if pixel sizes are fixed.</p>
-      <p class="note">This guide uses Compress Image 1.0.6, an Android app made by SugarMount. Rules differ by site, so we don't invent numbers here; the only example is the Korean passport photo, which has an official guide.</p>
-    </section>
-    <section aria-labelledby="check-first">
-      <h2 id="check-first">Check the site's rules first</h2>
-      <p>Photo fields on Korean application, job and government sites usually set three separate conditions. Meeting one of them is not always enough.</p>
-      <ul>
-        <li><strong>File size</strong>: written as "500KB 이하" (500 KB or less). This is what the app fits.</li>
-        <li><strong>Pixel size</strong>: for example 413 × 531 pixels. A fixed ratio means the photo must be cropped to it.</li>
-        <li><strong>File type</strong>: usually JPG (JPEG). The app always saves JPEG.</li>
-      </ul>
-      <p>The rules are in the notice or next to the upload button. For any site not covered here, follow that notice.</p>
-    </section>
-    <section aria-labelledby="without-app">
-      <h2 id="without-app">Without an app, and the limits</h2>
-      <ul>
-        <li><strong>Ask the photo studio for a file</strong>: studios can often hand over a digital file sized for submission. This is the surest route, but you need to go back if the photo is already taken.</li>
-        <li><strong>Your gallery app's editor</strong>: most Android gallery apps can crop, which handles the ratio. Menu names and resize options vary by phone and version, so we don't list them. After saving, check the real file size and pixels in the photo's details.</li>
-        <li><strong>For a passport photo, the government resize tool</strong>: the Ministry of Foreign Affairs passport site has an <a href="https://www.passport.go.kr/home/kor/photoVerify/index.do?menuPos=34" rel="noopener">online passport photo resize tool</a> (Korean only). You upload a photo, zoom and move it until the face fits a red dotted guide, then save. It accepts JPG or PNG under 1 MB, and the page says the result is not for ID, half-size or visa photos.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="app-steps">
-      <h2 id="app-steps">Shrink it with Compress Image</h2>
-      <ol class="steps">
-        <li><strong>Select photos</strong>: tap <strong>Select photos</strong> on the first screen and pick the ID photo. The app uses the Android photo picker, so it asks for no storage permission.</li>
-        <li><strong>Method: Fit to size</strong>: on the Options screen, choose <strong>Fit to size</strong> under <strong>Method</strong>.</li>
-        <li><strong>Pick the limit</strong>: under <strong>Size limit per photo</strong>, pick 100 KB, 200 KB, 500 KB or 1 MB, equal to or below the site's limit. If none matches, tap <strong>Custom</strong> and enter 20 to 20000 KB.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugarcompress/id-photo-size-1-en.webp" width="360" height="553" loading="lazy" alt="The Options screen with Fit to size selected, size limits from 100 KB to 1 MB plus Custom, and a Long edge row offering Keep, 1280, 1920 and 2560 px."></figure></li>
-        <li><strong>Set the long edge if pixels are fixed</strong>: on the same screen, open <strong>Long edge</strong>, tap the custom option and enter 320 to 8000 px. The aspect ratio stays the same, so if you already cropped to the required ratio, the short edge follows. A photo cropped to 3.5 : 4.5 with a long edge of 531 comes out at 413 × 531 pixels.</li>
-        <li><strong>Check the result</strong>: tap <strong>Create results</strong>. Each photo shows its size before → after and its width × height in pixels. These are the real sizes of the files that will be saved.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugarcompress/id-photo-size-2-en.webp" width="360" height="327" loading="lazy" alt="The result screen shows the total going from 8.58 MB to 1.44 MB, 84 percent smaller, and each photo with its new size, such as 2.63 MB to 485 KB, and pixel size, such as 4000 × 3000 px."><figcaption class="muted">Three sample photos shrunk to a 500 KB limit. With the long edge on Keep, they stay at sizes like 4000 × 3000 pixels, which a site with pixel rules will reject.</figcaption></figure></li>
-        <li><strong>Save or share</strong>: <strong>Save all</strong> writes new files to <code>Pictures/SugarCompress</code>, and <strong>Share</strong> sends them straight to another app. Your original photos are not changed.</li>
-      </ol>
-      <p class="muted">Screens are real app captures taken on an Android emulator in September 2026 for the Play listing, with sample pictures. Menu labels match the app's 1.0.6 source.</p>
-    </section>
-    <section aria-labelledby="passport">
-      <h2 id="passport">Korean passport photo upload rules</h2>
-      <p>The passport site lists the files it accepts for online renewal (quoted in Korean, our translation below):</p>
-      <blockquote cite="https://www.passport.go.kr/home/kor/contents.do?menuPos=12" lang="ko"><p>"파일 크기 500KB 이하, 파일 형식 JPG/JPEG"<br>"가로 413 픽셀(pixel), 세로 531 픽셀 사이즈 권장(가로 395~431 픽셀, 세로 507~550 픽셀 이내만 업로드 가능)"</p></blockquote>
-      <p class="muted">File size 500 KB or less, JPG/JPEG. Recommended 413 pixels wide by 531 high; only 395–431 wide and 507–550 high can be uploaded. Source: <a href="https://www.passport.go.kr/home/kor/contents.do?menuPos=12" rel="noopener">Ministry of Foreign Affairs passport site, photo files for online applications</a>, checked October 18, 2026. Rules can change, so check again before you submit.</p>
-      <p>The app can meet the size, the JPEG type and the long edge. It does not judge head size, the white background or whether the photo was taken in the last six months. The same page also advises against phone photos:</p>
-      <blockquote cite="https://www.passport.go.kr/home/kor/contents.do?menuPos=12" lang="ko"><p>"휴대폰 등 모바일 기기로 촬영된 사진, 사진 편집 프로그램 등으로 과도한 보정을 한 사진은 여권 발급 시 사진이 실물과 다르게 표현될 수 있으므로 권장하지 않음"</p></blockquote>
-      <p class="muted">Photos taken on phones or heavily retouched are not recommended, because they may look different from the person in the issued passport.</p>
-      <p>You can test the result with the site's <a href="https://www.passport.go.kr/home/kor/onlinePhotoVerify/index.do?menuPos=33" rel="noopener">online passport photo check</a>. The site says this check is for reference and the real review may differ.</p>
-    </section>
-    <section aria-labelledby="compare">
-      <h2 id="compare">Methods compared</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Method</th><th scope="col">Set a size limit</th><th scope="col">Crop to a ratio</th><th scope="col">Set pixels</th><th scope="col">Where it works</th></tr></thead>
-          <tbody>
-            <tr><th scope="row">Compress Image app</th><td>Yes (20 KB–20 MB)</td><td>No</td><td>Long edge only (320–8000 px)</td><td>Any site with a size limit</td></tr>
-            <tr><th scope="row">Gallery app editor</th><td>Varies by phone</td><td>Usually (crop)</td><td>Varies by phone</td><td>Anywhere on the phone</td></tr>
-            <tr><th scope="row">Passport photo resize tool</th><td>Not stated</td><td>Yes (face to guide)</td><td>Set by the tool</td><td>Passport online application only</td></tr>
-            <tr><th scope="row">Studio file</th><td>If you ask</td><td>Yes</td><td>If you ask</td><td>When taking a new photo</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p><strong>Verdict:</strong> if the site only sets a file size, the app alone is enough. If it also fixes the ratio and pixels, as for passports, crop first (for passports, use the official tool), then use the app last for the size and long edge.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">When it doesn't work, and limits</h2>
-      <ul>
-        <li><strong>No cropping to a ratio.</strong> The aspect ratio stays as it is. Crop in your gallery app or the passport tool first.</li>
-        <li><strong>No enlarging.</strong> If the original is smaller than required, a larger long edge changes nothing. Get the original file or a studio file instead.</li>
-        <li><strong>Pixels may shrink too.</strong> If lower quality still misses the limit, the app reduces the long edge and tries again, never below 320 px. Always check the pixel size on the result screen.</li>
-        <li><strong>Misses are reported.</strong> "The size limit could not be reached. Try a larger limit." means no result file was made for that photo. Raise the limit or use a different photo.</li>
-        <li><strong>Output is JPEG.</strong> Transparent parts of PNG and WebP become white. It won't help where PNG is required.</li>
-        <li><strong>No dpi setting.</strong> If a site asks for a dpi value such as 300 dpi, check whether it also gives a pixel size to aim for.</li>
-        <li><strong>No rule checking.</strong> Face size, background and when the photo was taken are up to you and the site's rules.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>The site counts 1 KB as 1024 bytes. Is that a problem?</summary><div><p>No. The app counts 1 KB as 1000 bytes, so a file fitted to 500 KB is at most 500,000 bytes. That is below 500 KB counted in 1024-byte units (512,000 bytes), so it passes either way.</p></div></details>
-        <details><summary>Does it change or delete my original photo?</summary><div><p>No. Results are saved as new files in <code>Pictures/SugarCompress</code>, and the original stays as it was.</p></div></details>
-        <details><summary>Is my photo uploaded anywhere?</summary><div><p>No. Photos are processed on your phone and never uploaded. See the <a href="https://sugarmount21.com/en/privacy/image-compress/">Compress Image privacy policy</a> for details.</p></div></details>
-        <details><summary>Does it work with HEIC photos from an iPhone?</summary><div><p>Yes, if your phone can decode HEIC. The result is saved as JPEG. To change only the format, see <a href="https://sugarmount21.com/en/apps/image-convert/heic-to-jpg/">Convert HEIC to JPG on a Samsung Galaxy phone</a>.</p></div></details>
-        <details><summary>Does it cost anything?</summary><div><p>It is free with ads and handles 20 photos at a time. Pro, a one-time purchase, removes ads and handles 100 at a time. Each photo can be up to 50 MB and 50 megapixels.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="related">
-      <h2 id="related">Related articles</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/apps/image-compress/photo-under-100kb/">Compress a photo to under 100 KB on Android</a></li>
-        <li><a href="https://sugarmount21.com/en/apps/image-convert/heic-to-jpg/">Convert HEIC to JPG on a Samsung Galaxy phone</a></li>
-        <li><a href="https://sugarmount21.com/en/apps/image-flip/unmirror-selfie/">Unmirror a selfie on a Samsung Galaxy phone</a></li>
-        <li>How the app does it (AX note): <a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="app">
-      <h2 id="app">Get Compress Image</h2>
-      <p>An Android app that shrinks photos for forms and uploads to under a size you set, such as 100 KB or 500 KB, and saves them as new files. Photos are processed on your phone and never uploaded; originals are kept.</p>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugarcompress&amp;referrer=utm_source%3Dsugarmount21.com%26utm_medium%3Dhowto%26utm_campaign%3Dsugarcompress&amp;hl=en" rel="noopener">Get Compress Image on Google Play</a><a class="button button--outline" href="https://sugarmount21.com/en/apps/image-compress/">About Compress Image</a></div>
-    </section>]]></description>
-    <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Compress a photo to under 100 KB on Android – SugarMount</title>
-    <link>https://sugarmount21.com/en/apps/image-compress/photo-under-100kb/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/apps/image-compress/photo-under-100kb/</guid>
-    <description><![CDATA[<section class="hero">
-      <span class="eyebrow">Help · Android</span>
-      <h1>Compress a photo to under 100 KB on Android</h1>
-      <p class="lead">Your phone's gallery can make a photo smaller, but it can't promise a file size. When a form says "under 100 KB", use an app that lets you type the limit in KB and checks the real file size.</p>
-      <p class="note">This guide uses Compress Image (SugarCompress) 1.0.6, an Android app made by SugarMount. Gallery menu names vary by phone model and software version.</p>
-    </section>
-    <section aria-labelledby="without-app">
-      <h2 id="without-app">Without an app: Resize in the Galaxy Gallery</h2>
-      <p>The built-in Gallery app on Galaxy phones can shrink a photo's dimensions. Samsung's support guide lists these steps:</p>
-      <ol>
-        <li>Open the photo in Gallery and tap <strong>Edit</strong>.</li>
-        <li>Tap <strong>More options</strong> (the three dots) and choose <strong>Resize</strong>.</li>
-        <li>Pick a percentage, tap <strong>Done</strong>, then <strong>Save</strong>. To keep the original, choose <strong>Save copy</strong> from More options before saving.</li>
-      </ol>
-      <blockquote cite="https://www.samsung.com/uk/support/mobile-devices/how-to-resize-a-photo-in-the-gallery-app-on-your-galaxy-phone/"><p>"Resizing the photo to be larger than its original size is not an option."</p></blockquote>
-      <p class="muted">Source: <a href="https://www.samsung.com/uk/support/mobile-devices/how-to-resize-a-photo-in-the-gallery-app-on-your-galaxy-phone/" rel="noopener">Samsung UK, How to resize a photo in the Gallery app on your Galaxy phone</a>. The same page notes: "The resize feature may not be supported depending on the model version."</p>
-      <h3>Limits of this method</h3>
-      <ul>
-        <li><strong>You choose a percentage, not a file size.</strong> You have to save, check the file size, and resize again if it is still too big.</li>
-        <li><strong>A plain save can replace the original.</strong> Samsung's guide says that on Android 11 saving overwrites the original unless you pick Save copy.</li>
-        <li><strong>One photo at a time.</strong> The guide covers editing a single photo.</li>
-      </ul>
-      <p>Some image compression websites let you set a size in KB, but your photo is uploaded to their server. For ID photos or document scans, that may matter to you.</p>
-    </section>
-    <section aria-labelledby="app-steps">
-      <h2 id="app-steps">Fit a photo under 100 KB with Compress Image</h2>
-      <ol class="steps">
-        <li><strong>Tap 100 KB</strong> — Under Quick start on the home screen, tap <strong>100 KB</strong>. This sets the limit to 100 KB and opens the photo picker. You can also tap Select photos and set the limit on the next screen.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugarcompress/photo-under-100kb-1-en.webp" width="270" height="419" loading="lazy" alt="The home screen has a Select photos button and, under Quick start, tiles for 100 KB, 200 KB, 500 KB and 1 MB."></figure></li>
-        <li><strong>Pick photos</strong> — Choose photos in the Android photo picker. The free version handles up to 20 at a time. Check the list and tap <strong>Next</strong>.</li>
-        <li><strong>Check the limit and create</strong> — On the Options screen, make sure the method is <strong>Fit to size</strong> and the size limit per photo is <strong>100 KB</strong>. For another number, use <strong>Custom</strong> and enter 20 to 20000 KB. Tap <strong>Create results</strong>.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugarcompress/photo-under-100kb-2-en.webp" width="270" height="419" loading="lazy" alt="The Options screen with Fit to size selected and size limit tiles for 100 KB, 200 KB, 500 KB, 1 MB and Custom; 500 KB is selected in this capture."></figure></li>
-        <li><strong>Review the results</strong> — Each photo shows its original size and its new size. The new size is the real size of the file that will be saved. A photo that could not fit the limit is marked as failed.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugarcompress/photo-under-100kb-3-en.webp" width="270" height="419" loading="lazy" alt="The results screen shows three photos reduced from 2.63 MB to 485 KB, 2.67 MB to 482 KB and 3.28 MB to 477 KB, 8.58 MB to 1.44 MB in total."></figure></li>
-        <li><strong>Save or share</strong> — Tap <strong>Save all</strong> to save new files in <code>Pictures/SugarCompress</code>. Originals stay untouched. Tap <strong>Share</strong> to send them right away.</li>
-      </ol>
-      <p class="muted">These are real app screens taken for the Google Play listing (version 1.0.1), so the example uses a 500 KB limit. Button and menu names are the same in 1.0.6.</p>
-    </section>
-    <section aria-labelledby="how-it-fits">
-      <h2 id="how-it-fits">How the app fits a photo under 100 KB</h2>
-      <p>Fit to size first adjusts JPEG quality between 95 and 40, looking for a high quality that still fits the limit. If even quality 40 is too big, it shrinks the photo's long edge step by step and tries again. It never goes below 320 px on the long edge and makes at most 20 attempts or 30 seconds per photo. If nothing fits, it says "The size limit could not be reached. Try a larger limit." and does not count that photo as a success.</p>
-      <p>To set the resolution yourself, choose 1280, 1920 or 2560 px, or a custom value from 320 to 8000 px, under <strong>Long edge</strong> on the Options screen. Photos are never enlarged.</p>
-    </section>
-    <section aria-labelledby="other-sizes">
-      <h2 id="other-sizes">500 KB, 200 KB and 50 KB work the same way</h2>
-      <p>Quick start offers 100 KB, 200 KB, 500 KB and 1 MB. For any other number, use <strong>Custom</strong> on the Options screen, from 20 KB to 20000 KB. A low limit such as 50 KB makes the photo smaller and softer, and some photos may not fit at all. The limit applies to each photo separately; the app does not fit a group of photos into a total size.</p>
-    </section>
-    <section aria-labelledby="compare">
-      <h2 id="compare">Methods compared</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Method</th><th scope="col">Set a KB limit</th><th scope="col">Photo uploaded</th><th scope="col">Original</th><th scope="col">Several photos</th></tr></thead>
-          <tbody>
-            <tr><th scope="row">Gallery Resize</th><td>No (percentage only)</td><td>No</td><td>Can be overwritten; kept with Save copy</td><td>One at a time in the guide</td></tr>
-            <tr><th scope="row">Compression website</th><td>Depends on the site</td><td>Yes, to the site's server</td><td>Kept on your phone</td><td>Depends on the site</td></tr>
-            <tr><th scope="row">Compress Image, Fit to size</th><td>Yes (20 to 20000 KB)</td><td>No, processed on the device</td><td>Kept; results saved as new files</td><td>20 free, 100 with Pro</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p><strong>Verdict:</strong> If a form sets a hard limit like "under 100 KB", an app that takes the limit in KB gets it done in one pass. If you only want a lighter photo with no exact limit, the Gallery's Resize is enough.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">When it fails, and what it can't do</h2>
-      <ul>
-        <li><strong>A very low limit can fail.</strong> If the photo is still too big at the lowest quality and resolution, it is marked as failed. Raise the limit a little and try again.</li>
-        <li><strong>Results are JPEG.</strong> Transparent areas in PNG or WebP become white, and animated images are not supported. If a form requires PNG, this app can't help.</li>
-        <li><strong>Photos are never enlarged.</strong> It can't raise a photo's resolution.</li>
-        <li><strong>HEIC works only if your phone can decode it.</strong> Unsupported or unreadable files are skipped, and the app tells you how many.</li>
-        <li><strong>Very large photos are refused.</strong> A photo over 50 MB or 50 megapixels is not processed.</li>
-        <li><strong>No cropping to exact dimensions.</strong> For ID photos with set pixel sizes or ratios, see <a href="https://sugarmount21.com/en/apps/image-compress/id-photo-size/">Resize a photo for Korean ID and application uploads</a>.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Is 1 KB 1000 bytes or 1024 bytes?</summary><div><p>The app counts 1 KB as 1000 bytes, so a 100 KB limit means at most 100,000 bytes. If a site counts 1 KB as 1024 bytes, its 100 KB is 102,400 bytes, so a photo the app fitted is still under the limit.</p></div></details>
-        <details><summary>What if my photo is already under 100 KB?</summary><div><p>A JPEG result is never larger than the original. If the photo is already small enough, the app keeps it at original quality without recompressing and removes only location and camera info.</p></div></details>
-        <details><summary>Are my photos uploaded?</summary><div><p>No. Photos are processed on your phone, and neither photos nor file names are sent to a server. See the <a href="https://sugarmount21.com/en/privacy/image-compress/">Compress Image privacy policy</a> for details.</p></div></details>
-        <details><summary>Does it cost anything?</summary><div><p>Every method, including Fit to size, is free, and the free version shows ads. Pro is a one-time purchase that removes ads and handles up to 100 photos at a time. It is not a subscription.</p></div></details>
-        <details><summary>Where are the saved photos?</summary><div><p>In the <code>Pictures/SugarCompress</code> folder, as new files. You can also find them in your gallery app.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="related">
-      <h2 id="related">Related guides</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/apps/image-compress/id-photo-size/">Resize a photo for Korean ID and application uploads</a></li>
-        <li><a href="https://sugarmount21.com/en/apps/image-convert/heic-to-jpg/">Convert HEIC to JPG on a Samsung Galaxy phone</a></li>
-        <li><a href="https://sugarmount21.com/en/apps/image-convert/png-to-jpg/">PNG to JPG on Android with a white background</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="app">
-      <h2 id="app">Get Compress Image</h2>
-      <p>An Android app that shrinks photos for forms, uploads and messages to under a size you choose, such as 100 KB or 500 KB. Photos are processed on your phone and never uploaded, and originals stay untouched. Requires Android 10 or later.</p>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugarcompress&amp;referrer=utm_source%3Dsugarmount21.com%26utm_medium%3Dhowto%26utm_campaign%3Dsugarcompress&amp;hl=en" rel="noopener">Get Compress Image on Google Play</a><a class="button button--outline" href="https://sugarmount21.com/en/apps/image-compress/">About Compress Image</a></div>
-    </section>]]></description>
-    <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Convert HEIC to JPG on a Samsung Galaxy phone – SugarMount</title>
-    <link>https://sugarmount21.com/en/apps/image-convert/heic-to-jpg/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/apps/image-convert/heic-to-jpg/</guid>
-    <description><![CDATA[<section class="hero">
-      <span class="eyebrow">Help · Android</span>
-      <h1>Convert HEIC to JPG on a Samsung Galaxy phone</h1>
-      <p class="lead">To turn HEIC photos you already took into JPG, use a converter app that saves new JPG files. Convert Image does several at once on your phone, without uploading, and leaves the originals untouched.</p>
-      <p class="note">This article is based on Convert Image JPG PNG WEBP 1.0.3, an Android app made by SugarMount. If you want future photos saved as JPG from the start, read "Without an app" first.</p>
-    </section>
-    <section aria-labelledby="difference">
-      <h2 id="difference">HEIC vs JPG</h2>
-      <p>HEIC is a file in the HEIF photo format, compressed with HEVC (H.265). JPG is far older, and almost every website, program and printer accepts it. That is why a HEIC photo that looks fine on your phone can be rejected by an upload form or fail to open on a PC.</p>
-      <p>Whether Android itself can read HEIC depends on the device. The supported formats table in the Android developer documentation says this about HEIF decoding:</p>
-      <blockquote cite="https://developer.android.com/media/platform/supported-formats"><p>"Android 9.0+ … Device optional. Check ImageDecoder.isMimeTypeSupported("image/heif") for 8-bit support. 10-bit decoding requires optional HEVC Main10 profile."</p></blockquote>
-      <p class="muted">Source: <a href="https://developer.android.com/media/platform/supported-formats" rel="noopener">Android Developers, Supported media formats</a></p>
-    </section>
-    <section aria-labelledby="without-app">
-      <h2 id="without-app">Without an app, and the limits</h2>
-      <ul>
-        <li><strong>Turn off HEIF (high efficiency) saving in the camera</strong> — some phones have a camera setting for it. With it off, new photos are saved as JPG. The menu name and place vary by model and version. <strong>Photos you already took stay HEIC.</strong></li>
-        <li><strong>Conversion when sharing from the gallery</strong> — depending on the model, the gallery may have a setting that sends photos as JPG when you share them. It only applies to what you share, and may not leave a JPG file on the phone.</li>
-        <li><strong>Convert on a PC</strong> — the PC program has to read HEIC, and you need to move the photos first.</li>
-        <li><strong>Upload to a converter website</strong> — no install, but the photos go to that site's server. Avoid it for photos of faces, IDs or documents.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="app-steps">
-      <h2 id="app-steps">Convert HEIC to JPG with Convert Image</h2>
-      <ol class="steps">
-        <li><strong>Pick the photos</strong> — on the home screen tap <strong>Select photos</strong> or <strong>Pick from files</strong> and choose your HEIC photos. Use <strong>Pick from files</strong> to keep the original file names: the photo picker does not share names, so photos picked there are saved as "SugarConvert + time". The <strong>JPG for forms</strong> quick start (quality 90, transparent areas white) starts with JPG settings ready.</li>
-        <li><strong>Check the selection</strong> — the Selected photos screen shows the count and total size. If HEIC photos are included, a notice says they convert only where the device can decode them. Tap <strong>Next</strong>.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugarconvert/heic-to-jpg-1-en.webp" width="270" height="413" loading="lazy" alt="The Selected photos screen shows three photos, 8.58 MB in total, a note that the free plan handles up to 20 photos at a time, and a format badge on each photo."><figcaption class="muted">Store screenshot taken for version 1.0.0. The sample photos are JPEGs.</figcaption></figure></li>
-        <li><strong>Choose JPEG</strong> — under <strong>Output format</strong> on Convert options, choose <strong>JPEG</strong> and set the quality. The default is 90; lower values give smaller files. Then tap <strong>Create results</strong>.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugarconvert/heic-to-jpg-2-en.webp" width="270" height="413" loading="lazy" alt="The Convert options screen shows the original and the preview side by side, with JPEG selected as the output format, quality 90 and white for transparent areas."><figcaption class="muted">Store screenshot taken for version 1.0.0.</figcaption></figure></li>
-        <li><strong>Check and save</strong> — the Results screen shows the real size and resolution before and after. Tap <strong>Save all</strong>. The JPG files are saved as new files in <strong>Pictures/SugarConvert</strong>; the original HEIC files are not changed.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugarconvert/heic-to-jpg-3-en.webp" width="270" height="413" loading="lazy" alt="The Results screen says 3 done, originals untouched, with the rule JPEG quality 90 white background and the total size going from 8.58 MB to 5.53 MB."><figcaption class="muted">Store screenshot taken for version 1.0.0. The sample photos are JPEGs.</figcaption></figure></li>
-        <li><strong>If some photos fail</strong> — a HEIC the device cannot decode is marked as failed on its own, and the rest continue. <strong>Retry failed only</strong> runs just those again. If they keep failing on the same phone, see "When it fails, and the limits".</li>
-      </ol>
-      <p class="muted">Test record: during development, HEIC input was checked on a Galaxy S21 (Android 15) with version 1.0.1 (September 25, 2026). Results on other models depend on whether the device has a HEIC decoder.</p>
-    </section>
-    <section aria-labelledby="compare">
-      <h2 id="compare">Methods compared</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Method</th><th scope="col">Photos already taken</th><th scope="col">Upload</th><th scope="col">Many at once</th><th scope="col">Use it when</th></tr></thead>
-          <tbody>
-            <tr><th scope="row">Camera HEIF setting off</th><td>Not changed</td><td>None</td><td>Not applicable</td><td>You want future photos saved as JPG</td></tr>
-            <tr><th scope="row">Gallery share conversion (some models)</th><td>Only when shared</td><td>None</td><td>Varies by model</td><td>You only need to send a few photos in a chat</td></tr>
-            <tr><th scope="row">PC program</th><td>Yes</td><td>None</td><td>Depends on the program</td><td>The photos are already on your PC</td></tr>
-            <tr><th scope="row">Converter website</th><td>Yes</td><td>Sent to a server</td><td>Varies by site</td><td>Only for photos without faces or documents</td></tr>
-            <tr><th scope="row">Convert Image app</th><td>Yes, if the device can decode them</td><td>None</td><td>Free 20 per job, Pro 100</td><td>You need JPG files on the phone to upload or attach</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p><strong>Verdict:</strong> to keep HEIC photos you already took as JPG files on your phone, a converter app is the quickest. If the problem is future photos, change the camera setting. Doing both means less converting later.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">When it fails, and the limits</h2>
-      <ul>
-        <li><strong>HEIC the device cannot decode is not converted.</strong> The app reads photos with the phone's own decoder. Without one, or for HEIC the device does not support (such as 10-bit), that photo fails. Use a PC instead.</li>
-        <li><strong>EXIF data such as date taken and location is not copied.</strong> The new JPG has no photo metadata. The photo's orientation is applied when saving.</li>
-        <li><strong>HEIF files holding several images are not supported.</strong> Image sequences such as burst shots are refused.</li>
-        <li><strong>Size limits.</strong> Up to 50 MB and 50 megapixels per photo.</li>
-        <li><strong>Quality does not improve.</strong> JPG compresses again, so even quality 100 is not better than the original. A file can end up larger than the original; the Results screen shows it when that happens.</li>
-        <li><strong>The original HEIC stays.</strong> Results are new files, so you have both. Delete the originals in your gallery if you no longer need them.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Where are the converted JPGs?</summary><div><p>They are saved as new files in the Pictures/SugarConvert folder on your phone. You can also share them straight from the Results screen.</p></div></details>
-        <details><summary>Are my photos uploaded?</summary><div><p>No. Photos are converted on the phone only, and the app asks for no storage permission; it reads only the photos you pick. Anonymous usage statistics and error reports contain no photos or file names, and you can turn them off in Settings. Details are in the <a href="https://sugarmount21.com/en/privacy/image-convert/">Convert Image JPG PNG WEBP privacy policy</a>.</p></div></details>
-        <details><summary>Is it free?</summary><div><p>The free version converts up to 20 photos at a time. Pro is a one-time purchase that removes ads and allows 100 photos at a time. It is not a subscription.</p></div></details>
-        <details><summary>Can I convert to PNG or WebP instead?</summary><div><p>Yes. Choose PNG or WebP as the output format; you can even give single photos their own format. Saving as HEIC is not available.</p></div></details>
-        <details><summary>Does converting HEIC to JPG lose quality?</summary><div><p>JPG compresses again, so there can be a small difference. At the default quality of 90, most photos look the same as the original. Raise the quality if detail matters, lower it if file size matters.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="related">
-      <h2 id="related">Related articles</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/apps/image-convert/png-to-jpg/">Convert PNG to JPG on a Galaxy phone</a></li>
-        <li><a href="https://sugarmount21.com/en/apps/image-compress/photo-under-100kb/">Compress a photo to under 100 KB</a></li>
-        <li><a href="https://sugarmount21.com/en/apps/image-compress/id-photo-size/">Resize a photo for Korean ID and application uploads</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="app">
-      <h2 id="app">Get Convert Image JPG PNG WEBP</h2>
-      <p>An Android app that turns HEIC, PNG and WebP photos into new JPG, PNG or WebP files. It handles several photos at once on your phone, with no upload and no sign-up. Requires Android 10 or later.</p>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugarconvert&amp;referrer=utm_source%3Dsugarmount21.com%26utm_medium%3Dhowto%26utm_campaign%3Dsugarconvert&amp;hl=en" rel="noopener">Get Convert Image JPG PNG WEBP on Google Play</a><a class="button button--outline" href="https://sugarmount21.com/en/apps/image-convert/">About Convert Image JPG PNG WEBP</a></div>
     </section>]]></description>
     <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
   </item>

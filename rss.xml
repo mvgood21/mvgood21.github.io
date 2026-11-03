@@ -6,7 +6,370 @@
   <description>한 가지 일을 간단하게 하는 Android 앱을 만듭니다. 사진 용량 줄이기부터 한글 문서 보기, 한글 맞춤법, 퍼즐 게임까지 앱마다 하는 일은 하나입니다.</description>
   <language>ko</language>
   <atom:link href="https://sugarmount21.com/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Tue, 03 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Wed, 04 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>앱에 Gemini 붙이기: 비용·모델 평가·한도 설계 – SugarMount</title>
+    <link>https://sugarmount21.com/ax/llm-explain-cost-limits/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/ax/llm-explain-cost-limits/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/llm-explain-cost-limits-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX 노트 · 측정</span>
+      <h1>맞춤법 앱에 처음 LLM을 붙였다: '왜 틀렸나요?'의 비용, 모델 평가, 한도 설계</h1>
+      <p class="lead">모델은 59건 평가로 골랐고(1,000건당 $0.93, 다음 날 프롬프트 v3로 약 $1.1), 비용은 함수가 하루 LLM 호출 3,000회에서 차단해 막습니다.</p>
+      <p>평가 첫 실행에서 교정 59건이 모두 HTTP 402로 거절됐습니다. 낮에 에이전트가 Blaze 크레딧으로 함께 청구된다고 안내했던 AI Studio 키였고, 2026년 9월 27일 밤 <a href="https://sugarmount21.com/apps/sugarspeller/">한글 띄어쓰기</a> 앱에 처음 서버 함수와 LLM을 붙이던 중이었습니다. 키를 Vertex AI로 바꾼 뒤 같은 59건에서 gemini-3.8-flash는 교정 이유를 모두 맞혔고(근거 규정까지 맞힌 것은 54건), p95 지연은 4.3초, 비용은 1,000건당 $0.93이었습니다. 10월 1일 출시 뒤 2주 동안 검사 사용자의 3.7%가 버튼을 눌렀고, 교정 시트를 연 사람만 보면 41%였습니다.</p>
+      <p class="note">근거는 앱 저장소의 설계 문서(2026-09-27 승인)와 커밋 de79cfd·350a6c6·df8f740·4c99287, 판정 기록 WATCH.md(10-17, 10-28 행), 작업 세션 기록입니다. 사용률은 GA4, 비용은 함수가 Firestore에 쌓은 사용량 문서에서 계산했습니다. 2026-11-02에 저장소에서 다시 확인했고, 시각은 한국 시간입니다. 클라우드 프로젝트와 계정 식별값은 적지 않았습니다.</p>
+    </section>
+    <section aria-labelledby="eval">
+      <h2 id="eval">59건 평가: flash-lite 78%, 3.8-flash 100%</h2>
+      <p>'왜 틀렸나요?'는 교정된 어절을 누르면 이유 한 줄과 근거 규정 이름을 돌려주는 버튼입니다. 모델은 앱 테스트 픽스처에 저장된 검사기 응답에서 뽑은 교정 59건(네이버 38건, 다음 21건)으로 골랐습니다. 합격선은 설계 문서에 미리 적은 정확 90% 이상, p95 2.5초 이하였고, 호출은 모두 Vertex AI global 엔드포인트로 했습니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>모델 (프롬프트)</th><th>설명 맞음</th><th>규정까지 맞음</th><th>p50 / p95</th><th>1,000건당</th></tr></thead>
+        <tbody>
+          <tr><td>gemini-3.5-flash-lite (v1)</td><td>43/59 (73%)</td><td>30/59</td><td>1.06초 / 1.26초</td><td>$0.27</td></tr>
+          <tr><td>gemini-3.5-flash-lite (v2)</td><td>46/59 (78%)</td><td>38/59</td><td>1.08초 / 4.6초</td><td>$0.42</td></tr>
+          <tr><td>gemini-3.8-flash (v2)</td><td>59/59 (100%)</td><td>54/59 (92%)</td><td>2.0초 / 4.3초</td><td>$0.93</td></tr>
+        </tbody>
+      </table></div>
+      <p>flash-lite는 73%였고, 띄어쓰기 판단 순서와 자주 나오는 교정의 근거표를 넣은 v2 프롬프트로도 78%에 그쳤습니다. 틀린 답에는 '명사+하다' 붙여쓰기를 어미로 본 설명과 "해여" 같은 깨진 글자가 있었습니다. 3.8-flash는 오타가 없었고 틀린 것은 규정 인용 5건이었습니다. 1,000건당 비용이 $0.42에서 $0.93으로 올라가도 정확도 기준을 넘은 모델은 이것 하나라 기본 모델이 됐습니다.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/llm-explain-cost-limits-1-ko.webp" width="1200" height="582" alt="막대 그림: 1,000건당 비용은 3.5-flash-lite v1 $0.27(설명 73%), v2 $0.42(78%), 3.8-flash v2 $0.93(100%)였습니다." loading="lazy"><figcaption>정확도 기준 90%를 넘은 모델은 1,000건당 $0.93인 3.8-flash 하나였습니다.</figcaption></figure>
+      <p>3.8-flash의 첫 실행은 59건이 모두 빈 응답이었습니다. 출력 상한 160토큰을 모델의 '생각' 토큰이 다 써 버렸기 때문이고, <code>thinkingBudget: 0</code>으로 생각을 끄자 정상으로 돌아왔습니다. 지연 목표 2.5초는 못 지켰습니다. 이 모델은 global 엔드포인트에만 있어서 서울과 도쿄 리전에서는 404가 났고, 호출 한 번에 2.1~2.8초가 걸렸습니다. 설계 문서는 앱 시한(당시 8초) 안이고 버튼 자리에 진행 표시가 있다는 이유로 목표를 p95 5초로 고쳤습니다.</p>
+    </section>
+    <section aria-labelledby="billing">
+      <h2 id="billing">AI Studio 키는 $300 크레딧과 묶이지 않았습니다</h2>
+      <p>402의 원인은 결제 경로였습니다. 오류 원문은 <code>Your prepayment credits are depleted</code>였고, 키 인증은 통과했습니다. 이 프로젝트의 AI Studio 결제는 선불 전용이라, Firebase를 종량제(Blaze)로 바꿀 때 받은 90일 $300 무료 체험 크레딧(Cloud Billing 쪽)과 연결되지 않았습니다.</p>
+      <p>에이전트는 그날 12시 01분에 "$300 크레딧이면 Gemini API 유료 티어 비용도 같은 프로젝트에 청구"된다고 했고, 10분 뒤에도 크레딧이 둘 모두에 먼저 차감된다는 표를 냈습니다. 스펙은 12시 18분 키 없는 Vertex AI로 바뀌었다가, 12시 21분 운영자가 만들어 둔 AI Studio 키를 보고 "같은 결제 계정"이라는 이유로 키 방식으로 돌아갔습니다(220b267, 740b9d5).</p>
+      <p>낮에 만든 함수, 한도, 캐시는 전부 가짜 프로바이더로 테스트해서, 진짜 Gemini는 밤 10시 무렵 평가에서 처음 불렸습니다. 22시 04분 402를 보고하며 에이전트가 처음 권한 것도 AI Studio 선불 크레딧 구매(최소 $5)였습니다. 22시 06분 운영자가 $300 무료 크레딧이 Blaze 요금에 포함돼 결제되는 것 아니었냐고 되묻자 에이전트는 설명이 틀렸다고 인정했습니다. 에이전트는 예전에는 AI Studio 키에 결제를 붙이면 Cloud 결제 계정으로 후불 청구됐다고 설명했고, 이 프로젝트는 그렇지 않았습니다.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/llm-explain-cost-limits-2-ko.webp" width="1200" height="738" alt="단계 그림: 9월 27일 12시 01분 같은 청구서 안내, 12시 21분 AI Studio 키 확정, 22시 04분 평가 59건 모두 402, 운영자의 질문, 22시 10분 Vertex AI 전환 커밋 de79cfd." loading="lazy"><figcaption>낮의 결제 안내는 밤에 진짜 모델을 처음 부를 때까지 확인되지 않았습니다.</figcaption></figure>
+      <p>22시 10분 커밋 de79cfd가 Gemini 인증을 Vertex AI와 ADC(Application Default Credentials, 실행 환경의 서비스 계정 자격)로 옮겼습니다. Vertex는 Cloud Billing으로 청구돼 설계 문서상 크레딧이 적용되는 경로이고, 관리할 API 키도 없습니다. 49분 뒤 배포에서 문제가 하나 더 나왔습니다. 쓰지 않는 Secret을 함수에 선언만 해 놓아도 배포 때 Secret Manager를 조회하다 403으로 실패해서, 키 모드일 때만 선언하게 고쳤습니다(e67a4f7).</p>
+      <p>LLM 기능을 만들 때는 결제 경로부터 실제 호출 한 건으로 확인하십시오. 다만 200 응답은 어느 잔액에서 빠졌는지 알려 주지 않습니다. 이 앱도 Vertex로 옮긴 뒤의 비용은 함수가 쌓은 토큰 수에 단가를 곱해 계산했고, 결제 보고서에서 크레딧 차감을 대조한 기록은 저장소에 없습니다.</p>
+    </section>
+    <section aria-labelledby="cap">
+      <h2 id="cap">하루 3,000회에서 함수가 LLM 호출을 끊습니다</h2>
+      <p>함수 <code>explainCorrection</code>은 Firebase Functions 2세대의 호출형(callable) 함수 하나입니다. 앱은 프로세스가 첫 화면을 띄울 때 익명 로그인을 걸고, SDK가 요청마다 인증 토큰을 붙여 보냅니다. 함수 안의 순서는 입력 검증, 캐시 조회, 한도 차감, LLM 호출, 캐시 저장입니다. 캐시가 한도보다 앞이라 이미 만든 설명은 무료 횟수를 쓰지 않습니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>장치</th><th>기본값</th><th>바꾸는 방법</th></tr></thead>
+        <tbody>
+          <tr><td>무료 사용자 한도</td><td>익명 uid당 하루 5회</td><td>Firestore <code>config/limits</code> 문서(60초 캐시)</td></tr>
+          <tr><td>구독자 상한</td><td>uid당 하루 100회</td><td>같은 문서</td></tr>
+          <tr><td>함수 전체 상한</td><td>하루 LLM 시도 3,000회</td><td>같은 문서, 0이면 닫힘</td></tr>
+          <tr><td>App Check 강제</td><td>꺼짐(계측만), 켰는지 미확인</td><td>같은 문서의 <code>requireAppCheck</code></td></tr>
+          <tr><td>앱 버튼</td><td>켜짐</td><td>Remote Config <code>explain_enabled</code>를 false로</td></tr>
+        </tbody>
+      </table></div>
+      <p>하루의 경계는 한국 시간 자정이고, 일자 키는 서버 시간대에 기대지 않고 UTC 밀리초에 9시간을 더해 만듭니다. 전체 상한이 세는 단위는 LLM 시도입니다. 재시도와 겹쳐 보낸 요청도 하나씩 들어가고, 네트워크 오류처럼 과금 전에 실패한 시도만 돌려받습니다. 시한 초과는 프로바이더가 이미 과금했을 수 있어서 돌려받지 않고 그대로 셉니다.</p>
+      <p>예산 알림은 결제를 막지 않아, 설계 문서는 이 3,000회 차단을 "실제 안전장치"로 적었습니다. 평가 때 단가($0.93)로 3,000회를 다 채우면 하루 약 $2.8이고, 9월 28일 근거표를 늘린 v3 프롬프트(1,000건당 약 $1.1) 기준으로는 약 $3.3입니다(계산값). 횟수 상한이 금액 상한이 되는 것은 호출 한 번의 토큰이 묶여 있어서입니다. 입력 어절은 원문과 교정이 각각 60자(코드 포인트)까지, 출력은 160토큰까지입니다. 오전에 에이전트가 낸 추정(건당 0.1원 미만, 월 1,000원 미만)은 flash-lite 단가였고, 고른 모델의 1,000건당 비용은 flash-lite v1의 3.4배입니다.</p>
+      <p>구독 여부는 첫 출시 단계에서 앱이 보낸 값을 믿습니다. 위조해도 얻는 것은 하루 95회 더, 비용으로 10원 미만이라 영수증 검증은 다음 출시 단계로 넘겼습니다. 하루 합계 문서를 사용자 한도와 같은 트랜잭션에 넣었더니 동시 요청이 락 타임아웃으로 죽어서, 9월 28일에 합계를 트랜잭션 밖으로 뺐습니다(73085eb). 그래서 전체 상한은 동시 진행 요청 수만큼 넘을 수 있습니다.</p>
+      <p>Remote Config는 런처 화면에서만 갱신돼서, 다른 앱에서 글자를 선택해 여는 미니창만 쓰는 사용자는 런처를 거치지 않아 <code>explain_enabled</code>를 꺼도 버튼이 남을 수 있었습니다. 9월 29일 릴리스 리뷰에서 나왔고, 미니창이 시트를 띄울 때 설정을 새로 받게 고쳤습니다(4c99287).</p>
+    </section>
+    <section aria-labelledby="cold-start">
+      <h2 id="cold-start">콜드 스타트 7.9초를 보고 앱 시한을 15초로</h2>
+      <p>9월 27일 밤 운영 배포 뒤 스모크 검사에서 첫 호출은 7.9초, 이어진 호출은 1.6~3.0초였습니다. 최소 인스턴스는 0, 앱의 시한은 8초였습니다. 식은 서버의 첫 호출이 시한과 0.1초 차이였습니다. 커밋 df8f740이 앱 시한을 15초로 늘렸습니다. 최소 인스턴스를 1로 두는 안(월 약 $3~4)은 콜드 스타트가 문제가 될 때 쓸 대안으로 함수 문서에만 남겼습니다. 10월 26~27일 이틀 LLM 비용이 $0.020(약 28원)이었으니, 그 고정비가 설명 비용보다 몇 배 많습니다.</p>
+      <p>다음 날에는 반복 평가에서 한 번 44.5초까지 늘어진 호출 때문에 서버 쪽 시한을 시도당 6초, 전체 12초로 정했습니다. 10월 25일부터는 4초 동안 답이 없으면 같은 요청을 하나 더 보내고, 10월 24일 25건 중 16건이던 실패가 10월 26~27일 16건 중 0건이 됐습니다.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EB%A7%9E%EC%B6%A4%EB%B2%95%20%EC%95%B1%EC%97%90%20%EC%B2%98%EC%9D%8C%20LLM%EC%9D%84%20%EB%B6%99%EC%98%80%EB%8B%A4%3A%20%27%EC%99%9C%20%ED%8B%80%EB%A0%B8%EB%82%98%EC%9A%94%3F%27%EC%9D%98%20%EB%B9%84%EC%9A%A9%2C%20%EB%AA%A8%EB%8D%B8%20%ED%8F%89%EA%B0%80%2C%20%ED%95%9C%EB%8F%84%20%EC%84%A4%EA%B3%84">메일로 문의하기</a></p></aside>
+    <section aria-labelledby="usage">
+      <h2 id="usage">검사 사용자의 3.7%, 시트를 연 사람의 41%</h2>
+      <p>출시 전 WATCH.md에 적은 규칙은, 14일 뒤 검사 사용자 중 버튼을 누른 비율이 8% 이상이면 유지하고 3% 미만이면 버튼 위치와 문구를 실험하는 것이었습니다. 10월 17일 판정(10월 2~16일, 1.6.025 이상) 결과는 검사 사용자 1,527명 중 56명, 3.7%였고 요청은 77건이었습니다. 두 경계 사이입니다.</p>
+      <p>같은 기간 교정 어절을 눌러 시트를 연 사람은 138명(9.0%)이었고, 그중 56명이 버튼을 눌렀습니다. 시트까지 온 사람의 41%가 이유를 궁금해했으니 버튼보다 시트가 발견되지 않는 쪽이 병목이었습니다. 다음 버전 1.6.031(10월 18일 단계적 출시)에 색칠한 구간을 누를 수 있다고 알리는 1회 안내를 넣었습니다.</p>
+      <p>하루 요청이 8건 수준이라 캐시 적중률은 14일 동안 11%로 목표 40%에 한참 못 미쳤습니다. 공유 캐시 설계는 <a href="https://sugarmount21.com/ax/llm-cache-no-context/">LLM 공유 캐시와 문맥을 보내지 않기로 한 블라인드 A/B</a>에 따로 적었습니다.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">익명 계정 대량 생성은 전체 상한만 막습니다</h2>
+      <p>uid 한도는 앱을 지웠다 깔면 새로 시작합니다. 스크립트로 익명 계정을 계속 만들면 사용자당 5회는 의미가 없고, 남는 방어는 함수 전체 3,000회와 App Check(기본은 계측만)입니다. 설명 한 건 값이 큰 기능이라면 영수증 검증을 미루지 말고 처음부터 서버에서 구독을 검증하십시오.</p>
+      <p>59건은 검사기 응답의 red·green·blue 그룹뿐이었고(네이버 red 25·green 13, 다음 red 14·green 5·blue 2), purple·violet 그룹은 한 건도 없었습니다. 9월 27일 채점은 구현을 맡은 에이전트가 직접 했습니다. 사람이 채점한 결과는 없습니다. global 엔드포인트 전용 모델은 개인정보처리방침의 처리 위치 문장도 바꾸게 하고, 같은 모델을 쓴 다른 앱의 사례는 <a href="https://sugarmount21.com/ax/ai-region-privacy-policy/">개인정보처리방침 AI 처리 위치(국외 이전)</a>에 적었습니다.</p>
+    </section>
+    <section aria-labelledby="steps">
+      <h2 id="steps">자기 앱에 붙이는 순서</h2>
+      <ol>
+        <li>Cloud Billing으로 청구되는 경로(이 앱은 Vertex AI)로 실제 모델을 한 건 부르고, 402나 403이면 다른 작업을 멈추고 결제 경로부터 정합니다. 200이 오면 결제 보고서에서 크레딧 차감을 확인합니다.</li>
+        <li>테스트 데이터 50건 정도로 후보 모델마다 정확도, p95, 1,000건당 비용을 한 표로 냅니다. 합격선은 먼저 적고, 생각 기능이 있는 모델은 생각 예산을 0으로 정합니다.</li>
+        <li>호출형 함수 하나에 익명 인증을 요구하고, 사용자별 무료, 구독자, 함수 전체 한도를 서비스 시간대의 일자 키로 셉니다. 상한 값은 배포 없이 바뀌는 문서에 두고 0을 '닫힘'으로 정합니다.</li>
+        <li>입력 길이와 출력 토큰에 상한을 둡니다.</li>
+        <li>앱에 버튼을 숨기는 원격 스위치를 두고, 모든 진입 화면이 그 값을 갱신하는지 확인합니다.</li>
+        <li>운영 배포 뒤 식은 상태의 첫 호출 시간을 재고 앱 시한을 그보다 길게 잡습니다. 출시 전에 판정 행(사용률 문턱 둘, 캐시 적중률, 실패율, 하루 비용)을 적습니다.</li>
+      </ol>
+      <p>기본 한도와 생각 끄기 설정입니다(<code>MAX_OUTPUT_TOKENS</code>는 160).</p>
+      <pre><code>// functions/src/limits.ts
+export const DEFAULT_LIMITS: Limits = { freePerDay: 5, entitledPerDay: 100, globalPerDay: 3000, requireAppCheck: false };
+// functions/src/llm/gemini.ts, generateContent 설정 일부
+maxOutputTokens: MAX_OUTPUT_TOKENS,
+thinkingConfig: { thinkingBudget: 0 },</code></pre>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">탭 안내 뒤 사용률과 단가 2배는 아직입니다</h2>
+      <p>1.6.031의 탭 안내 판정 문턱은 안내를 받은 사용자 중 설명 요청 6% 이상이고 판정일은 11월 1일이었지만, 11월 2일 기준 판정 기록에 그 행이 없습니다. 측정 예정입니다. 3.8-flash 단가는 2027년 1월 1일부터 입력 $1.50, 출력 $7.50(100만 토큰당)으로 두 배가 될 예정이라, 그날 단가와 하루 최대 비용을 다시 계산합니다. 90일 크레딧이 끝난 뒤 실제 청구액도 아직 보지 못했습니다.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EB%A7%9E%EC%B6%A4%EB%B2%95%20%EC%95%B1%EC%97%90%20%EC%B2%98%EC%9D%8C%20LLM%EC%9D%84%20%EB%B6%99%EC%98%80%EB%8B%A4%3A%20%27%EC%99%9C%20%ED%8B%80%EB%A0%B8%EB%82%98%EC%9A%94%3F%27%EC%9D%98%20%EB%B9%84%EC%9A%A9%2C%20%EB%AA%A8%EB%8D%B8%20%ED%8F%89%EA%B0%80%2C%20%ED%95%9C%EB%8F%84%20%EC%84%A4%EA%B3%84">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>Firebase Blaze 크레딧으로 Gemini API 비용을 낼 수 있나요?</summary><div><p>설계 문서상 이 프로젝트에서 크레딧이 적용되는 경로는 Vertex AI뿐이고, 청구서로는 아직 확인하지 않았습니다. AI Studio 키는 선불 전용 결제로 잡혀 있어 평가 59건이 모두 402로 거절됐습니다.</p></div></details>
+        <details><summary>LLM 기능의 비용 상한은 어떻게 거나요?</summary><div><p>함수 안에서 하루 LLM 호출 수를 세어 차단합니다. 예산 알림은 메일만 보냅니다. 이 앱은 하루 3,000회에서 닫고, 배포 없이 Firestore 문서 하나로 이 값을 고칩니다.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://sugarmount21.com/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 04 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>게임 결과창 연타 오입력 방지와 크래시 28회 – SugarMount</title>
+    <link>https://sugarmount21.com/ax/result-card-tap-through/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/ax/result-card-tap-through/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/result-card-tap-through-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX 노트 · 사고 기록</span>
+      <h1>막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</h1>
+      <p class="lead">결과 카드 버튼은 뜬 뒤 잠깐(이 게임은 600ms) 탭을 받지 않게 하십시오. 연타가 이어지면 다음 탭이 결과를 보기도 전에 판을 다시 시작할 수 있습니다.</p>
+      <p>운영자는 2026년 10월 2일 아침 "하트가 남았는데 갑자기 처음부터 다시 시작한다"는 증상을 적어 보냈고, 에이전트는 출시 전 퍼즐 게임 <a href="https://sugarmount21.com/apps/arrow-knots/">화살표 매듭풀기</a> 50판을 Galaxy S21에 띄워 5분 만에 앞부분을 재현했습니다. 막힌 화살표를 70ms 간격으로 8번 누르자 하트 3개가 250ms 안에 모두 빠졌고, 0.5초쯤 뒤 뜨는 실패 카드의 '다시 하기'는 뜨자마자 눌리는 상태였습니다. 이 재현에서는 탭이 카드보다 먼저 끝나 재시작까지 기록되지는 않았습니다. 연타가 조금 더 이어져 그 버튼이 눌리면 판이 처음부터 다시 시작되므로, 카드 버튼에 잠금을 걸었습니다. 그 뒤 운영자 지시로 돌린 스트레스 테스트는 첫 실행에서 크래시를 28번 냈고, 22판에서 재현한 원인은 스프링 애니메이션이 그리기 코드의 배열 번호를 -1로 만든 것이었습니다.</p>
+      <p class="note">근거는 게임 저장소의 커밋 6133e9e(10월 2일 08:50)와 69781a7(같은 날 12:23), 그 사이의 에이전트 세션 기록(기기 로그, 스트레스 테스트 출력)입니다. 시각은 한국 시간입니다. 당시 게임은 300레벨이었습니다.</p>
+    </section>
+    <section aria-labelledby="tap-chain">
+      <h2 id="tap-chain">하트 3개 소진과 잠금 없는 카드 버튼</h2>
+      <p>화살표 매듭풀기에서는 화살표를 누르면 머리 방향으로 빠져나가고, 앞이 막혀 있으면 앞으로 찔렀다가 되돌아오며 하트가 하나 줄어듭니다. 50판 좌측 상단의 남색 화살표는 오른쪽 위 보라색 화살표에 막혀 있었습니다. 에이전트는 이 화살표를 adb로 연타했습니다.</p>
+      <pre><code>adb shell 'for i in 1 2 3 4 5 6 7 8; do input tap 360 534 &amp; sleep 0.07; done; wait'</code></pre>
+      <p>되돌아오는 동안 같은 화살표에 들어온 탭이 매번 새 실수로 처리됐습니다. 기기 로그에는 160ms 사이에 막힘이 3번 찍혔고, 나머지 5번의 탭은 게임 오버 뒤에 들어왔습니다. 세션 보고에 따르면 하트 표시는 접촉 콜백에서 최종값으로 한 번에 바뀌어서, 하트가 다 빠진 순간에도 화면에는 아직 남아 있었습니다. 졌다고 판정되면 코드는 550ms를 기다린 뒤 실패 카드를 띄우는데, 카드 버튼에는 입력 잠금이 없었습니다. 이 재현의 마지막 탭(08:37:11.427)은 카드가 뜨기 전에 끝났고, 로그에 재시작은 없습니다.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/result-card-tap-through-1-ko.webp" width="1200" height="708" alt="단계 그림: 70ms 간격 8연타로 250ms 안에 하트 3개가 빠지고 실패 카드가 뜨는 데까지가 재현에서 확인한 것이고, 다음 탭이 잠금 없는 '다시 하기'를 누르는 단계는 가능성으로 막았다." loading="lazy"><figcaption>재현에서 확인한 것은 3단계까지이고, 4단계는 잠금 없는 버튼으로 생길 수 있던 경로라 600ms 잠금으로 막았습니다.</figcaption></figure>
+      <p>운영자가 피드백에 적은 짐작("틀렸을 때 같은데")은 방향이 맞았습니다. 커밋 메시지는 이 경로, 곧 다음 탭이 실패 카드의 재시작 버튼에 떨어져 판이 보이지 않게 다시 시작되는 것을 원인으로 적었습니다.</p>
+      <p>운영자가 적은 증상은 뒤에서 찾은 크래시로도 설명될 수 있습니다. 그 크래시도 막힌 화살표를 누를 때, 곧 틀렸을 때 났고, 앱이 꺼진 뒤 다시 열면 판이 처음부터 시작됩니다. 크래시라면 하트가 남아 있어도 판이 처음부터 시작될 수 있고, 카드를 거친 재시작이라면 하트는 이미 0이고 표시만 늦었던 것입니다. 이 세션에서 기기로 재현한 것은 크래시 자체이고, 카드를 거친 재시작은 버튼에 잠금이 없다는 코드에서 나온 가능성이라고 봅니다. 운영자의 S24 로그가 없어 어느 쪽이었는지는 가르지 못했고, 6133e9e와 69781a7이 두 경로를 모두 막았습니다.</p>
+    </section>
+    <section aria-labelledby="first-fix">
+      <h2 id="first-fix">첫 수정: 반복 탭 무시와 600ms 잠금</h2>
+      <p>6133e9e가 바꾼 것은 네 가지입니다.</p>
+      <ul>
+        <li>막혀서 되돌아오는 중인 화살표를 다시 누르면 그 탭은 버립니다. 조건은 <code>fx.isBumping(id) &amp;&amp; !state.canRemove(id)</code>이고, 다른 화살표 탭은 그대로 받습니다.</li>
+        <li>하트 표시는 접촉 한 번에 하나씩 줄입니다(<code>lives = maxOf(state.lives, lives - 1)</code>).</li>
+        <li>결과 카드 버튼은 뜬 뒤 600ms 동안 탭을 받지 않습니다. <code>RESULT_ARM_MS = 600L</code>을 두고 <code>LaunchedEffect</code>에서 그만큼 기다린 뒤 <code>armed</code>가 true가 되어야 <code>clickable(enabled = armed)</code>가 탭을 받습니다.</li>
+        <li>되돌아오는 애니메이션이 끝날 때, 그사이 화살표가 빠져나가기 시작했으면 그 애니메이션을 지우지 않습니다.</li>
+      </ul>
+      <p>같은 8연타를 다시 하자 하트는 2개만 빠졌습니다. 8번째 탭은 화살표가 다 돌아온 뒤에 들어와 새 실수로 처리됐습니다. 실패 카드가 뜬 직후 버튼 자리를 연타해도 카드가 그대로 있었고, 600ms가 지난 뒤의 탭은 정상으로 판을 다시 시작했습니다.</p>
+    </section>
+    <section aria-labelledby="ai-wrong">
+      <h2 id="ai-wrong">'착각일 수 있다'던 앱 꺼짐, 크래시는 있었습니다</h2>
+      <p>운영자 피드백에는 50판 좌측 상단을 빠르게 누르면 앱이 꺼진다는 증상도 있었습니다. 에이전트는 수정 전 빌드로 좌상단 화살표, 일시정지 버튼, 다시 하기 버튼을 30초 동안 번갈아 연타했고, 수정한 빌드로 신규 설치 몽키도 3번 돌렸지만 크래시 로그는 한 번도 나오지 않았습니다. 08:49 보고에서 에이전트는 앱이 꺼진 게 아니라 갑작스러운 재시작을 앱 꺼짐으로 본 것일 수 있다고 쓰고, 정말 꺼졌다면 운영자의 Galaxy S24를 USB로 연결해 달라고 했습니다.</p>
+      <p>운영자는 커밋을 지시한 뒤, 다른 세션과 잘 조율해서 버그가 남지 않게 스트레스 테스트를 아주 세게 돌리라고 했습니다. 크래시는 이 지시로 만든 스위트에서 나왔습니다. 재현하지 못한 크래시를 '사용자의 착각'으로 닫지 마십시오. 같은 기기에서 한 시간 넘게 도는 테스트(여기서는 첫 실행 85분, 재실행 99분)를 먼저 돌리십시오.</p>
+    </section>
+    <section aria-labelledby="stress-run">
+      <h2 id="stress-run">첫 스트레스 실행: 5,091초, 실패 30건</h2>
+      <p>먼저 엔진 퍼즈 테스트를 넣었습니다. 300레벨마다 무작위 게임 20판, 약 180만 탭을 규칙 엔진에 넣었고 규칙 위반, 예외, 막다른 판은 0이었습니다. 이어 S21에서 돈 <code>tools/stress_check.py</code>는 네 단계입니다.</p>
+      <ul>
+        <li>campaign: 300판을 한 프로세스로 연속 플레이합니다. 풀 수 있는 화살표를 묶어 빠르게 누르고, 하트 하나를 남기는 고의 실수도 넣고, 가끔(6%) 일부러 진 뒤 카드가 뜰 무렵 '다시 하기'를 누릅니다.</li>
+        <li>burst: 레벨 25개에서 화면 아무 곳이나 30번을 거의 동시에 누릅니다.</li>
+        <li>lifecycle: 레벨 12개에서 애니메이션 중 홈 이동, 일시정지 연타, 뒤로가기, 백그라운드 프로세스 종료 후 복원을 합니다.</li>
+        <li>monkey: 핀치, 뒤로가기, 앱 전환이 들어간 3,000 이벤트를 12번 넣습니다.</li>
+      </ul>
+      <p>판마다 logcat의 <code>FATAL EXCEPTION</code>과 ANR, <code>pidof</code>로 본 프로세스 생존을 확인합니다(앱이 화면 앞에 있는지 보는 검사는 첫 실행 뒤 37판 일로 추가했습니다). 첫 실행은 5,091초 걸렸고 실패가 30건이었습니다. 28건은 하네스가 crash/ANR로 판정한 것이었고 첫 크래시는 80판, 마지막은 298판에서 났습니다. 누적 실패는 50판까지 1건, 100판까지 5건, 200판까지 11건, 300판까지 30건으로 뒤 레벨로 갈수록 늘었습니다. 나머지 2건은 앱 버그가 아니었습니다. 37판에서는 크래시 기록 없이 앱이 뒤로 갔고(밖에서 홈으로 나간 것으로 봤습니다), 84판에서는 색종이 효과가 움직이는 동안 uiautomator가 '다음' 버튼을 읽지 못했습니다.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/result-card-tap-through-2-ko.webp" width="1200" height="446" alt="막대그래프: 첫 300판 스트레스 실행에서 크래시 28건과 하네스·환경 쪽 실패 2건이 나왔고, 수정 뒤 재실행은 0건이었다." loading="lazy"><figcaption>첫 실행 실패 30건 중 28건이 크래시였고, 수정 뒤 재실행에서는 0건이었습니다.</figcaption></figure>
+      <p>첫 실행의 크래시 버퍼는 이미 비워져 스택 앞부분이 없었고, 화면 그리기 경로만 남아 있었습니다. 그래서 28건이 모두 같은 예외인지는 직접 확인하지 못했습니다. 수정 뒤 재실행에서 크래시가 0건이 되어 같은 원인으로 봅니다.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EB%A7%89%ED%9E%8C%20%ED%99%94%EC%82%B4%ED%91%9C%20%EC%97%B0%ED%83%80%EC%99%80%20%EC%9E%A0%EA%B8%88%20%EC%97%86%EB%8A%94%20%EC%8B%A4%ED%8C%A8%20%EC%B9%B4%EB%93%9C%3A%20%EA%B2%B0%EA%B3%BC%20%EC%B9%B4%EB%93%9C%20600ms%20%EC%9E%A0%EA%B8%88%EA%B3%BC%20%EC%8A%A4%ED%8A%B8%EB%A0%88%EC%8A%A4%20%ED%85%8C%EC%8A%A4%ED%8A%B8%EA%B0%80%20%EC%B0%BE%EC%9D%80%20%ED%81%AC%EB%9E%98%EC%8B%9C%2028%ED%9A%8C">메일로 문의하기</a></p></aside>
+    <section aria-labelledby="spring-index">
+      <h2 id="spring-index">스프링이 넘쳐 points[-1]을 읽었습니다</h2>
+      <p>에이전트의 다음 가설은 메모리였습니다. 76판부터 새 프로세스로 25판을 돌리자 실패가 0이었고, 첫 실행은 오래 돈 뒤에만 죽었기 때문입니다.</p>
+      <p>10:28 기록에 적힌 단서는 크래시가 큰 판인 뒤 레벨(200판 이후)에 몰려 있다는 것이었고, 남은 스택도 화면 그리기 경로뿐이었습니다. 에이전트는 누수보다 판 크기 쪽을 의심했고, 스프링 넘침이 <code>Track.body()</code>의 배열 번호를 넘는다고 보고 막는 화살표가 먼 경우를 찾아 10:38에 눌렀습니다. 메모리 쪽은 같은 시각 메모리를 기록하며 돌린 재실행에서 GPU 메모리가 180~240MB 사이를 오르내려 누수로 보이지 않았습니다.</p>
+      <p>22판 6번 화살표는 막는 화살표까지 8.55칸 떨어져 있었습니다. 이 화살표를 한 번 누르자 앱이 바로 꺼졌습니다.</p>
+      <pre><code>java.lang.IndexOutOfBoundsException: Index -1 out of bounds for length 23</code></pre>
+      <p>막힌 화살표는 막는 화살표 앞까지 찌르므로 앞의 빈칸이 길수록 멀리 찌릅니다. 돌아올 때 쓰는 <code>spring(dampingRatio = 0.5f, stiffness = 600f)</code>은 커밋 메시지 기준 찌른 거리의 약 16%만큼 출발점 뒤로 넘쳤다가 돌아옵니다. 커밋 메시지는 이동량이 -1 아래로 내려가는 경계를 "막는 화살표가 6칸 이상"으로 적었고, TrackTest 주석에는 막는 화살표가 8.55칸 떨어진 화살표가 이동량 약 -1.4까지 밀렸다고 적혀 있고, 세션 기록으로 그 화살표가 22판 6번입니다. 이동량이 -1 아래면 몸통 좌표를 만드는 <code>Track.body(t)</code>가 <code>floor(t) + 1</code>을 배열 번호로 써서 <code>points[-1]</code>을 읽습니다. 이 코드는 draw 안에서 돌기 때문에 예외 하나가 앱 전체를 내립니다.</p>
+      <p>50판 처음 배치에는 이런 화살표가 없어서 30초 adb 연타로는 나오지 않았습니다. 판을 치울수록 화살표 앞 빈칸이 길어지므로 어느 판에서나 판 중간에 날 수 있었고, 판이 큰 뒤 레벨일수록 자주 났습니다.</p>
+      <p>69781a7은 스프링에 <code>anim.updateBounds(lowerBound = -0.12f)</code>로 하한을 걸고, 하한에 걸리면(<code>AnimationEndReason.BoundReached</code>) 120ms tween으로 마저 돌아오게 했습니다. <code>Track.body</code>는 배열 번호를 <code>coerceAtLeast(0)</code>와 <code>k &lt; points.size</code>로 막아 어떤 이동량을 받아도 죽지 않게 했습니다. 회귀 테스트 <code>TrackTest</code>는 팩에 든 모든 화살표를 이동량 -40부터 출구 너머 +40까지 0.37 간격으로 그려 보는데, 에이전트는 이 테스트가 옛 <code>Track.kt</code>에서 실패하는 것부터 확인했습니다. 크래시가 나던 화살표 4개(22·72·92·122판)를 3번씩 눌러도 꺼지지 않았고, 재실행한 전체 스위트(300판 연속, burst, lifecycle, monkey 12회)는 5,935초 동안 실패 0건, 신규 설치 몽키 3/3으로 끝났습니다.</p>
+    </section>
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">판 전체 잠금 대신 그 화살표만 막았습니다</h2>
+      <p>연타 문제는 판 전체 입력을 잠깐 막아도 사라집니다. 6133e9e는 그렇게 하지 않고 되돌아오는 그 화살표의 반복 탭만 버렸습니다. 바로 앞 커밋(6dfa183)이 빠르게 이어 빼면 쌓이는 콤보를 넣었는데, 콤보가 있는 판에서 전체를 잠그면 정상적인 연타까지 막는다고 봅니다. 결과 카드 잠금만 넣는 방법도 있었지만 그러면 하트는 여전히 250ms 안에 다 빠지고, 플레이어는 왜 졌는지 모른 채 실패 카드를 보게 됩니다. 6133e9e는 반복 탭 무시, 하트 하나씩, 카드 잠금을 한 커밋에 같이 넣었습니다.</p>
+      <p>크래시 쪽은 그리기 코드만 안전하게 만들어도 앱은 죽지 않습니다. 그래도 스프링 하한을 같이 걸었습니다. 코드 주석에 따르면 넘침이 화살표 꼬리 칸을 출발점 뒤로 끌고 가 그림이 틀어집니다.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">엔진 퍼즈는 그리기 코드를 지나지 않았습니다</h2>
+      <p>엔진 퍼즈 테스트는 통과했는데 같은 날 앱은 28번 죽었습니다. 규칙 엔진은 막힘·제거·하트 같은 규칙 상태만 계산하고 애니메이션 이동량이나 그리기 배열 번호는 보지 않습니다.</p>
+      <p>스트레스 하네스는 디버그 빌드를 전제로 합니다. <code>run-as</code>로 진행 파일에 레벨을 써 넣고, 디버그 로그에 찍힌 판 좌표로 탭 위치를 계산합니다. 그래서 69781a7 시점에 이 스위트는 R8로 줄인 릴리스 빌드에서 돈 적이 없고, 기기도 S21 한 대였습니다.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">8연타 재현부터 300판 연속 실행까지 6단계</h2>
+      <ol>
+        <li>막혀서 되돌아오는 대상을 하나 골라 위의 adb 명령으로 70ms 간격 8연타를 넣습니다. 잃은 하트 수가 실수 수와 맞는지, 결과 화면이 사람 눈에 보이는지 확인합니다.</li>
+        <li>애니메이션 중인 대상의 반복 탭은 실수 한 번으로 셉니다. 대상별로 "되돌아오는 중" 집합을 두고, 빠져나갈 수 있게 된 대상은 예외입니다.</li>
+        <li>결과 카드의 버튼과 뒤로가기는 뜬 뒤 일정 시간(여기서는 600ms) 받지 않습니다. 다음 판, 다시 하기처럼 판을 바꾸는 버튼 전부에 같은 상수를 적용합니다.</li>
+        <li>애니메이션 값이 배열 번호로 들어가는 그리기 코드를 찾아 어떤 값에도 안전하게 만듭니다. 스프링은 <code>updateBounds</code>로 하한을 걸고 <code>BoundReached</code>면 tween으로 마무리합니다.</li>
+        <li>출시 데이터 전체를 범위 밖 값까지 그려 보는 단위 테스트를 만들고, 수정을 되돌린 코드에서 실패하는지 먼저 봅니다.</li>
+        <li>한 프로세스로 전 레벨을 연속으로 돌리면서 고의 실수, 고의 패배 뒤 카드가 뜨는 순간의 재시작 탭, 동시 다발 탭, 생명주기, 몽키를 함께 넣습니다. 판정은 크래시·ANR 로그, 프로세스 생존, 포그라운드 이탈 셋으로 하고, 크래시가 나면 전체 트레이스를 바로 파일에 저장합니다. stress_check.py는 판마다 아래 세 가지를 봅니다(패키지 이름에는 자기 앱 것을 넣습니다).</li>
+      </ol>
+      <pre><code>adb logcat -d | grep -E "FATAL EXCEPTION|ANR in 패키지명"
+adb shell pidof 패키지명
+adb shell "dumpsys window | grep mCurrentFocus"</code></pre>
+      <p>튜토리얼 첫 탭에서 난 다른 크래시는 <a href="https://sugarmount21.com/ax/fresh-install-monkey-test/">VIBRATE 권한 크래시와 신규 설치 몽키 테스트</a>에 적었습니다.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">R8 릴리스 빌드에서 두 재현을 다시 합니다</h2>
+      <p>다음은 R8 릴리스 빌드에서 22판 6번 화살표 한 번 탭과 50판 8연타를 다시 해 보는 것입니다. 600ms는 고른 근거가 기록에 없어서, 실제 플레이 녹화로 실패 카드가 뜬 뒤 첫 탭까지 걸리는 시간을 재 보고 값을 다시 정하는 일도 남았습니다.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EB%A7%89%ED%9E%8C%20%ED%99%94%EC%82%B4%ED%91%9C%20%EC%97%B0%ED%83%80%EC%99%80%20%EC%9E%A0%EA%B8%88%20%EC%97%86%EB%8A%94%20%EC%8B%A4%ED%8C%A8%20%EC%B9%B4%EB%93%9C%3A%20%EA%B2%B0%EA%B3%BC%20%EC%B9%B4%EB%93%9C%20600ms%20%EC%9E%A0%EA%B8%88%EA%B3%BC%20%EC%8A%A4%ED%8A%B8%EB%A0%88%EC%8A%A4%20%ED%85%8C%EC%8A%A4%ED%8A%B8%EA%B0%80%20%EC%B0%BE%EC%9D%80%20%ED%81%AC%EB%9E%98%EC%8B%9C%2028%ED%9A%8C">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>Compose에서 버튼 연타를 막으려면 무엇을 쓰나요?</summary><div><p>이 게임은 <code>clickable(enabled = armed)</code>와, 화면이 뜬 뒤 <code>LaunchedEffect</code>에서 600ms를 기다려 <code>armed</code>를 켜는 상태 하나로 막았습니다. 흔한 디바운스(첫 탭을 받고 이어지는 탭을 버리는 방식)는 앞 화면에서 넘어온 첫 탭을 그대로 받으므로, "화면이 뜬 뒤 일정 시간"을 기준으로 잡았습니다.</p></div></details>
+        <details><summary>몽키 테스트로는 왜 못 찾았나요?</summary><div><p>신규 설치 몽키는 튜토리얼과 첫 판에서 시작합니다. 이 결함은 22판 6번 화살표(막는 화살표까지 8.55칸)처럼 막는 화살표가 6칸 이상 떨어진 화살표를 눌러야 나서, 300판을 끝까지 치우는 실행의 80판에서 처음 나왔습니다.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="https://sugarmount21.com/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
+        <li><a href="https://sugarmount21.com/ax/puzzle-first-chapter-walls/">퍼즐 게임 첫날 이탈 분석: 기기별 이벤트 순서와 판별 계산으로 찾은 첫 장의 벽 4판</a></li>
+        <li><a href="https://sugarmount21.com/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 04 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Claude Code WSL에서 Windows로 이전 – SugarMount</title>
+    <link>https://sugarmount21.com/ax/wsl-to-windows-claude-code/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/ax/wsl-to-windows-claude-code/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/wsl-to-windows-claude-code-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX 노트 · 방법</span>
+      <h1>WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</h1>
+      <p class="lead">저장소는 복사 뒤 git 설정 세 가지로 끝나지만 세션 기록은 cwd와 보관 기간을 따로 고쳐야 합니다. 판정은 R8 릴리스 빌드와 몽키 1,500회로 냈습니다.</p>
+      <p>Windows로 옮긴 sugar-utils의 사진 용량 줄이기 앱을 R8 릴리스 빌드로 묶는 데 5분 50초가 걸렸고, 그 APK에 몽키 이벤트 1,500개를 넣어도 크래시와 ANR은 0건이었습니다. 이전은 2026년 10월 18일 오전 11시 2분에 시작했고, 저장소와 도구 설치는 그날 오후 4시 무렵 이 확인으로 마무리됐습니다. 세션 기록과 Docker까지 정리된 것은 10월 22일이었고, 그 사이 에이전트가 틀린 곳이 다섯 군데 나왔습니다.</p>
+      <p class="note">근거는 이전 작업을 한 Claude Code 세션 기록(jsonl) 3개, 이전 내용을 적은 메모리 파일, 이전 전후의 전역 지침 파일입니다. 숫자는 2026년 11월 2일에 세션 기록에서 다시 확인했고 시각은 한국 시간입니다.</p>
+    </section>
+    <section aria-labelledby="checklist">
+      <h2 id="checklist">이전 체크리스트 8단계</h2>
+      <p>WSL을 쓴 이유는 예전에 Windows 터미널에서 Claude Code가 안 되는 기능이 많고 느렸기 때문입니다. 10월 18일 운영자가 이제 Windows에서 써도 되느냐고 묻자, 에이전트는 써도 된다면서 한 프로젝트만 하루 이틀 먼저 써 보라고 권했습니다. 운영자는 한 번에 옮기라고 했고, 도구 설치를 승인하면서 빌드까지 해 보라고 했습니다. 프로젝트를 WSL에 둔 채 Windows에서 WSL 네트워크 경로로 여는 방식은 에이전트가 아주 느리다며 권하지 않았습니다(속도는 재지 않았습니다).</p>
+      <ol>
+        <li>WSL 홈의 프로젝트를 Windows 홈으로 복사합니다. 옮기지 않습니다. <code>node_modules</code>, <code>build</code>, <code>.gradle</code>, <code>.dart_tool</code>, <code>.next</code>, <code>.cxx</code>는 제외합니다.</li>
+        <li>저장소마다 <code>git status --porcelain | wc -l</code>을 양쪽에서 세어 맞는지 확인합니다.</li>
+        <li><code>core.filemode=false</code>(서브모듈 포함), 링크가 있는 저장소는 <code>core.symlinks=true</code>로 바꾸고 링크를 다시 체크아웃, 워크트리는 <code>git worktree repair</code>, Android는 <code>local.properties</code>의 <code>sdk.dir</code>.</li>
+        <li>도구 버전을 확인하고 관리자 권한 없이 사용자 범위로 설치합니다.</li>
+        <li>Claude Code 지침 파일의 환경 절을 다시 쓰고, WSL에서만 필요했던 우회 규칙을 삭제합니다.</li>
+        <li>세션 기록을 옮기기 전에 <code>cleanupPeriodDays</code>부터 올립니다. 그다음 폴더 이름을 바꿔 복사하고, 기록 안의 <code>cwd</code>를 바꾸고, WSL root 계정 홈의 <code>.claude/projects</code>에 있는 기록도 찾습니다. 이전 뒤에도 WSL에서 이어 쓴 세션은 마지막에 한 번 더 복사합니다. 끝나면 각 프로젝트 폴더에서 <code>claude --resume</code>을 열어 옛 세션이 보이는지 봅니다. 다른 폴더에서 실행하면 기록이 별도 프로젝트 폴더로 저장됩니다.</li>
+        <li>Ubuntu를 깨우는 것을 끄고, Docker Desktop을 쓰면 <code>wsl --terminate &lt;배포판&gt;</code>으로 Ubuntu만 종료합니다. <code>wsl -l -v</code>에서 Ubuntu가 Stopped, docker-desktop이 Running이면 끝입니다. <code>.wslconfig</code>를 고쳤다면 적용하는 데 <code>wsl --shutdown</code>이 한 번 필요하고, 그때 Docker도 잠깐 내려갑니다.</li>
+        <li>R8 릴리스 빌드를 에뮬레이터에 설치하고 몽키 1,500회, crash 버퍼, 프로세스 생존을 봅니다.</li>
+      </ol>
+      <p>1단계와 3단계에 쓴 명령을 따라 하기 쉽게 한데 모은 것입니다. 저장소 이름은 자리표시자로 바꿨습니다. 저장소 안의 링크는 git이 모드 120000으로 기록한 파일로 찾았습니다.</p>
+      <pre><code># 1단계 (WSL 안에서)
+rsync -a --no-links --exclude=node_modules --exclude=build --exclude=.dart_tool \
+  --exclude=.gradle --exclude=.next --exclude=.cxx &lt;폴더 목록&gt; &lt;Windows 홈&gt;/
+# 3단계 (Git Bash, 저장소마다)
+r=&lt;저장소&gt;
+git -C "$r" config core.filemode false
+git -C "$r" submodule foreach --quiet 'git config core.filemode false'
+export MSYS=winsymlinks:nativestrict
+git -C "$r" config core.symlinks true
+git -C "$r" ls-files -s | awk '$1=="120000"{ $1=$2=$3=""; sub(/^ +/,""); print }' &gt; "$TMP/links.txt"
+while IFS= read -r p; do rm -f "${r:?}/${p:?}"; done &lt; "$TMP/links.txt"
+tr '\n' '\0' &lt; "$TMP/links.txt" | xargs -0 git -C "$r" checkout --
+git -C &lt;주 저장소&gt; worktree repair &lt;워크트리 경로...&gt;</code></pre>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/wsl-to-windows-claude-code-1-ko.webp" width="1200" height="774" alt="단계 그림: 10월 18일 폴더 35개 복사와 git 설정, 같은 날 릴리스 빌드 5분 50초와 몽키 1,500회 크래시 0, 10월 21일 세션 기록 31개 cwd 변환과 9월 기록 5개 복구, 10월 22일 root 기록 8개 포함 9개 추가와 Ubuntu 종료." loading="lazy"><figcaption>저장소와 도구는 10월 18일 하루에 검증까지 끝났고, 세션 기록과 WSL 끄기는 10월 22일에야 끝났습니다.</figcaption></figure>
+    </section>
+    <section aria-labelledby="git-settings">
+      <h2 id="git-settings">복사한 저장소에 거는 git 설정</h2>
+      <p>WSL 안에서 <code>rsync -a --no-links</code>로 홈 폴더 35개(sugar-game 워크트리 16개 포함)와 bundle 파일 1개를 Windows 홈으로 복사했습니다. 빌드 산출물을 뺀 크기는 약 1.5GB였습니다. WSL 원본은 지우지 않고 백업으로 남겼습니다. 운영자가 정한 규칙이고, 나중에 빠진 세션 기록을 이 원본에서 두 번 되살렸습니다.</p>
+      <p><code>--no-links</code> 때문에 심볼릭 링크는 "skipping non-regular file"로 모두 건너뛰었습니다. 링크가 든 저장소 3개는 <code>core.symlinks=true</code>로 바꾸고, Git Bash에서 <code>MSYS=winsymlinks:nativestrict</code>를 건 뒤 링크 파일을 지우고 <code>git checkout</code>으로 다시 받았습니다. 모든 저장소와 서브모듈에는 <code>core.filemode=false</code>를 걸었습니다. sugar-game의 워크트리 16개는 <code>.git</code> 파일이 옛 경로를 가리켜 <code>git worktree repair</code>가 "gitdir incorrect"를 고쳤습니다.</p>
+      <p>확인은 저장소별 <code>git status --porcelain</code> 줄 수를 WSL 원본과 맞춰 봤습니다. sugar-game 23, sugar-utils 0처럼 한 저장소만 빼고 모두 같았습니다. 그 하나는 브라우저 다운로드 메타데이터인 <code>…pptx:Zone.Identifier</code> 파일이 실수로 커밋돼 있었고, Windows는 파일 이름에 쌍점을 허용하지 않아 만들 수 없었습니다. <code>git update-index --skip-worktree</code>로 그 파일만 무시하게 했습니다.</p>
+    </section>
+    <section aria-labelledby="toolchain">
+      <h2 id="toolchain">도구 버전과 지워진 우회 규칙</h2>
+      <p>WSL 시절 전역 지침의 환경 절에는 node 20, python 3.10이 적혀 있었습니다. Windows에는 이미 node 22와 python 3.12가 깔려 있어서, 이전 날 오전에 새로 쓴 환경 절은 그 판을 기준으로 했습니다. PATH의 <code>java</code>는 JRE 8뿐이라 javac가 없었고, Gradle용 JDK 21은 사용자 폴더에 zip으로 풀어 <code>~/.gradle/gradle.properties</code>의 <code>org.gradle.java.home</code>으로 지정했습니다. gcloud는 winget 설치가 관리자 권한(UAC) 요청에서 막혀, 공식 zip을 사용자 폴더에 풀고 사용자 PATH에 넣었습니다. WSL 때부터 없던 jq와 Windows 쪽에 없던 rg는 winget <code>--scope user</code>로 넣었습니다.</p>
+      <p>WSL에서는 Windows 드라이브에 있는 Android 프로젝트를 9p 파일시스템으로 붙여 빌드했고, 거기서 Gradle 락이 깨져 <code>--project-cache-dir</code>을 따로 주거나 Linux 쪽 사본에서 빌드한다는 줄이 지침에 있었습니다. Windows 네이티브에서는 그 드라이브를 직접 쓰므로 새 지침에서 이 줄을 삭제했습니다. "PATH의 flutter는 Windows SDK이니 Linux SDK는 절대경로로 부른다"는 줄도 Windows용 SDK 하나만 남으면서 빠졌습니다. 이전 뒤 그 드라이브 프로젝트의 세션 5개(서브에이전트 기록까지 jsonl 81개)를 <code>Timeout waiting to lock</code>, <code>Could not lock</code>으로 찾아보니 0건이었습니다. 다만 그 기간 이 드라이브에서 빌드가 끝까지 돈 기록은 많지 않습니다.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/wsl-to-windows-claude-code-2-ko.webp" width="1200" height="644" alt="비교 그림: WSL 시절 지침은 node 20, python 3.10, Windows 드라이브 9p 빌드 시 Gradle 락 우회, Linux SDK 절대경로 호출이었고, Windows 지침은 node 22, python 3.12, Windows 드라이브 직접 빌드, Windows용 SDK 하나다." loading="lazy"><figcaption>이전 뒤 지침의 환경 절은 버전이 올라가고 WSL에서만 필요했던 우회 규칙 두 줄이 빠졌습니다.</figcaption></figure>
+    </section>
+    <section aria-labelledby="session-logs">
+      <h2 id="session-logs">세션 기록은 프로젝트 폴더 밖에 있다</h2>
+      <p>프로젝트를 다 옮긴 뒤에도 Windows에서 <code>claude --resume</code>을 열면 옛 세션이 보이지 않았습니다. Claude Code의 세션 기록은 <code>~/.claude/projects/</code> 아래, 작업 폴더의 절대 경로를 바꾼 이름의 폴더에 있습니다. Linux 홈의 sugar-utils는 <code>-home-&lt;사용자&gt;-sugar-utils</code>이고, Windows 홈의 같은 폴더는 <code>C--Users-&lt;사용자&gt;-sugar-utils</code>입니다. 10월 18일 밤 기록이 있는 폴더 14개(원본 약 3.1GB)를 새 이름으로 복사했습니다.</p>
+      <p>그래도 10월 21일까지 목록에 안 잡혔습니다. 기록 파일 한 줄마다 들어 있는 <code>"cwd"</code> 값이 여전히 Linux 경로였기 때문입니다. 에이전트가 이 값을 일괄로 바꾸려 하자 Claude Code의 자동 권한 검사가 "세션 기록 변조"로 막았습니다. 우회하지 않고 <code>cwd</code>만 바꾸는 스크립트를 만들어 운영자가 <code>!</code> 명령으로 직접 실행했고, 31개 파일이 바뀌었습니다.</p>
+      <p>스크립트는 각 기록 파일에서 <code>cwd</code> 값만 Linux 경로에서 Windows 경로로 바꾸고, 대화 본문과 파일 수정 시각은 건드리지 않습니다. 세션 본체 파일만 고칩니다. 하위 폴더의 서브에이전트 기록은 건드리지 않습니다. 홈 밖(예: 다른 드라이브)에서 연 세션은 그 경로에 맞는 줄을 따로 추가해야 합니다. 아래는 실제 스크립트에서 두 번째 드라이브 처리와 사용자 이름을 빼고, Windows 홈 경로를 자동으로 잡도록 고친 판입니다. Git Bash에서 <code>!</code>로 돌릴 때 스크립트 경로를 역슬래시로 넘기면 Bash가 역슬래시를 지워 파일을 못 찾습니다. 처음 실행이 이것 때문에 실패했고, 슬래시 경로로 다시 돌렸습니다.</p>
+      <pre><code># 옮겨 온 세션 기록(.jsonl)의 cwd만 Windows 경로로 바꾼다. 수정 시각은 유지한다.
+import os, re, glob
+LINUX_HOME = '/home/&lt;사용자&gt;'
+WIN_HOME = os.path.expanduser('~')          # %USERPROFILE%
+root = os.path.join(WIN_HOME, '.claude', 'projects')
+pat = re.compile(r'"cwd":"' + re.escape(LINUX_HOME) + r'((?:/[^"]*)?)"')
+def rep(m):
+    # JSON 문자열 안이므로 역슬래시를 두 번 쓴다
+    path = (WIN_HOME + m.group(1).replace('/', '\\')).replace('\\', '\\\\')
+    return '"cwd":"%s"' % path
+n = 0
+for f in glob.glob(os.path.join(root, '*', '*.jsonl')):
+    with open(f, encoding='utf-8') as fh:
+        s = fh.read()
+    if '"cwd":"' + LINUX_HOME not in s:
+        continue
+    st = os.stat(f)
+    with open(f, 'w', encoding='utf-8', newline='') as fh:
+        fh.write(pat.sub(rep, s))
+    os.utime(f, (st.st_atime, st.st_mtime))
+    n += 1
+print('rewritten', n)</code></pre>
+      <p>바로 그때 9월 18~20일 기록 5개가 사라진 것이 보였습니다. 에이전트가 복사하면서 원래 수정 시각을 유지했는데, Claude Code는 기본값으로 30일 넘게 손대지 않은 기록을 시작할 때 삭제합니다. <code>~/.claude/settings.json</code>에 <code>"cleanupPeriodDays": 3650</code>을 넣고 WSL 원본에서 5개를 다시 복사했습니다.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20WSL%EC%9D%84%20%EC%A0%91%EA%B3%A0%20Windows%20%EB%84%A4%EC%9D%B4%ED%8B%B0%EB%B8%8C%EB%A1%9C%3A%20Claude%20Code%20%EA%B0%9C%EB%B0%9C%20%ED%99%98%EA%B2%BD%20%EC%9D%B4%EC%A0%84%20%EC%B2%B4%ED%81%AC%EB%A6%AC%EC%8A%A4%ED%8A%B8">메일로 문의하기</a></p></aside>
+    <section aria-labelledby="ai-errors">
+      <h2 id="ai-errors">놓친 root 기록 8개와 shutdown</h2>
+      <p>10월 22일 밤 운영자가 "세션 기록이 제대로 안 옮겨진 것 같다"고 짚었습니다. 에이전트는 그 전에 이전이 끝났다고 보고했지만, 다시 보니 WSL root 계정의 기록 8개를 통째로 놓쳤고, 이전 뒤에도 WSL에서 이어진 세션 1개가 옛 상태였습니다. 9개를 옮기고 <code>cwd</code>를 바꾼 뒤에야 Linux 경로가 남은 기록이 0개가 됐습니다.</p>
+      <p>WSL 끄는 법도 에이전트가 틀렸습니다. 10월 18일부터 22일 낮까지 보고 여섯 번에 "<code>wsl --shutdown</code>을 요청해 주세요" 같은 안내를 적었고, 10월 22일 밤 운영자가 그대로 실행하자 Docker까지 내려갔습니다. 에이전트는 그걸 모른 채 그 뒤 보고 두 개에도 같은 안내를 붙였습니다. <code>--shutdown</code>은 WSL2 가상 머신 전체를 내리고, Docker Desktop도 같은 가상 머신 위의 <code>docker-desktop</code> 배포판에서 돕니다. Ubuntu만 끄는 명령은 <code>wsl --terminate Ubuntu-22.04</code>입니다. shutdown 뒤 Ubuntu가 다시 켜진 원인도 에이전트가 앞서 Ubuntu 안에서 돌린 세션 기록 검색 <code>find</code>가 남아 있던 것으로 보였습니다.</p>
+      <p>플러그인 하나를 지워 달라는 요청을 에이전트가 설치된 플러그인 전체로 읽고, 사용 기록을 보지 않은 채 user 범위 플러그인 22개를 지웠습니다. 운영자가 쓰는 것은 왜 지우냐고 되묻자 그제야 최근 60일 세션 기록의 MCP 호출 수를 확인했습니다. 직접 등록한 github MCP와 context7 MCP는 0회였고, 지운 것 중 Notion 플러그인이 1,437회, playwright 플러그인이 59회였습니다. 둘은 다시 설치했습니다. 플러그인을 지우기 전에는 호출 수부터 세십시오.</p>
+    </section>
+    <section aria-labelledby="wake-sources">
+      <h2 id="wake-sources">Ubuntu를 다시 깨우던 네 가지</h2>
+      <p>시작프로그램 폴더에서 WSL 안의 봇을 띄우던 스크립트, Docker Desktop 설정의 Ubuntu WSL 연동, Ubuntu에 영구 연결해 둔 네트워크 드라이브, 그리고 위에 쓴 남은 <code>find</code> 프로세스가 Ubuntu를 깨웠습니다. 스크립트와 Docker 설정은 지우지 않고 백업 폴더로 옮기거나 설정에서 해제했고, 네트워크 드라이브는 <code>net use</code>의 <code>/delete</code>로 연결을 풀었습니다.</p>
+      <p>Docker Desktop이 쓰는 WSL2 가상 머신은 계속 떠 있으므로 <code>.wslconfig</code>에서 memory=3GB, processors=2, swap=1GB, autoMemoryReclaim=dropCache로 줄였습니다. 탐색기의 Linux 항목이나 WSL 네트워크 경로를 여는 것만으로도 Ubuntu가 켜집니다. 그럴 때는 다시 <code>--terminate</code>로 종료합니다.</p>
+    </section>
+    <section aria-labelledby="verify">
+      <h2 id="verify">끝났다는 판정: R8 빌드와 몽키 1,500회</h2>
+      <p><a href="https://sugarmount21.com/ax/release-gate/">릴리스 게이트 글</a>에 쓴 R8 크래시는 디버그 빌드에서는 보이지 않았습니다. 그래서 환경 이전도 sugar-utils의 사진 용량 줄이기 앱을 <code>--no-daemon</code>으로 <code>assembleRelease</code>까지 돌려 판정했습니다. 빌드는 337개 태스크(298개 실행, 39개 캐시)에 <code>minifyReleaseWithR8</code>을 거쳐 5분 50초에 끝났습니다. Windows에서 처음 돌린 빌드(구성 캐시도 없던 상태)입니다.</p>
+      <pre><code>adb -s emulator-5554 install -r app-release.apk
+adb -s emulator-5554 logcat -c
+adb -s emulator-5554 shell monkey -p &lt;패키지&gt; --throttle 200 --pct-syskeys 0 -v 1500
+adb -s emulator-5554 shell pidof &lt;패키지&gt;
+adb -s emulator-5554 logcat -d -b crash</code></pre>
+      <p>Pixel 8 Pro API 35 에뮬레이터에서 "Events injected: 1500"과 "Monkey finished"가 나왔고, <code>pidof</code>가 프로세스 번호를 돌려줬고, crash 버퍼는 비어 있었습니다. 연결돼 있던 실제 폰 2대에는 Play에서 받은 판이 덮어써질 수 있어 설치하지 않았습니다. 이번 몽키는 <code>install -r</code>(있으면 덮어쓰는 설치)로 넣고 돌렸고, 앱 데이터를 지운 신규 설치 상태였는지는 확인하지 않았습니다. 신규 설치 상태에서만 드러나는 결함은 <a href="https://sugarmount21.com/ax/fresh-install-monkey-test/">VIBRATE 권한과 신규 설치 몽키 테스트</a>에 따로 적었습니다.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">심볼릭 링크를 못 만드는 PC</h2>
+      <p>네이티브 심볼릭 링크를 만들 수 없는 PC에서는 <code>core.symlinks=true</code>로 링크를 되살리는 3단계를 그대로 쓸 수 없습니다.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">빌드 시간 비교는 없고, /resume 목록은 운영자만 봤습니다</h2>
+      <p>Windows 네이티브와 WSL의 같은 조건 빌드 시간은 재지 않았습니다. <code>/resume</code> 목록은 에이전트가 직접 띄워 본 적이 없고, 10월 22일 운영자가 "된 거 같다"고 한 것이 마지막 확인입니다. 옮겨 온 세션은 대화 본문에 옛 Linux 경로가 남아 있어, 이어 가면 에이전트가 처음에 그 경로를 쓰려 할 수 있습니다. 에이전트가 당시 보고에 적은 대응은 이어 갈 때 새 경로를 한 번 말해 주라는 것이었고, 더 나은 방법은 아직 찾지 않았습니다.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20WSL%EC%9D%84%20%EC%A0%91%EA%B3%A0%20Windows%20%EB%84%A4%EC%9D%B4%ED%8B%B0%EB%B8%8C%EB%A1%9C%3A%20Claude%20Code%20%EA%B0%9C%EB%B0%9C%20%ED%99%98%EA%B2%BD%20%EC%9D%B4%EC%A0%84%20%EC%B2%B4%ED%81%AC%EB%A6%AC%EC%8A%A4%ED%8A%B8">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>WSL에서 쓰던 Claude Code 세션 기록을 Windows로 옮길 수 있나요?</summary><div><p>옮길 수 있지만 폴더 복사만으로는 안 됩니다. <code>~/.claude/projects/</code> 아래 폴더 이름을 Windows 경로 기준으로 바꾸고, 기록 안의 <code>cwd</code> 값도 바꿔야 합니다. 이번에는 바꾼 뒤 운영자가 <code>/resume</code>에서 된 것 같다고 확인했습니다. 먼저 <code>cleanupPeriodDays</code>를 올려 두지 않으면 30일 넘게 손대지 않은 기록이 지워집니다.</p></div></details>
+        <details><summary>wsl --shutdown과 wsl --terminate는 무엇이 다른가요?</summary><div><p><code>--shutdown</code>은 WSL2 가상 머신 전체를 내리므로 그 위의 Docker Desktop도 함께 내려갑니다. <code>--terminate &lt;배포판&gt;</code>은 그 배포판만 종료합니다.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
+        <li><a href="https://sugarmount21.com/ax/subagent-brief-rules/">서브에이전트 브리프의 절대 규칙 6개와 한도로 끊긴 에이전트 5건</a></li>
+        <li><a href="https://sugarmount21.com/ax/integration-review-defects/">AI 에이전트 병렬 브랜치 13개를 합친 뒤 통합 리뷰가 확정 결함 12건을 찾았다</a></li>
+        <li><a href="https://sugarmount21.com/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 04 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>Claude Code 컨텍스트 압축 9번과 메모리 파일 – SugarMount</title>
     <link>https://sugarmount21.com/ax/compaction-summary-memory/</link>
@@ -120,12 +483,12 @@ How to apply: 이 캠페인 설정·수정 때 사용자 지시가 runbook보다
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
         <li><a href="https://sugarmount21.com/ax/subagent-brief-rules/">서브에이전트 브리프의 절대 규칙 6개와 한도로 끊긴 에이전트 5건</a></li>
         <li><a href="https://sugarmount21.com/ax/integration-review-defects/">AI 에이전트 병렬 브랜치 13개를 합친 뒤 통합 리뷰가 확정 결함 12건을 찾았다</a></li>
         <li><a href="https://sugarmount21.com/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://sugarmount21.com/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -233,12 +596,12 @@ edge = if (next &lt; edge) next else edge - 1 // strictly decreasing</code></pre
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -374,8 +737,8 @@ git log --diff-filter=A --format="%h %ad %s" --date=iso -- &lt;채점 파일&gt;
         <li><a href="https://sugarmount21.com/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
         <li><a href="https://sugarmount21.com/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://sugarmount21.com/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -481,8 +844,8 @@ POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect
         <li><a href="https://sugarmount21.com/ax/static-site-check-gate/">여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/ai-region-privacy-policy/">개인정보처리방침 AI 처리 위치(국외 이전): 하루에 두 번 고친 고지를 코드에 묶기</a></li>
         <li><a href="https://sugarmount21.com/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -605,9 +968,9 @@ print("first", shows[:1], "gaps", [b - a for a, b in zip(inter, inter[1:])],
         <li><a href="https://sugarmount21.com/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
         <li><a href="https://sugarmount21.com/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
         <li><a href="https://sugarmount21.com/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -728,12 +1091,12 @@ print("first", shows[:1], "gaps", [b - a for a, b in zip(inter, inter[1:])],
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
         <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
         <li><a href="https://sugarmount21.com/ax/integration-review-defects/">AI 에이전트 병렬 브랜치 13개를 합친 뒤 통합 리뷰가 확정 결함 12건을 찾았다</a></li>
         <li><a href="https://sugarmount21.com/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://sugarmount21.com/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -856,8 +1219,8 @@ def diff(a_png, b_png, top=300, bottom=330):
         <li><a href="https://sugarmount21.com/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
         <li><a href="https://sugarmount21.com/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://sugarmount21.com/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -986,12 +1349,12 @@ def diff(a_png, b_png, top=300, bottom=330):
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
         <li><a href="https://sugarmount21.com/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1108,12 +1471,12 @@ expect(all.sort()).toEqual(files.sort());</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
         <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
         <li><a href="https://sugarmount21.com/ax/subagent-brief-rules/">서브에이전트 브리프의 절대 규칙 6개와 한도로 끊긴 에이전트 5건</a></li>
         <li><a href="https://sugarmount21.com/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://sugarmount21.com/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1397,12 +1760,12 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
         <li><a href="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1484,12 +1847,12 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
         <li><a href="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1578,12 +1941,12 @@ git grep -nE "addOn(Complete|Success|Failure|Canceled)Listener\((this|requireAct
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
         <li><a href="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1696,12 +2059,12 @@ depth(board):                   # peel
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
         <li><a href="https://sugarmount21.com/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
         <li><a href="https://sugarmount21.com/ax/puzzle-first-chapter-walls/">퍼즐 게임 첫날 이탈 분석: 기기별 이벤트 순서와 판별 계산으로 찾은 첫 장의 벽 4판</a></li>
         <li><a href="https://sugarmount21.com/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1834,9 +2197,9 @@ depth(board):                   # peel
         <li><a href="https://sugarmount21.com/ax/market-check-before-app/">사진 앱 3개를 만든 뒤에야 시장 조사를 했다: 올해 나온 경쟁 앱 설치 중앙값 1,166</a></li>
         <li><a href="https://sugarmount21.com/ax/commit-messages-701/">커밋 701개로 본 AI 코딩 1년: &#x27;완성&#x27;에서 &#x27;원인·검증&#x27;으로</a></li>
         <li><a href="https://sugarmount21.com/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/retro/">회고와 숫자 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1949,12 +2312,12 @@ if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
         <li><a href="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2056,12 +2419,12 @@ git diff --name-only $(git merge-base &lt;base&gt; &lt;branch&gt;) &lt;branch&gt
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
         <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
         <li><a href="https://sugarmount21.com/ax/subagent-brief-rules/">서브에이전트 브리프의 절대 규칙 6개와 한도로 끊긴 에이전트 5건</a></li>
         <li><a href="https://sugarmount21.com/ax/integration-review-defects/">AI 에이전트 병렬 브랜치 13개를 합친 뒤 통합 리뷰가 확정 결함 12건을 찾았다</a></li>
-        <li><a href="https://sugarmount21.com/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2148,12 +2511,12 @@ unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$TEST_PUB[~/][0-9]*" | sort -u | wc
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
         <li><a href="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2287,9 +2650,9 @@ lifecycleScope.launch {
         <li><a href="https://sugarmount21.com/ax/interstitial-frequency-timeline/">전면 광고 빈도를 기기 타임라인으로 정했다: 안내 퍼즐은 세지 않는다</a></li>
         <li><a href="https://sugarmount21.com/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
         <li><a href="https://sugarmount21.com/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2399,12 +2762,12 @@ lifecycleScope.launch {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
         <li><a href="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2503,12 +2866,12 @@ three_star = cleared and time &lt;= par(base, scale, floor) and mistakes &lt;= a
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
         <li><a href="https://sugarmount21.com/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://sugarmount21.com/ax/puzzle-first-chapter-walls/">퍼즐 게임 첫날 이탈 분석: 기기별 이벤트 순서와 판별 계산으로 찾은 첫 장의 벽 4판</a></li>
         <li><a href="https://sugarmount21.com/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2624,8 +2987,8 @@ print(pages.most_common(), "FAQ questions:", questions)</code></pre>
         <li><a href="https://sugarmount21.com/ax/static-site-check-gate/">여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/ai-region-privacy-policy/">개인정보처리방침 AI 처리 위치(국외 이전): 하루에 두 번 고친 고지를 코드에 묶기</a></li>
         <li><a href="https://sugarmount21.com/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2741,9 +3104,9 @@ NOT_TEST = {"notExpression": {"orGroup": {"expressions": [
         <li><a href="https://sugarmount21.com/ax/interstitial-frequency-timeline/">전면 광고 빈도를 기기 타임라인으로 정했다: 안내 퍼즐은 세지 않는다</a></li>
         <li><a href="https://sugarmount21.com/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
         <li><a href="https://sugarmount21.com/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2848,8 +3211,8 @@ export function cacheKey(api, group, original, corrected, model) {
         <li><a href="https://sugarmount21.com/ax/hwp-hancom-resave-check/">고친 HWP 7개 한컴 호환성 테스트: 열기 7/7, 다른 이름으로 저장은 로그인 뒤 2/2</a></li>
         <li><a href="https://sugarmount21.com/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
         <li><a href="https://sugarmount21.com/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2975,12 +3338,12 @@ const gaps = await agent(CTX + CHECKLIST + final + dossier, { schema: CRIT })</c
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
         <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
         <li><a href="https://sugarmount21.com/ax/subagent-brief-rules/">서브에이전트 브리프의 절대 규칙 6개와 한도로 끊긴 에이전트 5건</a></li>
         <li><a href="https://sugarmount21.com/ax/integration-review-defects/">AI 에이전트 병렬 브랜치 13개를 합친 뒤 통합 리뷰가 확정 결함 12건을 찾았다</a></li>
-        <li><a href="https://sugarmount21.com/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3091,12 +3454,12 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(":core
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
         <li><a href="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3215,12 +3578,12 @@ git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --gre
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
         <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
         <li><a href="https://sugarmount21.com/ax/subagent-brief-rules/">서브에이전트 브리프의 절대 규칙 6개와 한도로 끊긴 에이전트 5건</a></li>
         <li><a href="https://sugarmount21.com/ax/integration-review-defects/">AI 에이전트 병렬 브랜치 13개를 합친 뒤 통합 리뷰가 확정 결함 12건을 찾았다</a></li>
-        <li><a href="https://sugarmount21.com/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3353,8 +3716,8 @@ adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
         <li><a href="https://sugarmount21.com/ax/hwp-hancom-resave-check/">고친 HWP 7개 한컴 호환성 테스트: 열기 7/7, 다른 이름으로 저장은 로그인 뒤 2/2</a></li>
         <li><a href="https://sugarmount21.com/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
         <li><a href="https://sugarmount21.com/ax/zero-expect-e2e-runners/">&#x27;E2E 100% 통과&#x27;의 정체: expect()가 0개인 러너 7개를 지운 날</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3485,9 +3848,9 @@ print("my app in results:", MY_APP in ids)</code></pre>
         <li><a href="https://sugarmount21.com/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
         <li><a href="https://sugarmount21.com/ax/commit-messages-701/">커밋 701개로 본 AI 코딩 1년: &#x27;완성&#x27;에서 &#x27;원인·검증&#x27;으로</a></li>
         <li><a href="https://sugarmount21.com/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/retro/">회고와 숫자 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3618,8 +3981,8 @@ $ SOURCE_DATE=2026-12-31 python tools/build.py
         <li><a href="https://sugarmount21.com/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://sugarmount21.com/ax/ai-region-privacy-policy/">개인정보처리방침 AI 처리 위치(국외 이전): 하루에 두 번 고친 고지를 코드에 묶기</a></li>
         <li><a href="https://sugarmount21.com/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3737,8 +4100,8 @@ grep -rL --include='*Test.kt' -e 'assert' -e 'check(matches' app/src/</code></pr
         <li><a href="https://sugarmount21.com/ax/hwp-hancom-resave-check/">고친 HWP 7개 한컴 호환성 테스트: 열기 7/7, 다른 이름으로 저장은 로그인 뒤 2/2</a></li>
         <li><a href="https://sugarmount21.com/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
         <li><a href="https://sugarmount21.com/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3877,9 +4240,9 @@ git log --until=2026-10-20 --format='%(trailers:key=Co-authored-by,valueonly)' \
         <li><a href="https://sugarmount21.com/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
         <li><a href="https://sugarmount21.com/ax/market-check-before-app/">사진 앱 3개를 만든 뒤에야 시장 조사를 했다: 올해 나온 경쟁 앱 설치 중앙값 1,166</a></li>
         <li><a href="https://sugarmount21.com/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/retro/">회고와 숫자 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3985,8 +4348,8 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
         <li><a href="https://sugarmount21.com/ax/hwp-hancom-resave-check/">고친 HWP 7개 한컴 호환성 테스트: 열기 7/7, 다른 이름으로 저장은 로그인 뒤 2/2</a></li>
         <li><a href="https://sugarmount21.com/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
         <li><a href="https://sugarmount21.com/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4148,12 +4511,12 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
         <li><a href="https://sugarmount21.com/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://sugarmount21.com/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
         <li><a href="https://sugarmount21.com/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4267,12 +4630,12 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
         <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
         <li><a href="https://sugarmount21.com/ax/subagent-brief-rules/">서브에이전트 브리프의 절대 규칙 6개와 한도로 끊긴 에이전트 5건</a></li>
         <li><a href="https://sugarmount21.com/ax/integration-review-defects/">AI 에이전트 병렬 브랜치 13개를 합친 뒤 통합 리뷰가 확정 결함 12건을 찾았다</a></li>
-        <li><a href="https://sugarmount21.com/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4413,8 +4776,8 @@ curl -s "$POLICY_URL" | grep -o 'data-policy-version="[0-9-]*"'</code></pre>
         <li><a href="https://sugarmount21.com/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://sugarmount21.com/ax/static-site-check-gate/">여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4559,12 +4922,12 @@ font.save(dst)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
         <li><a href="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4651,12 +5014,12 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
         <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
         <li><a href="https://sugarmount21.com/ax/subagent-brief-rules/">서브에이전트 브리프의 절대 규칙 6개와 한도로 끊긴 에이전트 5건</a></li>
         <li><a href="https://sugarmount21.com/ax/integration-review-defects/">AI 에이전트 병렬 브랜치 13개를 합친 뒤 통합 리뷰가 확정 결함 12건을 찾았다</a></li>
-        <li><a href="https://sugarmount21.com/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4741,12 +5104,12 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
         <li><a href="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4866,8 +5229,8 @@ flutter test test/theme_matrix/ --dart-define=Y2_NO_SETTLE=true
         <li><a href="https://sugarmount21.com/ax/hwp-hancom-resave-check/">고친 HWP 7개 한컴 호환성 테스트: 열기 7/7, 다른 이름으로 저장은 로그인 뒤 2/2</a></li>
         <li><a href="https://sugarmount21.com/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
         <li><a href="https://sugarmount21.com/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4986,12 +5349,12 @@ FlowRow(
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
         <li><a href="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5070,12 +5433,12 @@ Mem:              13           8           2           0           2           4
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
         <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
         <li><a href="https://sugarmount21.com/ax/subagent-brief-rules/">서브에이전트 브리프의 절대 규칙 6개와 한도로 끊긴 에이전트 5건</a></li>
         <li><a href="https://sugarmount21.com/ax/integration-review-defects/">AI 에이전트 병렬 브랜치 13개를 합친 뒤 통합 리뷰가 확정 결함 12건을 찾았다</a></li>
-        <li><a href="https://sugarmount21.com/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5202,9 +5565,9 @@ if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFract
         <li><a href="https://sugarmount21.com/ax/interstitial-frequency-timeline/">전면 광고 빈도를 기기 타임라인으로 정했다: 안내 퍼즐은 세지 않는다</a></li>
         <li><a href="https://sugarmount21.com/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
         <li><a href="https://sugarmount21.com/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5324,8 +5687,8 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://sugarmount21.com/ax/hwp-hancom-resave-check/">고친 HWP 7개 한컴 호환성 테스트: 열기 7/7, 다른 이름으로 저장은 로그인 뒤 2/2</a></li>
         <li><a href="https://sugarmount21.com/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
         <li><a href="https://sugarmount21.com/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5423,12 +5786,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
         <li><a href="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5493,8 +5856,8 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://sugarmount21.com/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://sugarmount21.com/ax/static-site-check-gate/">여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/ai-region-privacy-policy/">개인정보처리방침 AI 처리 위치(국외 이전): 하루에 두 번 고친 고지를 코드에 묶기</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5884,12 +6247,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
         <li><a href="https://sugarmount21.com/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://sugarmount21.com/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
         <li><a href="https://sugarmount21.com/ax/puzzle-first-chapter-walls/">퍼즐 게임 첫날 이탈 분석: 기기별 이벤트 순서와 판별 계산으로 찾은 첫 장의 벽 4판</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -6000,8 +6363,8 @@ done</code></pre>
         <li><a href="https://sugarmount21.com/ax/hwp-hancom-resave-check/">고친 HWP 7개 한컴 호환성 테스트: 열기 7/7, 다른 이름으로 저장은 로그인 뒤 2/2</a></li>
         <li><a href="https://sugarmount21.com/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
         <li><a href="https://sugarmount21.com/ax/secrets-three-layers/">AI 코딩 에이전트와 비밀값: 채팅·로그·권한 세 겹, 복사된 마스킹 정규식이 놓친 예외 2곳</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -6102,12 +6465,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
         <li><a href="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</a></li>
         <li><a href="https://sugarmount21.com/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/ax/market-uri-store-chooser/">SKT 판매 삼성 폰에서 market://을 열면 스토어 선택 창이 뜬다: Play 패키지부터 지정하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
-        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -6481,303 +6844,6 @@ done</code></pre>
       <p>카카오톡·메일로 받은 한글 파일(HWP·HWPX)과 PDF를 받은 앱에서 바로 열고, 닫았다 다시 열면 읽던 쪽부터 이어서 보여 주는 Android 앱이에요. 광고와 회원가입이 없고, 문서는 업로드하지 않고 휴대폰 안에서만 열어요. Pro에서는 HWP 문서의 본문·표 칸 글자를 고쳐 새 파일로 저장할 수 있어요. Android 10 이상에서 써요.</p>
       <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugardoc&amp;referrer=utm_source%3Dsugarmount21.com%26utm_medium%3Dhowto%26utm_campaign%3Dsugardoc" rel="noopener">한글뷰어 슈가독 Google Play에서 받기</a><a class="button button--outline" href="https://sugarmount21.com/apps/doc-viewer/">한글뷰어 슈가독 앱 소개 보기</a></div>
       <p class="muted">본 제품은 한글과컴퓨터의 ᄒᆞᆫ글 문서 파일(.hwp) 공개 문서를 참고하여 개발하였습니다. 한글뷰어 슈가독은 한글과컴퓨터와 제휴하거나 그 승인을 받은 제품이 아닙니다. 한컴, ᄒᆞᆫ글은 주식회사 한글과컴퓨터의 상표입니다.</p>
-    </section>]]></description>
-    <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>갤럭시에서 증명사진 용량 줄이는 법 – SugarMount</title>
-    <link>https://sugarmount21.com/apps/image-compress/id-photo-size/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/apps/image-compress/id-photo-size/</guid>
-    <description><![CDATA[<section class="hero">
-      <span class="eyebrow">도움말 · Android</span>
-      <h1>갤럭시에서 증명사진 용량 줄이는 법</h1>
-      <p class="lead">증명사진은 '사진 용량 줄이기' 앱에서 상한을 500KB처럼 정하면 그 아래 JPEG로 줄어요. 규격 비율로 자르지는 않으니 픽셀 규격이 있으면 먼저 자르세요.</p>
-      <p class="note">이 글은 SugarMount가 만든 Android 앱 '사진 용량 줄이기' 1.0.6을 기준으로 써요. 갤럭시가 아닌 Android 휴대폰에서도 순서는 같아요. 제출처마다 규격이 달라서 이 글은 숫자를 지어내지 않고, 공식 안내가 있는 여권 사진만 예로 들어요.</p>
-    </section>
-    <section aria-labelledby="check-first">
-      <h2 id="check-first">먼저 제출처 규격부터 확인하세요</h2>
-      <p>원서·채용·민원 사이트의 사진 칸에는 보통 세 가지 조건이 붙어요. 이 셋은 서로 다른 조건이라 하나만 맞춰서는 올라가지 않을 수 있어요.</p>
-      <ul>
-        <li><strong>파일 용량</strong> — "500KB 이하"처럼 KB·MB로 적어요. 이 앱이 맞춰 주는 것은 이 조건이에요.</li>
-        <li><strong>픽셀 크기</strong> — "가로 413 × 세로 531 픽셀"처럼 적어요. 비율이 정해져 있으면 사진을 그 비율로 잘라야 해요.</li>
-        <li><strong>파일 형식</strong> — 대개 JPG(JPEG)예요. 이 앱의 결과는 항상 JPEG예요.</li>
-      </ul>
-      <p>규격은 공고문이나 사진 올리는 화면에 적혀 있어요. 이 글에 없는 제출처는 그 안내를 따르세요.</p>
-    </section>
-    <section aria-labelledby="without-app">
-      <h2 id="without-app">앱 없이 하는 방법과 한계</h2>
-      <ul>
-        <li><strong>사진관에서 파일로 받기</strong> — 증명사진을 찍을 때 제출용 파일을 함께 달라고 하면 규격에 맞춘 파일을 받을 수 있는 경우가 많아요. 가장 확실하지만 이미 찍은 사진이라면 다시 가야 해요.</li>
-        <li><strong>갤러리 앱의 편집 기능</strong> — 대부분의 Android 갤러리 앱에는 자르기 기능이 있어서 비율을 맞추는 데는 쓸 수 있어요. 메뉴 이름과 크기 조정 옵션은 기종과 버전마다 달라서 여기서는 적지 않아요. 저장한 뒤에는 사진의 '상세 정보'에서 실제 용량과 픽셀을 꼭 확인하세요.</li>
-        <li><strong>여권 사진이라면 외교부 크기 조정 도구</strong> — 외교부 여권안내 누리집의 <a href="https://www.passport.go.kr/home/kor/photoVerify/index.do?menuPos=34" rel="noopener">온라인 여권 사진 크기 조정</a>에서 사진을 올리고 확대·이동해 붉은 점선 안에 얼굴을 맞춘 뒤 저장할 수 있어요. 이 도구는 1MB 미만 JPG·PNG만 받고, 저장한 사진은 여권 온라인 신청용이에요. 같은 페이지에 증명사진·반명함사진·비자 사진 등에는 쓸 수 없다고 적혀 있어요.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="app-steps">
-      <h2 id="app-steps">사진 용량 줄이기 앱으로 줄이기</h2>
-      <ol class="steps">
-        <li><strong>사진 선택</strong> — 앱 첫 화면에서 <strong>사진 선택</strong>을 눌러 증명사진 파일을 고릅니다. Android 사진 선택 화면을 쓰기 때문에 저장소 권한을 따로 묻지 않아요.</li>
-        <li><strong>방식은 '용량 맞추기'</strong> — 옵션 화면의 <strong>방식</strong>에서 <strong>용량 맞추기</strong>를 고릅니다.</li>
-        <li><strong>용량 상한 고르기</strong> — <strong>사진별 용량 상한</strong>에서 100KB·200KB·500KB·1MB 중 제출처 기준과 같거나 더 작은 값을 고릅니다. 딱 맞는 값이 없으면 <strong>직접 입력</strong>에 20~20000 사이의 KB 값을 넣어요.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugarcompress/id-photo-size-1-ko.webp" width="360" height="553" loading="lazy" alt="옵션 화면에서 방식은 용량 맞추기, 사진별 용량 상한은 100KB부터 1MB와 직접 입력 중에서 고르고, 아래에 긴 변을 유지하거나 1280·1920·2560px로 줄이는 선택지가 있어요."></figure></li>
-        <li><strong>픽셀 규격이 있으면 긴 변 정하기</strong> — 같은 화면의 <strong>긴 변 (해상도)</strong>에서 <strong>직접 입력</strong>을 눌러 320~8000 사이 픽셀 값을 넣어요. 가로·세로 비율은 그대로라서, 사진을 미리 규격 비율로 잘라 두었다면 긴 변만 정해도 짧은 변이 따라와요. 예를 들어 가로 3.5 : 세로 4.5로 자른 사진의 긴 변을 531로 정하면 413 × 531 픽셀이 돼요.</li>
-        <li><strong>결과 확인</strong> — <strong>결과 만들기</strong>를 누르면 사진마다 줄이기 전 → 후 용량과 가로 × 세로 픽셀이 나와요. 이 숫자는 저장될 파일의 실제 크기예요.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugarcompress/id-photo-size-2-ko.webp" width="360" height="327" loading="lazy" alt="결과 화면 위쪽에 전체 용량이 8.58MB에서 1.44MB로 84% 줄었다고 나오고, 아래에 사진마다 2.63MB에서 485KB처럼 줄어든 용량과 4000 × 3000 px 같은 픽셀 크기가 보여요."><figcaption class="muted">예시 사진 3장을 500KB 상한으로 줄인 화면이에요. 긴 변을 '유지'로 두면 4000 × 3000 픽셀처럼 원래 크기가 그대로 남아서, 픽셀 규격이 있는 곳에는 그대로 올릴 수 없어요.</figcaption></figure></li>
-        <li><strong>저장하거나 공유</strong> — <strong>모두 저장</strong>을 누르면 <code>Pictures/SugarCompress</code> 폴더에 새 파일로 저장돼요. <strong>공유</strong>로 바로 다른 앱에 보낼 수도 있어요. 원본 사진은 바뀌지 않아요.</li>
-      </ol>
-      <p class="muted">화면은 Play 스토어 등록용으로 2026년 9월에 Android 에뮬레이터에서 찍은 실제 앱 화면이고, 사진은 예시용 그림이에요. 메뉴 이름은 앱 1.0.6 소스와 같아요.</p>
-    </section>
-    <section aria-labelledby="passport">
-      <h2 id="passport">여권 사진 온라인 제출 규격</h2>
-      <p>외교부 여권안내 누리집은 온라인 재발급에 낼 수 있는 사진 파일을 이렇게 안내해요.</p>
-      <blockquote cite="https://www.passport.go.kr/home/kor/contents.do?menuPos=12"><p>"파일 크기 500KB 이하, 파일 형식 JPG/JPEG"<br>"가로 413 픽셀(pixel), 세로 531 픽셀 사이즈 권장(가로 395~431 픽셀, 세로 507~550 픽셀 이내만 업로드 가능)"</p></blockquote>
-      <p class="muted">출처: <a href="https://www.passport.go.kr/home/kor/contents.do?menuPos=12" rel="noopener">외교부 여권안내, 온라인용 사진파일 안내</a>(2026년 10월 18일 확인). 규정은 바뀔 수 있으니 제출 직전에 다시 확인하세요.</p>
-      <p>이 앱으로 맞출 수 있는 것은 500KB 이하 용량, JPEG 형식, 긴 변 픽셀이에요. 머리 길이, 흰 배경, 6개월 이내 촬영 같은 조건은 앱이 판단하지 않아요. 같은 페이지는 휴대폰으로 찍은 사진도 권하지 않아요.</p>
-      <blockquote cite="https://www.passport.go.kr/home/kor/contents.do?menuPos=12"><p>"휴대폰 등 모바일 기기로 촬영된 사진, 사진 편집 프로그램 등으로 과도한 보정을 한 사진은 여권 발급 시 사진이 실물과 다르게 표현될 수 있으므로 권장하지 않음"</p></blockquote>
-      <p>줄인 사진은 외교부의 <a href="https://www.passport.go.kr/home/kor/onlinePhotoVerify/index.do?menuPos=33" rel="noopener">온라인 여권 사진 검증</a>에서 미리 확인해 볼 수 있어요. 이 검증은 참고용이라 실제 심사 결과와 다를 수 있다고 안내돼 있어요.</p>
-    </section>
-    <section aria-labelledby="compare">
-      <h2 id="compare">방법별 비교</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">방법</th><th scope="col">용량 상한 지정</th><th scope="col">규격 비율로 자르기</th><th scope="col">픽셀 지정</th><th scope="col">쓸 수 있는 곳</th></tr></thead>
-          <tbody>
-            <tr><th scope="row">사진 용량 줄이기 앱</th><td>돼요(20KB~20MB)</td><td>안 돼요</td><td>긴 변만(320~8000px)</td><td>용량 기준이 있는 모든 제출처</td></tr>
-            <tr><th scope="row">갤러리 앱 편집</th><td>기종마다 달라요</td><td>대개 돼요(자르기)</td><td>기종마다 달라요</td><td>휴대폰 안 어디서나</td></tr>
-            <tr><th scope="row">외교부 여권 사진 크기 조정</th><td>안내 없음</td><td>돼요(얼굴을 점선에 맞춤)</td><td>도구가 정함</td><td>여권 온라인 신청만</td></tr>
-            <tr><th scope="row">사진관 제출용 파일</th><td>요청하기 나름</td><td>돼요</td><td>요청하기 나름</td><td>새로 찍을 때</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p><strong>판정:</strong> 용량만 정해진 원서·민원 사진은 앱 하나로 끝나요. 여권처럼 비율과 픽셀까지 정해진 곳은 먼저 비율에 맞춰 자르고(여권은 외교부 도구), 마지막에 앱으로 용량과 긴 변을 맞추세요.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">안 될 때와 한계</h2>
-      <ul>
-        <li><strong>규격 비율로 자르지 않아요.</strong> 가로·세로 비율은 원본 그대로예요. 자르기는 갤러리 앱이나 외교부 도구에서 먼저 하세요.</li>
-        <li><strong>사진을 키우지 않아요.</strong> 원본이 규격보다 작으면 긴 변을 크게 넣어도 그대로예요. 너무 작은 사진은 사진관이나 원본 파일에서 다시 받아야 해요.</li>
-        <li><strong>필요하면 픽셀도 줄여요.</strong> 화질을 낮춰도 상한에 닿지 않으면 앱이 긴 변을 줄여서 다시 맞춰요(320픽셀 아래로는 줄이지 않아요). 그래서 결과 화면의 픽셀 크기를 꼭 확인하세요.</li>
-        <li><strong>맞추지 못하면 실패로 알려 줘요.</strong> "목표 용량에 맞출 수 없어요. 상한을 더 크게 해 보세요."가 나오면 그 사진은 결과 파일이 만들어지지 않아요. 상한을 올리거나 제출처에 다른 사진을 내야 해요.</li>
-        <li><strong>결과는 JPEG예요.</strong> PNG·WebP의 투명한 부분은 흰색으로 채워져요. PNG로 내야 하는 곳에는 맞지 않아요.</li>
-        <li><strong>dpi 값을 고르는 메뉴는 없어요.</strong> 제출처가 300dpi처럼 dpi를 요구하면 픽셀 크기로 맞추는 안내가 있는지 확인하세요.</li>
-        <li><strong>규격 심사는 하지 않아요.</strong> 얼굴 크기, 배경색, 촬영 시기 같은 조건은 제출처 기준을 따로 확인해야 해요.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">자주 묻는 질문</h2>
-      <div class="faq">
-        <details><summary>제출처는 1KB를 1024바이트로 세는데 괜찮나요?</summary><div><p>괜찮아요. 이 앱은 1KB를 1000바이트로 계산해서, 500KB로 맞춘 파일은 500,000바이트 이하예요. 1024바이트 기준의 500KB(512,000바이트)보다 작으니 어느 쪽 기준이든 넘지 않아요.</p></div></details>
-        <details><summary>원본 사진이 바뀌거나 지워지나요?</summary><div><p>아니요. 결과는 <code>Pictures/SugarCompress</code> 폴더에 새 파일로 저장되고 원본은 그대로 남아요.</p></div></details>
-        <details><summary>사진이 서버로 올라가나요?</summary><div><p>아니요. 사진은 휴대폰 안에서만 처리되고 업로드되지 않아요. 자세한 내용은 <a href="https://sugarmount21.com/privacy/image-compress/">사진 용량 줄이기 개인정보처리방침</a>에 있어요.</p></div></details>
-        <details><summary>아이폰에서 받은 HEIC 사진도 되나요?</summary><div><p>휴대폰이 HEIC를 읽을 수 있으면 돼요. 결과는 JPEG로 저장돼요. 형식만 바꾸고 싶다면 <a href="https://sugarmount21.com/apps/image-convert/heic-to-jpg/">갤럭시에서 HEIC 사진을 JPG로 바꾸는 법</a>을 보세요.</p></div></details>
-        <details><summary>돈이 드나요?</summary><div><p>무료로 쓸 수 있고 광고가 나와요. 한 번에 20장까지 처리하고, 일회성 구매인 Pro는 광고를 없애고 한 번에 100장까지 처리해요. 사진 한 장은 50MB·5000만 화소까지예요.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="related">
-      <h2 id="related">관련 글</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/apps/image-compress/photo-under-100kb/">갤럭시에서 사진을 100KB 이하로 줄이는 법</a></li>
-        <li><a href="https://sugarmount21.com/apps/image-convert/heic-to-jpg/">갤럭시에서 HEIC 사진을 JPG로 바꾸는 법</a></li>
-        <li><a href="https://sugarmount21.com/apps/image-flip/unmirror-selfie/">갤럭시 셀카 좌우반전, 이미 찍은 사진 되돌리는 법</a></li>
-        <li>만든 쪽 이야기(AX 노트): <a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="app">
-      <h2 id="app">사진 용량 줄이기 앱 정보</h2>
-      <p>서류 제출·업로드용 사진을 100KB, 500KB처럼 직접 정한 용량 아래로 줄여 새 파일로 저장하는 Android 앱이에요. 사진은 업로드하지 않고 휴대폰 안에서 처리하며, 원본은 그대로 둬요.</p>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugarcompress&amp;referrer=utm_source%3Dsugarmount21.com%26utm_medium%3Dhowto%26utm_campaign%3Dsugarcompress" rel="noopener">사진 용량 줄이기 Google Play에서 받기</a><a class="button button--outline" href="https://sugarmount21.com/apps/image-compress/">사진 용량 줄이기 앱 소개</a></div>
-    </section>]]></description>
-    <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>갤럭시에서 사진을 100KB 이하로 줄이는 법 – SugarMount</title>
-    <link>https://sugarmount21.com/apps/image-compress/photo-under-100kb/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/apps/image-compress/photo-under-100kb/</guid>
-    <description><![CDATA[<section class="hero">
-      <span class="eyebrow">도움말 · Android</span>
-      <h1>갤럭시에서 사진을 100KB 이하로 줄이는 법</h1>
-      <p class="lead">갤러리의 '크기 변경'으로도 줄일 수 있지만 몇 KB가 될지는 정할 수 없어요. 100KB처럼 상한이 정해져 있다면 용량을 직접 입력하는 앱을 쓰는 게 확실해요.</p>
-      <p class="note">이 글은 SugarMount가 만든 Android 앱 '사진 용량 줄이기'(SugarCompress) 1.0.6을 기준으로 써요. 갤러리 메뉴 이름은 휴대폰 모델과 소프트웨어 버전에 따라 다를 수 있어요.</p>
-    </section>
-    <section aria-labelledby="without-app">
-      <h2 id="without-app">앱 없이 하는 방법: 갤러리 '크기 변경'</h2>
-      <p>갤럭시 기본 갤러리 앱에는 사진의 크기(해상도)를 줄이는 메뉴가 있어요. 삼성전자서비스 안내에 나온 순서는 이래요.</p>
-      <ol>
-        <li>갤러리에서 사진을 고르고 <strong>편집</strong>을 눌러요.</li>
-        <li><strong>옵션 더보기</strong>(︙)에서 <strong>크기 변경</strong>을 골라요.</li>
-        <li>원하는 크기를 고르고 <strong>완료</strong>를 누른 뒤 <strong>저장</strong>해요. 원본을 남기려면 저장 전에 옵션 더보기에서 <strong>다른 파일로 저장</strong>을 골라요.</li>
-      </ol>
-      <blockquote cite="https://www.samsungsvc.co.kr/solution/394610"><p>"편집된 사진을 저장하면 새로운 사진을 만드는 대신 원래 사진이 덮어쓰게 됩니다."</p></blockquote>
-      <p class="muted">출처: <a href="https://www.samsungsvc.co.kr/solution/394610" rel="noopener">삼성전자서비스, 갤럭시 사진 크기 변경 및 다른 파일로 저장 방법</a>(2025-04-30). 같은 안내에 "이미지 크기 변경 기능은 모델 및 소프트웨어 버전에 따라 지원되지 않을 수 있습니다."라는 참고도 있어요.</p>
-      <h3>이 방법의 한계</h3>
-      <ul>
-        <li><strong>결과 용량을 정할 수 없어요.</strong> 고르는 건 사진의 크기(해상도)라서, 저장한 뒤 파일 정보를 열어 몇 KB인지 확인하고 모자라면 다시 줄여야 해요.</li>
-        <li><strong>그냥 저장하면 원본이 바뀌어요.</strong> 위 인용처럼 '다른 파일로 저장'을 고르지 않으면 원래 사진 위에 저장돼요.</li>
-        <li><strong>한 장씩 해야 해요.</strong> 안내에 나온 방법은 사진 한 장을 편집하는 순서예요.</li>
-      </ul>
-      <p>인터넷의 사진 압축 사이트도 KB를 정해 줄여 주는 곳이 있지만, 사진이 그 사이트의 서버로 올라가요. 증명사진처럼 얼굴이 나온 사진이나 서류 사진이라면 신경 쓰이는 부분이에요.</p>
-    </section>
-    <section aria-labelledby="app-steps">
-      <h2 id="app-steps">'사진 용량 줄이기' 앱으로 100KB 맞추기</h2>
-      <ol class="steps">
-        <li><strong>100 KB 누르기</strong> — 앱 첫 화면 '빠른 시작'에서 <strong>100 KB</strong>를 누르면 상한이 100KB로 정해지고 사진 선택 화면이 열려요. '사진 선택'을 눌러 고른 뒤 다음 화면에서 상한을 정해도 돼요.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugarcompress/photo-under-100kb-1-ko.webp" width="270" height="419" loading="lazy" alt="앱 첫 화면에 사진 선택 버튼이 있고, 그 아래 빠른 시작에 100 KB, 200 KB, 500 KB, 1 MB 칸이 보여요."></figure></li>
-        <li><strong>사진 고르기</strong> — Android 사진 선택 화면에서 줄일 사진을 골라요. 무료는 한 번에 20장까지예요. 고른 사진을 확인하고 <strong>다음</strong>을 눌러요.</li>
-        <li><strong>상한 확인하고 결과 만들기</strong> — 옵션 화면에서 방식이 <strong>용량 맞추기</strong>, 사진별 용량 상한이 <strong>100 KB</strong>인지 확인해요. 다른 숫자가 필요하면 <strong>직접 입력</strong>에 20~20000 사이의 KB를 넣어요. <strong>결과 만들기</strong>를 눌러요.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugarcompress/photo-under-100kb-2-ko.webp" width="270" height="419" loading="lazy" alt="옵션 화면에서 방식은 용량 맞추기가 골라져 있고, 사진별 용량 상한에 100 KB, 200 KB, 500 KB, 1 MB, 직접 입력 칸이 있으며 이 화면에서는 500 KB가 선택돼 있어요."></figure></li>
-        <li><strong>결과 확인하기</strong> — 사진마다 원래 용량과 줄인 뒤 용량이 나와요. 이 숫자가 저장될 파일의 실제 크기예요. 상한에 맞추지 못한 사진은 실패로 표시돼요.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugarcompress/photo-under-100kb-3-ko.webp" width="270" height="419" loading="lazy" alt="결과 화면에 사진 3장이 각각 2.63 MB에서 485 KB, 2.67 MB에서 482 KB, 3.28 MB에서 477 KB로 줄었고, 합계 8.58 MB가 1.44 MB가 됐다고 나와요."></figure></li>
-        <li><strong>저장하거나 공유하기</strong> — <strong>모두 저장</strong>을 누르면 <code>Pictures/SugarCompress</code> 폴더에 새 파일로 저장돼요. 원본은 그대로예요. 바로 보내려면 <strong>공유</strong>를 눌러요.</li>
-      </ol>
-      <p class="muted">화면은 Google Play 등록용으로 찍어 둔 실제 앱 화면(1.0.1)이라 500 KB 상한으로 줄인 예시예요. 버튼과 메뉴 이름은 1.0.6과 같아요.</p>
-    </section>
-    <section aria-labelledby="how-it-fits">
-      <h2 id="how-it-fits">앱이 100KB에 맞추는 방식</h2>
-      <p>용량 맞추기는 먼저 JPEG 품질을 95에서 40 사이에서 조절해 상한 아래로 들어가면서 되도록 높은 품질을 찾아요. 품질 40으로도 상한을 넘으면 사진의 긴 변을 조금씩 줄여 가며 다시 찾아요. 긴 변은 320px보다 작게 줄이지 않고, 사진 한 장에 최대 20번, 30초까지만 시도해요. 그 안에 맞추지 못하면 "목표 용량에 맞출 수 없어요. 상한을 더 크게 해 보세요."라고 알려 주고 그 사진은 성공으로 치지 않아요.</p>
-      <p>해상도를 먼저 정해 두고 싶다면 옵션 화면의 <strong>긴 변 (해상도)</strong>에서 1280·1920·2560px이나 직접 입력(320~8000px)을 고르면 돼요. 이때도 사진을 키우지는 않아요.</p>
-    </section>
-    <section aria-labelledby="other-sizes">
-      <h2 id="other-sizes">500KB, 200KB, 50KB도 같은 방법이에요</h2>
-      <p>'빠른 시작'에는 100KB, 200KB, 500KB, 1MB가 있고, 그 밖의 숫자는 옵션 화면의 <strong>직접 입력</strong>으로 정해요. 입력할 수 있는 범위는 20KB부터 20000KB까지예요. 50KB처럼 낮은 상한은 사진이 작아지고 화질이 떨어지며, 사진에 따라 맞추지 못할 수도 있어요. 상한은 고른 사진 한 장 한 장에 따로 적용돼요. 여러 장의 합계를 맞추는 기능은 아니에요.</p>
-    </section>
-    <section aria-labelledby="compare">
-      <h2 id="compare">방법별 비교</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">방법</th><th scope="col">KB 상한 지정</th><th scope="col">사진 업로드</th><th scope="col">원본</th><th scope="col">여러 장</th></tr></thead>
-          <tbody>
-            <tr><th scope="row">갤러리 '크기 변경'</th><td>안 돼요(해상도만 고름)</td><td>없음</td><td>그냥 저장하면 덮어씀. '다른 파일로 저장'을 고르면 남음</td><td>안내는 한 장씩</td></tr>
-            <tr><th scope="row">사진 압축 웹사이트</th><td>사이트마다 다름</td><td>서버로 올라감</td><td>휴대폰 원본은 남음</td><td>사이트마다 다름</td></tr>
-            <tr><th scope="row">'사진 용량 줄이기' 용량 맞추기</th><td>돼요(20~20000KB)</td><td>없음(기기 안에서 처리)</td><td>그대로 두고 새 파일로 저장</td><td>무료 20장, Pro 100장</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p><strong>판정:</strong> 제출처가 "100KB 이하"처럼 상한을 정해 두었다면 KB를 직접 지정하는 앱이 한 번에 끝나요. 용량 제한 없이 그냥 가볍게만 만들면 되는 사진이라면 갤러리의 '크기 변경'으로 충분해요.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">안 될 때와 한계</h2>
-      <ul>
-        <li><strong>상한이 너무 낮으면 실패해요.</strong> 품질과 해상도를 최소치까지 내려도 넘으면 실패로 표시돼요. 상한을 조금 올려서 다시 만들어 보세요.</li>
-        <li><strong>결과는 JPEG예요.</strong> PNG·WebP의 투명한 부분은 흰색으로 채워지고, 움직이는 이미지는 처리하지 않아요. 제출처가 PNG를 요구한다면 이 앱으로는 맞출 수 없어요.</li>
-        <li><strong>사진을 키우지 않아요.</strong> 해상도를 늘려야 하는 경우에는 쓸 수 없어요.</li>
-        <li><strong>HEIC는 휴대폰이 읽을 수 있을 때만 돼요.</strong> 지원하지 않거나 열 수 없는 파일은 목록에서 빠지고 몇 개를 뺐는지 알려 줘요.</li>
-        <li><strong>너무 큰 사진은 받지 않아요.</strong> 사진 한 장이 50MB나 5000만 화소를 넘으면 처리하지 않아요.</li>
-        <li><strong>규격 크기로 자르는 기능은 없어요.</strong> 증명사진처럼 가로·세로 픽셀이나 비율이 정해진 경우는 <a href="https://sugarmount21.com/apps/image-compress/id-photo-size/">증명사진·원서 사진 용량 줄이기</a>를 참고하세요.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">자주 묻는 질문</h2>
-      <div class="faq">
-        <details><summary>1KB는 1000바이트인가요, 1024바이트인가요?</summary><div><p>이 앱은 1KB를 1000바이트로 계산해요. 그래서 100KB 상한은 100,000바이트 이하예요. 제출처가 1KB를 1024바이트로 센다면 100KB는 102,400바이트라서, 앱에서 맞춘 사진은 그 기준으로도 상한 안에 들어가요.</p></div></details>
-        <details><summary>이미 100KB보다 작은 사진을 넣으면 어떻게 되나요?</summary><div><p>JPEG 사진은 결과가 원본보다 커지지 않아요. 이미 충분히 작으면 다시 압축하지 않고 원본 화질로 저장하고, 위치·카메라 정보만 지워요.</p></div></details>
-        <details><summary>사진이 어딘가로 올라가나요?</summary><div><p>아니요. 사진은 휴대폰 안에서만 처리되고, 사진과 파일 이름은 서버로 보내지 않아요. 자세한 내용은 <a href="https://sugarmount21.com/privacy/image-compress/">사진 용량 줄이기 개인정보처리방침</a>에 있어요.</p></div></details>
-        <details><summary>돈이 드나요?</summary><div><p>용량 맞추기를 포함한 모든 방식을 무료로 쓸 수 있고, 무료 버전에는 광고가 나와요. Pro는 한 번 결제하는 상품으로, 광고를 없애고 한 번에 100장까지 처리해요. 구독이 아니에요.</p></div></details>
-        <details><summary>저장한 사진은 어디에 있나요?</summary><div><p><code>Pictures/SugarCompress</code> 폴더에 새 파일로 저장돼요. 갤러리 앱에서도 찾을 수 있어요.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="related">
-      <h2 id="related">관련 글</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/apps/image-compress/id-photo-size/">증명사진·원서 사진 용량 줄이기</a></li>
-        <li><a href="https://sugarmount21.com/apps/image-convert/heic-to-jpg/">갤럭시에서 HEIC 사진을 JPG로 바꾸는 법</a></li>
-        <li><a href="https://sugarmount21.com/apps/image-convert/png-to-jpg/">갤럭시에서 PNG를 JPG로 바꾸는 법</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="app">
-      <h2 id="app">사진 용량 줄이기 앱 정보</h2>
-      <p>제출·업로드용 사진을 100KB, 500KB처럼 직접 정한 용량 아래로 줄여 주는 Android 앱이에요. 사진은 업로드하지 않고 휴대폰 안에서만 처리하며, 원본은 그대로 둬요. Android 10 이상에서 써요.</p>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugarcompress&amp;referrer=utm_source%3Dsugarmount21.com%26utm_medium%3Dhowto%26utm_campaign%3Dsugarcompress" rel="noopener">사진 용량 줄이기 Google Play에서 받기</a><a class="button button--outline" href="https://sugarmount21.com/apps/image-compress/">사진 용량 줄이기 앱 소개</a></div>
-    </section>]]></description>
-    <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>갤럭시에서 HEIC 사진을 JPG로 바꾸는 법 – SugarMount</title>
-    <link>https://sugarmount21.com/apps/image-convert/heic-to-jpg/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/apps/image-convert/heic-to-jpg/</guid>
-    <description><![CDATA[<section class="hero">
-      <span class="eyebrow">도움말 · Android</span>
-      <h1>갤럭시에서 HEIC 사진을 JPG로 바꾸는 법</h1>
-      <p class="lead">이미 찍은 HEIC 사진은 변환 앱으로 JPG 새 파일을 만들면 돼요. 이미지 변환 앱은 여러 장을 휴대폰 안에서 바꾸고 원본은 그대로 둬요.</p>
-      <p class="note">이 글은 SugarMount가 만든 Android 앱 '이미지 변환 JPG·PNG·WebP' 1.0.3을 기준으로 써요. 앞으로 찍을 사진을 처음부터 JPG로 저장하고 싶다면 아래 '앱 없이 하는 방법'을 먼저 보세요.</p>
-    </section>
-    <section aria-labelledby="difference">
-      <h2 id="difference">HEIC와 JPG 차이</h2>
-      <p>HEIC는 HEIF라는 사진 형식의 파일로, HEVC(H.265) 압축을 써요. JPG는 훨씬 오래된 형식이라 거의 모든 사이트, 프로그램, 프린터가 받아요. 그래서 휴대폰에서는 잘 보이던 HEIC 사진이 제출 사이트에서 거절되거나 PC에서 안 열리는 일이 생겨요.</p>
-      <p>Android에서도 HEIC를 읽을 수 있는지는 기기마다 달라요. Android 개발자 문서의 지원 형식 표는 HEIF 디코딩을 이렇게 적고 있어요.</p>
-      <blockquote cite="https://developer.android.com/media/platform/supported-formats" lang="en"><p>"Android 9.0+ … Device optional. Check ImageDecoder.isMimeTypeSupported("image/heif") for 8-bit support. 10-bit decoding requires optional HEVC Main10 profile."</p></blockquote>
-      <p class="muted">Android 9.0 이상에서 읽을 수 있지만 기기에 따라 선택 사항이고, 10비트 HEIC는 기기에 별도 디코더가 있어야 한다는 뜻이에요. 출처: <a href="https://developer.android.com/media/platform/supported-formats" rel="noopener">Android Developers, Supported media formats</a></p>
-    </section>
-    <section aria-labelledby="without-app">
-      <h2 id="without-app">앱 없이 하는 방법과 한계</h2>
-      <ul>
-        <li><strong>카메라 설정에서 HEIF(고효율) 저장 끄기</strong> — 일부 휴대폰은 카메라 설정에 HEIF 저장을 켜고 끄는 항목이 있어요. 끄면 앞으로 찍는 사진은 JPG로 저장돼요. 메뉴 이름과 위치는 기종과 버전마다 달라요. <strong>이미 찍은 HEIC 사진은 바뀌지 않아요.</strong></li>
-        <li><strong>기본 갤러리의 공유 변환</strong> — 기종에 따라 사진을 공유할 때 JPG로 바꿔 보내는 설정이 있을 수 있어요. 공유할 때만 바뀌고, 휴대폰에 JPG 파일이 남지 않을 수 있어요.</li>
-        <li><strong>PC로 옮겨서 바꾸기</strong> — PC 프로그램이 HEIC를 읽을 수 있어야 해요. 사진을 옮기는 수고가 들어요.</li>
-        <li><strong>웹 변환 사이트에 올리기</strong> — 설치 없이 되지만 사진이 그 사이트의 서버로 올라가요. 얼굴, 신분증, 서류가 찍힌 사진이라면 피하는 게 좋아요.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="app-steps">
-      <h2 id="app-steps">이미지 변환 앱으로 HEIC를 JPG로 바꾸기</h2>
-      <ol class="steps">
-        <li><strong>사진 고르기</strong> — 첫 화면에서 <strong>사진 선택</strong>이나 <strong>파일에서 고르기</strong>를 눌러 HEIC 사진을 골라요. 원래 파일 이름을 그대로 쓰고 싶다면 <strong>파일에서 고르기</strong>를 쓰세요. 사진 선택기는 파일 이름을 알려 주지 않아서, 그쪽으로 고른 사진은 'SugarConvert + 시각' 이름으로 저장돼요. 첫 화면의 <strong>제출용 JPG</strong>(품질 90, 투명 부분은 흰색)를 누르면 JPG 설정으로 바로 시작해요.</li>
-        <li><strong>고른 사진 확인</strong> — '선택한 사진' 화면에 장수와 전체 용량이 나와요. HEIC가 섞여 있으면 기기가 읽을 수 있는 사진만 변환된다는 안내가 함께 떠요. 확인했으면 <strong>다음</strong>을 눌러요.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugarconvert/heic-to-jpg-1-ko.webp" width="270" height="413" loading="lazy" alt="선택한 사진 화면에 사진 3장과 총 8.58 MB, 무료는 한 번에 20장까지라는 안내, 사진마다 저장될 형식 배지가 보여요."><figcaption class="muted">스토어 등록용으로 찍은 1.0.0 화면이에요. 예시 사진은 JPEG예요.</figcaption></figure></li>
-        <li><strong>저장 형식 JPEG 고르기</strong> — '변환 옵션'의 <strong>저장 형식</strong>에서 <strong>JPEG</strong>를 고르고 품질을 정해요. 기본값은 90이고, 낮출수록 용량이 줄어요. 다 됐으면 <strong>결과 만들기</strong>를 눌러요.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugarconvert/heic-to-jpg-2-ko.webp" width="270" height="413" loading="lazy" alt="변환 옵션 화면에서 원본과 미리보기가 나란히 있고, 저장 형식은 JPEG, 품질은 90, 투명한 부분은 흰색으로 골라져 있어요."><figcaption class="muted">스토어 등록용으로 찍은 1.0.0 화면이에요.</figcaption></figure></li>
-        <li><strong>결과 확인 후 저장</strong> — '결과' 화면에서 변환 전후의 실제 용량과 해상도를 확인하고 <strong>모두 저장</strong>을 눌러요. JPG 파일은 <strong>Pictures/SugarConvert</strong> 폴더에 새로 저장되고, 원본 HEIC 파일은 바뀌지 않아요.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugarconvert/heic-to-jpg-3-ko.webp" width="270" height="413" loading="lazy" alt="결과 화면에 3장 완료, 원본은 그대로라는 문구와 JPEG 품질 90 배경 흰색 규칙, 용량 8.58 MB에서 5.53 MB로 줄어든 결과가 보여요."><figcaption class="muted">스토어 등록용으로 찍은 1.0.0 화면이에요. 예시 사진은 JPEG예요.</figcaption></figure></li>
-        <li><strong>실패한 장이 있을 때</strong> — 기기가 읽지 못한 HEIC는 그 장만 실패로 표시되고 나머지는 계속 처리돼요. <strong>실패만 다시 시도</strong>로 실패한 사진만 다시 돌릴 수 있어요. 같은 기기에서 계속 실패한다면 아래 '안 될 때와 한계'를 보세요.</li>
-      </ol>
-      <p class="muted">확인 기록: 개발 중 Galaxy S21(Android 15)에서 1.0.1로 HEIC 사진 입력을 확인했어요(2026년 9월 25일). 다른 기종에서는 기기의 HEIC 디코더 유무에 따라 결과가 다를 수 있어요.</p>
-    </section>
-    <section aria-labelledby="compare">
-      <h2 id="compare">방법별 비교</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">방법</th><th scope="col">이미 찍은 사진</th><th scope="col">사진 업로드</th><th scope="col">여러 장</th><th scope="col">이럴 때 쓰세요</th></tr></thead>
-          <tbody>
-            <tr><th scope="row">카메라 HEIF 저장 끄기</th><td>안 바뀌어요</td><td>없음</td><td>해당 없음</td><td>앞으로 찍을 사진을 처음부터 JPG로 남기고 싶을 때</td></tr>
-            <tr><th scope="row">갤러리 공유 변환(기종에 따라)</th><td>공유할 때만</td><td>없음</td><td>기종마다 다름</td><td>메신저로 몇 장 보내기만 하면 될 때</td></tr>
-            <tr><th scope="row">PC 프로그램</th><td>돼요</td><td>없음</td><td>프로그램에 따라 다름</td><td>사진을 이미 PC로 옮겨 둔 경우</td></tr>
-            <tr><th scope="row">웹 변환 사이트</th><td>돼요</td><td>서버로 올라감</td><td>사이트마다 다름</td><td>얼굴·서류가 없는 사진일 때만</td></tr>
-            <tr><th scope="row">이미지 변환 앱</th><td>돼요(기기가 읽을 수 있을 때)</td><td>없음</td><td>무료 한 번에 20장, Pro 100장</td><td>휴대폰에 JPG 파일을 남겨 제출·첨부해야 할 때</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p><strong>판정:</strong> 이미 찍은 HEIC 사진을 휴대폰에서 JPG 파일로 남겨야 한다면 변환 앱이 가장 빨라요. 앞으로 찍을 사진이 문제라면 카메라 설정을 바꾸는 쪽이 맞아요. 둘을 같이 하면 다시 변환할 일이 줄어요.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">안 될 때와 한계</h2>
-      <ul>
-        <li><strong>기기가 읽지 못하는 HEIC는 변환되지 않아요.</strong> 앱은 휴대폰에 들어 있는 디코더로 사진을 읽어요. 디코더가 없거나 10비트처럼 기기가 지원하지 않는 HEIC는 그 장만 실패해요. 이때는 PC에서 바꾸는 방법을 쓰세요.</li>
-        <li><strong>촬영 날짜·위치 같은 EXIF 정보는 복사되지 않아요.</strong> 새 JPG에는 사진 메타데이터가 들어가지 않아요. 사진의 방향은 저장할 때 반영돼요.</li>
-        <li><strong>여러 장이 한 파일에 든 HEIC는 지원하지 않아요.</strong> 연속 사진처럼 이미지 묶음이 든 HEIF 파일은 변환하지 않아요.</li>
-        <li><strong>크기 제한이 있어요.</strong> 사진 한 장당 50MB, 5천만 화소까지예요.</li>
-        <li><strong>화질이 좋아지지는 않아요.</strong> JPG는 다시 압축하는 형식이라 품질을 100으로 해도 원본보다 나아지지 않아요. 용량이 원본보다 커질 수도 있고, 그럴 때는 결과 화면에 그대로 보여 줘요.</li>
-        <li><strong>원본 HEIC는 지워지지 않아요.</strong> 새 파일로 저장하는 방식이라 원본과 JPG가 둘 다 남아요. 필요 없으면 갤러리에서 직접 지우세요.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">자주 묻는 질문</h2>
-      <div class="faq">
-        <details><summary>변환한 JPG는 어디에 있나요?</summary><div><p>휴대폰의 Pictures/SugarConvert 폴더에 새 파일로 저장돼요. 저장한 뒤 결과 화면에서 바로 공유할 수도 있어요.</p></div></details>
-        <details><summary>사진이 서버로 올라가나요?</summary><div><p>아니요. 사진은 휴대폰 안에서만 변환되고, 앱은 저장소 권한도 요구하지 않아요. 직접 고른 사진만 읽어요. 익명 사용 통계와 오류 보고에는 사진이나 파일 이름이 들어가지 않고, 설정에서 끌 수 있어요. 자세한 내용은 <a href="https://sugarmount21.com/privacy/image-convert/">이미지 변환 JPG·PNG·WebP 개인정보처리방침</a>에 있어요.</p></div></details>
-        <details><summary>무료인가요?</summary><div><p>무료로 한 번에 20장까지 바꿀 수 있어요. Pro는 한 번 결제하는 상품으로, 광고를 없애고 한 번에 100장까지 처리해요. 구독이 아니에요.</p></div></details>
-        <details><summary>JPG 말고 PNG나 WebP로도 바꿀 수 있나요?</summary><div><p>네. 저장 형식에서 PNG나 WebP를 고르면 돼요. 사진마다 다른 형식을 정할 수도 있어요. HEIC로 저장하는 기능은 없어요.</p></div></details>
-        <details><summary>HEIC를 JPG로 바꾸면 화질이 떨어지나요?</summary><div><p>JPG로 다시 압축하므로 아주 조금 달라질 수 있어요. 기본값인 품질 90이면 대부분의 사진에서 원본과 구분하기 어려워요. 화질이 중요하면 품질을 높이고, 용량이 중요하면 낮추세요.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="related">
-      <h2 id="related">관련 글</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/apps/image-convert/png-to-jpg/">갤럭시에서 PNG를 JPG로 바꾸는 법</a></li>
-        <li><a href="https://sugarmount21.com/apps/image-compress/photo-under-100kb/">사진을 100KB 이하로 줄이는 법</a></li>
-        <li><a href="https://sugarmount21.com/apps/image-compress/id-photo-size/">증명사진·원서 사진 용량 줄이기</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="app">
-      <h2 id="app">이미지 변환 JPG·PNG·WebP 앱 정보</h2>
-      <p>HEIC·PNG·WebP 사진을 JPG·PNG·WebP 중 원하는 형식의 새 파일로 바꾸는 Android 앱이에요. 여러 장을 한 번에 처리하고, 사진은 업로드하지 않고 휴대폰 안에서만 바꿔요. 회원가입이 없고 Android 10 이상에서 써요.</p>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugarconvert&amp;referrer=utm_source%3Dsugarmount21.com%26utm_medium%3Dhowto%26utm_campaign%3Dsugarconvert" rel="noopener">이미지 변환 JPG·PNG·WebP Google Play에서 받기</a><a class="button button--outline" href="https://sugarmount21.com/apps/image-convert/">이미지 변환 JPG·PNG·WebP 앱 소개</a></div>
     </section>]]></description>
     <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
   </item>

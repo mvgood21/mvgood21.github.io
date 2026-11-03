@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gemini in an Android app: cost, eval, daily caps – SugarMount</title>
+  <meta name="description" content="A 59-case eval picked a Gemini model at $0.93 per 1,000 calls, a 3,000-call daily cap in the function limits spend, and an AI Studio 402 moved us to Vertex AI.">
+  <meta name="robots" content="max-image-preview:large">
+  <link rel="canonical" href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">
+  <link rel="alternate" hreflang="ko" href="https://sugarmount21.com/ax/llm-explain-cost-limits/">
+  <link rel="alternate" hreflang="en" href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">
+  <link rel="alternate" hreflang="x-default" href="https://sugarmount21.com/ax/llm-explain-cost-limits/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Gemini in an Android app: cost, eval, daily caps – SugarMount">
+  <meta property="og:description" content="A 59-case eval picked a Gemini model at $0.93 per 1,000 calls, a 3,000-call daily cap in the function limits spend, and an AI Studio 402 moved us to Vertex AI.">
+  <meta property="og:url" content="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">
+  <meta property="og:image" content="https://sugarmount21.com/assets/og/ax-llm-explain-cost-limits-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="https://sugarmount21.com/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/svg+xml" href="https://sugarmount21.com/assets/favicon.svg">
+  <link rel="apple-touch-icon" href="https://sugarmount21.com/assets/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://sugarmount21.com/en/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/site.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=e2770b30">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://sugarmount21.com/en/ax/llm-explain-cost-limits/#article","headline":"The first LLM feature in a spell-check app: cost, model evaluation and daily caps for \"Why is this wrong?\"","description":"A 59-case eval picked a Gemini model at $0.93 per 1,000 calls, a 3,000-call daily cap in the function limits spend, and an AI Studio 402 moved us to Vertex AI.","url":"https://sugarmount21.com/en/ax/llm-explain-cost-limits/","mainEntityOfPage":"https://sugarmount21.com/en/ax/llm-explain-cost-limits/","inLanguage":"en","articleSection":"Android development","datePublished":"2026-11-04T09:00:00+09:00","dateModified":"2026-11-04T09:00:00+09:00","image":["https://sugarmount21.com/assets/og/ax-llm-explain-cost-limits-en.png","https://sugarmount21.com/assets/ax/cover/llm-explain-cost-limits-en.webp","https://sugarmount21.com/assets/ax/llm-explain-cost-limits-1-en.webp","https://sugarmount21.com/assets/ax/llm-explain-cost-limits-2-en.webp"],"author":{"@id":"https://sugarmount21.com/#org"},"publisher":{"@id":"https://sugarmount21.com/#org"},"isPartOf":{"@id":"https://sugarmount21.com/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Can Firebase Blaze credit pay for the Gemini API?","acceptedAnswer":{"@type":"Answer","text":"Per the design doc, only Vertex AI is on the credit path in this project; we haven't confirmed it on an invoice yet. The AI Studio key was on prepaid-only billing, so all 59 eval calls on September 27, 2026 were rejected with 402."}},{"@type":"Question","name":"How do you cap the cost of an LLM feature?","acceptedAnswer":{"@type":"Answer","text":"Count LLM calls inside the function and refuse them past a daily limit. A budget alert only sends an email. This app closes at 3,000 calls a day, and one Firestore document can change that number or set it to 0 without a deploy."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://sugarmount21.com/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://sugarmount21.com/en/ax/"},{"@type":"ListItem","position":3,"name":"Android development","item":"https://sugarmount21.com/en/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"The first LLM feature in a spell-check app: cost, model evaluation and daily caps for \"Why is this wrong?\""}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=e2770b30">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/llm-explain-cost-limits/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-android">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/android/">Android development</a></li><li><span aria-current="page">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/llm-explain-cost-limits-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX Notes · Measurement</span>
+      <h1>The first LLM feature in a spell-check app: cost, model evaluation and daily caps for "Why is this wrong?"</h1>
+      <p class="lead">A 59-case eval picked the model at $0.93 per 1,000 calls (about $1.1 after the v3 prompt the next day). Spend is capped by the function itself, which refuses LLM calls past 3,000 a day.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Android development</span> <span aria-hidden="true">·</span> <span>11 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-11-04">November 4, 2026</time></p><!-- /build:meta -->
+      <p>The first eval run on the night of September 27, 2026 failed on all 59 calls with HTTP 402. It used an AI Studio key that the coding agent had said around noon that day would be billed against our Firebase credit, and we were in the middle of giving our Korean spelling app <a href="/en/apps/sugarspeller/">SugarSpeller</a> its first server function and LLM. After the key was replaced with Vertex AI, gemini-3.8-flash gave a correct reason for all 59 corrections (the right rule for 54), with a p95 latency of 4.3 seconds and a cost of $0.93 per 1,000 calls. In the two weeks after the October 1 release, 3.7% of users who ran a check tapped the button; among users who had opened the correction sheet, it was 41%.</p>
+      <p class="note">Sources: the design doc in the app repository (approved 2026-09-27), commits de79cfd, 350a6c6, df8f740 and 4c99287, the WATCH.md decision log (rows for Oct 17 and Oct 28), and the agent session log. Usage comes from GA4; cost comes from the usage documents the function writes to Firestore. Rechecked against the repository on 2026-11-02. Times are Korea Standard Time (UTC+9). Cloud project and account identifiers are left out.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (9)</summary><ol><li><a href="#eval">The 59-case eval: flash-lite at 78%, 3.8-flash at 100%</a></li><li><a href="#billing">The AI Studio key never touched the $300 credit</a></li><li><a href="#cap">The function refuses LLM calls past 3,000 a day</a></li><li><a href="#cold-start">A 7.9-second cold start pushed the app timeout to 15 seconds</a></li><li><a href="#usage">3.7% of checking users, 41% of sheet openers</a></li><li><a href="#limits">Mass-created anonymous accounts hit only the global cap</a></li><li><a href="#steps">Adding the same feature to your app</a></li><li><a href="#next">Still open: usage after the tap hint, and a price doubling</a></li><li><a href="#faq">FAQ</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#eval">The 59-case eval: flash-lite at 78%, 3.8-flash at 100%</a></li><li><a href="#billing">The AI Studio key never touched the $300 credit</a></li><li><a href="#cap">The function refuses LLM calls past 3,000 a day</a></li><li><a href="#cold-start">A 7.9-second cold start pushed the app timeout to 15 seconds</a></li><li><a href="#usage">3.7% of checking users, 41% of sheet openers</a></li><li><a href="#limits">Mass-created anonymous accounts hit only the global cap</a></li><li><a href="#steps">Adding the same feature to your app</a></li><li><a href="#next">Still open: usage after the tap hint, and a price doubling</a></li><li><a href="#faq">FAQ</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="eval">
+      <h2 id="eval">The 59-case eval: flash-lite at 78%, 3.8-flash at 100%</h2>
+      <p>The feature explains one correction at a time: the user taps a corrected word and gets a one-line reason plus the name of the Korean orthography rule behind it. We picked the model with 59 corrections taken from real checker responses stored as test fixtures in the app: 38 from Naver's spell checker and 21 from Daum's (Naver and Daum are the two big Korean portals, and the app uses their checkers). The pass mark was written into the design doc before the run: at least 90% correct and a p95 of 2.5 seconds or less. Every call went to the Vertex AI global endpoint.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Model (prompt)</th><th>Reason correct</th><th>Rule also correct</th><th>p50 / p95</th><th>Per 1,000</th></tr></thead>
+        <tbody>
+          <tr><td>gemini-3.5-flash-lite (v1)</td><td>43/59 (73%)</td><td>30/59</td><td>1.06 s / 1.26 s</td><td>$0.27</td></tr>
+          <tr><td>gemini-3.5-flash-lite (v2)</td><td>46/59 (78%)</td><td>38/59</td><td>1.08 s / 4.6 s</td><td>$0.42</td></tr>
+          <tr><td>gemini-3.8-flash (v2)</td><td>59/59 (100%)</td><td>54/59 (92%)</td><td>2.0 s / 4.3 s</td><td>$0.93</td></tr>
+        </tbody>
+      </table></div>
+      <p>Prompt v2 added an order of checks for spacing errors and a table of reasons for the most common corrections. It moved flash-lite from 73% to 78% and no further. Its wrong answers included explaining a noun fused with <i>hada</i> ("to do") as an ending or particle, garbled syllables, and calling an archaic spelling of a polite ending a past tense. 3.8-flash made no typos; its five misses were all wrong rule citations. It costs more than twice as much as flash-lite v2 per 1,000 calls, and it was the only model over the 90% bar, so it became the default.</p>
+      <figure class="ax-fig"><img src="/assets/ax/llm-explain-cost-limits-1-en.webp" width="1200" height="634" alt="Bar chart: cost per 1,000 calls was $0.27 for 3.5-flash-lite with prompt v1 (73% correct), $0.42 with v2 (78%), and $0.93 for 3.8-flash with v2 (100%)." loading="lazy"><figcaption>Only 3.8-flash cleared the 90% bar, at $0.93 per 1,000 calls.</figcaption></figure>
+      <p>The first 3.8-flash run returned 59 empty answers. The model's thinking tokens used up the 160-token output limit before any JSON came out; setting <code>thinkingBudget: 0</code> fixed it. The 2.5-second target was missed. This model is served only from the global endpoint (the Seoul and Tokyo regions returned 404), and each call took 2.1 to 2.8 seconds. Because that was still inside the app's 8-second timeout and the button shows a progress indicator, the design doc moved the target to a p95 of 5 seconds.</p>
+    </section>
+
+    <section aria-labelledby="billing">
+      <h2 id="billing">The AI Studio key never touched the $300 credit</h2>
+      <p>The 402 came from billing. The error read <code>Your prepayment credits are depleted</code>, and authentication had succeeded. In this project, AI Studio billing was prepaid only, so it had no link to the 90-day $300 free-trial credit (held in Cloud Billing) that came with moving the Firebase project to the pay-as-you-go Blaze plan.</p>
+      <p>At 12:01 the agent wrote that with the $300 credit, paid-tier Gemini API usage would be billed to the same project, and ten minutes later it produced a table showing the credit applied to both. The spec switched to keyless Vertex AI at 12:18 (220b267), then at 12:21 went back to an AI Studio key the operator had already created, on the grounds that it shared the billing account (740b9d5).</p>
+      <p>The function, the quota code and the cache were all tested against a fake provider during the day, so the first real Gemini call was the eval run around 10 p.m. When the agent reported the 402 at 22:04, its first recommendation was to buy AI Studio prepaid credit (minimum $5). At 22:06 the operator asked why, if the $300 was supposed to cover it. The agent then said its earlier explanation was wrong: AI Studio keys used to bill a project's Cloud billing account after the fact, and this project didn't work that way.</p>
+      <figure class="ax-fig"><img src="/assets/ax/llm-explain-cost-limits-2-en.webp" width="1200" height="822" alt="Steps: at 12:01 the agent says Gemini bills to the same account, at 12:21 the spec picks an AI Studio key, at 22:04 all 59 eval calls get 402, the operator questions it, and at 22:10 commit de79cfd moves to Vertex AI." loading="lazy"><figcaption>The midday billing advice went untested until the first real model call that night.</figcaption></figure>
+      <p>Commit de79cfd at 22:10 moved Gemini authentication to Vertex AI with ADC (Application Default Credentials, the service account the code already runs as). Vertex bills through Cloud Billing, which per the design doc is where the credit applies, and there is no API key to store or rotate. The deploy 49 minutes later hit one more snag: declaring an unused secret on the function was enough to make the deploy query Secret Manager and fail with 403, so the secret is now declared only in key mode (e67a4f7).</p>
+      <p>Before building an LLM feature, make one real call and check which bill it lands on. A 200 response does not say which balance paid for it. After the move to Vertex, this app computed its cost from token counts the function records times the list price, and the repository has no record of the credit deduction being checked against a billing report.</p>
+    </section>
+
+    <section aria-labelledby="cap">
+      <h2 id="cap">The function refuses LLM calls past 3,000 a day</h2>
+      <p><code>explainCorrection</code> is a single callable function on Cloud Functions for Firebase (2nd gen). The app signs in anonymously when its process opens the first screen, and the Firebase SDK attaches the auth token to each call. The function validates input, checks the cache, takes from the quota, calls the LLM, then stores the result. The cache comes before the quota, so an explanation that already exists costs the user nothing.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Control</th><th>Default</th><th>How to change it</th></tr></thead>
+        <tbody>
+          <tr><td>Free quota</td><td>5 a day per anonymous uid</td><td>Firestore doc <code>config/limits</code> (cached 60 s)</td></tr>
+          <tr><td>Subscriber ceiling</td><td>100 a day per uid</td><td>Same doc</td></tr>
+          <tr><td>Global cap</td><td>3,000 LLM attempts a day</td><td>Same doc; 0 closes it</td></tr>
+          <tr><td>App Check enforcement</td><td>Off (measured only); current setting unconfirmed</td><td><code>requireAppCheck</code> in the same doc</td></tr>
+          <tr><td>Button in the app</td><td>On</td><td>Remote Config <code>explain_enabled</code> = false</td></tr>
+        </tbody>
+      </table></div>
+      <p>The day rolls over at midnight Korea time. The day key is computed by adding nine hours to UTC milliseconds rather than trusting the server's time zone. The global cap counts LLM attempts, not requests: retries and hedged duplicates each count, and only attempts that failed before billing (network errors and the like) are given back. Timeouts stay counted, because the provider may already have charged for them.</p>
+      <p>A budget alert sends an email and does not stop charges, which is why the design doc calls the 3,000-call cap the real safeguard. At the eval price ($0.93), a full day at the cap is about $2.8; with the longer v3 prompt from September 28 (about $1.1 per 1,000) it is about $3.3 by our calculation. A call cap works as a money cap only because each call is bounded: the original and corrected words are limited to 60 code points each, and the output to 160 tokens. The agent's morning estimate (under 0.1 won per call, under 1,000 won a month) used flash-lite prices; the chosen model costs 3.4 times flash-lite v1 per 1,000 calls.</p>
+      <p>In the first release stage the function trusts the app's claim that the user subscribes. A forged claim buys 95 extra explanations a day at under 10 won (well under a cent), so receipt checks were deferred. Putting the daily total document in the same transaction as the user's quota made concurrent requests die on lock timeouts, and on September 28 the total moved outside the transaction (73085eb). As a result, the global cap can overshoot by the number of requests in flight.</p>
+      <p>Remote Config refreshed only on the launcher screen, and people who used only the mini window (opened from text selection in another app) never pass through it, so switching off <code>explain_enabled</code> would have left their button in place. The September 29 release review caught it, and the mini window now fetches config before it opens the sheet (4c99287).</p>
+    </section>
+
+    <section aria-labelledby="cold-start">
+      <h2 id="cold-start">A 7.9-second cold start pushed the app timeout to 15 seconds</h2>
+      <p>The smoke test after the production deploy on the night of September 27 measured 7.9 seconds for the first call and 1.6 to 3.0 seconds after that. The function runs with zero minimum instances, and the app's timeout was 8 seconds, so a cold call came within 0.1 seconds of it. Commit df8f740 raised the app timeout to 15 seconds. Keeping one instance warm (about $3 to $4 a month) stayed in the function docs as a fallback if cold starts became a problem. LLM calls on October 26 and 27 cost $0.020 in total, so the warm instance would cost far more than the feature itself.</p>
+      <p>The next day, one repeated eval call that stretched to 44.5 seconds set the server-side deadlines: 6 seconds per attempt and 12 for the whole request. From October 25 the function hedges: if an attempt is silent for 4 seconds, it sends the same request again and takes whichever answers first. Failures went from 16 of 25 in the October 24 function log to 0 of 16 on October 26 and 27.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20The%20first%20LLM%20feature%20in%20a%20spell-check%20app%3A%20cost%2C%20model%20evaluation%20and%20daily%20caps%20for%20%22Why%20is%20this%20wrong%3F%22">Email us</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="usage">
+      <h2 id="usage">3.7% of checking users, 41% of sheet openers</h2>
+      <p>The decision rule went into WATCH.md before release. Fourteen days in, if 8% or more of users who ran a check tapped the button, keep it; under 3%, test a new position and wording. The October 17 review (October 2 to 16, app 1.6.025 or later) counted 56 of 1,527 checking users, 3.7%, with 77 requests. That sits between the two thresholds.</p>
+      <p>Over the same period, 138 users (9.0%) tapped a corrected word to open the sheet, and 56 of them pressed the button. 41% of people who reached the sheet wanted the reason, so the bottleneck was finding the sheet rather than the button. Version 1.6.031, rolled out in stages from October 18, added a one-time hint that the highlighted words can be tapped.</p>
+      <p>With about 8 requests a day, the 14-day cache hit rate was 11% against a 40% target. How the shared cache key was built is covered in <a href="/en/ax/llm-cache-no-context/">the blind A/B that let us stop sending context to the LLM</a>.</p>
+    </section>
+
+    <section aria-labelledby="limits">
+      <h2 id="limits">Mass-created anonymous accounts hit only the global cap</h2>
+      <p>A uid's quota starts over when the app is reinstalled. A script that keeps creating anonymous accounts makes the per-user limit of 5 meaningless; what remains is the global 3,000 and App Check, which defaults to measuring only. If one explanation were expensive, verify the subscription on the server from day one.</p>
+      <p>The 59 cases came only from the checkers' red, green and blue groups (Naver red 25, green 13; Daum red 14, green 5, blue 2); there was not one purple or violet case, and the September 27 scoring was done by the same agent that wrote the code. No human scored it. A model that lives only on the global endpoint also changes what a privacy policy can say about where data is processed; another of our apps ran into that with the same model, written up in <a href="/en/ax/ai-region-privacy-policy/">the privacy-policy note on AI processing location</a>.</p>
+    </section>
+
+    <section aria-labelledby="steps">
+      <h2 id="steps">Adding the same feature to your app</h2>
+      <ol>
+        <li>Make one real model call through a path that bills to Cloud Billing (Vertex AI here). On 402 or 403, stop and settle the billing path first. On 200, check the billing report for the credit deduction.</li>
+        <li>Pull about 50 cases from your app's test data and put accuracy, p95 and cost per 1,000 calls for each candidate in one table. Write the pass mark first, and set the thinking budget of thinking models to 0.</li>
+        <li>Expose one callable function that requires anonymous auth, with three limits (free per user, subscriber ceiling, global) keyed by day in your users' time zone. Keep the limits in a document you can change without a deploy, with 0 meaning closed.</li>
+        <li>Cap input length and output tokens.</li>
+        <li>Give the app a remote switch that hides the button, and check that every entry screen refreshes it.</li>
+        <li>After the production deploy, time the first call to a cold instance and set the app timeout above it. Before release, write the decision rule: two usage thresholds, cache hit rate, failure rate and daily cost.</li>
+      </ol>
+      <p>The default limits and the thinking switch (<code>MAX_OUTPUT_TOKENS</code> is 160):</p>
+      <pre><code>// functions/src/limits.ts
+export const DEFAULT_LIMITS: Limits = { freePerDay: 5, entitledPerDay: 100, globalPerDay: 3000, requireAppCheck: false };
+
+// functions/src/llm/gemini.ts, part of the generateContent config
+maxOutputTokens: MAX_OUTPUT_TOKENS,
+thinkingConfig: { thinkingBudget: 0 },</code></pre>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">Still open: usage after the tap hint, and a price doubling</h2>
+      <p>The tap hint in 1.6.031 is judged by whether 6% or more of users who saw it request an explanation. The review was due November 1, and as of November 2 the log has no row for it yet. 3.8-flash is scheduled to double in price on January 1, 2027, to $1.50 input and $7.50 output per million tokens; on that day the prices and the worst-day figure need recalculating. We also haven't seen a real bill yet, since the 90-day credit is still running.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20The%20first%20LLM%20feature%20in%20a%20spell-check%20app%3A%20cost%2C%20model%20evaluation%20and%20daily%20caps%20for%20%22Why%20is%20this%20wrong%3F%22">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Can Firebase Blaze credit pay for the Gemini API?</summary><div><p>Per the design doc, only Vertex AI is on the credit path in this project; we haven't confirmed it on an invoice yet. The AI Studio key was on prepaid-only billing, so all 59 eval calls on September 27, 2026 were rejected with 402.</p></div></details>
+        <details><summary>How do you cap the cost of an LLM feature?</summary><div><p>Count LLM calls inside the function and refuse them past a daily limit. A budget alert only sends an email. This app closes at 3,000 calls a day, and one Firestore document can change that number or set it to 0 without a deploy.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
+        <li><a href="/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+      </ul>
+      <p><a href="/en/ax/topic/android/">All notes on Android development</a> · <a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/sitemap/">Site map</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>

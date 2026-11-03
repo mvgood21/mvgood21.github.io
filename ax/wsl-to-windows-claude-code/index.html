@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claude Code WSL에서 Windows로 이전 – SugarMount</title>
+  <meta name="description" content="Claude Code 작업 환경을 WSL에서 Windows 네이티브로 옮긴 점검표입니다. 저장소는 하루, 세션 기록과 Docker는 닷새 걸렸고 R8 릴리스 빌드와 몽키 1,500회로 확인했습니다.">
+  <meta name="robots" content="max-image-preview:large">
+  <link rel="canonical" href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">
+  <link rel="alternate" hreflang="ko" href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">
+  <link rel="alternate" hreflang="en" href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">
+  <link rel="alternate" hreflang="x-default" href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Claude Code WSL에서 Windows로 이전 – SugarMount">
+  <meta property="og:description" content="Claude Code 작업 환경을 WSL에서 Windows 네이티브로 옮긴 점검표입니다. 저장소는 하루, 세션 기록과 Docker는 닷새 걸렸고 R8 릴리스 빌드와 몽키 1,500회로 확인했습니다.">
+  <meta property="og:url" content="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">
+  <meta property="og:image" content="https://sugarmount21.com/assets/og/ax-wsl-to-windows-claude-code-ko.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="https://sugarmount21.com/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/svg+xml" href="https://sugarmount21.com/assets/favicon.svg">
+  <link rel="apple-touch-icon" href="https://sugarmount21.com/assets/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://sugarmount21.com/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/site.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=e2770b30">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://sugarmount21.com/ax/wsl-to-windows-claude-code/#article","headline":"WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트","description":"Claude Code 작업 환경을 WSL에서 Windows 네이티브로 옮긴 점검표입니다. 저장소는 하루, 세션 기록과 Docker는 닷새 걸렸고 R8 릴리스 빌드와 몽키 1,500회로 확인했습니다.","url":"https://sugarmount21.com/ax/wsl-to-windows-claude-code/","mainEntityOfPage":"https://sugarmount21.com/ax/wsl-to-windows-claude-code/","inLanguage":"ko","articleSection":"에이전트와 일하는 법","datePublished":"2026-11-04T09:00:00+09:00","dateModified":"2026-11-04T09:00:00+09:00","image":["https://sugarmount21.com/assets/og/ax-wsl-to-windows-claude-code-ko.png","https://sugarmount21.com/assets/ax/cover/wsl-to-windows-claude-code-ko.webp","https://sugarmount21.com/assets/ax/wsl-to-windows-claude-code-1-ko.webp","https://sugarmount21.com/assets/ax/wsl-to-windows-claude-code-2-ko.webp"],"author":{"@id":"https://sugarmount21.com/#org"},"publisher":{"@id":"https://sugarmount21.com/#org"},"isPartOf":{"@id":"https://sugarmount21.com/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"WSL에서 쓰던 Claude Code 세션 기록을 Windows로 옮길 수 있나요?","acceptedAnswer":{"@type":"Answer","text":"옮길 수 있지만 폴더 복사만으로는 안 됩니다. ~/.claude/projects/ 아래 폴더 이름을 Windows 경로 기준으로 바꾸고, 기록 안의 cwd 값도 바꿔야 합니다. 이번에는 바꾼 뒤 운영자가 /resume 에서 된 것 같다고 확인했습니다. 먼저 cleanupPeriodDays 를 올려 두지 않으면 30일 넘게 손대지 않은 기록이 지워집니다."}},{"@type":"Question","name":"wsl --shutdown과 wsl --terminate는 무엇이 다른가요?","acceptedAnswer":{"@type":"Answer","text":"--shutdown 은 WSL2 가상 머신 전체를 내리므로 그 위의 Docker Desktop도 함께 내려갑니다. --terminate <배포판> 은 그 배포판만 종료합니다."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://sugarmount21.com/"},{"@type":"ListItem","position":2,"name":"AX 노트","item":"https://sugarmount21.com/ax/"},{"@type":"ListItem","position":3,"name":"에이전트와 일하는 법","item":"https://sugarmount21.com/ax/topic/workflow/"},{"@type":"ListItem","position":4,"name":"WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=e2770b30">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a class="nav-apps" href="/apps/">앱</a>
+        <a class="nav-ax" href="/ax/" aria-current="page">AX 노트</a>
+        <a class="nav-about" href="/about/">소개</a>
+        <a class="nav-privacy" href="/privacy/">개인정보처리방침</a>
+      </nav>
+      <a class="lang" href="/en/ax/wsl-to-windows-claude-code/" lang="en" hreflang="en">English</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>메뉴</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="전체 메뉴">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">닫기</button>
+      <p class="menu-title" id="m-photo">사진·영상</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>슈가앨범</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 용량 줄이기</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 반전·회전</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>이미지 변환 JPG·PNG·WebP</span></a></li></ul>
+      <p class="menu-title" id="m-document">문서·글</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글 띄어쓰기</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글뷰어 슈가독</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">생활</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>생생카드</span></a></li></ul>
+      <p class="menu-title" id="m-games">게임</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>화살표 매듭풀기</span></a></li><li><a class="app-tile" data-app="blocks" href="/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한판블록</span></a></li></ul>
+      <p><a href="/apps/">모든 앱 보기</a></p>
+      <ul class="menu-links"><li><a href="/ax/" aria-current="page">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-workflow">
+    <nav class="crumbs" aria-label="이동 경로"><ol><li><a href="/">SugarMount</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/ax/topic/workflow/">에이전트와 일하는 법</a></li><li><span aria-current="page">WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/wsl-to-windows-claude-code-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX 노트 · 방법</span>
+      <h1>WSL을 접고 Windows 네이티브로: Claude Code 개발 환경 이전 체크리스트</h1>
+      <p class="lead">저장소는 복사 뒤 git 설정 세 가지로 끝나지만 세션 기록은 cwd와 보관 기간을 따로 고쳐야 합니다. 판정은 R8 릴리스 빌드와 몽키 1,500회로 냈습니다.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/about/">작성 SugarMount</a> <span aria-hidden="true">·</span> <span>에이전트와 일하는 법</span> <span aria-hidden="true">·</span> <span>읽는 시간 15분</span> <span aria-hidden="true">·</span> 최종 업데이트 <time datetime="2026-11-04">2026년 11월 4일</time></p><!-- /build:meta -->
+      <p>Windows로 옮긴 sugar-utils의 사진 용량 줄이기 앱을 R8 릴리스 빌드로 묶는 데 5분 50초가 걸렸고, 그 APK에 몽키 이벤트 1,500개를 넣어도 크래시와 ANR은 0건이었습니다. 이전은 2026년 10월 18일 오전 11시 2분에 시작했고, 저장소와 도구 설치는 그날 오후 4시 무렵 이 확인으로 마무리됐습니다. 세션 기록과 Docker까지 정리된 것은 10월 22일이었고, 그 사이 에이전트가 틀린 곳이 다섯 군데 나왔습니다.</p>
+      <p class="note">근거는 이전 작업을 한 Claude Code 세션 기록(jsonl) 3개, 이전 내용을 적은 메모리 파일, 이전 전후의 전역 지침 파일입니다. 숫자는 2026년 11월 2일에 세션 기록에서 다시 확인했고 시각은 한국 시간입니다.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>목차 (10)</summary><ol><li><a href="#checklist">이전 체크리스트 8단계</a></li><li><a href="#git-settings">복사한 저장소에 거는 git 설정</a></li><li><a href="#toolchain">도구 버전과 지워진 우회 규칙</a></li><li><a href="#session-logs">세션 기록은 프로젝트 폴더 밖에 있다</a></li><li><a href="#ai-errors">놓친 root 기록 8개와 shutdown</a></li><li><a href="#wake-sources">Ubuntu를 다시 깨우던 네 가지</a></li><li><a href="#verify">끝났다는 판정: R8 빌드와 몽키 1,500회</a></li><li><a href="#limits">심볼릭 링크를 못 만드는 PC</a></li><li><a href="#next">빌드 시간 비교는 없고, /resume 목록은 운영자만 봤습니다</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">목차</p><ol><li><a href="#checklist">이전 체크리스트 8단계</a></li><li><a href="#git-settings">복사한 저장소에 거는 git 설정</a></li><li><a href="#toolchain">도구 버전과 지워진 우회 규칙</a></li><li><a href="#session-logs">세션 기록은 프로젝트 폴더 밖에 있다</a></li><li><a href="#ai-errors">놓친 root 기록 8개와 shutdown</a></li><li><a href="#wake-sources">Ubuntu를 다시 깨우던 네 가지</a></li><li><a href="#verify">끝났다는 판정: R8 빌드와 몽키 1,500회</a></li><li><a href="#limits">심볼릭 링크를 못 만드는 PC</a></li><li><a href="#next">빌드 시간 비교는 없고, /resume 목록은 운영자만 봤습니다</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="checklist">
+      <h2 id="checklist">이전 체크리스트 8단계</h2>
+      <p>WSL을 쓴 이유는 예전에 Windows 터미널에서 Claude Code가 안 되는 기능이 많고 느렸기 때문입니다. 10월 18일 운영자가 이제 Windows에서 써도 되느냐고 묻자, 에이전트는 써도 된다면서 한 프로젝트만 하루 이틀 먼저 써 보라고 권했습니다. 운영자는 한 번에 옮기라고 했고, 도구 설치를 승인하면서 빌드까지 해 보라고 했습니다. 프로젝트를 WSL에 둔 채 Windows에서 WSL 네트워크 경로로 여는 방식은 에이전트가 아주 느리다며 권하지 않았습니다(속도는 재지 않았습니다).</p>
+      <ol>
+        <li>WSL 홈의 프로젝트를 Windows 홈으로 복사합니다. 옮기지 않습니다. <code>node_modules</code>, <code>build</code>, <code>.gradle</code>, <code>.dart_tool</code>, <code>.next</code>, <code>.cxx</code>는 제외합니다.</li>
+        <li>저장소마다 <code>git status --porcelain | wc -l</code>을 양쪽에서 세어 맞는지 확인합니다.</li>
+        <li><code>core.filemode=false</code>(서브모듈 포함), 링크가 있는 저장소는 <code>core.symlinks=true</code>로 바꾸고 링크를 다시 체크아웃, 워크트리는 <code>git worktree repair</code>, Android는 <code>local.properties</code>의 <code>sdk.dir</code>.</li>
+        <li>도구 버전을 확인하고 관리자 권한 없이 사용자 범위로 설치합니다.</li>
+        <li>Claude Code 지침 파일의 환경 절을 다시 쓰고, WSL에서만 필요했던 우회 규칙을 삭제합니다.</li>
+        <li>세션 기록을 옮기기 전에 <code>cleanupPeriodDays</code>부터 올립니다. 그다음 폴더 이름을 바꿔 복사하고, 기록 안의 <code>cwd</code>를 바꾸고, WSL root 계정 홈의 <code>.claude/projects</code>에 있는 기록도 찾습니다. 이전 뒤에도 WSL에서 이어 쓴 세션은 마지막에 한 번 더 복사합니다. 끝나면 각 프로젝트 폴더에서 <code>claude --resume</code>을 열어 옛 세션이 보이는지 봅니다. 다른 폴더에서 실행하면 기록이 별도 프로젝트 폴더로 저장됩니다.</li>
+        <li>Ubuntu를 깨우는 것을 끄고, Docker Desktop을 쓰면 <code>wsl --terminate &lt;배포판&gt;</code>으로 Ubuntu만 종료합니다. <code>wsl -l -v</code>에서 Ubuntu가 Stopped, docker-desktop이 Running이면 끝입니다. <code>.wslconfig</code>를 고쳤다면 적용하는 데 <code>wsl --shutdown</code>이 한 번 필요하고, 그때 Docker도 잠깐 내려갑니다.</li>
+        <li>R8 릴리스 빌드를 에뮬레이터에 설치하고 몽키 1,500회, crash 버퍼, 프로세스 생존을 봅니다.</li>
+      </ol>
+      <p>1단계와 3단계에 쓴 명령을 따라 하기 쉽게 한데 모은 것입니다. 저장소 이름은 자리표시자로 바꿨습니다. 저장소 안의 링크는 git이 모드 120000으로 기록한 파일로 찾았습니다.</p>
+      <pre><code># 1단계 (WSL 안에서)
+rsync -a --no-links --exclude=node_modules --exclude=build --exclude=.dart_tool \
+  --exclude=.gradle --exclude=.next --exclude=.cxx &lt;폴더 목록&gt; &lt;Windows 홈&gt;/
+
+# 3단계 (Git Bash, 저장소마다)
+r=&lt;저장소&gt;
+git -C "$r" config core.filemode false
+git -C "$r" submodule foreach --quiet 'git config core.filemode false'
+export MSYS=winsymlinks:nativestrict
+git -C "$r" config core.symlinks true
+git -C "$r" ls-files -s | awk '$1=="120000"{ $1=$2=$3=""; sub(/^ +/,""); print }' &gt; "$TMP/links.txt"
+while IFS= read -r p; do rm -f "${r:?}/${p:?}"; done &lt; "$TMP/links.txt"
+tr '\n' '\0' &lt; "$TMP/links.txt" | xargs -0 git -C "$r" checkout --
+git -C &lt;주 저장소&gt; worktree repair &lt;워크트리 경로...&gt;</code></pre>
+      <figure class="ax-fig"><img src="/assets/ax/wsl-to-windows-claude-code-1-ko.webp" width="1200" height="774" alt="단계 그림: 10월 18일 폴더 35개 복사와 git 설정, 같은 날 릴리스 빌드 5분 50초와 몽키 1,500회 크래시 0, 10월 21일 세션 기록 31개 cwd 변환과 9월 기록 5개 복구, 10월 22일 root 기록 8개 포함 9개 추가와 Ubuntu 종료." loading="lazy"><figcaption>저장소와 도구는 10월 18일 하루에 검증까지 끝났고, 세션 기록과 WSL 끄기는 10월 22일에야 끝났습니다.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="git-settings">
+      <h2 id="git-settings">복사한 저장소에 거는 git 설정</h2>
+      <p>WSL 안에서 <code>rsync -a --no-links</code>로 홈 폴더 35개(sugar-game 워크트리 16개 포함)와 bundle 파일 1개를 Windows 홈으로 복사했습니다. 빌드 산출물을 뺀 크기는 약 1.5GB였습니다. WSL 원본은 지우지 않고 백업으로 남겼습니다. 운영자가 정한 규칙이고, 나중에 빠진 세션 기록을 이 원본에서 두 번 되살렸습니다.</p>
+      <p><code>--no-links</code> 때문에 심볼릭 링크는 "skipping non-regular file"로 모두 건너뛰었습니다. 링크가 든 저장소 3개는 <code>core.symlinks=true</code>로 바꾸고, Git Bash에서 <code>MSYS=winsymlinks:nativestrict</code>를 건 뒤 링크 파일을 지우고 <code>git checkout</code>으로 다시 받았습니다. 모든 저장소와 서브모듈에는 <code>core.filemode=false</code>를 걸었습니다. sugar-game의 워크트리 16개는 <code>.git</code> 파일이 옛 경로를 가리켜 <code>git worktree repair</code>가 "gitdir incorrect"를 고쳤습니다.</p>
+      <p>확인은 저장소별 <code>git status --porcelain</code> 줄 수를 WSL 원본과 맞춰 봤습니다. sugar-game 23, sugar-utils 0처럼 한 저장소만 빼고 모두 같았습니다. 그 하나는 브라우저 다운로드 메타데이터인 <code>…pptx:Zone.Identifier</code> 파일이 실수로 커밋돼 있었고, Windows는 파일 이름에 쌍점을 허용하지 않아 만들 수 없었습니다. <code>git update-index --skip-worktree</code>로 그 파일만 무시하게 했습니다.</p>
+    </section>
+
+    <section aria-labelledby="toolchain">
+      <h2 id="toolchain">도구 버전과 지워진 우회 규칙</h2>
+      <p>WSL 시절 전역 지침의 환경 절에는 node 20, python 3.10이 적혀 있었습니다. Windows에는 이미 node 22와 python 3.12가 깔려 있어서, 이전 날 오전에 새로 쓴 환경 절은 그 판을 기준으로 했습니다. PATH의 <code>java</code>는 JRE 8뿐이라 javac가 없었고, Gradle용 JDK 21은 사용자 폴더에 zip으로 풀어 <code>~/.gradle/gradle.properties</code>의 <code>org.gradle.java.home</code>으로 지정했습니다. gcloud는 winget 설치가 관리자 권한(UAC) 요청에서 막혀, 공식 zip을 사용자 폴더에 풀고 사용자 PATH에 넣었습니다. WSL 때부터 없던 jq와 Windows 쪽에 없던 rg는 winget <code>--scope user</code>로 넣었습니다.</p>
+      <p>WSL에서는 Windows 드라이브에 있는 Android 프로젝트를 9p 파일시스템으로 붙여 빌드했고, 거기서 Gradle 락이 깨져 <code>--project-cache-dir</code>을 따로 주거나 Linux 쪽 사본에서 빌드한다는 줄이 지침에 있었습니다. Windows 네이티브에서는 그 드라이브를 직접 쓰므로 새 지침에서 이 줄을 삭제했습니다. "PATH의 flutter는 Windows SDK이니 Linux SDK는 절대경로로 부른다"는 줄도 Windows용 SDK 하나만 남으면서 빠졌습니다. 이전 뒤 그 드라이브 프로젝트의 세션 5개(서브에이전트 기록까지 jsonl 81개)를 <code>Timeout waiting to lock</code>, <code>Could not lock</code>으로 찾아보니 0건이었습니다. 다만 그 기간 이 드라이브에서 빌드가 끝까지 돈 기록은 많지 않습니다.</p>
+      <figure class="ax-fig"><img src="/assets/ax/wsl-to-windows-claude-code-2-ko.webp" width="1200" height="644" alt="비교 그림: WSL 시절 지침은 node 20, python 3.10, Windows 드라이브 9p 빌드 시 Gradle 락 우회, Linux SDK 절대경로 호출이었고, Windows 지침은 node 22, python 3.12, Windows 드라이브 직접 빌드, Windows용 SDK 하나다." loading="lazy"><figcaption>이전 뒤 지침의 환경 절은 버전이 올라가고 WSL에서만 필요했던 우회 규칙 두 줄이 빠졌습니다.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="session-logs">
+      <h2 id="session-logs">세션 기록은 프로젝트 폴더 밖에 있다</h2>
+      <p>프로젝트를 다 옮긴 뒤에도 Windows에서 <code>claude --resume</code>을 열면 옛 세션이 보이지 않았습니다. Claude Code의 세션 기록은 <code>~/.claude/projects/</code> 아래, 작업 폴더의 절대 경로를 바꾼 이름의 폴더에 있습니다. Linux 홈의 sugar-utils는 <code>-home-&lt;사용자&gt;-sugar-utils</code>이고, Windows 홈의 같은 폴더는 <code>C--Users-&lt;사용자&gt;-sugar-utils</code>입니다. 10월 18일 밤 기록이 있는 폴더 14개(원본 약 3.1GB)를 새 이름으로 복사했습니다.</p>
+      <p>그래도 10월 21일까지 목록에 안 잡혔습니다. 기록 파일 한 줄마다 들어 있는 <code>"cwd"</code> 값이 여전히 Linux 경로였기 때문입니다. 에이전트가 이 값을 일괄로 바꾸려 하자 Claude Code의 자동 권한 검사가 "세션 기록 변조"로 막았습니다. 우회하지 않고 <code>cwd</code>만 바꾸는 스크립트를 만들어 운영자가 <code>!</code> 명령으로 직접 실행했고, 31개 파일이 바뀌었습니다.</p>
+      <p>스크립트는 각 기록 파일에서 <code>cwd</code> 값만 Linux 경로에서 Windows 경로로 바꾸고, 대화 본문과 파일 수정 시각은 건드리지 않습니다. 세션 본체 파일만 고칩니다. 하위 폴더의 서브에이전트 기록은 건드리지 않습니다. 홈 밖(예: 다른 드라이브)에서 연 세션은 그 경로에 맞는 줄을 따로 추가해야 합니다. 아래는 실제 스크립트에서 두 번째 드라이브 처리와 사용자 이름을 빼고, Windows 홈 경로를 자동으로 잡도록 고친 판입니다. Git Bash에서 <code>!</code>로 돌릴 때 스크립트 경로를 역슬래시로 넘기면 Bash가 역슬래시를 지워 파일을 못 찾습니다. 처음 실행이 이것 때문에 실패했고, 슬래시 경로로 다시 돌렸습니다.</p>
+      <pre><code># 옮겨 온 세션 기록(.jsonl)의 cwd만 Windows 경로로 바꾼다. 수정 시각은 유지한다.
+import os, re, glob
+
+LINUX_HOME = '/home/&lt;사용자&gt;'
+WIN_HOME = os.path.expanduser('~')          # %USERPROFILE%
+root = os.path.join(WIN_HOME, '.claude', 'projects')
+pat = re.compile(r'"cwd":"' + re.escape(LINUX_HOME) + r'((?:/[^"]*)?)"')
+
+def rep(m):
+    # JSON 문자열 안이므로 역슬래시를 두 번 쓴다
+    path = (WIN_HOME + m.group(1).replace('/', '\\')).replace('\\', '\\\\')
+    return '"cwd":"%s"' % path
+
+n = 0
+for f in glob.glob(os.path.join(root, '*', '*.jsonl')):
+    with open(f, encoding='utf-8') as fh:
+        s = fh.read()
+    if '"cwd":"' + LINUX_HOME not in s:
+        continue
+    st = os.stat(f)
+    with open(f, 'w', encoding='utf-8', newline='') as fh:
+        fh.write(pat.sub(rep, s))
+    os.utime(f, (st.st_atime, st.st_mtime))
+    n += 1
+print('rewritten', n)</code></pre>
+      <p>바로 그때 9월 18~20일 기록 5개가 사라진 것이 보였습니다. 에이전트가 복사하면서 원래 수정 시각을 유지했는데, Claude Code는 기본값으로 30일 넘게 손대지 않은 기록을 시작할 때 삭제합니다. <code>~/.claude/settings.json</code>에 <code>"cleanupPeriodDays": 3650</code>을 넣고 WSL 원본에서 5개를 다시 복사했습니다.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20WSL%EC%9D%84%20%EC%A0%91%EA%B3%A0%20Windows%20%EB%84%A4%EC%9D%B4%ED%8B%B0%EB%B8%8C%EB%A1%9C%3A%20Claude%20Code%20%EA%B0%9C%EB%B0%9C%20%ED%99%98%EA%B2%BD%20%EC%9D%B4%EC%A0%84%20%EC%B2%B4%ED%81%AC%EB%A6%AC%EC%8A%A4%ED%8A%B8">메일로 문의하기</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="ai-errors">
+      <h2 id="ai-errors">놓친 root 기록 8개와 shutdown</h2>
+      <p>10월 22일 밤 운영자가 "세션 기록이 제대로 안 옮겨진 것 같다"고 짚었습니다. 에이전트는 그 전에 이전이 끝났다고 보고했지만, 다시 보니 WSL root 계정의 기록 8개를 통째로 놓쳤고, 이전 뒤에도 WSL에서 이어진 세션 1개가 옛 상태였습니다. 9개를 옮기고 <code>cwd</code>를 바꾼 뒤에야 Linux 경로가 남은 기록이 0개가 됐습니다.</p>
+      <p>WSL 끄는 법도 에이전트가 틀렸습니다. 10월 18일부터 22일 낮까지 보고 여섯 번에 "<code>wsl --shutdown</code>을 요청해 주세요" 같은 안내를 적었고, 10월 22일 밤 운영자가 그대로 실행하자 Docker까지 내려갔습니다. 에이전트는 그걸 모른 채 그 뒤 보고 두 개에도 같은 안내를 붙였습니다. <code>--shutdown</code>은 WSL2 가상 머신 전체를 내리고, Docker Desktop도 같은 가상 머신 위의 <code>docker-desktop</code> 배포판에서 돕니다. Ubuntu만 끄는 명령은 <code>wsl --terminate Ubuntu-22.04</code>입니다. shutdown 뒤 Ubuntu가 다시 켜진 원인도 에이전트가 앞서 Ubuntu 안에서 돌린 세션 기록 검색 <code>find</code>가 남아 있던 것으로 보였습니다.</p>
+      <p>플러그인 하나를 지워 달라는 요청을 에이전트가 설치된 플러그인 전체로 읽고, 사용 기록을 보지 않은 채 user 범위 플러그인 22개를 지웠습니다. 운영자가 쓰는 것은 왜 지우냐고 되묻자 그제야 최근 60일 세션 기록의 MCP 호출 수를 확인했습니다. 직접 등록한 github MCP와 context7 MCP는 0회였고, 지운 것 중 Notion 플러그인이 1,437회, playwright 플러그인이 59회였습니다. 둘은 다시 설치했습니다. 플러그인을 지우기 전에는 호출 수부터 세십시오.</p>
+    </section>
+
+    <section aria-labelledby="wake-sources">
+      <h2 id="wake-sources">Ubuntu를 다시 깨우던 네 가지</h2>
+      <p>시작프로그램 폴더에서 WSL 안의 봇을 띄우던 스크립트, Docker Desktop 설정의 Ubuntu WSL 연동, Ubuntu에 영구 연결해 둔 네트워크 드라이브, 그리고 위에 쓴 남은 <code>find</code> 프로세스가 Ubuntu를 깨웠습니다. 스크립트와 Docker 설정은 지우지 않고 백업 폴더로 옮기거나 설정에서 해제했고, 네트워크 드라이브는 <code>net use</code>의 <code>/delete</code>로 연결을 풀었습니다.</p>
+      <p>Docker Desktop이 쓰는 WSL2 가상 머신은 계속 떠 있으므로 <code>.wslconfig</code>에서 memory=3GB, processors=2, swap=1GB, autoMemoryReclaim=dropCache로 줄였습니다. 탐색기의 Linux 항목이나 WSL 네트워크 경로를 여는 것만으로도 Ubuntu가 켜집니다. 그럴 때는 다시 <code>--terminate</code>로 종료합니다.</p>
+    </section>
+
+    <section aria-labelledby="verify">
+      <h2 id="verify">끝났다는 판정: R8 빌드와 몽키 1,500회</h2>
+      <p><a href="/ax/release-gate/">릴리스 게이트 글</a>에 쓴 R8 크래시는 디버그 빌드에서는 보이지 않았습니다. 그래서 환경 이전도 sugar-utils의 사진 용량 줄이기 앱을 <code>--no-daemon</code>으로 <code>assembleRelease</code>까지 돌려 판정했습니다. 빌드는 337개 태스크(298개 실행, 39개 캐시)에 <code>minifyReleaseWithR8</code>을 거쳐 5분 50초에 끝났습니다. Windows에서 처음 돌린 빌드(구성 캐시도 없던 상태)입니다.</p>
+      <pre><code>adb -s emulator-5554 install -r app-release.apk
+adb -s emulator-5554 logcat -c
+adb -s emulator-5554 shell monkey -p &lt;패키지&gt; --throttle 200 --pct-syskeys 0 -v 1500
+adb -s emulator-5554 shell pidof &lt;패키지&gt;
+adb -s emulator-5554 logcat -d -b crash</code></pre>
+      <p>Pixel 8 Pro API 35 에뮬레이터에서 "Events injected: 1500"과 "Monkey finished"가 나왔고, <code>pidof</code>가 프로세스 번호를 돌려줬고, crash 버퍼는 비어 있었습니다. 연결돼 있던 실제 폰 2대에는 Play에서 받은 판이 덮어써질 수 있어 설치하지 않았습니다. 이번 몽키는 <code>install -r</code>(있으면 덮어쓰는 설치)로 넣고 돌렸고, 앱 데이터를 지운 신규 설치 상태였는지는 확인하지 않았습니다. 신규 설치 상태에서만 드러나는 결함은 <a href="/ax/fresh-install-monkey-test/">VIBRATE 권한과 신규 설치 몽키 테스트</a>에 따로 적었습니다.</p>
+    </section>
+
+    <section aria-labelledby="limits">
+      <h2 id="limits">심볼릭 링크를 못 만드는 PC</h2>
+      <p>네이티브 심볼릭 링크를 만들 수 없는 PC에서는 <code>core.symlinks=true</code>로 링크를 되살리는 3단계를 그대로 쓸 수 없습니다.</p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">빌드 시간 비교는 없고, /resume 목록은 운영자만 봤습니다</h2>
+      <p>Windows 네이티브와 WSL의 같은 조건 빌드 시간은 재지 않았습니다. <code>/resume</code> 목록은 에이전트가 직접 띄워 본 적이 없고, 10월 22일 운영자가 "된 거 같다"고 한 것이 마지막 확인입니다. 옮겨 온 세션은 대화 본문에 옛 Linux 경로가 남아 있어, 이어 가면 에이전트가 처음에 그 경로를 쓰려 할 수 있습니다. 에이전트가 당시 보고에 적은 대응은 이어 갈 때 새 경로를 한 번 말해 주라는 것이었고, 더 나은 방법은 아직 찾지 않았습니다.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20WSL%EC%9D%84%20%EC%A0%91%EA%B3%A0%20Windows%20%EB%84%A4%EC%9D%B4%ED%8B%B0%EB%B8%8C%EB%A1%9C%3A%20Claude%20Code%20%EA%B0%9C%EB%B0%9C%20%ED%99%98%EA%B2%BD%20%EC%9D%B4%EC%A0%84%20%EC%B2%B4%ED%81%AC%EB%A6%AC%EC%8A%A4%ED%8A%B8">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>WSL에서 쓰던 Claude Code 세션 기록을 Windows로 옮길 수 있나요?</summary><div><p>옮길 수 있지만 폴더 복사만으로는 안 됩니다. <code>~/.claude/projects/</code> 아래 폴더 이름을 Windows 경로 기준으로 바꾸고, 기록 안의 <code>cwd</code> 값도 바꿔야 합니다. 이번에는 바꾼 뒤 운영자가 <code>/resume</code>에서 된 것 같다고 확인했습니다. 먼저 <code>cleanupPeriodDays</code>를 올려 두지 않으면 30일 넘게 손대지 않은 기록이 지워집니다.</p></div></details>
+        <details><summary>wsl --shutdown과 wsl --terminate는 무엇이 다른가요?</summary><div><p><code>--shutdown</code>은 WSL2 가상 머신 전체를 내리므로 그 위의 Docker Desktop도 함께 내려갑니다. <code>--terminate &lt;배포판&gt;</code>은 그 배포판만 종료합니다.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="/ax/compaction-summary-memory/">13일짜리 세션의 자동 압축 9번과, 압축마다 다시 실린 메모리 색인 한 줄</a></li>
+        <li><a href="/ax/subagent-brief-rules/">서브에이전트 브리프의 절대 규칙 6개와 한도로 끊긴 에이전트 5건</a></li>
+        <li><a href="/ax/integration-review-defects/">AI 에이전트 병렬 브랜치 13개를 합친 뒤 통합 리뷰가 확정 결함 12건을 찾았다</a></li>
+        <li><a href="/ax/file-owner-table/">Claude 세션 여러 개가 한 저장소를 고칠 때: 머지 13개로 확인한 파일 주인 표</a></li>
+        <li><a href="/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+      </ul>
+      <p><a href="/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="/ax/">AX 노트 전체 보기</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>한 가지 일을 간단하게 하는 Android 앱</p>
+        <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">앱</p>
+        <ul><li><a href="/apps/sugaralbum/">슈가앨범</a></li><li><a href="/apps/image-compress/">사진 용량 줄이기</a></li><li><a href="/apps/image-flip/">사진 반전·회전</a></li><li><a href="/apps/image-convert/">이미지 변환 JPG·PNG·WebP</a></li><li><a href="/apps/sugarspeller/">한글 띄어쓰기</a></li><li><a href="/apps/sugarclip/">SugarClip</a></li><li><a href="/apps/doc-viewer/">한글뷰어 슈가독</a></li><li><a href="/apps/sugarcard/">생생카드</a></li><li><a href="/apps/arrow-knots/">화살표 매듭풀기</a></li><li><a href="/apps/blocks/">한판블록</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">사이트</p>
+        <ul><li><a href="/apps/">모든 앱</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li><li><a href="/sitemap/">사이트맵</a></li><li><a href="/rss.xml">RSS 피드</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play 개발자 페이지</a></div>
+    </div>
+  </footer>
+</body>
+</html>
