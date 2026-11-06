@@ -157,7 +157,7 @@ def footer(img, dr, f):
 # (top, bottom) fractions of the capture height, checked by eye against every shot in assets/apps.
 CROP = {"sugarcompress": (.19, 0), "sugarflip": (.19, 0), "sugarconvert": (.19, 0), "sugardoc": (.172, 0),
         "arrows": (.135, 0), "blocks": (.13, 0), "sugaralbum": (.16, 0), "sugarcard": (.22, 0),
-        "sugarspeller": (0, 0), "sugarclip": (.26, 0)}
+        "sugarspeller": (0, 0), "sugarclip": (.26, 0), "trimbox": (.215, 0)}
 CROP_SHOT = {"/assets/apps/sugaralbum/shot2.webp": (0, .145)}   # caption at the bottom
 # sugarspeller: the caption band (with outdated "최대 4000자" copy) was cut off the source files themselves (top 160 px)
 
