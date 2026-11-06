@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>R8 Gson SerializedName 릴리스 빈 값 – SugarMount</title>
+  <meta name="description" content="R8이 Gson 필드 output과 etype을 a와 b로 바꿔 릴리스에서만 빈 값이 나올 결함이 생겼습니다. 단위 테스트 203개가 놓친 이유와 불변식 테스트, dexdump 검사를 적었습니다.">
+  <meta name="robots" content="max-image-preview:large">
+  <link rel="canonical" href="https://sugarmount21.com/ax/r8-gson-field-names/">
+  <link rel="alternate" hreflang="ko" href="https://sugarmount21.com/ax/r8-gson-field-names/">
+  <link rel="alternate" hreflang="en" href="https://sugarmount21.com/en/ax/r8-gson-field-names/">
+  <link rel="alternate" hreflang="x-default" href="https://sugarmount21.com/ax/r8-gson-field-names/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="R8 Gson SerializedName 릴리스 빈 값 – SugarMount">
+  <meta property="og:description" content="R8이 Gson 필드 output과 etype을 a와 b로 바꿔 릴리스에서만 빈 값이 나올 결함이 생겼습니다. 단위 테스트 203개가 놓친 이유와 불변식 테스트, dexdump 검사를 적었습니다.">
+  <meta property="og:url" content="https://sugarmount21.com/ax/r8-gson-field-names/">
+  <meta property="og:image" content="https://sugarmount21.com/assets/og/ax-r8-gson-field-names-ko.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="https://sugarmount21.com/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/svg+xml" href="https://sugarmount21.com/assets/favicon.svg">
+  <link rel="apple-touch-icon" href="https://sugarmount21.com/assets/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://sugarmount21.com/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/site.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=e2770b30">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://sugarmount21.com/ax/r8-gson-field-names/#article","headline":"단위 테스트 203개가 놓친 릴리스 전용 빈 값: R8과 Gson 필드 이름","description":"R8이 Gson 필드 output과 etype을 a와 b로 바꿔 릴리스에서만 빈 값이 나올 결함이 생겼습니다. 단위 테스트 203개가 놓친 이유와 불변식 테스트, dexdump 검사를 적었습니다.","url":"https://sugarmount21.com/ax/r8-gson-field-names/","mainEntityOfPage":"https://sugarmount21.com/ax/r8-gson-field-names/","inLanguage":"ko","articleSection":"Android 개발","datePublished":"2026-11-07T09:00:00+09:00","dateModified":"2026-11-07T09:00:00+09:00","image":["https://sugarmount21.com/assets/og/ax-r8-gson-field-names-ko.png","https://sugarmount21.com/assets/ax/cover/r8-gson-field-names-ko.webp","https://sugarmount21.com/assets/ax/r8-gson-field-names-1-ko.webp","https://sugarmount21.com/assets/ax/r8-gson-field-names-2-ko.webp"],"author":{"@id":"https://sugarmount21.com/#org"},"publisher":{"@id":"https://sugarmount21.com/#org"},"isPartOf":{"@id":"https://sugarmount21.com/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"@SerializedName만 붙이면 keep 규칙은 필요 없나요?","acceptedAnswer":{"@type":"Answer","text":"Gson 버전에 따라 다릅니다. Gson 2.14.0은 jar 안의 META-INF/proguard/gson.pro 가 애노테이션 달린 필드를 지키는 규칙을 넣어 줍니다. 로컬 캐시의 2.11.0 jar에는 이 파일이 있고 2.10.1 jar에는 없었습니다."}},{"@type":"Question","name":"Abstract classes can't be instantiated 오류도 같은 원인인가요?","acceptedAnswer":{"@type":"Answer","text":"증상이 다릅니다. 이번 재현에서는 애노테이션 달린 필드가 없는 최상위 모델이 abstract 클래스가 됐고, Gson이 JsonIOException 을 던졌습니다. gson.pro 는 @SerializedName 필드가 있는 클래스의 <init>() 을 지키는데, 그 클래스의 필드에도 애노테이션을 붙이자 오류가 사라졌습니다."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://sugarmount21.com/"},{"@type":"ListItem","position":2,"name":"AX 노트","item":"https://sugarmount21.com/ax/"},{"@type":"ListItem","position":3,"name":"Android 개발","item":"https://sugarmount21.com/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"단위 테스트 203개가 놓친 릴리스 전용 빈 값: R8과 Gson 필드 이름"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=e2770b30">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a class="nav-apps" href="/apps/">앱</a>
+        <a class="nav-ax" href="/ax/" aria-current="page">AX 노트</a>
+        <a class="nav-about" href="/about/">소개</a>
+        <a class="nav-privacy" href="/privacy/">개인정보처리방침</a>
+      </nav>
+      <a class="lang" href="/en/ax/r8-gson-field-names/" lang="en" hreflang="en">English</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>메뉴</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="전체 메뉴">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">닫기</button>
+      <p class="menu-title" id="m-photo">사진·영상</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>슈가앨범</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 용량 줄이기</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 반전·회전</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>이미지 변환 JPG·PNG·WebP</span></a></li></ul>
+      <p class="menu-title" id="m-document">문서·글</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글 띄어쓰기</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글뷰어 슈가독</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">생활</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>생생카드</span></a></li></ul>
+      <p class="menu-title" id="m-games">게임</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>화살표 매듭풀기</span></a></li><li><a class="app-tile" data-app="blocks" href="/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한판블록</span></a></li></ul>
+      <p><a href="/apps/">모든 앱 보기</a></p>
+      <ul class="menu-links"><li><a href="/ax/" aria-current="page">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-android">
+    <nav class="crumbs" aria-label="이동 경로"><ol><li><a href="/">SugarMount</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/ax/topic/android/">Android 개발</a></li><li><span aria-current="page">단위 테스트 203개가 놓친 릴리스 전용 빈 값: R8과 Gson 필드 이름</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/r8-gson-field-names-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX 노트 · 사고 기록</span>
+      <h1>단위 테스트 203개가 놓친 릴리스 전용 빈 값: R8과 Gson 필드 이름</h1>
+      <p class="lead">@SerializedName이 없는 Gson 필드는 R8이 이름을 바꾸면 예외 없이 빈 값으로 남아, 릴리스 산출물을 직접 열어 봐야 드러납니다.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/about/">작성 SugarMount</a> <span aria-hidden="true">·</span> <span>Android 개발</span> <span aria-hidden="true">·</span> <span>읽는 시간 12분</span> <span aria-hidden="true">·</span> 최종 업데이트 <time datetime="2026-11-07">2026년 11월 7일</time></p><!-- /build:meta -->
+      <p><a href="/apps/sugarspeller/">한글 띄어쓰기</a> 앱의 두 번째 맞춤법 경로(첫 경로가 실패하면 Chat 모드가 넘어가는 폴백)는 릴리스 빌드에서만 교정문을 공백으로, 오류 개수를 0으로 돌려줄 상태였고, 예외는 나지 않았습니다. 2026년 9월 14일 이 결함을 찾았을 때 단위 테스트 203개는 전부 통과하고 있었습니다. R8이 Gson 필드 <code>output</code>과 <code>etype</code>을 <code>a</code>와 <code>b</code>로 바꾼 것이 원인이었고, 커밋 3791c2c가 <code>@SerializedName</code>과 불변식 테스트를 넣었습니다.</p>
+      <p class="note">근거: 앱 저장소(sugarspeller)의 git 기록과 CHANGELOG, 세션 기록, 2026-10-09 빌드 1.6.026 APK와 mapping.txt, 2026-11-04 재현.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>목차 (11)</summary><ol><li><a href="#silent-default">이름이 바뀐 필드에서 Gson은 예외를 내지 않습니다</a></li><li><a href="#fourteen-flags">mapping.txt가 가리킨 14개 중 결함은 2개였습니다</a></li><li><a href="#debug-claim">&#x27;디버그도 같은 난독화 상태&#x27;는 이틀 뒤 틀린 것으로 드러났습니다</a></li><li><a href="#lateinit-claim">&#x27;lateinit이라 우연히&#x27;의 실제 이유는 keep 규칙이었습니다</a></li><li><a href="#dex-grep">dex에 etype이 있어도 고쳐졌다는 증거는 아닙니다</a></li><li><a href="#invariant-test">불변식 테스트는 애노테이션 하나만 떼도 실패합니다</a></li><li><a href="#alternatives">패키지 keep은 넣지 않았고, 계측 테스트는 디버그에서 못 봅니다</a></li><li><a href="#audit-steps">fromJson 찾기부터 릴리스 APK 실행까지 점검 순서</a></li><li><a href="#fit">새 모델이나 keep 규칙 삭제는 이 테스트가 못 봅니다</a></li><li><a href="#next">테스트 주석의 틀린 문장과 수동으로 남은 dex 검사</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">목차</p><ol><li><a href="#silent-default">이름이 바뀐 필드에서 Gson은 예외를 내지 않습니다</a></li><li><a href="#fourteen-flags">mapping.txt가 가리킨 14개 중 결함은 2개였습니다</a></li><li><a href="#debug-claim">&#x27;디버그도 같은 난독화 상태&#x27;는 이틀 뒤 틀린 것으로 드러났습니다</a></li><li><a href="#lateinit-claim">&#x27;lateinit이라 우연히&#x27;의 실제 이유는 keep 규칙이었습니다</a></li><li><a href="#dex-grep">dex에 etype이 있어도 고쳐졌다는 증거는 아닙니다</a></li><li><a href="#invariant-test">불변식 테스트는 애노테이션 하나만 떼도 실패합니다</a></li><li><a href="#alternatives">패키지 keep은 넣지 않았고, 계측 테스트는 디버그에서 못 봅니다</a></li><li><a href="#audit-steps">fromJson 찾기부터 릴리스 APK 실행까지 점검 순서</a></li><li><a href="#fit">새 모델이나 keep 규칙 삭제는 이 테스트가 못 봅니다</a></li><li><a href="#next">테스트 주석의 틀린 문장과 수동으로 남은 dex 검사</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="silent-default">
+      <h2 id="silent-default">이름이 바뀐 필드에서 Gson은 예외를 내지 않습니다</h2>
+      <p>Gson은 <code>@SerializedName</code>이 없으면 Java 필드 이름을 JSON 키로 씁니다. R8은 응답 모델 <code>Result</code>의 필드 이름을 아래처럼 바꾸었습니다.</p>
+      <pre><code># 3791c2c 직전 release mapping.txt, 2026-09-14
+output -&gt; a
+etype  -&gt; b</code></pre>
+      <p>서버는 그대로 <code>"output"</code>과 <code>"etype"</code>을 보내는데 객체에는 <code>a</code>와 <code>b</code>뿐이니, Gson은 맞는 필드가 없는 키를 그냥 넘어가고, 필드에는 초기값 <code>""</code>이 남습니다.</p>
+      <figure class="ax-fig"><img src="/assets/ax/r8-gson-field-names-1-ko.webp" width="1200" height="501" alt="비교 그림: 단위 테스트와 디버그 빌드는 필드 이름이 그대로라 테스트 203개가 통과하고, 릴리스 빌드는 output이 a로 바뀌어 예외 없이 빈 문자열이 남습니다." loading="lazy"><figcaption>릴리스 빌드에서만 이름이 바뀌고, Gson은 예외 없이 빈 값을 남깁니다.</figcaption></figure>
+      <p>단위 테스트는 R8을 거치지 않은 클래스로 돌기 때문에 이름이 바뀐 필드를 만나지 못합니다. 203개는 3791c2c 직전 커밋의 <code>@Test</code>를 다시 센 값입니다(CHANGELOG에는 "200여 개"). 필드는 2024-06-14 경로 추가 때부터 애노테이션 없이 있었지만, 이 경로는 응답 자체를 못 받고 있다가 2026-09-13 커밋 0b74357에서야 살아났습니다. 0b74357과 3791c2c는 하루 차이로 함께 1.6.017에 들어갔습니다. 그 전에 경로가 살아 있던 기간에 사용자가 빈 결과를 봤는지는 기록에서 확인하지 못했습니다.</p>
+    </section>
+
+    <section aria-labelledby="fourteen-flags">
+      <h2 id="fourteen-flags">mapping.txt가 가리킨 14개 중 결함은 2개였습니다</h2>
+      <p>찾는 데는 28분이 걸렸습니다. 9월 14일 20시 50분 운영자가 "문제 없는지 교차 검증"을 요청했고, 에이전트는 앱과 같은 요청을 실서버에 보내 13/13을 통과시킨 뒤 proguard 규칙을 읽다가 애노테이션 없는 모델 필드를 의심했습니다. 클린 릴리스 빌드의 mapping.txt에서 스크립트로 모델 필드 19개를 대조하자 14개가 이름이 바뀐 것으로 나왔습니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th scope="col">이름이 바뀐 필드</th><th scope="col">개수</th><th scope="col">판정</th></tr></thead>
+        <tbody>
+          <tr><td><code>@SerializedName</code>이 이미 있음</td><td>5</td><td>값으로 매핑되니 안전</td></tr>
+          <tr><td>JSON이 아니라 코드가 채움</td><td>7</td><td>Gson과 무관</td></tr>
+          <tr><td><code>output</code>, <code>etype</code></td><td>2</td><td>결함</td></tr>
+        </tbody>
+      </table></div>
+      <p>첫 번째 경로가 릴리스에서 정상이던 이유는 절반만 이 표에 있습니다. 값을 담는 키들은 애노테이션이 있어서 이름이 바뀌어도 매핑됐습니다. 애노테이션이 없던 <code>message</code>와 <code>result</code>가 살아남은 이유는 뒤에 적었습니다. 21시 18분에 커밋한 수정은 두 경로의 필드 7개에 애노테이션을 붙였습니다. 이때 기기는 없어서 빈 화면은 mapping.txt와 dex로 판정했고, 같은 빈 값을 실행으로 본 것은 아래 재현에서입니다.</p>
+    </section>
+
+    <section aria-labelledby="debug-claim">
+      <h2 id="debug-claim">'디버그도 같은 난독화 상태'는 이틀 뒤 틀린 것으로 드러났습니다</h2>
+      <p>그날 밤 계측 테스트를 더한 커밋 4d29ca4의 메시지에 에이전트는 디버그 빌드에도 minify가 켜져 있으니 "출시 빌드와 같은 난독화 상태"에서 돈다고 적었습니다.</p>
+      <p>9월 16일 8시 31분, 운영자가 KVM 권한을 열어 준 에뮬레이터(Android 14)에서 계측 테스트를 다시 돌리기 직전, 에이전트가 디버그 mapping.txt를 열었습니다. <code>release</code>는 <code>output -&gt; a</code>인데 <code>debug</code>는 이름이 그대로였고, 10월 9일 빌드의 mapping.txt도 같습니다. 왜 그런지는 확인하지 못했습니다. 디버그 configuration.txt에 <code>-dontobfuscate</code>는 없고, 아래 재현을 R8 <code>--debug</code>로 돌리면 이름이 유지됐습니다.</p>
+      <p>에이전트는 릴리스 APK를 디버그 키로 서명해 설치하고, 첫 번째 경로를 에뮬레이터 hosts 파일로 막아 폴백을 유도했습니다. 8시 45분에 두 번째 경로의 교정 결과가 난독화된 빌드 화면에 나왔습니다. <code>v16017</code> 태그는 그보다 앞선 7시 47분에 찍혔습니다.</p>
+    </section>
+
+    <section aria-labelledby="lateinit-claim">
+      <h2 id="lateinit-claim">'lateinit이라 우연히'의 실제 이유는 keep 규칙이었습니다</h2>
+      <p>틀린 설명은 3791c2c에도 있습니다. 애노테이션이 없던 필드 중 <code>lateinit</code> 5개는 이름이 유지됐는데, 커밋과 메모리는 이것을 "R8이 우연히 이름을 유지"라고 적었습니다. 11월에 javap로 보니 Kotlin의 <code>lateinit var</code>는 public 필드이고, <code>var output = ""</code>는 private 필드에 getter였습니다. 당시 빌드에는 쓰지도 않는 Kakao SDK용 규칙 <code>-keepclassmembers class * { public static &lt;fields&gt;; public *; }</code>가 있었고, 이 규칙이 public 필드의 이름을 붙잡고 있었습니다. 9월 25일 커밋 e05f8e3이 이 규칙을 지운 뒤(<a href="/ax/r8-dex-optimization-keep-rule/">Play Console 'DEX 최적화 39%'의 범인</a>) 1.6.026 mapping.txt에는 <code>message -&gt; a</code>가 있습니다.</p>
+      <p>아래는 같은 가시성의 Java 모델을 R8 9.4.14, Gson 2.14.0, 3791c2c의 proguard 파일로 줄여 JVM에서 파싱한 재현이고, 실제 앱을 빌드한 결과는 아닙니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th scope="col">애노테이션</th><th scope="col">구성</th><th scope="col">결과</th></tr></thead>
+        <tbody>
+          <tr><td>없음</td><td>R8 없음(단위 테스트 쪽)</td><td>정상</td></tr>
+          <tr><td>없음</td><td>Kakao 규칙 + <code>-dontobfuscate</code>(디버그 흉내)</td><td>정상</td></tr>
+          <tr><td>없음</td><td>Kakao 규칙(9월 14일 릴리스)</td><td><code>output=[] etype=[]</code>, 예외 없음</td></tr>
+          <tr><td><code>output</code>, <code>etype</code>만</td><td>Kakao 규칙</td><td>정상</td></tr>
+          <tr><td><code>output</code>, <code>etype</code>만</td><td>Kakao 규칙 삭제</td><td><code>JsonIOException</code></td></tr>
+          <tr><td>필드 5개 전부</td><td>Kakao 규칙 삭제</td><td>정상, <code>message -&gt; a</code></td></tr>
+        </tbody>
+      </table></div>
+      <p>셋째 줄이 사고를 그대로 재현합니다. 넷째와 다섯째 줄을 보면 <code>output</code>과 <code>etype</code>만 고쳐도 9월 14일에는 통과했겠지만, 11일 뒤 Kakao 규칙이 사라지면 <code>message</code> 이름이 바뀌어 깨집니다. 이 재현은 모델을 코드가 생성하지 않아 <code>JsonIOException</code>으로 끝났습니다. 코드가 생성자를 불러 객체를 밖으로 넘기게 하면 9월 14일 구성과 최적화를 사용한 9월 20일 이후 구성 모두 <code>NullPointerException</code>이었습니다. 실제 앱에서 어느 예외가 날지는 빌드해 보지 않았습니다. 3791c2c가 <code>lateinit</code> 필드까지 애노테이션을 붙인 판단은 이유를 잘못 알고도 맞았습니다. JSON에서 값을 받는 필드에는 <code>lateinit</code>이든 아니든 <code>@SerializedName</code>을 전부 붙이십시오.</p>
+    </section>
+
+    <section aria-labelledby="dex-grep">
+      <h2 id="dex-grep">dex에 etype이 있어도 고쳐졌다는 증거는 아닙니다</h2>
+      <p>수정 전 APK에서 <code>grep -a etype</code>은 이미 classes2.dex와 classes3.dex에 걸렸고, 모델이 든 classes4.dex에는 없다가 수정 뒤 생겼습니다. 그런데 같은 날 밤의 AAB 검사와 9월 16일 배포 직전 점검은 모든 dex를 도는 루프로 <code>etype</code>이 "있음"이면 통과시켰고, 보고에도 근거로 적혔습니다. 그 루프는 수정 전 APK도 통과시켰을 가짜 검사입니다.</p>
+      <p>10월 9일 빌드의 APK는 classes.dex 하나뿐이라 파일로 범위를 줄일 수도 없습니다. 문자열 43,818개를 직접 읽어 보니 <code>etype</code>을 포함한 문자열이 3개였고(<code>mimetype</code>이 든 문구, <code>closetype</code>, <code>etype</code>), <code>output</code>은 43개, <code>message</code>는 97개, <code>result</code>는 104개였습니다. build-tools의 <code>dexdump -a</code>는 애노테이션을 값까지 출력합니다.</p>
+      <pre><code>unzip -o app-release.apk 'classes*.dex' -d dex
+dexdump -a dex/classes.dex | grep -c 'value="etype"'   # 1</code></pre>
+      <p>출력 줄은 <code>VISIBILITY_RUNTIME Lkt1; value="etype"</code>입니다. 애노테이션 클래스도 R8이 <code>kt1</code>로 바꾸어서 클래스 이름으로 찾으면 0건이 나옵니다. 이 방식으로 세면 맞춤법 응답 키 11종, 애노테이션 13건이 있습니다.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EB%8B%A8%EC%9C%84%20%ED%85%8C%EC%8A%A4%ED%8A%B8%20203%EA%B0%9C%EA%B0%80%20%EB%86%93%EC%B9%9C%20%EB%A6%B4%EB%A6%AC%EC%8A%A4%20%EC%A0%84%EC%9A%A9%20%EB%B9%88%20%EA%B0%92%3A%20R8%EA%B3%BC%20Gson%20%ED%95%84%EB%93%9C%20%EC%9D%B4%EB%A6%84">메일로 문의하기</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="invariant-test">
+      <h2 id="invariant-test">불변식 테스트는 애노테이션 하나만 떼도 실패합니다</h2>
+      <p><code>ResponseModelSerializedNameTest</code>는 응답 모델 8개 클래스의 모든 필드에 애노테이션이 있는지 리플렉션으로 봅니다. 아래는 그 핵심을 줄인 형태입니다.</p>
+      <pre><code>private val models = listOf(Response::class.java, Response.Result::class.java)
+private val codePopulated = setOf("com.example.Response#requestId")
+
+@Test fun `JSON 필드에는 SerializedName이 붙어 있다`() {
+    val missing = models.flatMap { type -&gt;
+        type.declaredFields
+            .filterNot { Modifier.isStatic(it.modifiers) || it.isSynthetic }
+            .map { it to type.name + "#" + it.name }
+            .filter { (_, key) -&gt; key !in codePopulated }
+            .filter { (f, _) -&gt; f.getAnnotation(SerializedName::class.java) == null }
+            .map { it.second }
+    }
+    assertTrue(missing.joinToString("\n"), missing.isEmpty())
+}</code></pre>
+      <p>실제 파일은 애노테이션 값과 JSON 키 대조, 면제 목록 <code>codePopulated</code>(지금 10개)의 죽은 항목 검사까지 테스트 3개입니다. 에이전트는 커밋 전에 <code>etype</code>의 애노테이션을 지우고 돌려, 위 테스트와 키 대조 테스트 2개가 <code>FAILED</code>로 끝나는 것을 확인한 뒤 복구했습니다.</p>
+    </section>
+
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">패키지 keep은 넣지 않았고, 계측 테스트는 디버그에서 못 봅니다</h2>
+      <p>가장 넓은 대안은 모델 패키지를 통째로 <code>-keep</code>하는 것입니다. 3791c2c는 이것을 넣지 않았고, 당시 세션에서 따져 본 기록도 없습니다. 지금 평가하면 빈 값은 사라져도 안전이 규칙 한 줄에 달려서, 규칙이 빠지는 날 같은 사고가 되돌아옵니다.</p>
+      <p>계측 테스트는 남겨 두었지만 디버그 빌드에서 돌면 이 결함을 볼 수 없고, <code>testBuildType</code>을 release로 돌리는 방법은 써 보지 않았습니다. <a href="/ax/release-gate/">AI가 만든 Android 앱, 출시 전에 무엇을 검사하나</a>의 R8 사고는 시작 직후 크래시였지만 이번 결함은 예외 없이 값만 비어서, 콜드 스타트 실행 검사도 통과합니다. 모델을 R8 <code>--classfile</code>로 줄여 JVM에서 파싱하는 재현 방식은 기기 없이 빈 값을 보여 줬지만 저장소에 넣지는 않았습니다.</p>
+      <p>릴리스 APK를 경로 끝까지 실행하는 것이 가장 강한 증거인데, 9월 16일에는 다른 확인까지 포함해 8시 23분부터 8시 46분까지 걸렸고 KVM 권한과 hosts 차단이 필요했습니다. 그래서 매 테스트에서 도는 불변식을 앞에 두고, 릴리스 APK 실행은 회귀가 의심될 때 하는 수동 절차로 문서에 남겼습니다.</p>
+    </section>
+
+    <section aria-labelledby="audit-steps">
+      <h2 id="audit-steps">fromJson 찾기부터 릴리스 APK 실행까지 점검 순서</h2>
+      <ol>
+        <li><code>rg 'fromJson|TypeToken|GsonConverterFactory' app/src/main</code>으로 Gson이 채우는 모델을 모읍니다. Retrofit을 쓰면 인터페이스의 반환 타입까지 따라가야 합니다.</li>
+        <li>릴리스 빌드의 mapping.txt에서 이름이 바뀐 필드를 위 표의 세 종류로 구분합니다.</li>
+        <li>불변식 테스트를 넣고 애노테이션 하나를 지워 실패를 봅니다.</li>
+        <li>키마다 <code>dexdump -a</code>로 <code>value="키"</code>를 세어 소스의 애노테이션 수와 비교합니다. dex가 여러 개면 전부 합산합니다. 1.6.026의 <code>message</code>는 두 모델에 있어 2건이므로, 1건 이상이면 통과로 보면 한쪽이 빠져도 모릅니다.</li>
+        <li>릴리스 APK를 디버그 키로 서명해 설치하고, 그 파서를 지나는 화면까지 갑니다. 폴백 뒤의 경로는 앞 경로를 막아야 지나갑니다.</li>
+      </ol>
+      <figure class="ax-fig"><img src="/assets/ax/r8-gson-field-names-2-ko.webp" width="1200" height="738" alt="점검 순서 그림: 대상 모델 찾기, mapping.txt 분류, 불변식 테스트와 변이, dexdump -a, 릴리스 APK 실행." loading="lazy"><figcaption>기기가 필요한 릴리스 APK 실행을 마지막에 둡니다.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="fit">
+      <h2 id="fit">새 모델이나 keep 규칙 삭제는 이 테스트가 못 봅니다</h2>
+      <p><code>models</code>는 손으로 적은 목록이라 새 응답 클래스를 빼먹으면 검사 대상이 아닙니다. 테스트는 소스 모델의 애노테이션만 보므로, 애노테이션을 보존하는 keep 규칙이 사라지거나 클래스가 abstract가 되는 경우에는 그대로 통과합니다. 그 두 경우는 5단계의 릴리스 APK 실행에서 드러납니다. 기존 두 모델은 Gson을 그대로 썼고, <a href="/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다</a>의 설명 기능은 응답을 Map으로 받아 이 문제가 없습니다. 코드를 생성하는 직렬화 라이브러리는 써 보지 않았습니다.</p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">테스트 주석의 틀린 문장과 수동으로 남은 dex 검사</h2>
+      <ul>
+        <li>테스트 머리 주석과 메모리의 "minify가 켜진 디버그도 이름을 바꾼다", 메모리의 "lateinit은 우연히 유지"는 고쳐야 합니다.</li>
+        <li>문서의 dex 확인은 아직 수동 <code>grep</code>입니다. <code>dexdump -a</code> 값 세기로 바꿔 릴리스 빌드 스크립트에 넣고, 키 목록은 테스트의 기대값에서 가져와야 합니다.</li>
+        <li>이 경로를 난독화 빌드로 확인한 기기는 기록상 에뮬레이터뿐입니다. 다음 릴리스는 실기기에서 폴백까지 지나가야 합니다.</li>
+      </ul>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EB%8B%A8%EC%9C%84%20%ED%85%8C%EC%8A%A4%ED%8A%B8%20203%EA%B0%9C%EA%B0%80%20%EB%86%93%EC%B9%9C%20%EB%A6%B4%EB%A6%AC%EC%8A%A4%20%EC%A0%84%EC%9A%A9%20%EB%B9%88%20%EA%B0%92%3A%20R8%EA%B3%BC%20Gson%20%ED%95%84%EB%93%9C%20%EC%9D%B4%EB%A6%84">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>@SerializedName만 붙이면 keep 규칙은 필요 없나요?</summary><div><p>Gson 버전에 따라 다릅니다. Gson 2.14.0은 jar 안의 <code>META-INF/proguard/gson.pro</code>가 애노테이션 달린 필드를 지키는 규칙을 넣어 줍니다. 로컬 캐시의 2.11.0 jar에는 이 파일이 있고 2.10.1 jar에는 없었습니다.</p></div></details>
+        <details><summary>Abstract classes can't be instantiated 오류도 같은 원인인가요?</summary><div><p>증상이 다릅니다. 이번 재현에서는 애노테이션 달린 필드가 없는 최상위 모델이 abstract 클래스가 됐고, Gson이 <code>JsonIOException</code>을 던졌습니다. <code>gson.pro</code>는 <code>@SerializedName</code> 필드가 있는 클래스의 <code>&lt;init&gt;()</code>을 지키는데, 그 클래스의 필드에도 애노테이션을 붙이자 오류가 사라졌습니다.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="/ax/pdf-save-back-seven-points/">&#x27;PDF로 저장&#x27; 하나를 내려고 BACK을 7가지 시점에 눌렀다</a></li>
+        <li><a href="/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="/ax/hwpx-octet-stream-intent-filter/">안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</a></li>
+        <li><a href="/ax/game-feel-frame-review/">모바일 게임 손맛 개선: 하트가 충돌보다 109ms 먼저 줄던 순서를 코드와 녹화 프레임으로 찾았다</a></li>
+        <li><a href="/ax/privacy-policy-code-audit/">앱 개인정보처리방침 직접 작성: &#x27;수집하지 않음&#x27; 템플릿을 버리고 코드 감사로 다시 썼다</a></li>
+      </ul>
+      <p><a href="/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="/ax/">AX 노트 전체 보기</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>한 가지 일을 간단하게 하는 Android 앱</p>
+        <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">앱</p>
+        <ul><li><a href="/apps/sugaralbum/">슈가앨범</a></li><li><a href="/apps/image-compress/">사진 용량 줄이기</a></li><li><a href="/apps/image-flip/">사진 반전·회전</a></li><li><a href="/apps/image-convert/">이미지 변환 JPG·PNG·WebP</a></li><li><a href="/apps/sugarspeller/">한글 띄어쓰기</a></li><li><a href="/apps/sugarclip/">SugarClip</a></li><li><a href="/apps/doc-viewer/">한글뷰어 슈가독</a></li><li><a href="/apps/sugarcard/">생생카드</a></li><li><a href="/apps/arrow-knots/">화살표 매듭풀기</a></li><li><a href="/apps/blocks/">한판블록</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">사이트</p>
+        <ul><li><a href="/apps/">모든 앱</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li><li><a href="/sitemap/">사이트맵</a></li><li><a href="/rss.xml">RSS 피드</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play 개발자 페이지</a></div>
+    </div>
+  </footer>
+</body>
+</html>

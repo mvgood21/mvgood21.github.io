@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>R8 renamed Gson fields: empty release results – SugarMount</title>
+  <meta name="description" content="R8 renamed the Gson fields output and etype to a and b, so release results would have come back empty while 203 unit tests passed. The fix and the dex check.">
+  <meta name="robots" content="max-image-preview:large">
+  <link rel="canonical" href="https://sugarmount21.com/en/ax/r8-gson-field-names/">
+  <link rel="alternate" hreflang="ko" href="https://sugarmount21.com/ax/r8-gson-field-names/">
+  <link rel="alternate" hreflang="en" href="https://sugarmount21.com/en/ax/r8-gson-field-names/">
+  <link rel="alternate" hreflang="x-default" href="https://sugarmount21.com/ax/r8-gson-field-names/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="R8 renamed Gson fields: empty release results – SugarMount">
+  <meta property="og:description" content="R8 renamed the Gson fields output and etype to a and b, so release results would have come back empty while 203 unit tests passed. The fix and the dex check.">
+  <meta property="og:url" content="https://sugarmount21.com/en/ax/r8-gson-field-names/">
+  <meta property="og:image" content="https://sugarmount21.com/assets/og/ax-r8-gson-field-names-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="https://sugarmount21.com/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/svg+xml" href="https://sugarmount21.com/assets/favicon.svg">
+  <link rel="apple-touch-icon" href="https://sugarmount21.com/assets/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://sugarmount21.com/en/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/site.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=e2770b30">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://sugarmount21.com/en/ax/r8-gson-field-names/#article","headline":"203 unit tests missed a release-only blank result: R8 and Gson field names","description":"R8 renamed the Gson fields output and etype to a and b, so release results would have come back empty while 203 unit tests passed. The fix and the dex check.","url":"https://sugarmount21.com/en/ax/r8-gson-field-names/","mainEntityOfPage":"https://sugarmount21.com/en/ax/r8-gson-field-names/","inLanguage":"en","articleSection":"Android development","datePublished":"2026-11-07T09:00:00+09:00","dateModified":"2026-11-07T09:00:00+09:00","image":["https://sugarmount21.com/assets/og/ax-r8-gson-field-names-en.png","https://sugarmount21.com/assets/ax/cover/r8-gson-field-names-en.webp","https://sugarmount21.com/assets/ax/r8-gson-field-names-1-en.webp","https://sugarmount21.com/assets/ax/r8-gson-field-names-2-en.webp"],"author":{"@id":"https://sugarmount21.com/#org"},"publisher":{"@id":"https://sugarmount21.com/#org"},"isPartOf":{"@id":"https://sugarmount21.com/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Do I still need keep rules if I use @SerializedName?","acceptedAnswer":{"@type":"Answer","text":"It depends on your Gson version. Gson 2.14.0, which this app uses, ships META-INF/proguard/gson.pro with rules that protect annotated fields, and our proguard-common.pro has a similar rule. In our local cache the 2.11.0 jar contains that file and the 2.10.1 jar does not, so open your own jar first."}},{"@type":"Question","name":"Is \"Abstract classes can't be instantiated\" the same bug?","acceptedAnswer":{"@type":"Answer","text":"It comes from R8 too, but the symptom is different. In our reproduction, a top-level model with no annotated fields came out of R8 as an abstract class, and Gson threw JsonIOException . gson.pro protects <init>() on classes with @SerializedName fields, and annotating that class's fields made the error go away."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://sugarmount21.com/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://sugarmount21.com/en/ax/"},{"@type":"ListItem","position":3,"name":"Android development","item":"https://sugarmount21.com/en/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"203 unit tests missed a release-only blank result: R8 and Gson field names"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=e2770b30">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/r8-gson-field-names/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-android">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/android/">Android development</a></li><li><span aria-current="page">203 unit tests missed a release-only blank result: R8 and Gson field names</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/r8-gson-field-names-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>203 unit tests missed a release-only blank result: R8 and Gson field names</h1>
+      <p class="lead">A Gson field without @SerializedName stays at its default, with no exception, once R8 renames it, so the defect only shows up when you open the release artifacts.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Android development</span> <span aria-hidden="true">·</span> <span>10 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-11-07">November 7, 2026</time></p><!-- /build:meta -->
+      <p>On a release build, the second spell-check path (the one Chat mode falls back to when the first path fails) in our Korean spelling app <a href="/en/apps/sugarspeller/">SugarSpeller</a> would have returned blank corrected text and zero errors, with no exception thrown. All 203 unit tests were passing when we found this on September 14, 2026. R8 had renamed the Gson fields <code>output</code> and <code>etype</code> to <code>a</code> and <code>b</code>; commit 3791c2c added <code>@SerializedName</code> and an invariant test.</p>
+      <p class="note">Sources: git history and CHANGELOG of the SugarMount app repository (sugarspeller), session logs from that week, the 1.6.026 release APK and mapping.txt built on 2026-10-09, and a reproduction run on 2026-11-04 with R8 9.4.14. The spell-check servers are not named here.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (11)</summary><ol><li><a href="#silent-default">Gson does not complain about a field it can&#x27;t match</a></li><li><a href="#fourteen-flags">mapping.txt flagged 14 fields; two were defects</a></li><li><a href="#debug-claim">The agent&#x27;s claim about debug builds lasted two days</a></li><li><a href="#lateinit-claim">&quot;lateinit got lucky&quot; was really a keep rule</a></li><li><a href="#dex-grep">Finding etype in the dex proves little</a></li><li><a href="#invariant-test">An invariant test that fails when one annotation goes</a></li><li><a href="#alternatives">No package keep, and a debug device test can&#x27;t see this</a></li><li><a href="#audit-steps">Auditing your own Gson models, from fromJson to the release APK</a></li><li><a href="#fit">What the test misses: new models and removed keep rules</a></li><li><a href="#next">Stale test comments and a dex check still done by hand</a></li><li><a href="#faq">FAQ</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#silent-default">Gson does not complain about a field it can&#x27;t match</a></li><li><a href="#fourteen-flags">mapping.txt flagged 14 fields; two were defects</a></li><li><a href="#debug-claim">The agent&#x27;s claim about debug builds lasted two days</a></li><li><a href="#lateinit-claim">&quot;lateinit got lucky&quot; was really a keep rule</a></li><li><a href="#dex-grep">Finding etype in the dex proves little</a></li><li><a href="#invariant-test">An invariant test that fails when one annotation goes</a></li><li><a href="#alternatives">No package keep, and a debug device test can&#x27;t see this</a></li><li><a href="#audit-steps">Auditing your own Gson models, from fromJson to the release APK</a></li><li><a href="#fit">What the test misses: new models and removed keep rules</a></li><li><a href="#next">Stale test comments and a dex check still done by hand</a></li><li><a href="#faq">FAQ</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="silent-default">
+      <h2 id="silent-default">Gson does not complain about a field it can't match</h2>
+      <p>Without <code>@SerializedName</code>, Gson uses the Java field name as the JSON key. In the release build, R8 had done this to the <code>Result</code> response model:</p>
+      <pre><code># release mapping.txt just before 3791c2c, 2026-09-14
+output -&gt; a
+etype  -&gt; b</code></pre>
+      <p>The server still sends <code>"output"</code> and <code>"etype"</code>. The object now has only <code>a</code> and <code>b</code>, so Gson skips both keys and the fields keep their initial <code>""</code>. Parsing succeeds, and the screen shows whitespace and zero errors.</p>
+      <figure class="ax-fig"><img src="/assets/ax/r8-gson-field-names-1-en.webp" width="1200" height="588" alt="Comparison: in unit tests and debug builds the field names stay the same and 203 tests pass; in the release build output becomes a and Gson leaves empty strings with no exception." loading="lazy"><figcaption>Only the release build renames the fields, and Gson responds by leaving defaults in place without an exception.</figcaption></figure>
+      <p>Unit tests run against classes R8 never touched, so none of them ever saw a renamed field. The 203 is our recount of <code>@Test</code> annotations at the commit before 3791c2c (the CHANGELOG says "200 or so"), and it includes tests that parse recorded server responses. The two fields had carried no annotation since the path was added on 2024-06-14. That path then stopped receiving responses at all, until commit 0b74357 revived it on 2026-09-13. Both commits shipped together in 1.6.017. We could not tell from the records whether users saw blank results while the path was alive earlier.</p>
+    </section>
+
+    <section aria-labelledby="fourteen-flags">
+      <h2 id="fourteen-flags">mapping.txt flagged 14 fields; two were defects</h2>
+      <p>Finding it took 28 minutes. At 20:50 KST on September 14 the operator asked for a cross-check. The agent replayed the app's exact requests against the live servers (13 of 13 passed), then read the proguard rules and grew suspicious of model fields with no annotation. A script over the mapping.txt of a clean release build checked 19 model fields and listed 14 as renamed.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th scope="col">Renamed field</th><th scope="col">Count</th><th scope="col">Verdict</th></tr></thead>
+        <tbody>
+          <tr><td>Already has <code>@SerializedName</code></td><td>5</td><td>Safe, maps by annotation value</td></tr>
+          <tr><td>Filled by code, not JSON</td><td>7</td><td>Gson never touches it</td></tr>
+          <tr><td><code>output</code>, <code>etype</code></td><td>2</td><td>Defect</td></tr>
+        </tbody>
+      </table></div>
+      <p>The same table explains half of why the first spell-check path kept working in release: the keys holding its values were annotated. Why its unannotated <code>message</code> and <code>result</code> survived comes later. The fix at 21:18 annotated seven fields across both paths. No usable device was available that night, so "blank screen" was a verdict from mapping.txt and the dex files. We only saw the empty values at runtime later, in the reproduction below.</p>
+    </section>
+
+    <section aria-labelledby="debug-claim">
+      <h2 id="debug-claim">The agent's claim about debug builds lasted two days</h2>
+      <p>Later that night the agent added an instrumented test (4d29ca4) and wrote in the commit message that because minify is on for debug too, the test runs in the same obfuscated state as the shipping build.</p>
+      <p>It was wrong, and that came out at 08:31 on September 16. The operator had opened KVM access so an Android 14 emulator could boot, and just before rerunning the test the agent checked whether the models were really obfuscated. Release said <code>output -&gt; a</code>; debug kept the original name. The mapping.txt from October 9 shows the same. We did not establish why: the debug configuration.txt has no <code>-dontobfuscate</code>, though running the reproduction below with R8 <code>--debug</code> kept the names.</p>
+      <p>The agent then signed the release APK with the debug key, installed it, and blocked the first path's host in the emulator's hosts file to force the fallback. At 08:45 the second path's corrections appeared on the obfuscated build, and commit 5c4e3d7 fixed the docs at 08:47. The <code>v16017</code> tag had already gone on at 07:47.</p>
+    </section>
+
+    <section aria-labelledby="lateinit-claim">
+      <h2 id="lateinit-claim">"lateinit got lucky" was really a keep rule</h2>
+      <p>3791c2c has a wrong explanation of its own. Five unannotated <code>lateinit</code> fields kept their names, and the commit and the agent's memory file say R8 was keeping the names "by accident." While drafting this note in November we ran javap: Kotlin's <code>lateinit var</code> compiles to a public field, while <code>var output = ""</code> is a private field with a getter. The build at the time still had a rule meant for a Kakao SDK the app never used, <code>-keepclassmembers class * { public static &lt;fields&gt;; public *; }</code>, and that rule pinned every public field name. Commit e05f8e3 removed it on September 25, as told in <a href="/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized</a>. The 1.6.026 mapping.txt has <code>message -&gt; a</code>.</p>
+      <p>This is a reproduction, not the real app: a Java model of the same field visibility, shrunk with R8 9.4.14, Gson 2.14.0 and the proguard files from 3791c2c, then parsed on the JVM.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th scope="col">Annotated</th><th scope="col">Configuration</th><th scope="col">Result</th></tr></thead>
+        <tbody>
+          <tr><td>None</td><td>No R8 (what unit tests see)</td><td>Correct</td></tr>
+          <tr><td>None</td><td>Kakao rule + <code>-dontobfuscate</code> (stand-in for debug)</td><td>Correct</td></tr>
+          <tr><td>None</td><td>Kakao rule (the September 14 release)</td><td><code>output=[] etype=[]</code>, no exception</td></tr>
+          <tr><td><code>output</code>, <code>etype</code> only</td><td>Kakao rule</td><td>Correct</td></tr>
+          <tr><td><code>output</code>, <code>etype</code> only</td><td>Kakao rule removed</td><td><code>JsonIOException</code></td></tr>
+          <tr><td>All 5 fields</td><td>Kakao rule removed</td><td>Correct, <code>message -&gt; a</code></td></tr>
+        </tbody>
+      </table></div>
+      <p>Row three reproduces the incident. Rows four and five show that annotating only <code>output</code> and <code>etype</code> would have passed on September 14, then broken eleven days later when the Kakao rule went away and <code>message</code> was renamed. Here the model is never constructed in code, so it ended in <code>JsonIOException</code>. When the code called the constructors and let the objects escape, both the September 14 configuration and the optimized one in use from September 20 ended in a <code>NullPointerException</code>. We did not build the real app, so we can't say which exception it would have thrown. 3791c2c annotated the <code>lateinit</code> fields for the wrong reason and still got it right. Annotate every field that takes a value from JSON, <code>lateinit</code> or not.</p>
+    </section>
+
+    <section aria-labelledby="dex-grep">
+      <h2 id="dex-grep">Finding etype in the dex proves little</h2>
+      <p>Before the fix, <code>grep -a etype</code> already hit classes2.dex and classes3.dex. classes4.dex, which held the model, did not have it, and that file gained it after the fix. The before-and-after in 3791c2c was valid because it looked at that one file. But the AAB check that night and the pre-release check on September 16 looped over every dex and passed if <code>etype</code> appeared anywhere, and the report cited that as evidence. That loop would have passed the broken APK too.</p>
+      <p>Narrowing to one file no longer works either, since the 1.6.026 APK has a single classes.dex. We read all 43,818 strings in 1.6.026: 3 contain <code>etype</code> (a sentence with <code>mimetype</code>, <code>closetype</code>, and <code>etype</code> itself), 43 contain <code>output</code>, 97 contain <code>message</code>, 104 contain <code>result</code>.</p>
+      <p><code>dexdump -a</code> from build-tools prints annotations with their values:</p>
+      <pre><code>unzip -o app-release.apk 'classes*.dex' -d dex
+dexdump -a dex/classes.dex | grep -c 'value="etype"'   # 1</code></pre>
+      <p>The line reads <code>VISIBILITY_RUNTIME Lkt1; value="etype"</code>. R8 renamed the annotation class to <code>kt1</code> as well, so searching by class name finds nothing. Counted this way the release holds 11 spell-check keys in 13 annotations.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20203%20unit%20tests%20missed%20a%20release-only%20blank%20result%3A%20R8%20and%20Gson%20field%20names">Email us</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="invariant-test">
+      <h2 id="invariant-test">An invariant test that fails when one annotation goes</h2>
+      <p><code>ResponseModelSerializedNameTest</code> uses reflection to require an annotation on every field of the 8 response-model classes. This is the core, shortened:</p>
+      <pre><code>private val models = listOf(Response::class.java, Response.Result::class.java)
+private val codePopulated = setOf("com.example.Response#requestId")
+
+@Test fun `every JSON field has SerializedName`() {
+    val missing = models.flatMap { type -&gt;
+        type.declaredFields
+            .filterNot { Modifier.isStatic(it.modifiers) || it.isSynthetic }
+            .map { it to type.name + "#" + it.name }
+            .filter { (_, key) -&gt; key !in codePopulated }
+            .filter { (f, _) -&gt; f.getAnnotation(SerializedName::class.java) == null }
+            .map { it.second }
+    }
+    assertTrue(missing.joinToString("\n"), missing.isEmpty())
+}</code></pre>
+      <p>The real file has three tests, adding a check of annotation values against JSON keys and a check that the exemption list <code>codePopulated</code> (10 entries today) holds no dead names. Before committing, the agent deleted the annotation on <code>etype</code>, watched this test and the key test end in <code>FAILED</code>, and restored it.</p>
+    </section>
+
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">No package keep, and a debug device test can't see this</h2>
+      <p>The broadest alternative is <code>-keep</code> on the whole model package. 3791c2c did not add one, and the session has no record of weighing it. Judged now, the empty values would go away but safety would hang on one rule, and losing that rule would bring the incident back.</p>
+      <p>The instrumented test stayed, but on a debug build it can't see this defect. We have not tried setting <code>testBuildType</code> to release. A launch check doesn't help either: the R8 incident in <a href="/en/ax/release-gate/">What to check before shipping an AI-built Android app</a> was a crash at startup, and this one crashes nothing, so a cold start passes. The method behind our reproduction, shrinking the model with R8 <code>--classfile</code> under the app's proguard files and parsing on the JVM, showed the empty values with no device, but it is not in the repository.</p>
+      <p>Running the release APK through the whole path is the strongest evidence. On September 16 that session ran from 08:23 to 08:46, including other checks, and needed KVM access and a hosts-file block. So the invariant test runs with every test pass, and running the release APK stays a manual step in the docs for when a regression is suspected.</p>
+    </section>
+
+    <section aria-labelledby="audit-steps">
+      <h2 id="audit-steps">Auditing your own Gson models, from fromJson to the release APK</h2>
+      <ol>
+        <li><code>rg 'fromJson|TypeToken|GsonConverterFactory' app/src/main</code> lists what Gson fills. With Retrofit, follow the interface return types too.</li>
+        <li>In the release mapping.txt, put each renamed field in one of the three rows above.</li>
+        <li>Add the invariant test, delete one annotation and confirm the failure.</li>
+        <li>For each key, count <code>value="key"</code> in <code>dexdump -a</code> across all dex files and compare with the number of annotations in source. In 1.6.026 <code>message</code> appears twice, once per model, so accepting "at least one" would miss a lost annotation.</li>
+        <li>Sign the release APK with the debug key, install it, and reach a screen that goes through that parser. A path behind a fallback only runs if you block the path in front of it.</li>
+      </ol>
+      <figure class="ax-fig"><img src="/assets/ax/r8-gson-field-names-2-en.webp" width="1200" height="738" alt="Five-step diagram: find the models, sort mapping.txt, invariant test and mutation, dexdump -a, run the release APK." loading="lazy"><figcaption>Running the release APK, the one step that needs a device, comes last.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="fit">
+      <h2 id="fit">What the test misses: new models and removed keep rules</h2>
+      <p><code>models</code> is a handwritten list, so a new response class is unchecked until someone adds it. The test only sees annotations on the source model; it passes if the keep rule protecting the annotation disappears or a class turns abstract. Step 5, running the release APK, is where those two show up. The two existing models stayed on Gson, while the explanation feature from <a href="/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app</a> takes its response as a Map and avoids this problem. We have not used a code-generating serializer.</p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">Stale test comments and a dex check still done by hand</h2>
+      <ul>
+        <li>The test's header comment and the agent's memory still say that minified debug builds rename fields, and the memory also says <code>lateinit</code> survives by accident. Both need correcting.</li>
+        <li>The dex check in the docs is still a manual <code>grep</code>. It should become a <code>dexdump -a</code> value count in the release build script, with its key list taken from the test's expected values.</li>
+        <li>The only device on record that ran this path on an obfuscated build is the emulator. The next release should go through the fallback on real hardware.</li>
+      </ul>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20203%20unit%20tests%20missed%20a%20release-only%20blank%20result%3A%20R8%20and%20Gson%20field%20names">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Do I still need keep rules if I use @SerializedName?</summary><div><p>It depends on your Gson version. Gson 2.14.0, which this app uses, ships <code>META-INF/proguard/gson.pro</code> with rules that protect annotated fields, and our <code>proguard-common.pro</code> has a similar rule. In our local cache the 2.11.0 jar contains that file and the 2.10.1 jar does not, so open your own jar first.</p></div></details>
+        <details><summary>Is "Abstract classes can't be instantiated" the same bug?</summary><div><p>It comes from R8 too, but the symptom is different. In our reproduction, a top-level model with no annotated fields came out of R8 as an abstract class, and Gson threw <code>JsonIOException</code>. <code>gson.pro</code> protects <code>&lt;init&gt;()</code> on classes with <code>@SerializedName</code> fields, and annotating that class's fields made the error go away.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+        <li><a href="/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+      </ul>
+      <p><a href="/en/ax/topic/android/">All notes on Android development</a> · <a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/sitemap/">Site map</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>

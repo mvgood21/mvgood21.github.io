@@ -6,7 +6,448 @@
   <description>Small Android apps that each do one thing simply, from shrinking photos and opening Korean HWP documents to checking Korean spelling and playing puzzle games.</description>
   <language>en</language>
   <atom:link href="https://sugarmount21.com/en/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Fri, 06 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Sat, 07 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Game feel fix: a heart that fell 109 ms early – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/game-feel-frame-review/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/game-feel-frame-review/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/game-feel-frame-review-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX Notes · Method</span>
+      <h1>Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</h1>
+      <p class="lead">Don't stop at asking an agent to fix the animation. Give it the code and the recording's frames, and have it list each event's cause and effect in order. Use timing measurements to prove the fix.</p>
+      <p>Tap a blocked arrow in our puzzle game and the heart starts to change first; the arrow hits its blocker 109 ms later. That order is on a Galaxy S21 recording of <a href="https://sugarmount21.com/en/apps/arrow-knots/">Arrow Knots</a>, then unreleased, made on the night of October 1, 2026. When the operator called the animation sloppy, the agent committed 719 new lines 10 minutes 47 seconds later and the order stayed wrong. It changed only after a separate code and frame review that asked about timing per event. In the recording after the fix, the heart moves 16 ms after contact.</p>
+      <p class="note">Sources: commits da0e624, 3eb21df and 65dcf41 in the game repository, the review document, and that night's agent session logs. The 109 ms and 16 ms figures were measured from the original recordings on November 4, 2026. Clock times are Korea time.</p>
+    </section>
+    <section aria-labelledby="measured-order">
+      <h2 id="measured-order">Measured again, the heart led by 109 ms</h2>
+      <p>The recordings from before and after the fix each hold one blocked tap. We decoded both frame by frame, counted pixels whose brightness changed by more than 25 between frames, split the count into the header and the board, then checked the result against contact sheets by eye. The median frame gap was about 8 ms, which set the resolution. A 60 Hz screen would limit it to about 17 ms.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Event</th><th scope="col">Before (level 151)</th><th scope="col">After (level 52)</th></tr></thead>
+          <tbody>
+            <tr><td>Arrow starts moving</td><td>3,807 ms</td><td>3,851 ms</td></tr>
+            <tr><td>Heart starts changing</td><td>3,815 ms</td><td>3,984 ms</td></tr>
+            <tr><td>Contact (board shake before, contact ring after)</td><td>3,924 ms</td><td>3,968 ms</td></tr>
+            <tr><td>Heart relative to contact</td><td>109 ms early</td><td>16 ms late</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Before the fix, the heart began to swell 8 ms after the arrow set off and had faded about halfway by the time anything touched. The review document describes this scene as the effect coming before the cause. That night the reviewer printed time-stamped 60 fps frame differences, and the output showed the heart changing at 3.817 s and the board at 3.933 s, but the review document recorded no measured value. The 109 ms was measured from the original frames a month after the fix.</p>
+      <p>In the fixed code, the contact callback runs before the ring is drawn. The 16 ms in the video is about two frames, so read it as the delay until each change reaches the screen. Nobody tuned it to that value.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/game-feel-frame-review-1-en.webp" width="1200" height="594" alt="Comparison: before the fix the heart changed at 3,815 ms, 109 ms ahead of contact at 3,924 ms; after the fix contact came at 3,968 ms and the heart followed at 3,984 ms, 16 ms later." loading="lazy"><figcaption>The heart used to change 109 ms before contact; after the fix it follows contact by 16 ms.</figcaption></figure>
+    </section>
+    <section aria-labelledby="first-rebuild">
+      <h2 id="first-rebuild">A 719-line rewrite left the order alone</h2>
+      <p>At 22:05 the operator's verdict, roughly, was that the animation was too sloppy for anyone to bother playing. The agent assumed the game lacked effects. It added snake-like exits, five synthesized sound effects, vibration, confetti and a star card, and committed da0e624 at 22:16.</p>
+      <p>It had looked at frames too: 89 at 5 fps, then 162 and 149 at 10 fps, recorded on the S21. Its notes from that pass say the blocked bump and the heart animation checked out. Nothing in the log times their order. What it changed afterward was the result backdrop, the confetti and the coloring of touching arrows. The report said the work was checked frame by frame. In the rewritten code the heart still dropped at the moment of the tap.</p>
+      <p>About fifteen minutes later the operator told it to analyze more deeply. The agent split the work into three tracks, and the game-feel reviewer came back in 4 minutes 51 seconds with 6 problems seen on video and 14 recommendations.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/game-feel-frame-review-2-en.webp" width="1200" height="986" alt="Step diagram: 22:05 criticism, 22:16 rewrite da0e624, 22:31 second request, 22:37 review filed, 22:47 3eb21df, 23:02 crash report, 23:07 65dcf41." loading="lazy"><figcaption>From the 22:05 criticism to the 23:07 crash fix took about an hour.</figcaption></figure>
+    </section>
+    <section aria-labelledby="cause-chain">
+      <h2 id="cause-chain">The heart code sat one line after the animation call</h2>
+      <p><code>bump</code> launches its animation in a coroutine and returns immediately, so the next two lines run in the same frame that handles the tap.</p>
+      <pre><code>is TapResult.Blocked -&gt; {
+    fx.bump(id, distance, r.blockers)  // starts the animation, returns at once
+    lives = state.lives                // heart drops at the tap
+    feedback.blocked(view)             // sound and vibration at the tap
+}</code></pre>
+      <p>One level down, <code>state.tap()</code> settled the outcome on the spot and the UI code sat right there, so nothing separated rule time from display time.</p>
+      <p>The poke that sends a blocked arrow to its blocker took longer with distance: <code>(90 + 45 * distance).toInt().coerceAtMost(260)</code>. The review document put contact 90 to 260 ms after the tap; those are the two ends of this formula. Distance is <code>k + 0.55</code>, so a real blocked tap takes at least about 114 ms. The recording showed 117 ms. This tap sits near the formula's shortest case; by the formula, a far-blocked arrow would have widened the reversal to nearly 260 ms.</p>
+    </section>
+    <section aria-labelledby="review-question">
+      <h2 id="review-question">The reviewer was asked a different question</h2>
+      <p>The blocked-tap behavior the first pass approved came back as a problem in the review. The reviewer also cut the same video into 149 frames at 10 fps. Its brief asked for motion timing and easing per event, feedback layering per event (visual, audio, haptic), and any abrupt cuts visible frame by frame.</p>
+      <p>At 10 fps, frames are 100 ms apart, so a 109 ms gap is a single step. The reviewer read the code first, skimmed the 149 frames, then recut only the blocked-tap section at 30 and 60 fps.</p>
+      <p>The review document pinned the reversed order on code lines and cited no frame numbers for it. An arrow flying over the hearts and status bar (frames 58, 62 and 89), the opening pop-in hidden by the splash fade (frame 21), and a red warning tint that barely showed on the vermilion arrow all came from frames. Take call order and the timing of sound and vibration from the code; take what shows on screen and the actual timestamps from the frames.</p>
+    </section>
+    <section aria-labelledby="display-only">
+      <h2 id="display-only">The rule stayed instant; only the display moved</h2>
+      <p>Delaying the rule result until contact was an option, but the review said to keep it immediate and the build followed. The document doesn't give a reason. <code>bump</code> gained an <code>onContact</code> callback, and heart, sound and vibration moved inside it (3eb21df).</p>
+      <pre><code>fx.bump(id, dist, r.blockers) {        // called when the poke lands
+    feedback.contact(view, costsLife = !tutorial)
+    if (!tutorial) lives = state.lives
+}</code></pre>
+      <p>The poke became a fixed 110 ms instead of scaling with distance, so contact no longer shifts with distance. The poke in these two taps took 117 ms both before and after; what moved was the heart. Board shake dropped from 0.12 of a cell to 4 dp, and red now appears only in the contact ring. The blocked arrow darkens and its blocker gets a white outline.</p>
+      <p>Under rapid taps, <code>lives = state.lives</code> in the callback jumped straight to the final count, and 6133e9e fixed that the next morning by dropping one heart per contact. That incident has its own note: <a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button</a>.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Mobile%20game%20feel%3A%20frame%20timing%20showed%20our%20heart%20penalty%20landing%20109%20ms%20before%20the%20collision">Email us</a></p></aside>
+    <section aria-labelledby="colors">
+      <h2 id="colors">Eight colors became six</h2>
+      <p>The review measured color as well, using the Machado 2009 simulation matrices with the CIEDE2000 color-difference formula, and treated a difference under 10 as hard to tell apart. We implemented the formula separately on November 4, 2026, and every value matched.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Vision</th><th scope="col">Old 8 colors, smallest difference</th><th scope="col">New 6 colors, smallest difference</th></tr></thead>
+          <tbody>
+            <tr><td>Typical</td><td>12.8</td><td>22.5</td></tr>
+            <tr><td>Protan</td><td>5.5</td><td>17.0</td></tr>
+            <tr><td>Deutan</td><td>7.4</td><td>16.7</td></tr>
+            <tr><td>Tritan</td><td>2.7</td><td>18.5</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Against the paper background, amber reached 2.43:1 and green 2.9:1, both under the 3:1 in WCAG 1.4.11. The warning red and the vermilion arrow differed by 11.1 for typical vision but only 2.0 under tritan simulation, so blocked state ended up carried by shape and motion. The review judged that making all eight colors safe for color vision deficiency was close to impossible, and noted that six colors are enough because the neighbor graph is planar.</p>
+      <p>To fix contrast the review recommended darkening amber to <code>B87A00</code>, which made things worse: it cuts the deutan difference from vermilion from 7.4 to 2.4. The reviewer saw that number in its own 22:35 run and left the advice in. The agent doing the implementation searched six-color combinations and replaced the whole palette. That search missed the review's target of 20, and 16.7 became the accepted minimum.</p>
+    </section>
+    <section aria-labelledby="first-tap-crash">
+      <h2 id="first-tap-crash">Following the review crashed the first tap</h2>
+      <p>Recommendation 14 said to replace weak vibration on Samsung devices with <code>VibrationEffect.Composition</code>. It didn't mention permissions, and 3eb21df shipped the change without declaring <code>VIBRATE</code>, so the first arrow to leave the board threw <code>SecurityException</code>.</p>
+      <p>At 22:46 the agent had a tutorial script finish without a crash, and on the S24 it had only confirmed install and launch. Asked whether testing was done, it said no. About four minutes later the operator found the tutorial error by hand on that S24. A monkey run on an S21 from fresh state died at event 15 of 800. At 22:47 a level-check script had removed 16 arrows on the same code without dying. The logs don't settle why either script missed it.</p>
+      <p>65dcf41 declared the permission and made vibration failures fall back to standard haptics. Three seeds of 800 events each on the S21 gave zero fatal errors. Right after that, f7beb3d turned the fresh-state monkey run into a script.</p>
+    </section>
+    <section aria-labelledby="procedure">
+      <h2 id="procedure">Record a blocked tap, fill the table, fix, fill it again</h2>
+      <ol>
+        <li>Record a level on a real device, with every event in it at least once: blocked, removed, cleared.</li>
+        <li>Cut the whole clip at 10 fps, number the frames on a contact sheet, and show the agent.</li>
+        <li>Have the agent read the code too, and tell it: "For each event, give me a table of cause frame, effect frame, and where sound and vibration are called. Find where an effect comes before its cause. Mark each number as a code formula or a video measurement." Leave "make it better" out of the brief.</li>
+        <li>Recut only the suspect section at 60 fps to look at it, and read times from the original frames' timestamps.</li>
+        <li>After the fix, record the same scene, fill in the same table, and run monkey from fresh state, as in <a href="https://sugarmount21.com/en/ax/fresh-install-monkey-test/">the fresh-install monkey test</a> note.</li>
+      </ol>
+      <pre><code>adb shell screenrecord --time-limit 25 --bit-rate 8000000 /sdcard/run.mp4
+adb pull /sdcard/run.mp4
+ffmpeg -i run.mp4 -vf fps=10,scale=360:-1 f_%04d.png
+ffmpeg -ss 3.6 -t 0.9 -i run.mp4 -vf fps=60,scale=360:-1 g_%03d.png</code></pre>
+      <p>Replace <code>-ss 3.6 -t 0.9</code> with the time of the blocked tap in your own video. The code below prints each frame's time and, for the header and board regions, how many pixels changed in brightness by more than 25. Region ratios differ per game.</p>
+      <pre><code>import cv2
+c = cv2.VideoCapture("run.mp4")
+H = int(c.get(cv2.CAP_PROP_FRAME_HEIGHT)); prev = None
+while True:
+    ok, f = c.read()
+    if not ok: break
+    t = c.get(cv2.CAP_PROP_POS_MSEC)
+    g = cv2.cvtColor(f, cv2.COLOR_BGR2GRAY)
+    if prev is not None:
+        d = cv2.absdiff(g, prev) &gt; 25
+        print(round(t), d[int(H*.04):int(H*.1)].sum(), d[int(H*.12):int(H*.8)].sum())
+    prev = g</code></pre>
+      <p>The table above came from decoding every original frame with OpenCV: 1,276 before the fix and 1,840 after. No frames arrive while the screen is still. Gaps in these recordings had a median of 8 ms and a maximum of 3 seconds, so never convert frame numbers to time.</p>
+    </section>
+    <section aria-labelledby="outside-video">
+      <h2 id="outside-video">Sound, haptics, fingers and long sessions stay off camera</h2>
+      <p>Sound didn't make it into the screen recording, and video can't show vibration strength. Automated taps hit the exact center of a cell, so they say nothing about real finger accuracy. Long-session defects are missed as well: this game's spring-back crash appeared 28 times in a 300-level stress run the next day.</p>
+      <p>The boards being too easy was already flagged in the rewrite report, and separate level analysis measured and fixed it the same night. The generator side is covered in <a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a>.</p>
+    </section>
+    <section aria-labelledby="next-checks">
+      <h2 id="next-checks">Far-blocked taps and retention weren't measured</h2>
+      <p>An arrow blocked from far away wasn't timed. We have no player metric, such as retention, comparing game feel before and after.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Mobile%20game%20feel%3A%20frame%20timing%20showed%20our%20heart%20penalty%20landing%20109%20ms%20before%20the%20collision">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">Frequently asked questions</h2>
+      <div class="faq">
+        <details><summary>How many milliseconds should game feedback animation take?</summary><div><p>This game fixes the poke at 110 ms and puts heart, sound and vibration in the contact callback. We haven't validated those values for any other game.</p></div></details>
+        <details><summary>What frame rate should I use to review a recording?</summary><div><p>Use 10 fps to skim and 60 fps to look at a section, and read times from the original frames. This recording averaged 85.58 fps.</p></div></details>
+        <details><summary>Is a debug build good enough for this?</summary><div><p>It was enough to find the order; both recordings here are debug builds. We didn't repeat the measurement on a release build, so use one if you also want to compare frame delays.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Sat, 07 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Why we replaced an app privacy policy template – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/privacy-policy-code-audit/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/privacy-policy-code-audit/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/privacy-policy-code-audit-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX note · Retrospective</span>
+      <h1>App privacy policy templates: we threw ours out and rewrote it from a code audit</h1>
+      <p class="lead">Four apps shared one generated privacy policy. We replaced it with 8 pages written from source, each checked by a second agent looking for counter-evidence.</p>
+      <p>Four of our Android apps pointed at one English template that said user information "is not collected by me in any way", while one of them, the Korean spell checker <a href="https://sugarmount21.com/en/apps/sugarspeller/">SugarSpeller</a> 1.6.025, was sending AI explanation requests and an anonymous ID to our own server. On October 4, 2026, 8 agents read the four codebases for 11 min 46 s and wrote 8 Korean and English policy pages, published at 11:30 in commit <code>d75409b</code>. We treat a privacy policy as a code audit report first and a legal document second, so the site's rules now say that a fact you cannot verify gets left out.</p>
+      <p class="note">Sources: git history of this site and the app repositories, work session records from September 29 to October 4 and October 17, 2026, and SugarSpeller's release runbook and monitoring log. Commit counts and versions were re-measured on November 4, 2026. This note is not legal review, and it does not judge whether our policies meet any statute.</p>
+    </section>
+    <section aria-labelledby="template-text">
+      <h2 id="template-text">Where the template and the 1.6.025 code disagreed</h2>
+      <p>The template still ended with "created at privacypolicytemplate.net and modified/generated by App Privacy Policy Generator". It opened with a line ending "built the This app as a Free app." The word This sat where the app name belonged.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Template</th><th scope="col">SugarSpeller 1.6.025 code</th></tr></thead>
+          <tbody>
+            <tr><td>"retained on your device and is not collected by me in any way"</td><td>AI explanation requests (corrected words up to 60 characters each, error type, checker, subscription status, app version) and a Firebase anonymous ID reach our server.</td></tr>
+            <tr><td>Two third parties: Google Play Services, AdMob</td><td>Naver and Daum (Korean portals whose spell checkers do the checking), Firebase, Vertex AI (Gemini) and the ad partner Liftoff also receive data.</td></tr>
+            <tr><td>"Free app", "at no cost"</td><td>Sells Google Play subscriptions.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>1.6.025 was the first version to send data to our own server, but text to be checked had gone to Naver and Daum for longer than that, so the third-party list was already short. The design of the AI feature is in <a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">the first LLM in our spell checker</a>.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/privacy-policy-code-audit-1-en.webp" width="1200" height="571" alt="Two-column comparison: the template says not collected, two third parties and free app; SugarSpeller 1.6.025 sends AI explanation requests and an anonymous ID to our server, sells subscriptions, and Naver, Daum, Firebase, Vertex AI and Liftoff also receive data." loading="lazy"><figcaption>The template's lines on collection, third parties and price disagreed with the 1.6.025 code.</figcaption></figure>
+    </section>
+    <section aria-labelledby="wrote-it-down">
+      <h2 id="wrote-it-down">We wrote down that it was wrong, and it stayed until October 4</h2>
+      <p>At 21:49 on September 29, commit <code>0b64ea6</code> in the SugarSpeller repository added draft policy text and a Play Data safety answer table. The draft states that the published policy "is the template as is" and does not match reality. Step 3 of the release runbook says to fix the policy and the Data safety form before submitting the app.</p>
+      <p>When an agent fetched the Google Sites page at 11:05 on October 4, the paragraph was not there. 1.6.025 was rolling out by the night of October 1, so that version ran under the wrong policy for about two and a half days. The monitoring log counted 254 users on 1.6.025 between September 22 and October 3, with no note that test devices were excluded.</p>
+      <p>The agent's release notes on the night of September 29 said the policy had to change before submission, and on September 30 it handed the item back as the owner's third remaining task. Nothing records why the item stayed open, but the structure that allowed it is visible.</p>
+      <ol>
+        <li>The policy's sentences had no source in the code. A generator wrote them, so nothing could flag a mismatch when the code moved.</li>
+        <li>The policy lived on Google Sites, outside any repository. Fixing it was one manual line in a runbook, and the four app repositories have no <code>.github/workflows</code> (checked November 4).</li>
+        <li>Four apps shared one URL, as their Play listings showed. There was no page on which to state a fact about one app.</li>
+      </ol>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/privacy-policy-code-audit-2-en.webp" width="1200" height="774" alt="Five-step timeline: Sep 29 draft commit 0b64ea6, 1.6.025 rolling out by Oct 1 22:47, Oct 4 11:05 Google Sites unchanged, 8 agents for 11 min 46 s from 11:07, commit d75409b at 11:30." loading="lazy"><figcaption>The text existed on September 29; the public policy changed at 11:30 on October 4.</figcaption></figure>
+    </section>
+    <section aria-labelledby="first-guess">
+      <h2 id="first-guess">The one-paragraph plan rested on a sentence that did not exist</h2>
+      <p>The September 29 plan kept the template and added a paragraph under "Information Collection and Use". The agent-written draft says the analytics and ads section could keep its "existing text (Google Analytics for Firebase, AdMob)". Searching the template for Analytics returns zero hits.</p>
+      <p>The paragraph would not have been enough anyway. On a shared page, a sentence about sending text to Naver would also have landed in the policy of SugarAlbum, a video maker, and "Free app" would have stayed.</p>
+      <p>The owner's request on October 4 was to move policies and app information to one site. Moving alone would have carried the same sentence to a new address. The audit was the agent's addition, and so was its size: 8 agents and about 1 million tokens excluding cache reads, which the agent reported as not requested.</p>
+    </section>
+    <section aria-labelledby="two-agents">
+      <h2 id="two-agents">One writer per app, one reviewer hunting counter-evidence</h2>
+      <p>Four writer agents were told to "only claim what the code does" and, when unsure, to "disclose rather than deny". Four other agents then took the files, looked for evidence against every "we don't collect or send X" sentence, and fixed what was wrong. All four apps needed fixes.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">App</th><th scope="col">Writer's draft</th><th scope="col">After review</th></tr></thead>
+          <tbody>
+            <tr><td>SugarSpeller</td><td>Sends words, error type and checker name to Vertex AI</td><td>Words and error type only. The server passes <code>original</code>, <code>corrected</code> and <code>type</code>.</td></tr>
+            <tr><td><a href="https://sugarmount21.com/en/apps/sugarcard/">SugarCard</a></td><td>No ads while subscribed</td><td>The basic plan keeps the banner, and the exit-screen ad shows on every plan.</td></tr>
+            <tr><td>SugarAlbum</td><td>Three groups of permissions missing</td><td>Added storage write, ad API and Firebase permissions after reading the merged release manifest.</td></tr>
+            <tr><td>SugarClip</td><td>Android erases it beyond recovery</td><td>Removed with app data or the app; backup copies are deleted in the Google account.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The first row claimed too much and the second flattered the app. These agents had the source open and the "only claim what the code does" instruction in front of them, and they still wrote those sentences. The workflow script had split writers from reviewers before any draft existed.</p>
+      <p>Reviewers also settled values that live outside the code. The SugarSpeller writer flagged that "deleted after 30 days" depended on a Firestore TTL policy it could not confirm. The reviewer read it from the API (<code>ttlConfig.state: ACTIVE</code>) and read <code>retentionDays: 30</code> from the log bucket. That TTL was step 1 of the same runbook, also manual: a query at 16:00 on October 3 found it unset, and one at 01:00 on October 4 found it ACTIVE.</p>
+    </section>
+    <section aria-labelledby="leave-it-out">
+      <h2 id="leave-it-out">The numbers we deleted and the claim the owner dropped</h2>
+      <p>On October 5, <code>bdbbe97</code> put "Policies describe the actual code. Don't add claims the code doesn't back." into the site's agent instructions file, AGENTS.md. On October 18, <code>b82faac</code> added "If a fact cannot be verified there, leave it out."</p>
+      <p>Commit <code>13d00b8</code> in our family calendar app AXFamily (October 10) changed the invite link default from 72 hours to the 24 in the code, replaced "an internal ID instead of a name" with the fact that display names are sent, and deleted two numbers found nowhere in code or repository: "integrity tokens 12 hours" and "Play grace period 7 days". The same commit's move to the Seoul region turned out wrong, a story told in <a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">the AI processing notice we changed twice in a day</a>.</p>
+      <p>On November 1 a person made the call. The Block Turn page promised no banner or interstitial in the first three games, but a classic game over counts as two runs, so an interstitial could appear from the second game over. The owner kept the code and removed the sentence, and commit <code>6ab2edb</code> records it as an owner decision.</p>
+      <p>Policy work kept coming. After <code>d75409b</code>, through November 4, 22 of 104 commits have privacy, policy or the Korean word for it in the subject line, mostly policies for new apps. Across the whole repository it is 29 of 117. That is a subject-line grep, so one AX notes commit is in there by accident.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20App%20privacy%20policy%20templates%3A%20we%20threw%20ours%20out%20and%20rewrote%20it%20from%20a%20code%20audit">Email us</a></p></aside>
+    <section aria-labelledby="store-form">
+      <h2 id="store-form">The same defect in a Play Data safety form on October 17</h2>
+      <p>One more place states the same facts. At 14:41 on October 17, the owner asked whether Block Turn and Arrow Knots needed a Data safety fix. That day both public store pages listed four shared data types, but the collected section said no data was collected, while our site policies already listed Firebase Analytics and Crashlytics (<code>861c5a3</code> on October 8, <code>e13de33</code> on October 11).</p>
+      <p>The agent lacked console permission, so the owner entered the answers from a table, and at 14:58 the agent expanded the console preview and compared it line by line. On October 4, Play policy URLs couldn't be changed through the API either, so the owner changed four by hand. No app had the URL hard-coded, so that finished the move.</p>
+    </section>
+    <section aria-labelledby="options">
+      <h2 id="options">Nowhere to run a check between the four apps' code and a table</h2>
+      <p>AXFamily goes further. Its processors live in <code>processors.json</code>, the policy tables are generated, and the CI job <code>legal-consistency</code> compares the output with the JSON and the in-app notice with the function constants. Its policy wasn't public on October 4, so we never compared the two side by side. We would still run the per-app audit on the four old apps.</p>
+      <p>Generating the tables alone could sit in the pre-commit check of the site repository, where the policies live. The hard part is comparing the JSON with app code: the four app repositories have no CI to run that, and SugarAlbum has had no commit since January 3. A per-app audit must be redone when the code changes; generation fails a check on a mismatch but needs somewhere in the app repository to run it. So far only AXFamily uses generation. Start any new app with it.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">What reading the source cannot tell you, and legal review</h2>
+      <ul>
+        <li>Code can't confirm legal requirements. The section list came from a list of Korean privacy law items the agent wrote into its own prompt (purpose, items, retention, third parties and overseas transfers, destruction, user rights, privacy officer) plus earlier policies, and we have no record of a person or professional reviewing that list. The photo app policy the writers took their structure from on October 4 had no section on processors and overseas transfers; they added one, and the original got its own 18 days later in <code>45c6b76</code>.</li>
+        <li>Source is not the shipped build. The SugarCard reviewer noted it could not tell which build was on Play, and SugarAlbum's merged manifest came from a January 3 build.</li>
+        <li>What an SDK collects isn't in the app's code. Commit <code>ba0fe57</code> (September 23) added IP address, ad interactions and diagnostics to our first policy after the fact.</li>
+      </ul>
+      <p>We haven't tried this on a service with many servers and processors, or on an outsourced app without source. We've only run it on Android apps with one operator.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Start by marking the negative claims in your published policy</h2>
+      <p>If a sentence can't be tied to a line of code or a console value, delete it. Doubt "we don't collect" first.</p>
+      <ol>
+        <li>Fetch the published policy, split it into sentences and mark every negative claim.</li>
+        <li>Note the app version and build a data flow table: data, destination, code location.</li>
+        <li>Count permissions from the merged release manifest, not the source manifest. Permissions added by libraries appear only there.</li>
+        <li>Read each SDK vendor's data disclosure and copy the items over.</li>
+        <li>Read retention and deletion settings from the API instead of assuming them.</li>
+        <li>Give the table and policy to a different agent or person and ask only for counter-evidence.</li>
+        <li>Compare your Play Data safety answers with the same table.</li>
+        <li>Record the audited commit next to the policy and run the diff below at each release. We have not done this step for the four apps.</li>
+      </ol>
+      <pre><code># Permissions and dependencies changed since the audit
+git diff $AUDITED HEAD -- '*AndroidManifest.xml' '*build.gradle*' '*libs.versions.toml'
+# Permissions in the merged release manifest (path varies with AGP version)
+grep -rh 'uses-permission' app/build/intermediates/merged_manifest/release/
+# Firestore TTL and log retention
+TOKEN=$(gcloud auth application-default print-access-token)
+curl -s -H "Authorization: Bearer $TOKEN" -H "x-goog-user-project: $PROJECT" \
+  "https://firestore.googleapis.com/v1/projects/$PROJECT/databases/(default)/collectionGroups/$GROUP/fields/$FIELD" \
+  | grep -A3 ttlConfig
+curl -s -H "Authorization: Bearer $TOKEN" -H "x-goog-user-project: $PROJECT" \
+  "https://logging.googleapis.com/v2/projects/$PROJECT/locations/global/buckets/_Default" \
+  | grep retentionDays</code></pre>
+      <p>This diff does not see server code or request fields. SugarSpeller's repeated AI requests live under <code>functions/</code>, so these paths miss them. Add your server and network code paths.</p>
+      <p>Step 6 used a review prompt along these lines, shortened and with file paths removed.</p>
+      <pre><code>Adversarially review the privacy policy pages against the real app source.
+Read-only on the source repo. Check: every claim matches code (especially any
+"we don't collect/send X" claims: look for counter-evidence: ad SDK, Firebase,
+network calls, other paths), ko/en say the same thing.
+FIX problems directly in those two files only.
+Report: what you fixed, what remains uncertain.</code></pre>
+      <p>The gate in <a href="https://sugarmount21.com/en/ax/release-gate/">our release gate and R8 crash note</a> confirms the policy URL returns 200, which proves a page exists and says nothing about its sentences. The Firestore and logging calls copy the form the reviewer used on October 4; we did not rerun them for this note.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Four policies still dated October 4</h2>
+      <p>All four policies still carry an effective date of October 4. In the repositories, SugarSpeller has reached 1.6.033, SugarCard 1.0.003 and SugarClip 1.2.002. A diff of SugarSpeller shows no new dependency in <code>build.gradle</code>, a manifest with queries for 3 sibling apps and one new game screen, and a server that can now send the same AI request up to 3 times. We haven't done the re-audit that decides whether any of this changes the policy.</p>
+      <p>The Play Data safety forms of those four apps have not finished being compared with these policies.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20App%20privacy%20policy%20templates%3A%20we%20threw%20ours%20out%20and%20rewrote%20it%20from%20a%20code%20audit">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Is a privacy policy template risky for an app?</summary><div><p>It is when its sentences differ from the code. Ours said "not collected by me" while the app sent data to our server. Use a template as a table of contents and rewrite the sentences from code.</p></div></details>
+        <details><summary>Can an AI agent write my privacy policy?</summary><div><p>It can draft one, but don't publish that draft unreviewed. All four of our source-based drafts needed fixes from a second agent. Keep writer and reviewer separate, and decide on professional review separately.</p></div></details>
+        <details><summary>What do I write when I can't verify something?</summary><div><p>Delete the claim or state it broadly on the side of disclosure. We deleted unsupported numbers such as "integrity tokens 12 hours", and kept a permission we could not tie to a build as "may be declared". Don't write a denial like "we don't store this" until you've checked.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Sat, 07 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>R8 renamed Gson fields: empty release results – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/r8-gson-field-names/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/r8-gson-field-names/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/r8-gson-field-names-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>203 unit tests missed a release-only blank result: R8 and Gson field names</h1>
+      <p class="lead">A Gson field without @SerializedName stays at its default, with no exception, once R8 renames it, so the defect only shows up when you open the release artifacts.</p>
+      <p>On a release build, the second spell-check path (the one Chat mode falls back to when the first path fails) in our Korean spelling app <a href="https://sugarmount21.com/en/apps/sugarspeller/">SugarSpeller</a> would have returned blank corrected text and zero errors, with no exception thrown. All 203 unit tests were passing when we found this on September 14, 2026. R8 had renamed the Gson fields <code>output</code> and <code>etype</code> to <code>a</code> and <code>b</code>; commit 3791c2c added <code>@SerializedName</code> and an invariant test.</p>
+      <p class="note">Sources: git history and CHANGELOG of the SugarMount app repository (sugarspeller), session logs from that week, the 1.6.026 release APK and mapping.txt built on 2026-10-09, and a reproduction run on 2026-11-04 with R8 9.4.14. The spell-check servers are not named here.</p>
+    </section>
+    <section aria-labelledby="silent-default">
+      <h2 id="silent-default">Gson does not complain about a field it can't match</h2>
+      <p>Without <code>@SerializedName</code>, Gson uses the Java field name as the JSON key. In the release build, R8 had done this to the <code>Result</code> response model:</p>
+      <pre><code># release mapping.txt just before 3791c2c, 2026-09-14
+output -&gt; a
+etype  -&gt; b</code></pre>
+      <p>The server still sends <code>"output"</code> and <code>"etype"</code>. The object now has only <code>a</code> and <code>b</code>, so Gson skips both keys and the fields keep their initial <code>""</code>. Parsing succeeds, and the screen shows whitespace and zero errors.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/r8-gson-field-names-1-en.webp" width="1200" height="588" alt="Comparison: in unit tests and debug builds the field names stay the same and 203 tests pass; in the release build output becomes a and Gson leaves empty strings with no exception." loading="lazy"><figcaption>Only the release build renames the fields, and Gson responds by leaving defaults in place without an exception.</figcaption></figure>
+      <p>Unit tests run against classes R8 never touched, so none of them ever saw a renamed field. The 203 is our recount of <code>@Test</code> annotations at the commit before 3791c2c (the CHANGELOG says "200 or so"), and it includes tests that parse recorded server responses. The two fields had carried no annotation since the path was added on 2024-06-14. That path then stopped receiving responses at all, until commit 0b74357 revived it on 2026-09-13. Both commits shipped together in 1.6.017. We could not tell from the records whether users saw blank results while the path was alive earlier.</p>
+    </section>
+    <section aria-labelledby="fourteen-flags">
+      <h2 id="fourteen-flags">mapping.txt flagged 14 fields; two were defects</h2>
+      <p>Finding it took 28 minutes. At 20:50 KST on September 14 the operator asked for a cross-check. The agent replayed the app's exact requests against the live servers (13 of 13 passed), then read the proguard rules and grew suspicious of model fields with no annotation. A script over the mapping.txt of a clean release build checked 19 model fields and listed 14 as renamed.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th scope="col">Renamed field</th><th scope="col">Count</th><th scope="col">Verdict</th></tr></thead>
+        <tbody>
+          <tr><td>Already has <code>@SerializedName</code></td><td>5</td><td>Safe, maps by annotation value</td></tr>
+          <tr><td>Filled by code, not JSON</td><td>7</td><td>Gson never touches it</td></tr>
+          <tr><td><code>output</code>, <code>etype</code></td><td>2</td><td>Defect</td></tr>
+        </tbody>
+      </table></div>
+      <p>The same table explains half of why the first spell-check path kept working in release: the keys holding its values were annotated. Why its unannotated <code>message</code> and <code>result</code> survived comes later. The fix at 21:18 annotated seven fields across both paths. No usable device was available that night, so "blank screen" was a verdict from mapping.txt and the dex files. We only saw the empty values at runtime later, in the reproduction below.</p>
+    </section>
+    <section aria-labelledby="debug-claim">
+      <h2 id="debug-claim">The agent's claim about debug builds lasted two days</h2>
+      <p>Later that night the agent added an instrumented test (4d29ca4) and wrote in the commit message that because minify is on for debug too, the test runs in the same obfuscated state as the shipping build.</p>
+      <p>It was wrong, and that came out at 08:31 on September 16. The operator had opened KVM access so an Android 14 emulator could boot, and just before rerunning the test the agent checked whether the models were really obfuscated. Release said <code>output -&gt; a</code>; debug kept the original name. The mapping.txt from October 9 shows the same. We did not establish why: the debug configuration.txt has no <code>-dontobfuscate</code>, though running the reproduction below with R8 <code>--debug</code> kept the names.</p>
+      <p>The agent then signed the release APK with the debug key, installed it, and blocked the first path's host in the emulator's hosts file to force the fallback. At 08:45 the second path's corrections appeared on the obfuscated build, and commit 5c4e3d7 fixed the docs at 08:47. The <code>v16017</code> tag had already gone on at 07:47.</p>
+    </section>
+    <section aria-labelledby="lateinit-claim">
+      <h2 id="lateinit-claim">"lateinit got lucky" was really a keep rule</h2>
+      <p>3791c2c has a wrong explanation of its own. Five unannotated <code>lateinit</code> fields kept their names, and the commit and the agent's memory file say R8 was keeping the names "by accident." While drafting this note in November we ran javap: Kotlin's <code>lateinit var</code> compiles to a public field, while <code>var output = ""</code> is a private field with a getter. The build at the time still had a rule meant for a Kakao SDK the app never used, <code>-keepclassmembers class * { public static &lt;fields&gt;; public *; }</code>, and that rule pinned every public field name. Commit e05f8e3 removed it on September 25, as told in <a href="https://sugarmount21.com/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized</a>. The 1.6.026 mapping.txt has <code>message -&gt; a</code>.</p>
+      <p>This is a reproduction, not the real app: a Java model of the same field visibility, shrunk with R8 9.4.14, Gson 2.14.0 and the proguard files from 3791c2c, then parsed on the JVM.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th scope="col">Annotated</th><th scope="col">Configuration</th><th scope="col">Result</th></tr></thead>
+        <tbody>
+          <tr><td>None</td><td>No R8 (what unit tests see)</td><td>Correct</td></tr>
+          <tr><td>None</td><td>Kakao rule + <code>-dontobfuscate</code> (stand-in for debug)</td><td>Correct</td></tr>
+          <tr><td>None</td><td>Kakao rule (the September 14 release)</td><td><code>output=[] etype=[]</code>, no exception</td></tr>
+          <tr><td><code>output</code>, <code>etype</code> only</td><td>Kakao rule</td><td>Correct</td></tr>
+          <tr><td><code>output</code>, <code>etype</code> only</td><td>Kakao rule removed</td><td><code>JsonIOException</code></td></tr>
+          <tr><td>All 5 fields</td><td>Kakao rule removed</td><td>Correct, <code>message -&gt; a</code></td></tr>
+        </tbody>
+      </table></div>
+      <p>Row three reproduces the incident. Rows four and five show that annotating only <code>output</code> and <code>etype</code> would have passed on September 14, then broken eleven days later when the Kakao rule went away and <code>message</code> was renamed. Here the model is never constructed in code, so it ended in <code>JsonIOException</code>. When the code called the constructors and let the objects escape, both the September 14 configuration and the optimized one in use from September 20 ended in a <code>NullPointerException</code>. We did not build the real app, so we can't say which exception it would have thrown. 3791c2c annotated the <code>lateinit</code> fields for the wrong reason and still got it right. Annotate every field that takes a value from JSON, <code>lateinit</code> or not.</p>
+    </section>
+    <section aria-labelledby="dex-grep">
+      <h2 id="dex-grep">Finding etype in the dex proves little</h2>
+      <p>Before the fix, <code>grep -a etype</code> already hit classes2.dex and classes3.dex. classes4.dex, which held the model, did not have it, and that file gained it after the fix. The before-and-after in 3791c2c was valid because it looked at that one file. But the AAB check that night and the pre-release check on September 16 looped over every dex and passed if <code>etype</code> appeared anywhere, and the report cited that as evidence. That loop would have passed the broken APK too.</p>
+      <p>Narrowing to one file no longer works either, since the 1.6.026 APK has a single classes.dex. We read all 43,818 strings in 1.6.026: 3 contain <code>etype</code> (a sentence with <code>mimetype</code>, <code>closetype</code>, and <code>etype</code> itself), 43 contain <code>output</code>, 97 contain <code>message</code>, 104 contain <code>result</code>.</p>
+      <p><code>dexdump -a</code> from build-tools prints annotations with their values:</p>
+      <pre><code>unzip -o app-release.apk 'classes*.dex' -d dex
+dexdump -a dex/classes.dex | grep -c 'value="etype"'   # 1</code></pre>
+      <p>The line reads <code>VISIBILITY_RUNTIME Lkt1; value="etype"</code>. R8 renamed the annotation class to <code>kt1</code> as well, so searching by class name finds nothing. Counted this way the release holds 11 spell-check keys in 13 annotations.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20203%20unit%20tests%20missed%20a%20release-only%20blank%20result%3A%20R8%20and%20Gson%20field%20names">Email us</a></p></aside>
+    <section aria-labelledby="invariant-test">
+      <h2 id="invariant-test">An invariant test that fails when one annotation goes</h2>
+      <p><code>ResponseModelSerializedNameTest</code> uses reflection to require an annotation on every field of the 8 response-model classes. This is the core, shortened:</p>
+      <pre><code>private val models = listOf(Response::class.java, Response.Result::class.java)
+private val codePopulated = setOf("com.example.Response#requestId")
+@Test fun `every JSON field has SerializedName`() {
+    val missing = models.flatMap { type -&gt;
+        type.declaredFields
+            .filterNot { Modifier.isStatic(it.modifiers) || it.isSynthetic }
+            .map { it to type.name + "#" + it.name }
+            .filter { (_, key) -&gt; key !in codePopulated }
+            .filter { (f, _) -&gt; f.getAnnotation(SerializedName::class.java) == null }
+            .map { it.second }
+    }
+    assertTrue(missing.joinToString("\n"), missing.isEmpty())
+}</code></pre>
+      <p>The real file has three tests, adding a check of annotation values against JSON keys and a check that the exemption list <code>codePopulated</code> (10 entries today) holds no dead names. Before committing, the agent deleted the annotation on <code>etype</code>, watched this test and the key test end in <code>FAILED</code>, and restored it.</p>
+    </section>
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">No package keep, and a debug device test can't see this</h2>
+      <p>The broadest alternative is <code>-keep</code> on the whole model package. 3791c2c did not add one, and the session has no record of weighing it. Judged now, the empty values would go away but safety would hang on one rule, and losing that rule would bring the incident back.</p>
+      <p>The instrumented test stayed, but on a debug build it can't see this defect. We have not tried setting <code>testBuildType</code> to release. A launch check doesn't help either: the R8 incident in <a href="https://sugarmount21.com/en/ax/release-gate/">What to check before shipping an AI-built Android app</a> was a crash at startup, and this one crashes nothing, so a cold start passes. The method behind our reproduction, shrinking the model with R8 <code>--classfile</code> under the app's proguard files and parsing on the JVM, showed the empty values with no device, but it is not in the repository.</p>
+      <p>Running the release APK through the whole path is the strongest evidence. On September 16 that session ran from 08:23 to 08:46, including other checks, and needed KVM access and a hosts-file block. So the invariant test runs with every test pass, and running the release APK stays a manual step in the docs for when a regression is suspected.</p>
+    </section>
+    <section aria-labelledby="audit-steps">
+      <h2 id="audit-steps">Auditing your own Gson models, from fromJson to the release APK</h2>
+      <ol>
+        <li><code>rg 'fromJson|TypeToken|GsonConverterFactory' app/src/main</code> lists what Gson fills. With Retrofit, follow the interface return types too.</li>
+        <li>In the release mapping.txt, put each renamed field in one of the three rows above.</li>
+        <li>Add the invariant test, delete one annotation and confirm the failure.</li>
+        <li>For each key, count <code>value="key"</code> in <code>dexdump -a</code> across all dex files and compare with the number of annotations in source. In 1.6.026 <code>message</code> appears twice, once per model, so accepting "at least one" would miss a lost annotation.</li>
+        <li>Sign the release APK with the debug key, install it, and reach a screen that goes through that parser. A path behind a fallback only runs if you block the path in front of it.</li>
+      </ol>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/r8-gson-field-names-2-en.webp" width="1200" height="738" alt="Five-step diagram: find the models, sort mapping.txt, invariant test and mutation, dexdump -a, run the release APK." loading="lazy"><figcaption>Running the release APK, the one step that needs a device, comes last.</figcaption></figure>
+    </section>
+    <section aria-labelledby="fit">
+      <h2 id="fit">What the test misses: new models and removed keep rules</h2>
+      <p><code>models</code> is a handwritten list, so a new response class is unchecked until someone adds it. The test only sees annotations on the source model; it passes if the keep rule protecting the annotation disappears or a class turns abstract. Step 5, running the release APK, is where those two show up. The two existing models stayed on Gson, while the explanation feature from <a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app</a> takes its response as a Map and avoids this problem. We have not used a code-generating serializer.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Stale test comments and a dex check still done by hand</h2>
+      <ul>
+        <li>The test's header comment and the agent's memory still say that minified debug builds rename fields, and the memory also says <code>lateinit</code> survives by accident. Both need correcting.</li>
+        <li>The dex check in the docs is still a manual <code>grep</code>. It should become a <code>dexdump -a</code> value count in the release build script, with its key list taken from the test's expected values.</li>
+        <li>The only device on record that ran this path on an obfuscated build is the emulator. The next release should go through the fallback on real hardware.</li>
+      </ul>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20203%20unit%20tests%20missed%20a%20release-only%20blank%20result%3A%20R8%20and%20Gson%20field%20names">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Do I still need keep rules if I use @SerializedName?</summary><div><p>It depends on your Gson version. Gson 2.14.0, which this app uses, ships <code>META-INF/proguard/gson.pro</code> with rules that protect annotated fields, and our <code>proguard-common.pro</code> has a similar rule. In our local cache the 2.11.0 jar contains that file and the 2.10.1 jar does not, so open your own jar first.</p></div></details>
+        <details><summary>Is "Abstract classes can't be instantiated" the same bug?</summary><div><p>It comes from R8 too, but the symptom is different. In our reproduction, a top-level model with no annotated fields came out of R8 as an abstract class, and Gson threw <code>JsonIOException</code>. <code>gson.pro</code> protects <code>&lt;init&gt;()</code> on classes with <code>@SerializedName</code> fields, and annotating that class's fields made the error go away.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Sat, 07 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>Measuring 4.5:1 colour contrast in the site build – SugarMount</title>
     <link>https://sugarmount21.com/en/ax/build-measures-contrast/</link>
@@ -105,12 +546,12 @@
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -219,8 +660,8 @@
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -317,12 +758,12 @@
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -432,12 +873,12 @@ thinkingConfig: { thinkingBudget: 0 },</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -545,12 +986,12 @@ adb shell "dumpsys window | grep mCurrentFocus"</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -686,8 +1127,8 @@ adb -s emulator-5554 logcat -d -b crash</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -810,8 +1251,8 @@ How to apply: when setting or changing this campaign, the user's instruction bea
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -919,12 +1360,12 @@ edge = if (next &lt; edge) next else edge - 1 // strictly decreasing</code></pre
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1061,8 +1502,8 @@ git log --diff-filter=A --format="%h %ad %s" --date=iso -- &lt;scoring file&gt;
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1164,12 +1605,12 @@ POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1292,9 +1733,9 @@ print("first", shows[:1], "gaps", [b - a for a, b in zip(inter, inter[1:])],
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1419,8 +1860,8 @@ Severity is exactly one of Blocker, High, Medium, Low</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1544,8 +1985,8 @@ def diff(a_png, b_png, top=300, bottom=330):
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1674,12 +2115,12 @@ def diff(a_png, b_png, top=300, bottom=330):
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1800,8 +2241,8 @@ expect(all.sort()).toEqual(files.sort());</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2095,12 +2536,12 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2182,12 +2623,12 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2276,12 +2717,12 @@ git grep -nE "addOn(Complete|Success|Failure|Canceled)Listener\((this|requireAct
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2394,12 +2835,12 @@ depth(board):                   # peel
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
         <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2533,8 +2974,8 @@ depth(board):                   # peel
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2647,12 +3088,12 @@ if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2758,8 +3199,8 @@ git diff --name-only $(git merge-base &lt;base&gt; &lt;branch&gt;) &lt;branch&gt
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2846,12 +3287,12 @@ unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$TEST_PUB[~/][0-9]*" | sort -u | wc
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2986,9 +3427,9 @@ lifecycleScope.launch {
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3098,12 +3539,12 @@ lifecycleScope.launch {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3202,12 +3643,12 @@ three_star = cleared and time &lt;= par(base, scale, floor) and mistakes &lt;= a
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
         <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3319,12 +3760,12 @@ print(pages.most_common(), "FAQ questions:", questions)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3440,9 +3881,9 @@ NOT_TEST = {"notExpression": {"orGroup": {"expressions": [
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3547,8 +3988,8 @@ export function cacheKey(api, group, original, corrected, model) {
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3678,8 +4119,8 @@ const gaps = await agent(CTX + CHECKLIST + final + dossier, { schema: CRIT })</c
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3790,12 +4231,12 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(":core
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3918,8 +4359,8 @@ git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --gre
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4059,8 +4500,8 @@ adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4192,8 +4633,8 @@ print("my app in results:", MY_APP in ids)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4316,12 +4757,12 @@ out of date:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4439,8 +4880,8 @@ grep -rL --include='*Test.kt' -e 'assert' -e 'check(matches' app/src/</code></pr
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4581,8 +5022,8 @@ git log --until=2026-10-20 --format='%(trailers:key=Co-authored-by,valueonly)' \
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4688,8 +5129,8 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4851,12 +5292,12 @@ after_hint = win(board after the correct first move, 2 pieces left, lines it cle
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
         <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4974,8 +5415,8 @@ Schedule expires: YYYY-MM-DD / register again on: YYYY-MM-DD
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5112,12 +5553,12 @@ curl -s "$POLICY_URL" | grep -o 'data-policy-version="[0-9-]*"'</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5262,12 +5703,12 @@ font.save(dst)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5359,8 +5800,8 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5445,12 +5886,12 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5570,8 +6011,8 @@ flutter test test/theme_matrix/ --dart-define=Y2_NO_SETTLE=true
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5690,12 +6131,12 @@ FlowRow(
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5778,8 +6219,8 @@ Mem:              13           8           2           0           2           4
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5906,9 +6347,9 @@ if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFract
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6032,8 +6473,8 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6131,12 +6572,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6197,12 +6638,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6591,306 +7032,16 @@ room  = is there space for a 3×3 square, a 1×4 bar, a 4×1 bar (0–3)</code><
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
         <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
     <pubDate>Mon, 19 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>VIBRATE crash and the fresh-install monkey test – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/fresh-install-monkey-test/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/fresh-install-monkey-test/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/fresh-install-monkey-test-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · Incident</span>
-      <h1>The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</h1>
-      <p class="lead">Scripted device tests missed a crash caused by one missing permission line. Running adb monkey on a freshly cleared app reproduced it at the 15th of 800 events.</p>
-      <p>At 22:58 on October 1, 2026 (Korea time), our AI coding agent installed a pre-release build of the puzzle game <a href="https://sugarmount21.com/en/apps/arrow-knots/">Arrow Knots</a> on a Galaxy S24 and reported "launched in 857 ms, no crash". Four minutes later the operator reported that it errored out in the tutorial: the app closed on the first arrow tap. The code called <code>Vibrator.vibrate</code>, the manifest did not declare <code>android.permission.VIBRATE</code>, and the call threw a <code>SecurityException</code>. The fix, commit <code>65dcf41</code>, landed 5 minutes 29 seconds after the crash report, and a fresh-install monkey script (<code>f7beb3d</code>) followed 15 seconds later.</p>
-      <p class="note">Sources: the game repository's git history, the agent's session log from that night, and the agent's memory files. Times are Korea Standard Time (UTC+9). Checked on October 19, 2026.</p>
-    </section>
-    <section aria-labelledby="timeline">
-      <h2 id="timeline">Four minutes from "installed" to "it crashes"</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Time</th><th scope="col">What happened</th></tr></thead>
-          <tbody>
-            <tr><td>22:47</td><td>Commit <code>3eb21df</code> adds the tutorial and switches haptics to <code>VibrationEffect</code> composition primitives</td></tr>
-            <tr><td>22:58</td><td>Agent reports the S24 install as "no crash". The S24 then drops off adb, so no screenshot. Asked "So is it tested?", it says the S24 was only installed and launched, and the S21 had "automated tests complete"</td></tr>
-            <tr><td>23:02</td><td>Operator: it errors out in the tutorial. On the S21, with progress cleared, monkey seed 7 crashes the app at event 15 of 800</td></tr>
-            <tr><td>23:07</td><td>Fix committed as <code>65dcf41</code>; <code>tools/monkey_check.sh</code> follows 15 seconds later as <code>f7beb3d</code></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>The agent's mistake was in what "no crash" rested on: <code>am start -W</code> returning <code>Status: ok</code> and a 857 ms launch time. Nothing on screen was ever tapped. (The logcat it read did contain a <code>FATAL EXCEPTION</code>, from a Samsung system app on September 30. The agent correctly ignored it.)</p>
-    </section>
-    <section aria-labelledby="cause">
-      <h2 id="cause">Cause: Vibrator.vibrate without the VIBRATE permission</h2>
-      <p>Ten minutes before the install, commit <code>3eb21df</code> replaced <code>View.performHapticFeedback</code> with <code>Vibrator.vibrate(VibrationEffect.startComposition()…)</code>. The code comment gives the reason: on Samsung devices <code>CONTEXT_CLICK</code> is barely felt.</p>
-      <p>The two APIs have different rules. View haptics need no permission. <code>Vibrator.vibrate</code> needs <code>android.permission.VIBRATE</code>, and the manifest did not declare it. The game buzzes every time an arrow leaves the board, so the very first tutorial tap was the crash.</p>
-      <pre><code>E AndroidRuntime: FATAL EXCEPTION: main
-E AndroidRuntime: Process: (pre-release package name), PID: 12034
-E AndroidRuntime: java.lang.SecurityException: vibrate: Neither user 10322 nor current process has android.permission.VIBRATE.</code></pre>
-      <p>The fix touched two files, six lines added and one removed: declare the permission, and fall back to view haptics if the vibrator call fails for any reason.</p>
-      <pre><code>&lt;uses-permission android:name="android.permission.VIBRATE" /&gt;
-runCatching { v.vibrate(VibrationEffect.startComposition().addPrimitive(primitive, scale).compose()) }
-    .onFailure { view.performHapticFeedback(fallback) }</code></pre>
-      <p>VIBRATE is a normal permission, granted at install with no dialog. Leave it out and the debug build still compiles.</p>
-    </section>
-    <section aria-labelledby="why-missed">
-      <h2 id="why-missed">Why the scripted tests missed it</h2>
-      <p>Two device scripts were running on the S21 at the time. <code>tutorial_check.py</code> taps the three tutorial lessons in a fixed order. <code>device_check.py</code> writes a progress file to jump to a given level, then solves the board. Neither had a real pass condition. The tutorial script stops only if it cannot find the "Next" button, and the level script prints how many taps it sent. Neither looked for a crash in logcat or checked that the process was still alive.</p>
-      <p>The agent's own explanation was that the scripts only tap a fixed path. That is half right. The bigger hole was a check that never looked at crashes. (The tutorial script did run to the end on the S21 at about 22:45. Whether that build already had the vibration change was not checked that night, and the log does not say.)</p>
-      <p><code>device_check.py</code> also writes <code>tutorialDone=true</code> when it jumps to a level, so it skips the first screens a new player sees by design. The new-player path only exists when the app has no data.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20The%20agent%20said%20it%20was%20tested.%20The%20game%20crashed%20on%20the%20first%20tutorial%20tap%3A%20a%20missing%20VIBRATE%20permission%20and%20the%20fresh-install%20monkey%20test">Email us</a></p></aside>
-    <section aria-labelledby="monkey-script">
-      <h2 id="monkey-script">The fresh-install monkey script</h2>
-      <p><code>tools/monkey_check.sh</code> loops over three fixed seeds (7, 21, 99). For each one it wipes the app's data, launches it, sends 800 random events, and counts <code>FATAL EXCEPTION</code> lines in logcat. Any non-zero count fails the run. Below is the core of the current version, without device selection, output cleanup and the exit code. The script defaults to the debug package; here it uses the release package published on Play.</p>
-      <pre><code>PKG=com.sugarmount.arrows
-adb shell setprop debug.firebase.analytics.app $PKG
-for seed in 7 21 99; do
-  adb shell am force-stop $PKG
-  adb shell pm clear $PKG
-  adb logcat -c
-  adb shell am start -W -n $PKG/sugar.arrows.MainActivity
-  sleep 2
-  adb shell monkey -p $PKG --pct-touch 90 --pct-motion 10 --pct-nav 0 --pct-majornav 0 \
-    --pct-syskeys 0 --pct-appswitch 0 --throttle 120 -s $seed 800
-  n=$(adb logcat -d | grep -c "FATAL EXCEPTION")
-  echo "seed=$seed fatal=$n"
-done</code></pre>
-      <ul>
-        <li><code>-p</code> keeps events inside this package.</li>
-        <li><code>--pct-touch 90 --pct-motion 10</code>: 90% taps, 10% drags. Navigation, system keys and app switching are set to 0 so the run stays in the game.</li>
-        <li><code>--throttle 120</code> waits 120 ms between events. The last argument, 800, is the event count, so a run takes at least 96 seconds.</li>
-        <li><code>-s</code> fixes the seed, which replays the same event sequence. Before the fix, seed 7 printed <code>System appears to have crashed at event 15 of 800 using seed 7</code>. After it, the same seed injected all 800.</li>
-      </ul>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/fresh-install-monkey-test-1-en.webp" width="1200" height="811" alt="Comparison: the scripted tests only tapped a fixed path and never looked for crashes, while the fresh-install monkey run wiped app data for each of three seeds, sent 800 events and caught the crash at event 15 with seed 7." loading="lazy"><figcaption>Only the run whose pass condition counted crashes caught the first-tap tutorial crash.</figcaption></figure>
-      <p>"Fresh install" here means no app data at all. The first version deleted a single progress file through <code>run-as</code>, which only works on debuggable builds. When release signing went in on October 3 (commit <code>f421333</code>), it became <code>pm clear</code>, with the comment "works on release (non-debuggable) builds too". If you suspect the install itself, run <code>adb uninstall</code> and install again. The script does not reinstall per seed; it clears data.</p>
-      <p>The pass condition changed too. The first version counted every <code>FATAL EXCEPTION</code> on the device, which also counts other apps' crashes, like the Samsung one on the S24. On October 4 the block puzzle game's <code>block_monkey.sh</code> (commit <code>575aaa1</code>) began counting only <code>Process: &lt;package&gt;,</code> lines plus <code>am_anr</code> entries from the events buffer. Its comment notes that uiautomator and the monkey tool can die on their own. On October 18 (<code>dca02f2</code>) both scripts gained a <code>setprop debug.firebase.analytics.app</code> call before the loop. That makes test runs visible in Firebase DebugView, but it does not keep them out of the GA4 reports; that takes a separate developer traffic data filter on the GA4 property (corrected 2026-10-26).</p>
-      <p>(During the post-fix check, the S21 briefly disconnected in the middle of seed 21. Any run that printed <code>- waiting for device -</code> was thrown out and repeated.)</p>
-    </section>
-    <section aria-labelledby="done-rule">
-      <h2 id="done-rule">The rule: no "done" without a fresh-install monkey run</h2>
-      <p>After that night the agent's memory gained one rule. Before calling an Android build tested, run <code>monkey_check.sh</code> on the connected device, on top of the fixed-path scripts, and name every device it ran on. Always run it when the manifest, a permission or a system-service call changes. The rule also includes the line "installing is not verifying".</p>
-      <p>Commit messages changed after that. As of October 19, 2026, 19 of the 144 commits since <code>f7beb3d</code> mention monkey in the message, and 16 of those report a result, in lines like "release (R8, test ads) monkey 3x1500 0 fatals" and "Android 7 launch and monkey pass on API 24". The other three are a tool list or a "still to run". Reported event counts range from 600 to 4,000.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/fresh-install-monkey-test-2-en.webp" width="1200" height="530" alt="Bar chart: of 144 commits since f7beb3d, 19 mention monkey in the message and 16 of those report a result." loading="lazy"><figcaption>After the incident, 16 of 144 commits recorded a monkey result in the message.</figcaption></figure>
-      <p>When an agent says "done", ask which device and what ran on it. Without a monkey result from clean app data, we do not accept it as done. The wider pre-release routine is in <a href="https://sugarmount21.com/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>, and how we pin rules like this one for the agent is in <a href="https://sugarmount21.com/en/ax/agents-md/">How to write AGENTS.md for an AI coding agent</a>.</p>
-      <p>The next day (October 2) a new stress suite crashed the game 28 times on its first pass through 300 levels: a blocked arrow springing back from far away overshot and read <code>points[-1]</code>, an <code>IndexOutOfBoundsException</code> fixed in <code>69781a7</code>. A fresh-install monkey run starts at the tutorial and the first level, so deep levels need their own runs.</p>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">What is still open</h2>
-      <p>Arrow Knots' <code>monkey_check.sh</code> still counts every <code>FATAL EXCEPTION</code> on the device and ignores ANRs. It should match the block game's script and count only its own process's crashes plus ANRs. Several agent sessions share the same phones, so another app's crash failing our run is the first thing to fix.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20The%20agent%20said%20it%20was%20tested.%20The%20game%20crashed%20on%20the%20first%20tutorial%20tap%3A%20a%20missing%20VIBRATE%20permission%20and%20the%20fresh-install%20monkey%20test">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Do I need to ask the user for the VIBRATE permission?</summary><div><p>No. VIBRATE is a normal permission, granted at install once it is declared in AndroidManifest.xml. <code>View.performHapticFeedback</code> works without it, but calling <code>Vibrator.vibrate</code> without the declaration throws a SecurityException and kills the app.</p></div></details>
-        <details><summary>How many seeds and events should an adb monkey run use?</summary><div><p>Our default is three seeds (7, 21, 99) at 800 events each, and five commits record release builds with test ads run at 1,500 events per seed. Fixing the seed is what lets you replay the exact sequence that failed.</p></div></details>
-        <details><summary>Can I run monkey on a build with live ads?</summary><div><p>We never do. Random taps on real ads are invalid clicks and put the AdMob account at risk, so monkey and other automated taps only run on builds using Google's test ad IDs.</p></div></details>
-        <details><summary>If unit tests pass, can I skip the monkey run?</summary><div><p>Not if you want to catch this kind of crash. All 31 engine unit tests passed that night. Permission checks happen in the device's system service, so a JVM unit test never sees them.</p></div></details>
-      </div>
-    </section>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Mon, 19 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Building an Android HWP viewer with rhwp: measured – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/hwp-viewer-rhwp-webview/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/hwp-viewer-rhwp-webview/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/hwp-viewer-rhwp-webview-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · Measurement</span>
-      <h1>Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</h1>
-      <p class="lead">Running the open-source rhwp engine inside an Android WebView, 221 of 222 Korean HWP and HWPX files opened on a Galaxy S21, with a median of 1.2 to 1.5 seconds from tap to first page.</p>
-      <p>221 of 222 Korean word-processor files opened. Before writing <a href="https://sugarmount21.com/en/apps/doc-viewer/">HWP Viewer SugarDoc</a>, we wanted to know whether the engine could carry an app at all, so on October 3, 2026 we opened every file from a cold start on a Galaxy S21 (Android 15, WebView 153). The engine passed, with two catches. Drawing every page of a 384-page file pushed the WebView renderer to 2.8 GB, and the set the first report called "24 government documents" held only 17 real government attachments.</p>
-      <p class="note">Numbers come from the engine spike report in SugarMount's app repository (sugar-utils; measured 2026-10-03, commit 7b0e567), the follow-up verification report (2026-10-05), and a recount from the raw result JSON done while writing this note. Checked on October 19, 2026.</p>
-    </section>
-    <section aria-labelledby="hwp-format">
-      <h2 id="hwp-format">HWP, HWPX and why a viewer is hard</h2>
-      <p>HWP is the file format of Hancom Office Hangul, the word processor that Korean government offices, schools and many employers still use. HWP 5 is a binary compound file; HWPX is the newer ZIP-and-XML version; very old files are HWP 3.0. On a phone they usually arrive as attachments in KakaoTalk (Korea's main messenger) or email.</p>
-      <p>Layout is the hard part. Government press releases lean on dense tables, logos and fixed line breaks, and exam papers add equations and two-column pages.</p>
-    </section>
-    <section aria-labelledby="setup">
-      <h2 id="setup">Setup: one phone, 222 files, a cold start each time</h2>
-      <p><a href="https://www.npmjs.com/package/@rhwp/core" rel="noopener">rhwp</a> is an open-source HWP/HWPX parser written in Rust and compiled to WebAssembly. It renders each page as SVG and is MIT-licensed. We used the npm package <code>@rhwp/core</code> 0.8.6, and the shipped app is still pinned to that version.</p>
-      <p>The test app was a single WebView with rhwp and the font stylesheet rhwp ships (153 font rules). For every file the app was force-stopped and relaunched; the first three pages went into the DOM and the rest were only timed.</p>
-      <ul>
-        <li>Attachments from Korea's government policy portal, korea.kr: 17 files downloaded on 2026-10-02 (14 press releases; 13 HWPX, 4 HWP).</li>
-        <li>198 samples from the rhwp repository, each with a reference PDF printed from Hancom Office 2020 or 2022, so page counts and first-page images can be compared. Many are hard cases: exam papers, equations, converted HWP 3.0 files.</li>
-        <li>Seven more files, explained in the section on what the AI got wrong.</li>
-      </ul>
-      <p>We had no low-end phone.</p>
-    </section>
-    <section aria-labelledby="results">
-      <h2 id="results">Results: 221 of 222 opened</h2>
-      <p>"Tap to first page" is app launch time plus first-page render time, so it includes the cold start. p90 is the value where the slowest 10% begin. Renderer memory is the PSS (proportional set size: private memory plus a fair share of shared pages) of the WebView renderer process.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Metric</th><th scope="col">korea.kr, 17 files</th><th scope="col">First report's "24 government documents"</th><th scope="col">rhwp samples, 198</th></tr></thead>
-          <tbody>
-            <tr><td>Opened</td><td>17/17</td><td>24/24</td><td>197/198</td></tr>
-            <tr><td>Tap to first page, median</td><td>1.4 s</td><td>1.5 s</td><td>1.2 s</td></tr>
-            <tr><td>Tap to first page, p90</td><td>1.6 s</td><td>2.1 s</td><td>1.9 s</td></tr>
-            <tr><td>Tap to first page, max</td><td>1.8 s</td><td>3.0 s</td><td>3.3 s</td></tr>
-            <tr><td>Render per page, median</td><td>-</td><td>10 ms</td><td>6 ms</td></tr>
-            <tr><td>Renderer memory (PSS), max</td><td>286 MB</td><td>391 MB</td><td>422 MB</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>The one failure, <code>issue2063_huge_cellbreak_table.hwp</code>, is a stress test built around a giant table split across pages; it ran past the 120-second limit. The spike report made a fallback path a condition for adopting the engine, and the app now lets you keep waiting or hand the file to another app after 10 seconds.</p>
-      <p>Fidelity held up. Against the reference PDFs, page counts matched for 195 of 197 samples (the other two were one page off), and the median first-page image similarity was 0.997. We also put seven files (two press releases, five samples) side by side with Hancom's output. The press-release tables, logos and bold text and the exam paper's equations and two columns looked nearly the same. The one visible miss was the first question number, "문1)", dropped from one exam paper.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Building%20an%20Android%20HWP%20viewer%3A%20rhwp%20in%20a%20WebView%2C%20measured%20on%20222%20documents">Email us</a></p></aside>
-    <section aria-labelledby="virtual-scroll">
-      <h2 id="virtual-scroll">A 384-page file only works if you draw the visible pages</h2>
-      <p>One rhwp sample is a 384-page government administration handbook (10.7 MB). With every page's SVG in the DOM, the WebView renderer process grew to 2.8 GB. Drawing only the visible pages, the same file sat at 255 MB in one run and 366 MB in another run the same afternoon.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/hwp-viewer-rhwp-webview-1-en.webp" width="1200" height="582" alt="Comparison: drawing all pages of a 384-page file took the WebView renderer to 2.8 GB; drawing only the visible pages kept it at 255 MB (366 MB in another run)." loading="lazy"><figcaption>Virtual scrolling cut renderer memory by an order of magnitude on the 384-page file.</figcaption></figure>
-      <p>If you build an HWP viewer on a WebView, put virtual scrolling (only the visible pages and their neighbours in the DOM) in from day one.</p>
-      <p>The shipped viewer gives every page an empty slot of the right size and keeps SVG only for the visible pages plus two on each side, or one on each side on low-memory devices. Rendered SVG strings live in a byte-capped LRU (least recently used) cache, so the pages viewed longest ago are dropped first.</p>
-    </section>
-    <section aria-labelledby="fonts">
-      <h2 id="fonts">Fonts went from 144 MB to 9.2 MB</h2>
-      <p>The font folder that comes with rhwp is 87 files and 144,327,972 bytes. The spike report called it "138 MB", which is the same number counted in mebibytes. The 222 documents actually used 17 of those files, about 37 MB.</p>
-      <p>The app ships 10 files, 9,207,952 bytes, about 6% of the original. Two rules decided what went in: a clear license and a close look. Hancom's own Hamchorom fonts were left out because Hancom's license page does not spell out whether they may be bundled in an app; Hamchorom Batang is drawn with Noto Serif KR and Hamchorom Dotum with NanumGothic, both under the SIL Open Font License. rhwp's NanumGothic was a subset that kept the reserved font name, so we swapped in the original TTF from google/fonts.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/hwp-viewer-rhwp-webview-2-en.webp" width="1200" height="498" alt="Bar chart: rhwp&#x27;s 87 font files total 144 MB, the 17 the 222 documents used are about 37 MB, and the 10 bundled in the app are 9.2 MB." loading="lazy"><figcaption>The app bundles 10 fonts with clear licenses, about 6% of what rhwp ships.</figcaption></figure>
-      <p>On 2026-10-05 we measured the cost on the same S21: how much first-page ink overlap (F1) against the reference drops with the substitute fonts. The pass mark, fixed in advance, was a median drop of 0.02 or less; the median came out at 0.0071. One file went over at 0.0336, a college entrance exam (Suneung) paper whose title is in Chinese characters (hanja). The difference sat in the hanja title and the circled numbers ① to ⑤, which the bundled fonts lack, so the system font draws them.</p>
-    </section>
-    <section aria-labelledby="ai-errors">
-      <h2 id="ai-errors">What the AI got wrong, and what verification changed</h2>
-      <p>An AI coding agent (Claude) session ran the engine spike and wrote its report. Two days later, the follow-up experiments split the work: one agent measured, a separate verifier agent reopened the evidence files and recomputed every number, and only corrected values went into the docs. The first report's statistics were recounted at that point.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">First report</th><th scope="col">After verification</th></tr></thead>
-          <tbody>
-            <tr><td>24 real government documents</td><td>17 korea.kr files (14 press releases) plus 7 others: 4 byte-identical to samples, 3 rhwp test fixtures</td></tr>
-            <tr><td>Samples: 177 HWP, 21 HWPX</td><td>180 HWP, 18 HWPX (9 of them HWP 3.0)</td></tr>
-            <tr><td>Number recall around 0.9</td><td>A bug in the comparison script: text runs were joined with no separator, so <code>11:00</code> and <code>10. 2.</code> became <code>11:0010. 2.</code>. Fixed, all 17 korea.kr files score 1.0 (a lenient upper bound)</td></tr>
-            <tr><td>Bundled fonts 9,700 KB (the follow-up's measuring agent)</td><td>KiB written as KB; 9,933,636 bytes is 9.93 MB (later cut to 9,207,952 bytes)</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>"24 of 24 government documents" reads well, and 7 of the 24 were not government documents. Counted alone, the 17 real files were faster (1.4 s median) and lighter (286 MB max). The engine decision did not change, but without the verifier we would have published a number with the wrong provenance.</p>
-      <p>Writing this note, we recomputed the medians once more from the raw <code>s21b.json</code>. The report's 1.5, 2.1 and 3.0 seconds came out exactly; the 366 MB run of the 384-page file turned up then. (The verification report also flagged that another script had overwritten one raw file, which must be regenerated before anyone quotes it.)</p>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">Still open</h2>
-      <ul>
-        <li>Low-end phones. According to the development plan, the Firebase Test Lab low-end run has not happened yet, so we do not know how a 400 MB renderer behaves on a 3 to 4 GB phone.</li>
-        <li>Hanja-heavy documents. The 0.0336 is only recorded, from a sample of two.</li>
-        <li>Upgrading rhwp. It is pre-1.0, so the app pins 0.8.6 and every build checks that the engine files match the pinned copy. An upgrade will be re-measured on the same 222 files. The other pre-release checks are in <a href="https://sugarmount21.com/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>.</li>
-      </ul>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Building%20an%20Android%20HWP%20viewer%3A%20rhwp%20in%20a%20WebView%2C%20measured%20on%20222%20documents">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Can rhwp be used in a commercial Android app?</summary><div><p>Yes. rhwp is MIT-licensed, but the Rust crates compiled into its WASM (Apache-2.0, BSD and others) need their notices too. The fonts it ships carry their own licenses and need checking file by file. HWP Viewer SugarDoc bundles 10 font files with confirmed licenses, OFL and others, and leaves out Hamchorom.</p></div></details>
-        <details><summary>Why does a WebView HWP viewer use so much memory?</summary><div><p>Every rendered page stays in the DOM as SVG. A 384-page file took the renderer to 2.8 GB with all pages drawn and 255 MB with only the visible ones.</p></div></details>
-        <details><summary>Does one engine open both HWP and HWPX?</summary><div><p>Yes. rhwp 0.8.6 opens both, and 221 of the 222 mixed files here opened. The difference between the two formats is explained in <a href="https://sugarmount21.com/en/apps/doc-viewer/hwp-vs-hwpx/">HWP vs HWPX: what differs and how to open both</a>. If an HWPX file from a chat app will not open on your phone, see <a href="https://sugarmount21.com/en/apps/doc-viewer/hwpx-open/">How to open an HWPX or HWP file on Android</a>.</p></div></details>
-      </div>
-    </section>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Mon, 19 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>About SugarMount: independent Android apps</title>
-    <link>https://sugarmount21.com/en/about/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/about/</guid>
-    <description><![CDATA[<section class="hero">
-      <h1>About SugarMount</h1>
-      <p class="lead">SugarMount is an Android app brand run by simpest, an independent developer, making small apps that each do one job. Ten of them are on Google Play, from a Korean spelling checker and an HWP viewer to photo tools and two puzzle games.</p>
-    </section>
-    <section aria-labelledby="who">
-      <h2 id="who">Who makes the apps</h2>
-      <p>SugarMount is the developer name used by simpest, an independent developer, to publish apps on Google Play. Planning, development, releases and support are all done by the same person. It is not a company or a team.</p>
-    </section>
-    <section aria-labelledby="apps">
-      <h2 id="apps">The apps</h2>
-      <p>As of October 18, 2026, ten apps are public on Google Play. Features, data handling and help articles are on the <a href="https://sugarmount21.com/en/apps/">SugarMount apps list</a> and each app's page.</p>
-      <h3 class="group-title" id="g-photo">Photo and video</h3>
-      <ul class="app-tiles" aria-labelledby="g-photo">
-        <li><a class="app-tile" data-app="sugarcompress" href="https://sugarmount21.com/en/apps/image-compress/"><img class="app-icon" src="https://sugarmount21.com/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt=""><span>Compress Image</span></a></li>
-        <li><a class="app-tile" data-app="sugarflip" href="https://sugarmount21.com/en/apps/image-flip/"><img class="app-icon" src="https://sugarmount21.com/assets/apps/sugarflip/icon.webp" width="48" height="48" alt=""><span>Flip &amp; Rotate Image</span></a></li>
-        <li><a class="app-tile" data-app="sugarconvert" href="https://sugarmount21.com/en/apps/image-convert/"><img class="app-icon" src="https://sugarmount21.com/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt=""><span>Convert Image JPG PNG WEBP</span></a></li>
-        <li><a class="app-tile" data-app="sugaralbum" href="https://sugarmount21.com/en/apps/sugaralbum/"><img class="app-icon" src="https://sugarmount21.com/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt=""><span>SugarAlbum</span></a></li>
-      </ul>
-      <h3 class="group-title" id="g-doc">Documents and text</h3>
-      <ul class="app-tiles" aria-labelledby="g-doc">
-        <li><a class="app-tile" data-app="sugardoc" href="https://sugarmount21.com/en/apps/doc-viewer/"><img class="app-icon" src="https://sugarmount21.com/assets/apps/sugardoc/icon.webp" width="48" height="48" alt=""><span>HWP Viewer SugarDoc</span></a></li>
-        <li><a class="app-tile" data-app="sugarspeller" href="https://sugarmount21.com/en/apps/sugarspeller/"><img class="app-icon" src="https://sugarmount21.com/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt=""><span>SugarSpeller</span></a></li>
-        <li><a class="app-tile" data-app="sugarclip" href="https://sugarmount21.com/en/apps/sugarclip/"><img class="app-icon" src="https://sugarmount21.com/assets/apps/sugarclip/icon.webp" width="48" height="48" alt=""><span>SugarClip</span></a></li>
-      </ul>
-      <h3 class="group-title" id="g-life">Everyday</h3>
-      <ul class="app-tiles" aria-labelledby="g-life">
-        <li><a class="app-tile" data-app="sugarcard" href="https://sugarmount21.com/en/apps/sugarcard/"><img class="app-icon" src="https://sugarmount21.com/assets/apps/sugarcard/icon.webp" width="48" height="48" alt=""><span>SugarCard</span></a></li>
-      </ul>
-      <h3 class="group-title" id="g-game">Games</h3>
-      <ul class="app-tiles" aria-labelledby="g-game">
-        <li><a class="app-tile" data-app="arrows" href="https://sugarmount21.com/en/apps/arrow-knots/"><img class="app-icon" src="https://sugarmount21.com/assets/apps/arrows/icon.webp" width="48" height="48" alt=""><span>Arrow Knots</span></a></li>
-        <li><a class="app-tile" data-app="blocks" href="https://sugarmount21.com/en/apps/blocks/"><img class="app-icon" src="https://sugarmount21.com/assets/apps/blocks/icon.webp" width="48" height="48" alt=""><span>Block Turn</span></a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="how">
-      <h2 id="how">How the apps are built and checked</h2>
-      <ul>
-        <li><strong>Built with an AI coding agent.</strong> The three photo apps, HWP Viewer SugarDoc and the two games were built with Anthropic's Claude Code. In their repositories, 195 of 212 commits (92%) carry an AI co-author line (git history, October 18, 2026). SugarSpeller has been updated the same way since August 2025. The agent writes code, tests and release scripts; a person decides ad placement, pricing and releases, and checks on real devices.</li>
-        <li><strong>Release builds run on a device before upload.</strong> The three photo apps and HWP Viewer SugarDoc go through a release gate (leftover test ad IDs, empty config, policy URLs), two launches of the shrunk release build, and end-to-end tests on a real device. Details are in the <a href="https://sugarmount21.com/en/ax/release-gate/">release check note</a>.</li>
-        <li><strong>Policies come from the code.</strong> Privacy policies are written after checking each app's source code and SDK settings, and say nothing the code doesn't back.</li>
-        <li><strong>Numbers carry a source and a date.</strong> Numbers on this site come from the app repositories' git history, changelogs and device QA reports, with the date they were taken. What we could not verify, we leave out.</li>
-      </ul>
-      <p>The process and the measured numbers are written up in the <a href="https://sugarmount21.com/en/ax/">AX notes</a>.</p>
-    </section>
-    <section aria-labelledby="principles">
-      <h2 id="principles">Principles</h2>
-      <ul class="principles">
-        <li><h3>Photos and documents stay on the device</h3><p>The apps that handle photos, videos and documents (Compress Image, Flip &amp; Rotate Image, Convert Image, SugarAlbum, HWP Viewer SugarDoc) process files on the device without uploading them, and never modify or delete the originals.</p></li>
-        <li><h3>No sign-up</h3><p>None of the ten public apps has a sign-up or log-in screen. SugarSpeller creates an anonymous ID, not linked to any name or email, to count daily use of AI explanations.</p></li>
-        <li><h3>Policies that match the code</h3><p>Each app's privacy policy is written from its actual code, including what the ad and analytics SDKs send.</p></li>
-      </ul>
-    </section>
-    <section aria-labelledby="privacy">
-      <h2 id="privacy">Privacy</h2>
-      <p>What leaves the device differs by app. For example, SugarSpeller sends the text you check to the Naver or Daum (Kakao) spelling checker, while the photo apps send no photos. Each app's details are in the <a href="https://sugarmount21.com/en/privacy/">privacy policy list</a>.</p>
-    </section>
-    <section aria-labelledby="contact">
-      <h2 id="contact">Contact</h2>
-      <p>Questions and bug reports go by email. Including the app name, device model and Android version helps us check faster.</p>
-      <p>Email: sugarmount21@gmail.com (<a href="mailto:sugarmount21@gmail.com">write an email</a>)</p>
-      <p>Google Play: <a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">sugarmount developer page</a></p>
-    </section>]]></description>
-    <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
   </item>
 </channel>
 </rss>

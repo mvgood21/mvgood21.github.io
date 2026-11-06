@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>게임 손맛 개선: 충돌보다 109ms 빠른 하트 – SugarMount</title>
+  <meta name="description" content="막힌 화살표를 누르면 하트가 접촉보다 109ms 먼저 움직였습니다. 코드와 녹화 프레임으로 원인과 결과의 순서를 찾고, 하트·소리·진동을 접촉 시점으로 옮긴 절차입니다.">
+  <meta name="robots" content="max-image-preview:large">
+  <link rel="canonical" href="https://sugarmount21.com/ax/game-feel-frame-review/">
+  <link rel="alternate" hreflang="ko" href="https://sugarmount21.com/ax/game-feel-frame-review/">
+  <link rel="alternate" hreflang="en" href="https://sugarmount21.com/en/ax/game-feel-frame-review/">
+  <link rel="alternate" hreflang="x-default" href="https://sugarmount21.com/ax/game-feel-frame-review/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="게임 손맛 개선: 충돌보다 109ms 빠른 하트 – SugarMount">
+  <meta property="og:description" content="막힌 화살표를 누르면 하트가 접촉보다 109ms 먼저 움직였습니다. 코드와 녹화 프레임으로 원인과 결과의 순서를 찾고, 하트·소리·진동을 접촉 시점으로 옮긴 절차입니다.">
+  <meta property="og:url" content="https://sugarmount21.com/ax/game-feel-frame-review/">
+  <meta property="og:image" content="https://sugarmount21.com/assets/og/ax-game-feel-frame-review-ko.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="https://sugarmount21.com/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/svg+xml" href="https://sugarmount21.com/assets/favicon.svg">
+  <link rel="apple-touch-icon" href="https://sugarmount21.com/assets/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://sugarmount21.com/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/site.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=e2770b30">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://sugarmount21.com/ax/game-feel-frame-review/#article","headline":"모바일 게임 손맛 개선: 하트가 충돌보다 109ms 먼저 줄던 순서를 코드와 녹화 프레임으로 찾았다","description":"막힌 화살표를 누르면 하트가 접촉보다 109ms 먼저 움직였습니다. 코드와 녹화 프레임으로 원인과 결과의 순서를 찾고, 하트·소리·진동을 접촉 시점으로 옮긴 절차입니다.","url":"https://sugarmount21.com/ax/game-feel-frame-review/","mainEntityOfPage":"https://sugarmount21.com/ax/game-feel-frame-review/","inLanguage":"ko","articleSection":"게임 개발","datePublished":"2026-11-07T09:00:00+09:00","dateModified":"2026-11-07T09:00:00+09:00","image":["https://sugarmount21.com/assets/og/ax-game-feel-frame-review-ko.png","https://sugarmount21.com/assets/ax/cover/game-feel-frame-review-ko.webp","https://sugarmount21.com/assets/ax/game-feel-frame-review-1-ko.webp","https://sugarmount21.com/assets/ax/game-feel-frame-review-2-ko.webp"],"author":{"@id":"https://sugarmount21.com/#org"},"publisher":{"@id":"https://sugarmount21.com/#org"},"isPartOf":{"@id":"https://sugarmount21.com/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"게임 피드백 애니메이션 타이밍은 몇 ms로 맞춰야 하나요?","acceptedAnswer":{"@type":"Answer","text":"이 게임은 찌르기를 110ms로 고정하고 하트, 소리, 진동을 접촉 콜백에 넣었습니다. 다른 게임에 그대로 옮길 값으로 검증한 것은 아닙니다."}},{"@type":"Question","name":"녹화 영상은 몇 fps로 잘라야 하나요?","acceptedAnswer":{"@type":"Answer","text":"전체를 볼 때는 10fps, 구간을 볼 때는 60fps를 쓰고, 시각은 원본 프레임에서 읽으십시오. 이 녹화는 평균 85.58fps로 잡혔습니다."}},{"@type":"Question","name":"디버그 빌드로 재도 되나요?","acceptedAnswer":{"@type":"Answer","text":"순서를 찾는 데는 충분했습니다. 이 글의 두 영상은 디버그 빌드입니다. 릴리스 빌드에서 같은 측정은 하지 않았으므로, 프레임 지연까지 비교하려면 릴리스 빌드로 다시 측정하십시오."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://sugarmount21.com/"},{"@type":"ListItem","position":2,"name":"AX 노트","item":"https://sugarmount21.com/ax/"},{"@type":"ListItem","position":3,"name":"게임 개발","item":"https://sugarmount21.com/ax/topic/games/"},{"@type":"ListItem","position":4,"name":"모바일 게임 손맛 개선: 하트가 충돌보다 109ms 먼저 줄던 순서를 코드와 녹화 프레임으로 찾았다"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=e2770b30">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a class="nav-apps" href="/apps/">앱</a>
+        <a class="nav-ax" href="/ax/" aria-current="page">AX 노트</a>
+        <a class="nav-about" href="/about/">소개</a>
+        <a class="nav-privacy" href="/privacy/">개인정보처리방침</a>
+      </nav>
+      <a class="lang" href="/en/ax/game-feel-frame-review/" lang="en" hreflang="en">English</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>메뉴</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="전체 메뉴">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">닫기</button>
+      <p class="menu-title" id="m-photo">사진·영상</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>슈가앨범</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 용량 줄이기</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 반전·회전</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>이미지 변환 JPG·PNG·WebP</span></a></li></ul>
+      <p class="menu-title" id="m-document">문서·글</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글 띄어쓰기</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글뷰어 슈가독</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">생활</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>생생카드</span></a></li></ul>
+      <p class="menu-title" id="m-games">게임</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>화살표 매듭풀기</span></a></li><li><a class="app-tile" data-app="blocks" href="/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한판블록</span></a></li></ul>
+      <p><a href="/apps/">모든 앱 보기</a></p>
+      <ul class="menu-links"><li><a href="/ax/" aria-current="page">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-games">
+    <nav class="crumbs" aria-label="이동 경로"><ol><li><a href="/">SugarMount</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/ax/topic/games/">게임 개발</a></li><li><span aria-current="page">모바일 게임 손맛 개선: 하트가 충돌보다 109ms 먼저 줄던 순서를 코드와 녹화 프레임으로 찾았다</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/game-feel-frame-review-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX 노트 · 방법</span>
+      <h1>모바일 게임 손맛 개선: 하트가 충돌보다 109ms 먼저 줄던 순서를 코드와 녹화 프레임으로 찾았다</h1>
+      <p class="lead">애니메이션을 고치라고만 시키지 마십시오. 코드와 녹화 프레임을 함께 주고 이벤트마다 원인과 결과의 순서를 표로 내게 하십시오. 시각 측정은 증명용입니다.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/about/">작성 SugarMount</a> <span aria-hidden="true">·</span> <span>게임 개발</span> <span aria-hidden="true">·</span> <span>읽는 시간 11분</span> <span aria-hidden="true">·</span> 최종 업데이트 <time datetime="2026-11-07">2026년 11월 7일</time></p><!-- /build:meta -->
+      <p>막힌 화살표를 누르면 하트가 먼저 변하고, 109ms 뒤에야 화살표가 막는 화살표에 닿았습니다. 2026년 10월 1일 밤 Galaxy S21에서 녹화한 출시 전 퍼즐 게임 <a href="/apps/arrow-knots/">화살표 매듭풀기</a> 영상에 남은 순서입니다. 운영자가 애니메이션이 엉성하다고 평하자 에이전트는 10분 47초 뒤 719줄을 커밋했지만 이 순서는 그대로였고, 이벤트별 타이밍을 묻는 코드·프레임 리뷰를 돌린 뒤에야 고쳐졌습니다. 수정 뒤 녹화에서 하트는 접촉보다 16ms 늦게 움직입니다.</p>
+      <p class="note">출처: 게임 저장소의 커밋 da0e624, 3eb21df, 65dcf41과 리뷰 문서, 그날의 에이전트 세션 기록입니다. 109ms와 16ms는 2026년 11월 4일에 당시 녹화 원본에서 다시 측정한 값입니다. 시각은 한국 시간입니다.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>목차 (11)</summary><ol><li><a href="#measured-order">녹화를 다시 측정하니 하트가 109ms 앞섰습니다</a></li><li><a href="#first-rebuild">719줄 재작성으로도 순서는 그대로였습니다</a></li><li><a href="#cause-chain">하트 코드가 애니메이션 시작 다음 줄에 있었습니다</a></li><li><a href="#review-question">프레임 수보다 리뷰에 던진 질문이 달랐습니다</a></li><li><a href="#display-only">판정은 두고 표시만 접촉 시점으로 옮겼습니다</a></li><li><a href="#colors">8색을 지키는 대신 6색으로 줄였습니다</a></li><li><a href="#first-tap-crash">리뷰대로 만들자 첫 탭에서 앱이 죽었습니다</a></li><li><a href="#procedure">막힌 탭을 녹화해 표를 만들고, 고친 뒤 다시 만듭니다</a></li><li><a href="#outside-video">소리, 진동, 손가락, 긴 플레이는 영상 밖입니다</a></li><li><a href="#next-checks">먼 거리 막힘과 리텐션은 재지 않았습니다</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">목차</p><ol><li><a href="#measured-order">녹화를 다시 측정하니 하트가 109ms 앞섰습니다</a></li><li><a href="#first-rebuild">719줄 재작성으로도 순서는 그대로였습니다</a></li><li><a href="#cause-chain">하트 코드가 애니메이션 시작 다음 줄에 있었습니다</a></li><li><a href="#review-question">프레임 수보다 리뷰에 던진 질문이 달랐습니다</a></li><li><a href="#display-only">판정은 두고 표시만 접촉 시점으로 옮겼습니다</a></li><li><a href="#colors">8색을 지키는 대신 6색으로 줄였습니다</a></li><li><a href="#first-tap-crash">리뷰대로 만들자 첫 탭에서 앱이 죽었습니다</a></li><li><a href="#procedure">막힌 탭을 녹화해 표를 만들고, 고친 뒤 다시 만듭니다</a></li><li><a href="#outside-video">소리, 진동, 손가락, 긴 플레이는 영상 밖입니다</a></li><li><a href="#next-checks">먼 거리 막힘과 리텐션은 재지 않았습니다</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="measured-order">
+      <h2 id="measured-order">녹화를 다시 측정하니 하트가 109ms 앞섰습니다</h2>
+      <p>수정 전 영상과 수정 뒤 영상에는 막힌 탭이 한 번씩 들어 있습니다. 두 영상을 프레임별로 풀어 연속 프레임의 밝기 차이가 25를 넘는 픽셀을 헤더와 판 영역으로 따로 세고, 프레임 시트를 눈으로 대조했습니다. 프레임 간격은 중앙값 약 8ms라 그 단위로 측정할 수 있었습니다. 60Hz 화면이면 약 17ms가 한계입니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">사건</th><th scope="col">수정 전 (레벨 151)</th><th scope="col">수정 뒤 (레벨 52)</th></tr></thead>
+          <tbody>
+            <tr><td>화살표가 움직이기 시작</td><td>3,807ms</td><td>3,851ms</td></tr>
+            <tr><td>하트가 변하기 시작</td><td>3,815ms</td><td>3,984ms</td></tr>
+            <tr><td>접촉 (수정 전은 판 흔들림, 수정 뒤는 접촉 링)</td><td>3,924ms</td><td>3,968ms</td></tr>
+            <tr><td>접촉 기준 하트의 위치</td><td>109ms 앞</td><td>16ms 뒤</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>수정 전에는 화살표가 출발하고 8ms 만에 하트가 부풀기 시작했고, 접촉 직전에는 이미 절반쯤 흐려져 있었습니다. 리뷰 문서는 이 장면을 "결과가 원인보다 먼저 나옵니다"라고 적었습니다. 그날 리뷰는 60fps 프레임 차이를 시각과 함께 찍어 하트 쪽 변화(3.817초)가 판 변화(3.933초)보다 앞서는 출력을 얻었지만, 문서에 측정값을 남기지는 않았습니다. 109ms는 고친 뒤 한 달이 지나 원본 프레임에서 다시 측정한 값입니다.</p>
+      <p>수정 뒤 코드에서는 접촉 콜백이 링보다 먼저 호출됩니다. 영상의 16ms는 약 2프레임으로, 화면에 나타나기까지의 차이입니다.</p>
+      <figure class="ax-fig"><img src="/assets/ax/game-feel-frame-review-1-ko.webp" width="1200" height="542" alt="비교 그림: 수정 전 녹화에서는 하트가 3,815ms에 변해 3,924ms 접촉보다 109ms 앞섰고, 수정 뒤 녹화에서는 3,968ms 접촉 뒤 3,984ms에 변해 16ms 뒤따랐다." loading="lazy"><figcaption>하트 변화가 접촉보다 109ms 앞서던 순서가 수정 뒤 16ms 뒤로 바뀌었습니다.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="first-rebuild">
+      <h2 id="first-rebuild">719줄 재작성으로도 순서는 그대로였습니다</h2>
+      <p>22:05, 운영자는 애니메이션이 엉성해서 이런 게임을 누가 하겠느냐는 취지로 평했습니다. 에이전트의 처음 가설은 연출이 모자란다는 것이었습니다. 뱀처럼 휘어 나가는 이동, 직접 합성한 효과음 5종, 진동, 색종이, 별 카드를 넣었고 22:16에 da0e624를 커밋했습니다.</p>
+      <p>에이전트는 S21에서 화면을 녹화해 프레임을 뽑아 보기도 했습니다. 5fps로 89장, 10fps로 162장과 149장을 잘랐습니다. 그때 기록에는 막힌 탭의 충돌과 하트 애니메이션이 문제없다고 남아 있습니다. 순서를 측정한 기록은 없습니다. 고친 것도 결과 화면 배경의 농도, 색종이 크기·개수, 맞닿은 화살표의 색 배정이었습니다. 보고에는 "프레임 단위로 확인했다"고 적혔지만, 재작성한 코드 안에서 하트는 여전히 탭 순간에 줄었습니다.</p>
+      <p>약 15분 뒤 운영자가 더 깊이 분석해서 다시 하라고 지시했습니다. 에이전트는 분석을 세 갈래로 돌렸고, 그중 손맛 리뷰 에이전트가 4분 51초 만에 보고서를 냈습니다. 영상에서 찾은 문제 6건, 권고 14건이었습니다.</p>
+      <figure class="ax-fig"><img src="/assets/ax/game-feel-frame-review-2-ko.webp" width="1200" height="934" alt="단계 그림: 22:05 혹평, 22:16 재작성 da0e624, 22:31 재지시, 22:37 리뷰 제출, 22:47 3eb21df, 23:02 크래시 보고, 23:07 65dcf41 순서로 이어졌다." loading="lazy"><figcaption>22:05 혹평부터 23:07 크래시 수정까지 약 1시간이 걸렸습니다.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="cause-chain">
+      <h2 id="cause-chain">하트 코드가 애니메이션 시작 다음 줄에 있었습니다</h2>
+      <p>순서가 뒤집힌 직접 원인은 호출 순서입니다. <code>bump</code>는 코루틴으로 애니메이션을 띄우고 바로 돌아오기 때문에, 그다음 두 줄이 탭을 처리하는 그 프레임에 실행됩니다.</p>
+      <pre><code>is TapResult.Blocked -&gt; {
+    fx.bump(id, distance, r.blockers)  // 애니메이션을 띄우고 바로 반환
+    lives = state.lives                // 탭 순간에 하트 감소
+    feedback.blocked(view)             // 탭 순간에 소리와 진동
+}</code></pre>
+      <p>한 단계 아래에서는 <code>state.tap()</code>이 결과를 그 자리에서 확정하고 화면 코드가 그 자리에 붙어 있어, 판정 시각과 표시 시각이 나뉘지 않았습니다.</p>
+      <p>막힌 화살표가 막는 화살표까지 나가는 찌르기 시간은 거리에 따라 달랐습니다. 식은 <code>(90 + 45 * distance).toInt().coerceAtMost(260)</code>입니다. 리뷰 문서는 접촉이 탭 90~260ms 뒤라고 적었는데, 이 값은 이 식의 양 끝입니다. 거리 값은 <code>k + 0.55</code>라서 실제로 막힌 탭은 약 114ms가 가장 짧고, 녹화에서 측정한 찌르기는 117ms였습니다. 이 탭은 식의 가장 짧은 경우에 가깝고, 먼 곳에서 막혔다면 식으로는 뒤집힘이 260ms 가까이 벌어집니다.</p>
+    </section>
+
+    <section aria-labelledby="review-question">
+      <h2 id="review-question">프레임 수보다 리뷰에 던진 질문이 달랐습니다</h2>
+      <p>첫 확인이 통과시킨 막힌 탭 동작이 리뷰에서는 문제로 올라왔습니다. 리뷰 에이전트도 같은 영상을 10fps로 잘라 149장을 봤습니다. 지시문에는 이벤트별 모션 타이밍과 이징, 이벤트별 피드백 층(시각·소리·진동), 프레임에서 보이는 끊김을 평가하라고 적혀 있었습니다.</p>
+      <p>10fps는 프레임 간격이 100ms라서 109ms 차이는 고작 한 칸입니다. 리뷰 에이전트는 코드를 먼저 읽고 149장을 본 뒤, 막힌 탭 구간만 30fps와 60fps로 다시 잘랐습니다.</p>
+      <p>순서 뒤집힘은 리뷰 문서에서 코드 행으로 짚였고, 프레임 번호가 붙은 근거는 없습니다. 날아가는 화살표가 하트와 상태바 위를 지나가는 장면(f58, f62, f89), 시작 팝인이 스플래시 페이드에 가려지는 장면(f21), 주황 화살표에서 빨간 경고 틴트가 거의 안 보이는 장면은 프레임에서 나왔습니다. 호출 순서와 소리·진동 시점은 코드로, 화면에 보이는지와 실제 시각은 프레임으로 확인하십시오.</p>
+    </section>
+
+    <section aria-labelledby="display-only">
+      <h2 id="display-only">판정은 두고 표시만 접촉 시점으로 옮겼습니다</h2>
+      <p>판정까지 접촉 시점으로 늦추는 방법도 있었지만 리뷰는 판정을 즉시 유지하라고 적었고, 구현도 그렇게 했습니다. 문서에 그 이유는 적혀 있지 않습니다. <code>bump</code>에 <code>onContact</code> 콜백을 넣어 하트, 소리, 진동만 그 안으로 옮겼습니다(3eb21df).</p>
+      <pre><code>fx.bump(id, dist, r.blockers) {        // 찌르기가 끝나면 호출
+    feedback.contact(view, costsLife = !tutorial)
+    if (!tutorial) lives = state.lives
+}</code></pre>
+      <p>거리에 비례하던 찌르기는 110ms로 고정해 접촉 시점이 거리에 따라 달라지지 않습니다. 이번 두 탭의 찌르기는 수정 전후 모두 117ms였고, 달라진 것은 하트의 위치입니다. 판을 흔드는 양은 0.12칸에서 4dp로 줄였고, 빨간색은 접촉 링에만 남겼습니다. 막힌 화살표는 진한 색으로 변하고, 막는 화살표에는 흰 윤곽선이 생깁니다.</p>
+      <p>콜백 안의 <code>lives = state.lives</code>는 연타가 들어오면 최종값으로 건너뛰었고, 다음 날 아침 6133e9e에서 접촉 하나에 하트 하나씩 줄도록 고쳤습니다. 그 사고는 <a href="/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드</a>에 따로 적었습니다.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EB%AA%A8%EB%B0%94%EC%9D%BC%20%EA%B2%8C%EC%9E%84%20%EC%86%90%EB%A7%9B%20%EA%B0%9C%EC%84%A0%3A%20%ED%95%98%ED%8A%B8%EA%B0%80%20%EC%B6%A9%EB%8F%8C%EB%B3%B4%EB%8B%A4%20109ms%20%EB%A8%BC%EC%A0%80%20%EC%A4%84%EB%8D%98%20%EC%88%9C%EC%84%9C%EB%A5%BC%20%EC%BD%94%EB%93%9C%EC%99%80%20%EB%85%B9%ED%99%94%20%ED%94%84%EB%A0%88%EC%9E%84%EC%9C%BC%EB%A1%9C%20%EC%B0%BE%EC%95%98%EB%8B%A4">메일로 문의하기</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="colors">
+      <h2 id="colors">8색을 지키는 대신 6색으로 줄였습니다</h2>
+      <p>리뷰는 색도 측정했습니다. Machado 2009 시뮬레이션 행렬에 색차 공식 CIEDE2000을 적용했고, 문서는 색차 10 미만을 구분이 어려운 값으로 잡았습니다. 2026년 11월 4일에 이 공식을 따로 구현해 다시 계산했더니 값이 모두 일치했습니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">조건</th><th scope="col">옛 8색 최소 색차</th><th scope="col">새 6색 최소 색차</th></tr></thead>
+          <tbody>
+            <tr><td>정상 시각</td><td>12.8</td><td>22.5</td></tr>
+            <tr><td>적색약</td><td>5.5</td><td>17.0</td></tr>
+            <tr><td>녹색약</td><td>7.4</td><td>16.7</td></tr>
+            <tr><td>청색약</td><td>2.7</td><td>18.5</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>종이색 배경 대비는 amber가 2.43:1, green이 2.9:1로 WCAG 1.4.11 기준 3:1에 못 미쳤습니다. 경고색 빨강과 주황 화살표의 색차는 정상 시각에서 11.1이지만 청색약에서는 2.0까지 떨어졌습니다. 그래서 막힘 상태는 모양과 움직임으로 보여 주기로 했습니다. 리뷰는 8색 전부를 색각 이상에서 안전하게 만들기는 사실상 어렵다고 봤고, 이웃 그래프가 평면 그래프라 6색이면 충분하다고 적었습니다.</p>
+      <p>여기서 리뷰가 틀렸습니다. 대비를 맞추려고 amber를 <code>B87A00</code>으로 낮추라고 권했는데, 이 색을 쓰면 녹색약에서 주황과의 색차가 7.4에서 2.4로 나빠집니다. 리뷰 에이전트는 이 값을 22:35 실행 출력에서 봤는데도 권고를 그대로 남겼습니다. 구현을 맡은 에이전트는 한 색만 고치지 않고 6색 조합을 탐색해 팔레트를 통째로 새로 골랐습니다. 리뷰가 제시한 색차 20 이상은 채우지 못했고 16.7을 하한으로 받아들였습니다.</p>
+    </section>
+
+    <section aria-labelledby="first-tap-crash">
+      <h2 id="first-tap-crash">리뷰대로 만들자 첫 탭에서 앱이 죽었습니다</h2>
+      <p>권고 14번은 삼성 기기에서 약한 진동을 <code>VibrationEffect.Composition</code>으로 교체하라는 내용이었고, 필요한 권한은 적혀 있지 않았습니다. 3eb21df는 이 권고를 넣으면서 <code>VIBRATE</code> 권한을 선언하지 않았습니다. 첫 화살표가 나가는 순간 <code>SecurityException</code>이 났습니다.</p>
+      <p>에이전트는 22:46에 튜토리얼 확인 스크립트가 크래시 없이 끝났다고 봤고, S24에는 설치와 실행만 확인한 상태였습니다. 운영자가 테스트가 끝난 거냐고 되묻자 그제야 아니라고 답했습니다. 약 4분 뒤 운영자가 S24에서 직접 눌러 튜토리얼 오류를 찾았습니다. 처음 설치 상태의 S21에서 monkey를 돌리자 800 이벤트 중 15번째에 죽었습니다. 22:47에는 레벨 확인 스크립트가 같은 코드로 화살표를 16개 제거하고도 죽지 않았습니다. 두 스크립트가 왜 이 크래시를 못 봤는지는 기록만으로 확정하지 못했습니다.</p>
+      <p>65dcf41이 권한을 선언하고 진동 실패를 기본 진동으로 넘겼고, S21에서 3개 시드로 800 이벤트씩 돌려 치명 오류 0건을 확인했습니다. 바로 뒤 f7beb3d는 처음 설치 상태의 monkey 검사를 스크립트로 고정했습니다.</p>
+    </section>
+
+    <section aria-labelledby="procedure">
+      <h2 id="procedure">막힌 탭을 녹화해 표를 만들고, 고친 뒤 다시 만듭니다</h2>
+      <ol>
+        <li>실기기에서 이벤트가 모두 나오는 판을 녹화합니다. 막힘, 제거, 클리어가 한 번씩은 들어가게 합니다.</li>
+        <li>전체를 10fps로 잘라 시트로 묶고, 프레임 번호를 찍어 에이전트에게 보입니다.</li>
+        <li>에이전트에게 코드를 함께 읽히고 "이벤트별로 원인 프레임, 결과 프레임, 소리·진동 호출 위치를 표로 내라. 결과가 원인보다 앞서는 곳을 찾아라. 각 수치가 코드 식인지 영상 실측인지 표시하라"고 시킵니다. 지시문에 "더 좋게"는 쓰지 않습니다.</li>
+        <li>의심 구간만 60fps로 다시 잘라 눈으로 보고, 시각은 원본 프레임의 타임스탬프에서 읽습니다.</li>
+        <li>고친 뒤 같은 장면을 녹화해 같은 표를 채우고, 처음 설치 상태에서 monkey까지 돌립니다. 방법은 <a href="/ax/fresh-install-monkey-test/">신규 설치 몽키 테스트</a> 글에 있습니다.</li>
+      </ol>
+      <pre><code>adb shell screenrecord --time-limit 25 --bit-rate 8000000 /sdcard/run.mp4
+adb pull /sdcard/run.mp4
+ffmpeg -i run.mp4 -vf fps=10,scale=360:-1 f_%04d.png
+ffmpeg -ss 3.6 -t 0.9 -i run.mp4 -vf fps=60,scale=360:-1 g_%03d.png</code></pre>
+      <p><code>-ss 3.6 -t 0.9</code>는 자기 영상의 막힌 탭 시각으로 교체합니다. 아래 코드는 프레임마다 시각과, 밝기 차이가 25를 넘는 픽셀 수를 헤더·판 영역별로 찍습니다. 영역 비율은 게임마다 다릅니다.</p>
+      <pre><code>import cv2
+c = cv2.VideoCapture("run.mp4")
+H = int(c.get(cv2.CAP_PROP_FRAME_HEIGHT)); prev = None
+while True:
+    ok, f = c.read()
+    if not ok: break
+    t = c.get(cv2.CAP_PROP_POS_MSEC)
+    g = cv2.cvtColor(f, cv2.COLOR_BGR2GRAY)
+    if prev is not None:
+        d = cv2.absdiff(g, prev) &gt; 25
+        print(round(t), d[int(H*.04):int(H*.1)].sum(), d[int(H*.12):int(H*.8)].sum())
+    prev = g</code></pre>
+      <p>이 글의 표는 OpenCV로 두 영상의 원본 프레임(수정 전 1,276장, 수정 뒤 1,840장)을 그대로 읽어 얻었습니다. 화면이 멈춘 동안은 프레임이 나오지 않습니다. 두 녹화의 간격은 중앙값 8ms, 최대 3초였으니 프레임 번호를 시각으로 환산하지 마십시오.</p>
+    </section>
+
+    <section aria-labelledby="outside-video">
+      <h2 id="outside-video">소리, 진동, 손가락, 긴 플레이는 영상 밖입니다</h2>
+      <p>소리는 화면 녹화에 담기지 않았고 진동 세기도 영상으로 알 수 없습니다. 자동 탭은 칸 정중앙만 누르므로 실제 손가락의 정확도도 알려 주지 않습니다. 긴 플레이에서만 나오는 결함도 마찬가지입니다. 이 게임의 스프링 복귀 크래시는 다음 날 300판 스트레스 실행에서 28번 나왔습니다.</p>
+      <p>판이 쉬웠던 문제는 재작성 보고에 이미 적혀 있었고, 같은 밤 별도의 레벨 분석이 수치로 잡아 생성기를 고쳤습니다. 레벨 생성 쪽 기록은 <a href="/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a>에 있습니다.</p>
+    </section>
+
+    <section aria-labelledby="next-checks">
+      <h2 id="next-checks">먼 거리 막힘과 리텐션은 재지 않았습니다</h2>
+      <p>먼 곳에서 막힌 화살표는 측정하지 않았습니다. 손맛이 나아졌는지를 리텐션 같은 플레이어 지표로 비교한 값도 없습니다.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EB%AA%A8%EB%B0%94%EC%9D%BC%20%EA%B2%8C%EC%9E%84%20%EC%86%90%EB%A7%9B%20%EA%B0%9C%EC%84%A0%3A%20%ED%95%98%ED%8A%B8%EA%B0%80%20%EC%B6%A9%EB%8F%8C%EB%B3%B4%EB%8B%A4%20109ms%20%EB%A8%BC%EC%A0%80%20%EC%A4%84%EB%8D%98%20%EC%88%9C%EC%84%9C%EB%A5%BC%20%EC%BD%94%EB%93%9C%EC%99%80%20%EB%85%B9%ED%99%94%20%ED%94%84%EB%A0%88%EC%9E%84%EC%9C%BC%EB%A1%9C%20%EC%B0%BE%EC%95%98%EB%8B%A4">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>게임 피드백 애니메이션 타이밍은 몇 ms로 맞춰야 하나요?</summary><div><p>이 게임은 찌르기를 110ms로 고정하고 하트, 소리, 진동을 접촉 콜백에 넣었습니다. 다른 게임에 그대로 옮길 값으로 검증한 것은 아닙니다.</p></div></details>
+        <details><summary>녹화 영상은 몇 fps로 잘라야 하나요?</summary><div><p>전체를 볼 때는 10fps, 구간을 볼 때는 60fps를 쓰고, 시각은 원본 프레임에서 읽으십시오. 이 녹화는 평균 85.58fps로 잡혔습니다.</p></div></details>
+        <details><summary>디버그 빌드로 재도 되나요?</summary><div><p>순서를 찾는 데는 충분했습니다. 이 글의 두 영상은 디버그 빌드입니다. 릴리스 빌드에서 같은 측정은 하지 않았으므로, 프레임 지연까지 비교하려면 릴리스 빌드로 다시 측정하십시오.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
+        <li><a href="/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
+        <li><a href="/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
+        <li><a href="/ax/puzzle-first-chapter-walls/">퍼즐 게임 첫날 이탈 분석: 기기별 이벤트 순서와 판별 계산으로 찾은 첫 장의 벽 4판</a></li>
+        <li><a href="/ax/privacy-policy-code-audit/">앱 개인정보처리방침 직접 작성: &#x27;수집하지 않음&#x27; 템플릿을 버리고 코드 감사로 다시 썼다</a></li>
+        <li><a href="/ax/r8-gson-field-names/">단위 테스트 203개가 놓친 릴리스 전용 빈 값: R8과 Gson 필드 이름</a></li>
+      </ul>
+      <p><a href="/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="/ax/">AX 노트 전체 보기</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>한 가지 일을 간단하게 하는 Android 앱</p>
+        <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">앱</p>
+        <ul><li><a href="/apps/sugaralbum/">슈가앨범</a></li><li><a href="/apps/image-compress/">사진 용량 줄이기</a></li><li><a href="/apps/image-flip/">사진 반전·회전</a></li><li><a href="/apps/image-convert/">이미지 변환 JPG·PNG·WebP</a></li><li><a href="/apps/sugarspeller/">한글 띄어쓰기</a></li><li><a href="/apps/sugarclip/">SugarClip</a></li><li><a href="/apps/doc-viewer/">한글뷰어 슈가독</a></li><li><a href="/apps/sugarcard/">생생카드</a></li><li><a href="/apps/arrow-knots/">화살표 매듭풀기</a></li><li><a href="/apps/blocks/">한판블록</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">사이트</p>
+        <ul><li><a href="/apps/">모든 앱</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li><li><a href="/sitemap/">사이트맵</a></li><li><a href="/rss.xml">RSS 피드</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play 개발자 페이지</a></div>
+    </div>
+  </footer>
+</body>
+</html>

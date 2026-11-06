@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Game feel fix: a heart that fell 109 ms early – SugarMount</title>
+  <meta name="description" content="Tapping a blocked arrow changed the heart 109 ms before contact. How the code and recorded frames exposed the order, and what moved to the moment of contact.">
+  <meta name="robots" content="max-image-preview:large">
+  <link rel="canonical" href="https://sugarmount21.com/en/ax/game-feel-frame-review/">
+  <link rel="alternate" hreflang="ko" href="https://sugarmount21.com/ax/game-feel-frame-review/">
+  <link rel="alternate" hreflang="en" href="https://sugarmount21.com/en/ax/game-feel-frame-review/">
+  <link rel="alternate" hreflang="x-default" href="https://sugarmount21.com/ax/game-feel-frame-review/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Game feel fix: a heart that fell 109 ms early – SugarMount">
+  <meta property="og:description" content="Tapping a blocked arrow changed the heart 109 ms before contact. How the code and recorded frames exposed the order, and what moved to the moment of contact.">
+  <meta property="og:url" content="https://sugarmount21.com/en/ax/game-feel-frame-review/">
+  <meta property="og:image" content="https://sugarmount21.com/assets/og/ax-game-feel-frame-review-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="https://sugarmount21.com/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/svg+xml" href="https://sugarmount21.com/assets/favicon.svg">
+  <link rel="apple-touch-icon" href="https://sugarmount21.com/assets/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://sugarmount21.com/en/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/site.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=e2770b30">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://sugarmount21.com/en/ax/game-feel-frame-review/#article","headline":"Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision","description":"Tapping a blocked arrow changed the heart 109 ms before contact. How the code and recorded frames exposed the order, and what moved to the moment of contact.","url":"https://sugarmount21.com/en/ax/game-feel-frame-review/","mainEntityOfPage":"https://sugarmount21.com/en/ax/game-feel-frame-review/","inLanguage":"en","articleSection":"Game development","datePublished":"2026-11-07T09:00:00+09:00","dateModified":"2026-11-07T09:00:00+09:00","image":["https://sugarmount21.com/assets/og/ax-game-feel-frame-review-en.png","https://sugarmount21.com/assets/ax/cover/game-feel-frame-review-en.webp","https://sugarmount21.com/assets/ax/game-feel-frame-review-1-en.webp","https://sugarmount21.com/assets/ax/game-feel-frame-review-2-en.webp"],"author":{"@id":"https://sugarmount21.com/#org"},"publisher":{"@id":"https://sugarmount21.com/#org"},"isPartOf":{"@id":"https://sugarmount21.com/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How many milliseconds should game feedback animation take?","acceptedAnswer":{"@type":"Answer","text":"This game fixes the poke at 110 ms and puts heart, sound and vibration in the contact callback. We haven't validated those values for any other game."}},{"@type":"Question","name":"What frame rate should I use to review a recording?","acceptedAnswer":{"@type":"Answer","text":"Use 10 fps to skim and 60 fps to look at a section, and read times from the original frames. This recording averaged 85.58 fps."}},{"@type":"Question","name":"Is a debug build good enough for this?","acceptedAnswer":{"@type":"Answer","text":"It was enough to find the order; both recordings here are debug builds. We didn't repeat the measurement on a release build, so use one if you also want to compare frame delays."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://sugarmount21.com/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://sugarmount21.com/en/ax/"},{"@type":"ListItem","position":3,"name":"Game development","item":"https://sugarmount21.com/en/ax/topic/games/"},{"@type":"ListItem","position":4,"name":"Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=e2770b30">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/game-feel-frame-review/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-games">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/games/">Game development</a></li><li><span aria-current="page">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/game-feel-frame-review-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX Notes · Method</span>
+      <h1>Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</h1>
+      <p class="lead">Don't stop at asking an agent to fix the animation. Give it the code and the recording's frames, and have it list each event's cause and effect in order. Use timing measurements to prove the fix.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Game development</span> <span aria-hidden="true">·</span> <span>10 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-11-07">November 7, 2026</time></p><!-- /build:meta -->
+      <p>Tap a blocked arrow in our puzzle game and the heart starts to change first; the arrow hits its blocker 109 ms later. That order is on a Galaxy S21 recording of <a href="/en/apps/arrow-knots/">Arrow Knots</a>, then unreleased, made on the night of October 1, 2026. When the operator called the animation sloppy, the agent committed 719 new lines 10 minutes 47 seconds later and the order stayed wrong. It changed only after a separate code and frame review that asked about timing per event. In the recording after the fix, the heart moves 16 ms after contact.</p>
+      <p class="note">Sources: commits da0e624, 3eb21df and 65dcf41 in the game repository, the review document, and that night's agent session logs. The 109 ms and 16 ms figures were measured from the original recordings on November 4, 2026. Clock times are Korea time.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (11)</summary><ol><li><a href="#measured-order">Measured again, the heart led by 109 ms</a></li><li><a href="#first-rebuild">A 719-line rewrite left the order alone</a></li><li><a href="#cause-chain">The heart code sat one line after the animation call</a></li><li><a href="#review-question">The reviewer was asked a different question</a></li><li><a href="#display-only">The rule stayed instant; only the display moved</a></li><li><a href="#colors">Eight colors became six</a></li><li><a href="#first-tap-crash">Following the review crashed the first tap</a></li><li><a href="#procedure">Record a blocked tap, fill the table, fix, fill it again</a></li><li><a href="#outside-video">Sound, haptics, fingers and long sessions stay off camera</a></li><li><a href="#next-checks">Far-blocked taps and retention weren&#x27;t measured</a></li><li><a href="#faq">Frequently asked questions</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#measured-order">Measured again, the heart led by 109 ms</a></li><li><a href="#first-rebuild">A 719-line rewrite left the order alone</a></li><li><a href="#cause-chain">The heart code sat one line after the animation call</a></li><li><a href="#review-question">The reviewer was asked a different question</a></li><li><a href="#display-only">The rule stayed instant; only the display moved</a></li><li><a href="#colors">Eight colors became six</a></li><li><a href="#first-tap-crash">Following the review crashed the first tap</a></li><li><a href="#procedure">Record a blocked tap, fill the table, fix, fill it again</a></li><li><a href="#outside-video">Sound, haptics, fingers and long sessions stay off camera</a></li><li><a href="#next-checks">Far-blocked taps and retention weren&#x27;t measured</a></li><li><a href="#faq">Frequently asked questions</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="measured-order">
+      <h2 id="measured-order">Measured again, the heart led by 109 ms</h2>
+      <p>The recordings from before and after the fix each hold one blocked tap. We decoded both frame by frame, counted pixels whose brightness changed by more than 25 between frames, split the count into the header and the board, then checked the result against contact sheets by eye. The median frame gap was about 8 ms, which set the resolution. A 60 Hz screen would limit it to about 17 ms.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Event</th><th scope="col">Before (level 151)</th><th scope="col">After (level 52)</th></tr></thead>
+          <tbody>
+            <tr><td>Arrow starts moving</td><td>3,807 ms</td><td>3,851 ms</td></tr>
+            <tr><td>Heart starts changing</td><td>3,815 ms</td><td>3,984 ms</td></tr>
+            <tr><td>Contact (board shake before, contact ring after)</td><td>3,924 ms</td><td>3,968 ms</td></tr>
+            <tr><td>Heart relative to contact</td><td>109 ms early</td><td>16 ms late</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Before the fix, the heart began to swell 8 ms after the arrow set off and had faded about halfway by the time anything touched. The review document describes this scene as the effect coming before the cause. That night the reviewer printed time-stamped 60 fps frame differences, and the output showed the heart changing at 3.817 s and the board at 3.933 s, but the review document recorded no measured value. The 109 ms was measured from the original frames a month after the fix.</p>
+      <p>In the fixed code, the contact callback runs before the ring is drawn. The 16 ms in the video is about two frames, so read it as the delay until each change reaches the screen. Nobody tuned it to that value.</p>
+      <figure class="ax-fig"><img src="/assets/ax/game-feel-frame-review-1-en.webp" width="1200" height="594" alt="Comparison: before the fix the heart changed at 3,815 ms, 109 ms ahead of contact at 3,924 ms; after the fix contact came at 3,968 ms and the heart followed at 3,984 ms, 16 ms later." loading="lazy"><figcaption>The heart used to change 109 ms before contact; after the fix it follows contact by 16 ms.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="first-rebuild">
+      <h2 id="first-rebuild">A 719-line rewrite left the order alone</h2>
+      <p>At 22:05 the operator's verdict, roughly, was that the animation was too sloppy for anyone to bother playing. The agent assumed the game lacked effects. It added snake-like exits, five synthesized sound effects, vibration, confetti and a star card, and committed da0e624 at 22:16.</p>
+      <p>It had looked at frames too: 89 at 5 fps, then 162 and 149 at 10 fps, recorded on the S21. Its notes from that pass say the blocked bump and the heart animation checked out. Nothing in the log times their order. What it changed afterward was the result backdrop, the confetti and the coloring of touching arrows. The report said the work was checked frame by frame. In the rewritten code the heart still dropped at the moment of the tap.</p>
+      <p>About fifteen minutes later the operator told it to analyze more deeply. The agent split the work into three tracks, and the game-feel reviewer came back in 4 minutes 51 seconds with 6 problems seen on video and 14 recommendations.</p>
+      <figure class="ax-fig"><img src="/assets/ax/game-feel-frame-review-2-en.webp" width="1200" height="986" alt="Step diagram: 22:05 criticism, 22:16 rewrite da0e624, 22:31 second request, 22:37 review filed, 22:47 3eb21df, 23:02 crash report, 23:07 65dcf41." loading="lazy"><figcaption>From the 22:05 criticism to the 23:07 crash fix took about an hour.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="cause-chain">
+      <h2 id="cause-chain">The heart code sat one line after the animation call</h2>
+      <p><code>bump</code> launches its animation in a coroutine and returns immediately, so the next two lines run in the same frame that handles the tap.</p>
+      <pre><code>is TapResult.Blocked -&gt; {
+    fx.bump(id, distance, r.blockers)  // starts the animation, returns at once
+    lives = state.lives                // heart drops at the tap
+    feedback.blocked(view)             // sound and vibration at the tap
+}</code></pre>
+      <p>One level down, <code>state.tap()</code> settled the outcome on the spot and the UI code sat right there, so nothing separated rule time from display time.</p>
+      <p>The poke that sends a blocked arrow to its blocker took longer with distance: <code>(90 + 45 * distance).toInt().coerceAtMost(260)</code>. The review document put contact 90 to 260 ms after the tap; those are the two ends of this formula. Distance is <code>k + 0.55</code>, so a real blocked tap takes at least about 114 ms. The recording showed 117 ms. This tap sits near the formula's shortest case; by the formula, a far-blocked arrow would have widened the reversal to nearly 260 ms.</p>
+    </section>
+
+    <section aria-labelledby="review-question">
+      <h2 id="review-question">The reviewer was asked a different question</h2>
+      <p>The blocked-tap behavior the first pass approved came back as a problem in the review. The reviewer also cut the same video into 149 frames at 10 fps. Its brief asked for motion timing and easing per event, feedback layering per event (visual, audio, haptic), and any abrupt cuts visible frame by frame.</p>
+      <p>At 10 fps, frames are 100 ms apart, so a 109 ms gap is a single step. The reviewer read the code first, skimmed the 149 frames, then recut only the blocked-tap section at 30 and 60 fps.</p>
+      <p>The review document pinned the reversed order on code lines and cited no frame numbers for it. An arrow flying over the hearts and status bar (frames 58, 62 and 89), the opening pop-in hidden by the splash fade (frame 21), and a red warning tint that barely showed on the vermilion arrow all came from frames. Take call order and the timing of sound and vibration from the code; take what shows on screen and the actual timestamps from the frames.</p>
+    </section>
+
+    <section aria-labelledby="display-only">
+      <h2 id="display-only">The rule stayed instant; only the display moved</h2>
+      <p>Delaying the rule result until contact was an option, but the review said to keep it immediate and the build followed. The document doesn't give a reason. <code>bump</code> gained an <code>onContact</code> callback, and heart, sound and vibration moved inside it (3eb21df).</p>
+      <pre><code>fx.bump(id, dist, r.blockers) {        // called when the poke lands
+    feedback.contact(view, costsLife = !tutorial)
+    if (!tutorial) lives = state.lives
+}</code></pre>
+      <p>The poke became a fixed 110 ms instead of scaling with distance, so contact no longer shifts with distance. The poke in these two taps took 117 ms both before and after; what moved was the heart. Board shake dropped from 0.12 of a cell to 4 dp, and red now appears only in the contact ring. The blocked arrow darkens and its blocker gets a white outline.</p>
+      <p>Under rapid taps, <code>lives = state.lives</code> in the callback jumped straight to the final count, and 6133e9e fixed that the next morning by dropping one heart per contact. That incident has its own note: <a href="/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button</a>.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Mobile%20game%20feel%3A%20frame%20timing%20showed%20our%20heart%20penalty%20landing%20109%20ms%20before%20the%20collision">Email us</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="colors">
+      <h2 id="colors">Eight colors became six</h2>
+      <p>The review measured color as well, using the Machado 2009 simulation matrices with the CIEDE2000 color-difference formula, and treated a difference under 10 as hard to tell apart. We implemented the formula separately on November 4, 2026, and every value matched.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Vision</th><th scope="col">Old 8 colors, smallest difference</th><th scope="col">New 6 colors, smallest difference</th></tr></thead>
+          <tbody>
+            <tr><td>Typical</td><td>12.8</td><td>22.5</td></tr>
+            <tr><td>Protan</td><td>5.5</td><td>17.0</td></tr>
+            <tr><td>Deutan</td><td>7.4</td><td>16.7</td></tr>
+            <tr><td>Tritan</td><td>2.7</td><td>18.5</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Against the paper background, amber reached 2.43:1 and green 2.9:1, both under the 3:1 in WCAG 1.4.11. The warning red and the vermilion arrow differed by 11.1 for typical vision but only 2.0 under tritan simulation, so blocked state ended up carried by shape and motion. The review judged that making all eight colors safe for color vision deficiency was close to impossible, and noted that six colors are enough because the neighbor graph is planar.</p>
+      <p>To fix contrast the review recommended darkening amber to <code>B87A00</code>, which made things worse: it cuts the deutan difference from vermilion from 7.4 to 2.4. The reviewer saw that number in its own 22:35 run and left the advice in. The agent doing the implementation searched six-color combinations and replaced the whole palette. That search missed the review's target of 20, and 16.7 became the accepted minimum.</p>
+    </section>
+
+    <section aria-labelledby="first-tap-crash">
+      <h2 id="first-tap-crash">Following the review crashed the first tap</h2>
+      <p>Recommendation 14 said to replace weak vibration on Samsung devices with <code>VibrationEffect.Composition</code>. It didn't mention permissions, and 3eb21df shipped the change without declaring <code>VIBRATE</code>, so the first arrow to leave the board threw <code>SecurityException</code>.</p>
+      <p>At 22:46 the agent had a tutorial script finish without a crash, and on the S24 it had only confirmed install and launch. Asked whether testing was done, it said no. About four minutes later the operator found the tutorial error by hand on that S24. A monkey run on an S21 from fresh state died at event 15 of 800. At 22:47 a level-check script had removed 16 arrows on the same code without dying. The logs don't settle why either script missed it.</p>
+      <p>65dcf41 declared the permission and made vibration failures fall back to standard haptics. Three seeds of 800 events each on the S21 gave zero fatal errors. Right after that, f7beb3d turned the fresh-state monkey run into a script.</p>
+    </section>
+
+    <section aria-labelledby="procedure">
+      <h2 id="procedure">Record a blocked tap, fill the table, fix, fill it again</h2>
+      <ol>
+        <li>Record a level on a real device, with every event in it at least once: blocked, removed, cleared.</li>
+        <li>Cut the whole clip at 10 fps, number the frames on a contact sheet, and show the agent.</li>
+        <li>Have the agent read the code too, and tell it: "For each event, give me a table of cause frame, effect frame, and where sound and vibration are called. Find where an effect comes before its cause. Mark each number as a code formula or a video measurement." Leave "make it better" out of the brief.</li>
+        <li>Recut only the suspect section at 60 fps to look at it, and read times from the original frames' timestamps.</li>
+        <li>After the fix, record the same scene, fill in the same table, and run monkey from fresh state, as in <a href="/en/ax/fresh-install-monkey-test/">the fresh-install monkey test</a> note.</li>
+      </ol>
+      <pre><code>adb shell screenrecord --time-limit 25 --bit-rate 8000000 /sdcard/run.mp4
+adb pull /sdcard/run.mp4
+ffmpeg -i run.mp4 -vf fps=10,scale=360:-1 f_%04d.png
+ffmpeg -ss 3.6 -t 0.9 -i run.mp4 -vf fps=60,scale=360:-1 g_%03d.png</code></pre>
+      <p>Replace <code>-ss 3.6 -t 0.9</code> with the time of the blocked tap in your own video. The code below prints each frame's time and, for the header and board regions, how many pixels changed in brightness by more than 25. Region ratios differ per game.</p>
+      <pre><code>import cv2
+c = cv2.VideoCapture("run.mp4")
+H = int(c.get(cv2.CAP_PROP_FRAME_HEIGHT)); prev = None
+while True:
+    ok, f = c.read()
+    if not ok: break
+    t = c.get(cv2.CAP_PROP_POS_MSEC)
+    g = cv2.cvtColor(f, cv2.COLOR_BGR2GRAY)
+    if prev is not None:
+        d = cv2.absdiff(g, prev) &gt; 25
+        print(round(t), d[int(H*.04):int(H*.1)].sum(), d[int(H*.12):int(H*.8)].sum())
+    prev = g</code></pre>
+      <p>The table above came from decoding every original frame with OpenCV: 1,276 before the fix and 1,840 after. No frames arrive while the screen is still. Gaps in these recordings had a median of 8 ms and a maximum of 3 seconds, so never convert frame numbers to time.</p>
+    </section>
+
+    <section aria-labelledby="outside-video">
+      <h2 id="outside-video">Sound, haptics, fingers and long sessions stay off camera</h2>
+      <p>Sound didn't make it into the screen recording, and video can't show vibration strength. Automated taps hit the exact center of a cell, so they say nothing about real finger accuracy. Long-session defects are missed as well: this game's spring-back crash appeared 28 times in a 300-level stress run the next day.</p>
+      <p>The boards being too easy was already flagged in the rewrite report, and separate level analysis measured and fixed it the same night. The generator side is covered in <a href="/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a>.</p>
+    </section>
+
+    <section aria-labelledby="next-checks">
+      <h2 id="next-checks">Far-blocked taps and retention weren't measured</h2>
+      <p>An arrow blocked from far away wasn't timed. We have no player metric, such as retention, comparing game feel before and after.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Mobile%20game%20feel%3A%20frame%20timing%20showed%20our%20heart%20penalty%20landing%20109%20ms%20before%20the%20collision">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">Frequently asked questions</h2>
+      <div class="faq">
+        <details><summary>How many milliseconds should game feedback animation take?</summary><div><p>This game fixes the poke at 110 ms and puts heart, sound and vibration in the contact callback. We haven't validated those values for any other game.</p></div></details>
+        <details><summary>What frame rate should I use to review a recording?</summary><div><p>Use 10 fps to skim and 60 fps to look at a section, and read times from the original frames. This recording averaged 85.58 fps.</p></div></details>
+        <details><summary>Is a debug build good enough for this?</summary><div><p>It was enough to find the order; both recordings here are debug builds. We didn't repeat the measurement on a release build, so use one if you also want to compare frame delays.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
+        <li><a href="/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+      </ul>
+      <p><a href="/en/ax/topic/games/">All notes on Game development</a> · <a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/sitemap/">Site map</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>
