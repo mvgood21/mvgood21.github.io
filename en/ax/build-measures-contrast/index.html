@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Measuring 4.5:1 colour contrast in the site build – SugarMount</title>
+  <meta name="description" content="Our site build computes 143 contrast pairs from 13 app accents and fails below 4.5:1. A dark hover pair failed for 7 of 11 apps; a CSS swap still slips past.">
+  <meta name="robots" content="max-image-preview:large">
+  <link rel="canonical" href="https://sugarmount21.com/en/ax/build-measures-contrast/">
+  <link rel="alternate" hreflang="ko" href="https://sugarmount21.com/ax/build-measures-contrast/">
+  <link rel="alternate" hreflang="en" href="https://sugarmount21.com/en/ax/build-measures-contrast/">
+  <link rel="alternate" hreflang="x-default" href="https://sugarmount21.com/ax/build-measures-contrast/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Measuring 4.5:1 colour contrast in the site build – SugarMount">
+  <meta property="og:description" content="Our site build computes 143 contrast pairs from 13 app accents and fails below 4.5:1. A dark hover pair failed for 7 of 11 apps; a CSS swap still slips past.">
+  <meta property="og:url" content="https://sugarmount21.com/en/ax/build-measures-contrast/">
+  <meta property="og:image" content="https://sugarmount21.com/assets/og/ax-build-measures-contrast-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="https://sugarmount21.com/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/svg+xml" href="https://sugarmount21.com/assets/favicon.svg">
+  <link rel="apple-touch-icon" href="https://sugarmount21.com/assets/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://sugarmount21.com/en/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/site.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=e2770b30">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://sugarmount21.com/en/ax/build-measures-contrast/#article","headline":"4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps","description":"Our site build computes 143 contrast pairs from 13 app accents and fails below 4.5:1. A dark hover pair failed for 7 of 11 apps; a CSS swap still slips past.","url":"https://sugarmount21.com/en/ax/build-measures-contrast/","mainEntityOfPage":"https://sugarmount21.com/en/ax/build-measures-contrast/","inLanguage":"en","articleSection":"Website and search","datePublished":"2026-11-06T09:00:00+09:00","dateModified":"2026-11-06T09:00:00+09:00","image":["https://sugarmount21.com/assets/og/ax-build-measures-contrast-en.png","https://sugarmount21.com/assets/ax/cover/build-measures-contrast-en.webp","https://sugarmount21.com/assets/ax/build-measures-contrast-1-en.webp","https://sugarmount21.com/assets/ax/build-measures-contrast-2-en.webp"],"author":{"@id":"https://sugarmount21.com/#org"},"publisher":{"@id":"https://sugarmount21.com/#org"},"isPartOf":{"@id":"https://sugarmount21.com/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Which text does the WCAG 4.5:1 contrast minimum apply to?","acceptedAnswer":{"@type":"Answer","text":"Normal-size text. WCAG 2 success criterion 1.4.3 sets 4.5:1 for normal text and 3:1 for large text. Our gate ignores text size and applies 4.5:1 to all 11 pairs."}},{"@type":"Question","name":"How is a contrast ratio calculated?","acceptedAnswer":{"@type":"Answer","text":"Take the relative luminance of both colours, L1 for the lighter and L2 for the darker, and compute (L1 + 0.05) / (L2 + 0.05). Relative luminance linearises the sRGB channels and sums 0.2126 R + 0.7152 G + 0.0722 B. The contrast() function in sds_apps.py is this formula."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://sugarmount21.com/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://sugarmount21.com/en/ax/"},{"@type":"ListItem","position":3,"name":"Website and search","item":"https://sugarmount21.com/en/ax/topic/web/"},{"@type":"ListItem","position":4,"name":"4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=e2770b30">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/build-measures-contrast/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-web">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/web/">Website and search</a></li><li><span aria-current="page">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/build-measures-contrast-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX notes · Measurement</span>
+      <h1>4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</h1>
+      <p class="lead">One accent colour per app turns into 11 text-on-background pairs. Our site build computes every one of them, and its --check fails if any pair drops below 4.5:1.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Website and search</span> <span aria-hidden="true">·</span> <span>9 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-11-06">November 6, 2026</time></p><!-- /build:meta -->
+      <p>In dark mode, putting the dark accent text colour on the pale accent background of a hovered outline button leaves 7 of our 11 apps below 4.5:1, the lowest at 4.17:1 (Arrow Knots). Commit <code>b82faac</code> (18 October 2026, the design-system rework) gave that spot its own text token, tuned against that background, and made the build compute 11 contrast pairs per app. With 13 apps today, the lowest of the 143 pairs is 4.60:1 (SugarCard).</p>
+      <p class="note">Sources: the site repository's git history and <code>tools/sds_apps.py</code>, and the design docs in our utilities app repository. All ratios were recomputed on 3 and 4 November 2026 in a copy of the site, using the contrast functions in <code>sds_apps.py</code>.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (8)</summary><ol><li><a href="#dark-hover">Dark hover contrast at b82faac: 4.17 to 4.66</a></li><li><a href="#sentence-rule">For 13 days the rule was one line of prose</a></li><li><a href="#cause">The dark accent was tuned against a different background</a></li><li><a href="#gate">The gate computes 11 pairs per app, 143 today</a></li><li><a href="#blind-spot">Swap the CSS pairing and the gate still passes</a></li><li><a href="#alternatives">color-mix() is banned by T3, and dark colours are not hand-picked</a></li><li><a href="#how-to">From one accent hex to a 143-pair gate in six steps</a></li><li><a href="#faq">FAQ</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#dark-hover">Dark hover contrast at b82faac: 4.17 to 4.66</a></li><li><a href="#sentence-rule">For 13 days the rule was one line of prose</a></li><li><a href="#cause">The dark accent was tuned against a different background</a></li><li><a href="#gate">The gate computes 11 pairs per app, 143 today</a></li><li><a href="#blind-spot">Swap the CSS pairing and the gate still passes</a></li><li><a href="#alternatives">color-mix() is banned by T3, and dark colours are not hand-picked</a></li><li><a href="#how-to">From one accent hex to a 143-pair gate in six steps</a></li><li><a href="#faq">FAQ</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="dark-hover">
+      <h2 id="dark-hover">Dark hover contrast at b82faac: 4.17 to 4.66</h2>
+      <p>Each app on this site has a single accent hex in <code>data/apps.json</code>. <code>sds_apps.py</code> computes nine colour tokens from it as CSS text, and <code>build.py</code> writes that to a file. In dark mode the pale background <code>bg-accent-weak</code> is 24% accent mixed into the default dark surface <code>#172131</code>. The dark text colour <code>fg-accent</code> is the accent with its HSL lightness raised 1% at a time until it reaches 4.6:1 on <code>#1D2940</code>, the lightest of the three dark neutral surfaces.</p>
+      <p>Put <code>fg-accent</code> text on <code>bg-accent-weak</code>, as a hovered outline button would, and the 11 apps at <code>b82faac</code> score: Arrow Knots 4.17, SugarSpeller 4.20, Compress Image 4.27, Flip &amp; Rotate Image 4.31, SugarCard 4.40, SugarAlbum 4.41, AXFamily 4.41, Block Turn 4.58, SugarClip 4.59, Convert Image 4.64, SugarDoc 4.66. Seven are under 4.5 and nine under 4.6.</p>
+      <figure class="ax-fig"><img src="/assets/ax/build-measures-contrast-1-en.webp" width="1200" height="1058" alt="Bar chart: in dark mode, putting fg-accent text on the weak accent background of an outline-button hover leaves 7 of 11 apps below 4.5:1, the lowest being Arrow Knots at 4.17:1." loading="lazy"><figcaption>Reusing the dark accent as hover text puts 7 of 11 apps below 4.5:1.</figcaption></figure>
+      <p>Our working notes say a review agent checking the design spec flagged this pair: "7 of 11 apps, lowest 4.17". We could not find the review itself, so we recomputed it from the app list at <code>b82faac</code> and got the same numbers. The implementation commit already shipped the fixed pairing: in <code>site.css</code>, <code>.button--outline:hover</code> uses <code>fg-accent-contrast</code> for its text and border.</p>
+    </section>
+
+    <section aria-labelledby="sentence-rule">
+      <h2 id="sentence-rule">For 13 days the rule was one line of prose</h2>
+      <p>The commit that first added the site pages, <code>00b093f</code> on 20 September 2026, set the default accent in <code>site.css</code> to <code>#00897B</code> ("default accent: SugarCompress"). The same day, the first commit of the utilities app repository (<code>7885e3e</code>) listed "compress (temp) #00897B" in its design tokens. Both commits carry an AI co-author trailer. White text on that colour is 4.32:1, and the colour as text on the light background <code>#F6F8FB</code> is 4.06:1.</p>
+      <p>The next day, the "Design v2" commit <code>33e6cc0</code> in the utilities repository (also AI co-authored) caught it. Line 46 of its design spec reads "temporary #00897B (4.3:1, fails AA) is replaced by #0F766E.", and line 20 makes 4.5:1 text contrast in both themes a principle. The site picked up <code>#0F766E</code> (white text 5.47:1) on 5 October, when commit <code>bdbbe97</code> introduced <code>data/apps.json</code>.</p>
+      <p>The contrast rule that commit added to <code>AGENTS.md</code> was a field description: <code>accent</code> "(hex, white text on it must reach 4.5:1)". Searching that commit's <code>tools/build.py</code> for <code>lumin</code>, <code>contrast</code> or <code>4.5</code> finds nothing.</p>
+      <p>The first assumption matched the line: if white text clears 4.5:1 on the accent, the accent is safe. But one accent becomes nine tokens per theme, and those tokens meet as text and background in 11 pairs. Today every white-on-accent pair across the 13 apps is 5.45:1 or higher, while the dark hover pair from the same accents goes down to 4.17.</p>
+    </section>
+
+    <section aria-labelledby="cause">
+      <h2 id="cause">The dark accent was tuned against a different background</h2>
+      <p>The dark hover used <code>fg-accent</code> for text and <code>bg-accent-weak</code> for the background. <code>fg-accent</code> only guarantees 4.6:1 on <code>#1D2940</code> (relative luminance 0.0222), and for the blue and teal apps the pale background is lighter than that. Arrow Knots' <code>bg-accent-weak</code>, <code>#14344E</code>, has a luminance of 0.0315, and the same text colour <code>#0A99EE</code> falls from 4.71 to 4.17. The purple and magenta apps passed because their pale backgrounds sit close to <code>#1D2940</code>: Convert Image (<code>#2C2359</code>, 0.0246) at 4.64 and SugarDoc (<code>#32223C</code>, 0.0215) at 4.66.</p>
+      <p>A second assumption, made while writing this note, was that raising the target to 4.6 would cover the hover too, but the 4.6 target is measured on <code>#1D2940</code>, so with today's formula the pair on the pale background is still 4.17.</p>
+      <p>The fix is a token per pair. <code>fg-accent-contrast</code> takes the dark accent and lightens it again, 1% at a time, until it reaches 4.6:1 on the pale background. For Arrow Knots that moves <code>#0A99EE</code> to <code>#17A2F5</code> and 4.17 to 4.61. The header of <code>sds_apps.py</code> states the rule as T2: "text on bg-accent-weak is fg-accent-contrast".</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%204.5%3A1%20contrast%20in%20the%20site%20build%3A%20the%20dark%20hover%20pair%20that%20failed%20for%207%20of%2011%20apps">Email us</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="gate">
+      <h2 id="gate">The gate computes 11 pairs per app, 143 today</h2>
+      <p>Inside <code>python tools/build.py --check</code>, which <code>AGENTS.md</code> says to run before every commit, <code>sds_gates()</code> checks three things. The rest of that check is described in <a href="/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a>.</p>
+      <ul>
+        <li>for each app, 11 pairs; any pair under 4.5:1 is an error, <code>SDS contrast &lt;app&gt;: &lt;pair names&gt;</code>. Pairs have names like <code>white on accent</code>, <code>accent on basement</code> and <code>d-contrast on d-weak</code>; the full list of 11 is in <code>audit()</code>;</li>
+        <li>the tokens read back from the generated <code>assets/sds-apps.css</code> must equal what <code>accent_tokens()</code> computes (rule T1: a literal hex per app);</li>
+        <li>the header mark colours in <code>site.css</code> must match the social-image generator <code>og.py</code>.</li>
+      </ul>
+      <p>The docstring explains the 4.6 target: "targets are 4.6:1 so rounding and browser blending never drop below 4.5:1". Every mix and lightness step rounds RGB to integers. Because of that margin, Block Turn (4.58) and SugarClip (4.59) also got their own token, and in the dark block of the generated CSS at <code>b82faac</code>, 9 of 11 apps declare a separate <code>fg-accent-contrast</code>.</p>
+      <p>We also ran a revert test. Setting Compress Image back to <code>#00897B</code> in the copy's <code>apps.json</code> made the gate print this (run with <code>--check</code> on 3 November, confirmed through <code>audit()</code> on 4 November):</p>
+      <pre><code>error: SDS contrast sugarcompress: white on accent, accent on basement
+1 gate error(s)</code></pre>
+      <p>Two apps arrived later, CarDrawer (<code>b79f2d1</code>, 19 October) and TrimBox (<code>7bb4744</code>, 31 October). Each added one hex to <code>apps.json</code>, and <code>sds_apps.py</code> has not changed since <code>b82faac</code>. The gate now computes 13 apps x 11 pairs = 143 pairs. Had the hover kept <code>fg-accent</code>, 9 of the 13 would be under 4.5, with TrimBox at 4.22 and CarDrawer at 4.39.</p>
+    </section>
+
+    <section aria-labelledby="blind-spot">
+      <h2 id="blind-spot">Swap the CSS pairing and the gate still passes</h2>
+      <p>On 3 November the agent that first drafted this note changed line 236 of the copy's <code>site.css</code> so the hover text was <code>var(--sds-fg-accent)</code> again, rebuilt, and ran <code>--check</code>, which printed <code>up to date; gates passed</code> with the 4.17:1 pair back in the stylesheet. The only thing <code>sds_gates()</code> reads from <code>site.css</code> is the header mark regex; contrast comes entirely from the token pairs listed in <code>audit()</code>.</p>
+      <p><code>site.css</code> uses <code>bg-accent-weak</code> as the background in six rules.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Line</th><th scope="col">Selector</th><th scope="col">Text token</th><th scope="col">In the gate's pairs?</th></tr></thead>
+          <tbody>
+            <tr><td>210</td><td><code>.app-tile:hover</code></td><td><code>fg-accent-contrast</code></td><td>Yes</td></tr>
+            <tr><td>236</td><td><code>.button--outline:hover</code></td><td><code>fg-accent-contrast</code></td><td>Yes</td></tr>
+            <tr><td>242</td><td><code>.badge</code></td><td><code>fg-accent-contrast</code></td><td>Yes</td></tr>
+            <tr><td>250</td><td><code>.trust li</code></td><td><code>fg-accent-contrast</code></td><td>Yes</td></tr>
+            <tr><td>356</td><td><code>[data-app] .note</code></td><td>body text <code>fg-neutral</code></td><td>No</td></tr>
+            <tr><td>449</td><td><code>.ax-cta</code></td><td>not set</td><td>No</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>On app pages, <code>.note</code> keeps <code>fg-neutral</code> body text (its border, links and the eyebrow use <code>fg-accent-contrast</code>: border on line 356, links and the eyebrow on line 358), and <code>.ax-cta</code> sets no text colour at all. Neither pair is among the 11, so neither is measured. We left both unfixed; that call belongs to whoever owns the build.</p>
+      <figure class="ax-fig"><img src="/assets/ax/build-measures-contrast-2-en.webp" width="1200" height="769" alt="Comparison: the contrast gate errors on the old accent #00897B, on any pair below 4.5:1 and on generated CSS that drifts, but passes a site.css change that puts fg-accent back on the hover, and the .note body text and .ax-cta text pairs." loading="lazy"><figcaption>The gate checks its fixed list of 11 pairs, not the text and background pairs the CSS actually uses.</figcaption></figure>
+      <p>Both the mistakes and the catches in this history are recorded in AI co-authored commits or agent work. The spec rule that a new accent should be at least dE00 12 (a colour-distance measure) from existing ones was left out of the gate because "the new-key dE00 &gt;= 12 rule needs a human to know which key is new"; the CLI only warns about pairs under dE00 8, currently 7 (smallest 2.2, Flip &amp; Rotate Image and Arrow Knots).</p>
+    </section>
+
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">color-mix() is banned by T3, and dark colours are not hand-picked</h2>
+      <p>Letting the browser blend hover colours with CSS <code>color-mix()</code> is banned by rule T3. The gate compares literal hex values in the generated CSS with computed ones, and a browser-blended colour gives it nothing to compare. Hand-picking dark colours per app was dropped too: the site went from 11 apps to 13, and that approach means a person picking nine tokens for every new app.</p>
+      <p>We measured rendered pixels in another app; that write-up is <a href="/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text</a>. <code>sds_apps.py</code> uses only the Python standard library and never starts a browser.</p>
+      <p>Without design tokens, with colours written per component, there is no pair list to compute in the first place. Gradients, text over photos and translucent layers don't reduce to two tokens, and this site doesn't measure them either.</p>
+    </section>
+
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">From one accent hex to a 143-pair gate in six steps</h2>
+      <ol>
+        <li>Keep one accent hex per brand or app in your source data and derive every other token with a function.</li>
+        <li>Write down every text-on-background pair. Then search the CSS for rules that use each background token (<code>grep -n "accent-weak" assets/site.css</code>) and check each rule's text token against your list, as in the table above.</li>
+        <li>Aim a little above 4.5 (we use 4.6), and give any pair that falls short its own token.</li>
+        <li>Fail the build check when any pair is under 4.5:1, and compare the generated CSS values with the computed ones.</li>
+        <li>Put an old failing colour into <code>apps.json</code> and run <code>python tools/build.py --check</code>: expect a line containing <code>1 gate error(s)</code>, and a line containing <code>up to date; gates passed</code> again once you revert. Then deliberately mismatch a CSS pairing, rebuild with <code>build.py</code> and run <code>--check</code>. Here it still says <code>gates passed</code>.</li>
+        <li>Run <code>python tools/sds_apps.py</code> to print the colour-distance warnings and have a person look; today it lists 7 pairs under dE00 8.</li>
+      </ol>
+      <p>Don't leave a contrast rule as a sentence in a doc. Make the build compute it from a list of colour pairs, and check that the list matches the pairs your CSS actually uses. We have only done the first half. The next step is a <code>--check</code> stage that extracts the text token of every rule with a <code>bg-accent-weak</code> background and compares it with the 11 pairs, and before that, measuring the <code>.note</code> body text and the <code>.ax-cta</code> text for the first time.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%204.5%3A1%20contrast%20in%20the%20site%20build%3A%20the%20dark%20hover%20pair%20that%20failed%20for%207%20of%2011%20apps">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Which text does the WCAG 4.5:1 contrast minimum apply to?</summary><div><p>Normal-size text. WCAG 2 success criterion 1.4.3 sets 4.5:1 for normal text and 3:1 for large text. Our gate ignores text size and applies 4.5:1 to all 11 pairs.</p></div></details>
+        <details><summary>How is a contrast ratio calculated?</summary><div><p>Take the relative luminance of both colours, L1 for the lighter and L2 for the darker, and compute (L1 + 0.05) / (L2 + 0.05). Relative luminance linearises the sRGB channels and sums 0.2126 R + 0.7152 G + 0.0722 B. The <code>contrast()</code> function in <code>sds_apps.py</code> is this formula.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
+        <li><a href="/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
+        <li><a href="/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
+        <li><a href="/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+      </ul>
+      <p><a href="/en/ax/topic/web/">All notes on Website and search</a> · <a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/sitemap/">Site map</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>

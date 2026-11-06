@@ -1,0 +1,80 @@
+[
+ {
+  "kind": "compare",
+  "ko": {
+   "title": "저장 버튼 뒤 BACK 시점: 첫 격자 5점과 다시 잡은 7점 (2026-10-18 릴리스 검증)",
+   "left": [
+    "첫 격자 (S21, 플래그 ON 이전 빌드)",
+    [
+     "BACK 0.3 / 1.0 / 1.8 / 2.6 / 3.5초",
+     "0.3초만 취소",
+     "나머지 4점은 저장이 끝난 뒤: 15쪽 PDF 851,990바이트가 남음"
+    ]
+   ],
+   "right": [
+    "다시 잡은 7점 (1.2.0 (5), minified 릴리스)",
+    [
+     "BACK 0.3 / 0.45 / 0.6 / 0.75 / 0.9 / 1.0 / 1.8초",
+     "S20 (Android 13): 0.9초까지 취소, 1.0초부터 완료",
+     "S21 (Android 15): 0.75초까지 취소, 0.9초부터 완료",
+     "빈 파일, 0바이트 파일, 크래시 0건"
+    ]
+   ],
+   "note": "47쪽 HWP를 처음 15쪽까지 PDF로 저장하는 시험입니다. 저장이 끝난 파일은 모두 15쪽이 온전했습니다.",
+   "alt": "비교 그림: 처음 BACK 시점 0.3, 1.0, 1.8, 2.6, 3.5초 중 취소된 것은 0.3초 하나였고, 다시 잡은 7점에서는 S20이 0.9초와 1.0초 사이, S21이 0.75초와 0.9초 사이에서 취소와 완료가 갈렸습니다.",
+   "caption": "처음 다섯 점 중 넷은 저장이 끝난 뒤였고, 경계 앞에 시점을 몰아 다시 잡자 기기마다 다른 경계가 보였습니다."
+  },
+  "en": {
+   "title": "BACK delays after the Save tap: the first 5-point grid and the 7-point grid (release check, Oct 18, 2026)",
+   "left": [
+    "First grid (S21, earlier flag-on build)",
+    [
+     "BACK at 0.3 / 1.0 / 1.8 / 2.6 / 3.5 s",
+     "Only 0.3 s cancelled",
+     "The other 4 came after the save finished: a 15-page PDF of 851,990 bytes stayed"
+    ]
+   ],
+   "right": [
+    "Seven delays (1.2.0 (5), minified release)",
+    [
+     "BACK at 0.3 / 0.45 / 0.6 / 0.75 / 0.9 / 1.0 / 1.8 s",
+     "S20 (Android 13): cancelled up to 0.9 s, finished from 1.0 s",
+     "S21 (Android 15): cancelled up to 0.75 s, finished from 0.9 s",
+     "0 empty files, 0 zero-byte files, 0 crashes"
+    ]
+   ],
+   "note": "The test saves the first 15 pages of a 47-page HWP file as a PDF. Every finished file had all 15 pages.",
+   "alt": "Comparison: of the first BACK delays 0.3, 1.0, 1.8, 2.6 and 3.5 s only 0.3 s cancelled the save; with 7 delays the switch from cancelled to finished fell between 0.9 and 1.0 s on the S20 and between 0.75 and 0.9 s on the S21.",
+   "caption": "Four of the first five delays came after the save had finished; packing delays in front of the boundary showed a different boundary on each phone."
+  }
+ },
+ {
+  "kind": "steps",
+  "ko": {
+   "title": "'PDF로 저장'의 다섯 단계와 결함 세 건의 자리 (커밋 6687cd0)",
+   "items": [
+    ["고르는 화면 (SAF)", "사용자가 저장을 누르면 문서 제공자가 빈 문서를 먼저 만듭니다. 앱은 이 URI만 쓰고 지울 수 있습니다."],
+    ["쪽 배치", "인쇄와 같은 경로로 배치합니다. 상한 15쪽(저사양 6쪽)."],
+    ["파일 열기 (IO 스레드)", "openFileDescriptor \"wt\". 결함 2: 이 틈의 BACK이 무시됨. 결함 3: 이 틈에 Activity가 사라지면 빈 PDF가 남음."],
+    ["WebView가 fd에 쓰기", "onStart, onLayout, onWrite를 대화상자 없이 부릅니다. 결함 1: 멈추자마자 fd를 닫음."],
+    ["마무리", "크기 0이면 실패로 보고 닫습니다. 실패나 취소면 deleteDocument로 지웁니다."]
+   ],
+   "note": "결함 세 건은 리뷰 에이전트가 찾았고, 같은 커밋에 수정과 테스트가 들어갔습니다(결함 3은 기기로만 확인).",
+   "alt": "단계 그림: 고르는 화면, 쪽 배치, 파일 열기, WebView의 fd 쓰기, 마무리 다섯 단계 중 파일 열기에서 결함 2와 3, fd 쓰기에서 결함 1이 나왔습니다.",
+   "caption": "결함 세 건은 모두 단계 사이의 짧은 구간이나 쓰기 도중의 멈춤에서 나왔습니다."
+  },
+  "en": {
+   "title": "The five stages of one 'Save as PDF' and where the three defects sat (commit 6687cd0)",
+   "items": [
+    ["System picker (SAF)", "When the user taps Save, the document provider creates an empty document first. The app may write or delete only this URI."],
+    ["Page layout", "Same path as printing. Cap: 15 pages (6 on low-end phones)."],
+    ["Open the file (IO thread)", "openFileDescriptor \"wt\". Defect 2: BACK in this gap was ignored. Defect 3: if the Activity went away here, an empty PDF stayed."],
+    ["WebView writes the fd", "onStart, onLayout and onWrite called with no dialog. Defect 1: the fd was closed as soon as the save stopped."],
+    ["Finish", "A zero-byte file counts as a failure; then close. A failed or cancelled save deletes the document with deleteDocument."]
+   ],
+   "note": "A review agent found all three defects; fixes and tests went into the same commit (defect 3 was checked on devices only).",
+   "alt": "Steps: picker, page layout, open the file, WebView writes the fd, finish; defects 2 and 3 sat in the file-open stage and defect 1 in the fd write.",
+   "caption": "All three defects lived in a short gap between stages or in a stop during the write."
+  }
+ }
+]

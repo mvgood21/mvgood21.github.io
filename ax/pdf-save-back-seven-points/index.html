@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>안드로이드 PDF 저장 취소 처리와 SAF 빈 파일 – SugarMount</title>
+  <meta name="description" content="SAF로 PDF를 바로 저장하는 기능을 릴리스 빌드에서 BACK 7시점으로 확인했습니다. S20은 0.9~1.0초, S21은 0.75~0.9초에서 취소와 완료가 갈렸고 남은 빈 파일은 0개였습니다.">
+  <meta name="robots" content="max-image-preview:large">
+  <link rel="canonical" href="https://sugarmount21.com/ax/pdf-save-back-seven-points/">
+  <link rel="alternate" hreflang="ko" href="https://sugarmount21.com/ax/pdf-save-back-seven-points/">
+  <link rel="alternate" hreflang="en" href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">
+  <link rel="alternate" hreflang="x-default" href="https://sugarmount21.com/ax/pdf-save-back-seven-points/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="안드로이드 PDF 저장 취소 처리와 SAF 빈 파일 – SugarMount">
+  <meta property="og:description" content="SAF로 PDF를 바로 저장하는 기능을 릴리스 빌드에서 BACK 7시점으로 확인했습니다. S20은 0.9~1.0초, S21은 0.75~0.9초에서 취소와 완료가 갈렸고 남은 빈 파일은 0개였습니다.">
+  <meta property="og:url" content="https://sugarmount21.com/ax/pdf-save-back-seven-points/">
+  <meta property="og:image" content="https://sugarmount21.com/assets/og/ax-pdf-save-back-seven-points-ko.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="https://sugarmount21.com/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/svg+xml" href="https://sugarmount21.com/assets/favicon.svg">
+  <link rel="apple-touch-icon" href="https://sugarmount21.com/assets/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://sugarmount21.com/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/site.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=e2770b30">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://sugarmount21.com/ax/pdf-save-back-seven-points/#article","headline":"'PDF로 저장' 하나를 내려고 BACK을 7가지 시점에 눌렀다","description":"SAF로 PDF를 바로 저장하는 기능을 릴리스 빌드에서 BACK 7시점으로 확인했습니다. S20은 0.9~1.0초, S21은 0.75~0.9초에서 취소와 완료가 갈렸고 남은 빈 파일은 0개였습니다.","url":"https://sugarmount21.com/ax/pdf-save-back-seven-points/","mainEntityOfPage":"https://sugarmount21.com/ax/pdf-save-back-seven-points/","inLanguage":"ko","articleSection":"Android 개발","datePublished":"2026-11-06T09:00:00+09:00","dateModified":"2026-11-06T09:00:00+09:00","image":["https://sugarmount21.com/assets/og/ax-pdf-save-back-seven-points-ko.png","https://sugarmount21.com/assets/ax/cover/pdf-save-back-seven-points-ko.webp","https://sugarmount21.com/assets/ax/pdf-save-back-seven-points-1-ko.webp","https://sugarmount21.com/assets/ax/pdf-save-back-seven-points-2-ko.webp"],"author":{"@id":"https://sugarmount21.com/#org"},"publisher":{"@id":"https://sugarmount21.com/#org"},"isPartOf":{"@id":"https://sugarmount21.com/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"SAF ACTION_CREATE_DOCUMENT에서 사용자가 취소하면 빈 파일이 남나요?","acceptedAnswer":{"@type":"Answer","text":"고르는 화면에서 취소하면 결과 URI가 null이라 파일이 생기지 않습니다. 저장 버튼을 누른 뒤에는 문서 제공자가 빈 문서를 먼저 만들기 때문에, 그 뒤에 실패하거나 취소되면 앱이 DocumentsContract.deleteDocument 로 직접 지워야 합니다."}},{"@type":"Question","name":"저장을 취소할 때 ParcelFileDescriptor를 바로 닫으면 안 되나요?","acceptedAnswer":{"@type":"Answer","text":"쓰기가 시작되기 전이면 바로 닫아도 됩니다. WebView 인쇄 경로가 이미 쓰는 중이면 쓰기 결과가 올 때까지 열어 두십시오. 먼저 닫은 번호를 앱의 다른 파일이 받으면 늦게 온 PDF 바이트가 그 파일에 들어갈 수 있습니다."}},{"@type":"Question","name":"인쇄 대화상자 없이 WebView 내용을 PDF로 저장할 수 있나요?","acceptedAnswer":{"@type":"Answer","text":"createPrintDocumentAdapter 가 돌려준 객체에 onStart , onLayout , onWrite , onFinish 를 직접 부르면 대화상자 없이 저장됩니다. 결과 콜백 생성자가 SDK에서 패키지 전용이라 그 콜백을 만드는 파일만 android.print 패키지에 두어야 하고, 릴리스 빌드에서 숨김 API 경고와 R8 오류가 없는지 확인해야 합니다."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://sugarmount21.com/"},{"@type":"ListItem","position":2,"name":"AX 노트","item":"https://sugarmount21.com/ax/"},{"@type":"ListItem","position":3,"name":"Android 개발","item":"https://sugarmount21.com/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"'PDF로 저장' 하나를 내려고 BACK을 7가지 시점에 눌렀다"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=e2770b30">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a class="nav-apps" href="/apps/">앱</a>
+        <a class="nav-ax" href="/ax/" aria-current="page">AX 노트</a>
+        <a class="nav-about" href="/about/">소개</a>
+        <a class="nav-privacy" href="/privacy/">개인정보처리방침</a>
+      </nav>
+      <a class="lang" href="/en/ax/pdf-save-back-seven-points/" lang="en" hreflang="en">English</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>메뉴</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="전체 메뉴">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">닫기</button>
+      <p class="menu-title" id="m-photo">사진·영상</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>슈가앨범</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 용량 줄이기</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 반전·회전</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>이미지 변환 JPG·PNG·WebP</span></a></li></ul>
+      <p class="menu-title" id="m-document">문서·글</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글 띄어쓰기</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글뷰어 슈가독</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">생활</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>생생카드</span></a></li></ul>
+      <p class="menu-title" id="m-games">게임</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>화살표 매듭풀기</span></a></li><li><a class="app-tile" data-app="blocks" href="/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한판블록</span></a></li></ul>
+      <p><a href="/apps/">모든 앱 보기</a></p>
+      <ul class="menu-links"><li><a href="/ax/" aria-current="page">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-android">
+    <nav class="crumbs" aria-label="이동 경로"><ol><li><a href="/">SugarMount</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/ax/topic/android/">Android 개발</a></li><li><span aria-current="page">&#x27;PDF로 저장&#x27; 하나를 내려고 BACK을 7가지 시점에 눌렀다</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/pdf-save-back-seven-points-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX 노트 · 방법</span>
+      <h1>'PDF로 저장' 하나를 내려고 BACK을 7가지 시점에 눌렀다</h1>
+      <p class="lead">저장 버튼 뒤 일곱 시점에 BACK을 눌러 보니 S20은 0.9~1.0초, S21은 0.75~0.9초에서 취소와 완료가 갈렸고 빈 파일은 남지 않았습니다.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/about/">작성 SugarMount</a> <span aria-hidden="true">·</span> <span>Android 개발</span> <span aria-hidden="true">·</span> <span>읽는 시간 13분</span> <span aria-hidden="true">·</span> 최종 업데이트 <time datetime="2026-11-06">2026년 11월 6일</time></p><!-- /build:meta -->
+      <p>2026년 10월 18일, <a href="/apps/doc-viewer/">한글뷰어 슈가독</a> 1.2.0의 'PDF로 저장'을 minified 릴리스 빌드로 확인한 기록입니다. BACK은 저장 버튼 뒤 0.3초부터 1.8초 사이에 보냈고, 경계 양쪽 어디에서도 부분 파일은 남지 않았습니다. 이 확인을 마친 뒤에야 스토어 제목에 'PDF 저장'을 넣었습니다.</p>
+      <p class="note">근거는 앱 저장소의 1.2.0 출시 기록 문서와 커밋 6687cd0·c4f1dd3(2026-10-18), 스토어 검색 최적화(ASO) 계획 문서, 10월 17~18일의 Claude Code 세션 기록(구현·리뷰·릴리스 검증 에이전트의 보고)입니다. 수치는 2026년 11월 4일 저장소에서 다시 확인했습니다. 기기 시리얼은 적지 않았습니다.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>목차 (10)</summary><ol><li><a href="#boundary">BACK 경계는 S20 0.9~1.0초, S21 0.75~0.9초</a></li><li><a href="#title-gate">제목에 &#x27;PDF 저장&#x27;을 넣기 전에 건 조건 세 가지</a></li><li><a href="#stages">저장 한 번은 다섯 단계를 지나고, 빈 문서가 맨 먼저 생깁니다</a></li><li><a href="#fd-close">결함 1: 멈추자마자 닫은 fd에 WebView가 계속 썼습니다</a></li><li><a href="#open-gap">결함 2·3은 파일을 여는 짧은 틈에 있었습니다</a></li><li><a href="#grid">다섯 점 중 넷은 저장이 끝난 뒤를 눌렀습니다</a></li><li><a href="#checklist">릴리스 빌드에서 돌린 SAF 저장 체크리스트</a></li><li><a href="#limits">쓰기 단계에 들어갔는지는 밖에서 구분할 수 없었습니다</a></li><li><a href="#next">6쪽 상한 기기와 Drive 저장은 아직 해 보지 않았습니다</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">목차</p><ol><li><a href="#boundary">BACK 경계는 S20 0.9~1.0초, S21 0.75~0.9초</a></li><li><a href="#title-gate">제목에 &#x27;PDF 저장&#x27;을 넣기 전에 건 조건 세 가지</a></li><li><a href="#stages">저장 한 번은 다섯 단계를 지나고, 빈 문서가 맨 먼저 생깁니다</a></li><li><a href="#fd-close">결함 1: 멈추자마자 닫은 fd에 WebView가 계속 썼습니다</a></li><li><a href="#open-gap">결함 2·3은 파일을 여는 짧은 틈에 있었습니다</a></li><li><a href="#grid">다섯 점 중 넷은 저장이 끝난 뒤를 눌렀습니다</a></li><li><a href="#checklist">릴리스 빌드에서 돌린 SAF 저장 체크리스트</a></li><li><a href="#limits">쓰기 단계에 들어갔는지는 밖에서 구분할 수 없었습니다</a></li><li><a href="#next">6쪽 상한 기기와 Drive 저장은 아직 해 보지 않았습니다</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="boundary">
+      <h2 id="boundary">BACK 경계는 S20 0.9~1.0초, S21 0.75~0.9초</h2>
+      <p>시험 문서는 47쪽짜리 HWP입니다. 한글뷰어 슈가독은 긴 문서를 처음 15쪽까지만 PDF로 저장해서, "이 문서는 47쪽이에요. 처음 15쪽까지만 PDF로 저장돼요." 안내가 먼저 나옵니다. 시스템 파일 선택 화면에서 저장 버튼을 누른 뒤 0.3, 0.45, 0.6, 0.75, 0.9, 1.0, 1.8초에 BACK을 보냈고, 매번 다운로드 폴더에 파일이 남았는지, 남았다면 <code>%PDF-</code> 헤더와 <code>%%EOF</code>, 15쪽이 다 있는지를 봤습니다.</p>
+      <p>Galaxy S20(Android 13)은 0.9초까지 저장이 취소되고 파일이 지워졌고, 1.0초부터는 BACK이 닿기 전에 저장이 끝나 15쪽 PDF가 온전히 남았습니다. Galaxy S21(Android 15)은 0.75초까지 취소되고 0.9초부터 완료됐습니다. 0바이트 파일, 헤더만 있는 파일, 크래시는 두 기기 모두 0건이었습니다.</p>
+      <figure class="ax-fig"><img src="/assets/ax/pdf-save-back-seven-points-1-ko.webp" width="1200" height="739" alt="비교 그림: 처음 BACK 시점 0.3, 1.0, 1.8, 2.6, 3.5초 중 취소된 것은 0.3초 하나였고, 다시 잡은 7점에서는 S20이 0.9초와 1.0초 사이, S21이 0.75초와 0.9초 사이에서 취소와 완료가 갈렸습니다." loading="lazy"><figcaption>처음 다섯 점 중 넷은 저장이 끝난 뒤였고, 경계 앞에 시점을 몰아 다시 잡자 기기마다 다른 경계가 보였습니다.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="title-gate">
+      <h2 id="title-gate">제목에 'PDF 저장'을 넣기 전에 건 조건 세 가지</h2>
+      <p>한글뷰어 슈가독에는 1.0.0부터 '인쇄·PDF로 저장' 메뉴가 있었습니다. 시스템 인쇄 화면을 열고 거기서 프린터 대신 'PDF로 저장'을 고르는 방식입니다. 10월 17일, 스토어 검색 순위를 올리는 작업을 시작하면서 리드 에이전트는 "PDF 저장이 아직 출시되지 않았다"고 전제했고, 코드를 읽은 조사 에이전트가 이 전제를 바로잡았습니다. 실제로 빠진 것은 인쇄 화면을 거치지 않는 바로 저장과, 스토어 제목에 그 기능이 드러나는 것이었습니다.</p>
+      <p>같은 날 쓴 ASO 계획 문서는 제목 B안 '한글뷰어 슈가독: HWP 한글 파일 열기·PDF 저장'에 조건 세 개를 달았습니다. 인쇄 화면 없는 바로 저장이 출시될 것, 릴리스(minified) 빌드에서 저장하고 다시 열어 보고 확인한 기기를 기록할 것, 저장한 PDF가 다른 PDF 앱에서도 열릴 것. 제목을 보고 들어온 사용자가 인쇄 대화상자를 만나면 "PDF 저장 안 됨" 1점 리뷰를 남기기 쉬운데, 그때 이 앱의 리뷰는 0개라 그 한 건이 평점 전체가 된다는 이유였습니다.</p>
+      <p>구현 방법으로 두 가지를 버렸습니다. 앱 안에서 <code>PdfDocument</code>로 쪽을 직접 그리는 방식은 이전 스파이크에서 50쪽 편람 하나에 최대 메모리 1.95 GB, <code>writeTo</code> 10.9초가 나왔고, 글꼴을 APK에 넣으면 26 MB 크기 게이트를 넘습니다. 15쪽 상한을 넘기려고 15쪽씩 나눠 쓴 뒤 합치는 방식은 WebView 렌더러가 문서를 닫을 때까지 쪽당 약 7~8 MB를 쥐고 있어 같은 화면으로는 할 수 없었고, 합칠 PDF 라이브러리의 라이선스도 따로 봐야 했습니다. 그래서 이미 인쇄가 쓰는 WebView의 <code>PrintDocumentAdapter</code>를 그대로 두고, 출력 대상만 SAF가 만든 문서로 정했습니다. 상한은 인쇄와 같은 15쪽(저사양 기기 6쪽)입니다.</p>
+    </section>
+
+    <section aria-labelledby="stages">
+      <h2 id="stages">저장 한 번은 다섯 단계를 지나고, 빈 문서가 맨 먼저 생깁니다</h2>
+      <p>'PDF로 저장'은 <code>ActivityResultContracts.CreateDocument("application/pdf")</code>로 시스템 고르는 화면(Storage Access Framework, 줄여서 SAF의 ACTION_CREATE_DOCUMENT)을 띄우는 데서 시작합니다. 사용자가 이름과 폴더를 정하고 저장을 누르면 문서 제공자가 그 자리에 빈 문서를 만들고 URI를 돌려줍니다. 앱은 그 URI를 '방금 고른 대상' 목록에 넣고, 이 목록에 있는 URI만 쓰거나 지울 수 있게 막아 두었습니다. 원본 문서에는 쓰지 않는다는 규칙 때문입니다.</p>
+      <p>그다음 인쇄와 같은 경로로 쪽을 배치하고, IO 스레드에서 <code>openFileDescriptor(uri, "wt")</code>로 파일 디스크립터(fd)를 연 뒤(제공자가 "wt"를 받지 않으면 "w"), WebView의 <code>PrintDocumentAdapter</code>에 <code>onStart</code>, <code>onLayout</code>, <code>onWrite</code>, <code>onFinish</code>를 인쇄 대화상자 없이 직접 부릅니다. 결과 콜백의 생성자가 SDK에서는 패키지 전용이라, 이 부분만 <code>android.print</code> 패키지에 99줄짜리 파일로 두었습니다. 리플렉션은 쓰지 않습니다. 쓰기가 끝나면 파일 크기가 0인지 보고 닫으며, 실패하거나 취소되면 <code>DocumentsContract.deleteDocument</code>로 만든 문서를 삭제합니다.</p>
+      <figure class="ax-fig"><img src="/assets/ax/pdf-save-back-seven-points-2-ko.webp" width="1200" height="810" alt="단계 그림: 고르는 화면, 쪽 배치, 파일 열기, WebView의 fd 쓰기, 마무리 다섯 단계 중 파일 열기에서 결함 2와 3, fd 쓰기에서 결함 1이 나왔습니다." loading="lazy"><figcaption>결함 세 건은 모두 단계 사이의 짧은 구간이나 쓰기 도중의 멈춤에서 나왔습니다.</figcaption></figure>
+      <p>내용보다 문서가 먼저 생기므로, 그 뒤 어느 단계에서 멈추든 앱이 지우지 않으면 사용자 폴더에 이름만 있는 PDF가 남습니다. 그래서 멈추면 닫고 지우는 것이 기본 동작인데, WebView가 fd에 쓰는 도중에는 이 '닫기'가 위험했습니다.</p>
+    </section>
+
+    <section aria-labelledby="fd-close">
+      <h2 id="fd-close">결함 1: 멈추자마자 닫은 fd에 WebView가 계속 썼습니다</h2>
+      <p>구현 에이전트가 처음 쓴 코드는 BACK, 시간 초과, 화면 닫힘으로 저장이 멈추면 WebView의 쓰기 결과를 기다리지 않고 곧바로 fd를 닫고 파일을 지웠습니다. 에이전트는 보고서의 위험 항목에 이 점을 적고도 "늦게 오는 쓰기는 실패로 끝나야 한다"는 가정으로 넘어갔습니다. 디버그 E2E는 두 기기 모두 17/17, 단위 테스트 504건도 초록인 코드입니다.</p>
+      <p>새 맥락으로 띄운 리뷰 에이전트가 이 가정을 High 결함으로 뒤집었습니다. 리뷰 보고와 지금 코드 주석에 따르면 WebView(Chromium의 <code>AwPrintManager</code>)는 받은 fd를 복제하지 않고 그 번호 그대로 백그라운드 스레드에서 기록합니다. 앱이 먼저 닫으면 그 번호는 비고, 곧 앱의 다른 파일(데이터베이스, 문서 사본)이 같은 번호를 받을 수 있습니다. 그때 늦게 도착한 PDF 바이트는 실패하지 않고 그 파일에 들어갑니다. <code>onFinish</code>도 쓰기가 끝나기 전에 불리고 있었습니다. (Chromium 소스는 이번에 직접 열어 보지 않았습니다.)</p>
+      <p>고친 뒤 쓰기 함수는 결과와 함께 <code>settled</code> 값을 넘깁니다. 쓰기가 시작되기 전에 멈췄다면 <code>true</code>라서 앱이 바로 닫고 삭제합니다. 쓰기 도중이면 <code>false</code>라서 앱은 fd를 닫지 않고 저장 완료로 치지 않은 채 문서를 지우며, WebView의 쓰기 결과가 도착한 뒤 쓰기 함수가 <code>onFinish</code>를 부르고 fd를 닫습니다. WebView가 끝내 답하지 않으면 fd 하나가 프로세스가 끝날 때까지 열려 있는데, 리뷰는 다른 파일이 깨지는 것보다 작은 피해로 보고 이쪽을 골랐습니다. Robolectric 테스트 3건이 이 규칙을 고정합니다.</p>
+      <p>운영자가 이 코드를 직접 고치지는 않았습니다. 대신 운영자가 정해 둔 작업 규칙(큰 수정 뒤에는 다른 맥락의 리뷰를 한 번 더 받고, 릴리스 빌드를 실기기에서 돌리기 전에는 끝났다고 하지 않는다)이 이 리뷰 단계를 만들었습니다.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%27PDF%EB%A1%9C%20%EC%A0%80%EC%9E%A5%27%20%ED%95%98%EB%82%98%EB%A5%BC%20%EB%82%B4%EB%A0%A4%EA%B3%A0%20BACK%EC%9D%84%207%EA%B0%80%EC%A7%80%20%EC%8B%9C%EC%A0%90%EC%97%90%20%EB%88%8C%EB%A0%80%EB%8B%A4">메일로 문의하기</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="open-gap">
+      <h2 id="open-gap">결함 2·3은 파일을 여는 짧은 틈에 있었습니다</h2>
+      <p>결함 2는 BACK이 사라지는 문제였습니다. 취소 손잡이는 쓰기가 시작될 때 등록되는데, 쪽 배치가 끝나고 IO 스레드에서 파일을 여는 동안은 손잡이가 비어 있어 이 틈의 BACK은 무시되고 저장이 그대로 진행됐습니다. 구현 에이전트도 보고서에 위험으로 적어 둔 틈입니다. 리뷰는 '취소 대기' 플래그를 넣어 손잡이가 등록되는 순간 바로 멈추게 했고, 컨트롤러 테스트 1건이 이를 고정합니다.</p>
+      <p>결함 3은 파일을 여는 도중 Activity가 사라지는 경우입니다. 코루틴이 취소되면 열린 결과가 버려져 fd가 새고, 사용자 폴더에 빈 PDF가 남고, 진행 덮개가 내려가지 않을 수 있었습니다. 이제 취소 예외를 받으면 fd를 닫고 문서를 지우고 저장을 '취소'로 끝낸 뒤 예외를 다시 던집니다. Activity 코드라 JVM 테스트는 없고, 기기에서 화면 재생성과 프로세스 종료로만 확인했습니다.</p>
+      <p>세 건을 고친 뒤 단위 테스트는 debug 508건(504 + 3 + 1), release 469건이 모두 통과했고, 가드를 하나씩 지워 테스트가 실패하는지 보는 검사표는 29행에서 32행으로 늘었습니다. 리뷰는 기존 행 일부가 소스 문자열만 고정해서 문자열을 둔 채 동작을 망가뜨려도 통과한다는 점도 짚었고, 그 자리는 Robolectric 테스트로 보강했습니다. 가드를 하나씩 지워 보는 검사 방식은 다른 노트(<a href="/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다: 가드 지워 보기</a>)에 따로 적었습니다.</p>
+    </section>
+
+    <section aria-labelledby="grid">
+      <h2 id="grid">다섯 점 중 넷은 저장이 끝난 뒤를 눌렀습니다</h2>
+      <p>릴리스 검증 에이전트가 처음 정한 BACK 시점은 0.3, 1.0, 1.8, 2.6, 3.5초였습니다. 플래그를 ON으로 둔 이전 빌드로 S21에서 돌린 첫 실행에서 취소된 것은 0.3초 하나뿐이고, 나머지 넷은 851,990바이트짜리 15쪽 PDF가 온전히 남았습니다. 1.0초 이후의 BACK은 끝난 저장 뒤에 도착해 리더 화면을 닫았을 뿐이라, 화면 맨 위에는 런처가 떠 있었습니다.</p>
+      <p>이 결과를 본 에이전트가 0.3초와 1.0초 사이에 여섯 점을 몰고 1.8초를 남겨 일곱 개로 다시 잡았고, 그 결과가 맨 위의 경계입니다. 같은 첫 실행에서 실패 2건도 나왔는데 둘 다 테스트 방법 문제였습니다. 개발자 옵션의 <code>always_finish_activities</code>는 실행 중에 바꿔도 적용되지 않아서, Activity 재생성은 글꼴 크기(<code>font_scale</code>) 변경으로, 프로세스 종료는 <code>am kill</code>로 대신했습니다. 기기의 Chrome 155는 <code>content://</code> PDF를 열지 않아서 Chrome 열기는 통과·실패 판정에서 제외했습니다.</p>
+      <p>1.2.0(5) 빌드로 돌린 37항목은 S21 37/37, S20 36/37이었습니다. S20의 실패 1건은 <code>uiautomator dump</code>가 NPE로 죽은 것인데, 기본 스크립트의 크래시 필터가 패키지 이름을 가리지 않아 테스트 도구의 크래시까지 실패로 잡았습니다. 그 로그에 앱 패키지 줄은 0개였고, 플래그를 ON으로 둔 이전 빌드로 다시 돌렸을 때는 두 기기 모두 37/37이었습니다.</p>
+    </section>
+
+    <section aria-labelledby="checklist">
+      <h2 id="checklist">릴리스 빌드에서 돌린 SAF 저장 체크리스트</h2>
+      <p>37항목에서 다른 앱에도 옮길 수 있는 것만 순서대로 추렸습니다. 모두 플래그를 ON으로 둔 minified 릴리스 빌드로 돌립니다. 디버그 빌드는 R8이 지우거나 바꾼 코드를 지나가지 않습니다.</p>
+      <ol>
+        <li>고르는 화면에서 취소하고 파일이 하나도 생기지 않았는지 봅니다.</li>
+        <li>작은 문서를 저장하고 <code>%PDF-</code> 헤더, <code>%%EOF</code>, 쪽 수를 확인합니다. 여기서는 3쪽 HWPX로 했습니다.</li>
+        <li>상한을 넘는 문서로 안내 문구와 잘린 쪽 수(15쪽)를 확인합니다.</li>
+        <li>저장한 PDF를 앱에서 두 번 다시 엽니다. 그린 쪽 15개, 실패한 쪽 0개였습니다.</li>
+        <li>BACK 시점은 성긴 격자로 저장이 끝나는 때를 먼저 찾고, 그 앞을 0.15초 간격으로 다시 누릅니다. 매번 남은 파일, 0바이트, 헤더와 끝 표시, 크래시를 봅니다.</li>
+        <li>0.15초 만에 BACK으로 취소한 뒤 다시 저장해 정상인지 봅니다.</li>
+        <li>고르는 화면이 떠 있는 동안, 그리고 저장 직후 0, 0.3, 0.6초에 Activity를 재생성합니다. <code>font_scale</code>을 바꾸면 됩니다.</li>
+        <li>고르는 화면이 떠 있는 동안 <code>am kill</code>로 프로세스를 끝내고, 결과가 돌아와도 빈 파일이 남지 않는지 봅니다.</li>
+        <li>logcat에서 <code>Accessing hidden</code>(앱 프로세스), StrictMode, R8 오류(ClassNotFound, NoSuchMethod)를 세고, crash 버퍼는 앱 패키지로 거릅니다. 이번 빌드는 모두 0이었습니다.</li>
+        <li>저장한 PDF를 다른 PDF 앱에서 엽니다. 기기 Chrome이 거부해서 데스크톱 Chrome으로 15쪽을 확인했습니다.</li>
+      </ol>
+      <p>SAF 저장 기능을 낸다면 BACK을 한 시점에서만 눌러 보고 끝내지 마십시오. 취소와 완료는 0.1~0.15초 차이로 갈렸습니다. 이 목록을 돌린 10월 18일, 10시 53분에 커밋 6687cd0이 들어갔고, 12시 8분에 운영자가 production 승격 명령을 직접 실행했으며, 12시 11분 커밋 c4f1dd3으로 B안 제목을 적용했습니다(데스크톱 Chrome 확인은 이 커밋에 기록).</p>
+    </section>
+
+    <section aria-labelledby="limits">
+      <h2 id="limits">쓰기 단계에 들어갔는지는 밖에서 구분할 수 없었습니다</h2>
+      <p>BACK이 쪽 배치 중에 닿았는지, 배치가 끝나고 파일에 쓰는 중에 닿았는지는 기기 밖에서 구분할 방법이 없었습니다. 확인한 것은 취소와 완료의 경계(0.75~1.0초) 양쪽에서 남는 파일, 0바이트 파일, 크래시가 없었다는 사실까지입니다. 결함 1의 수정이 쓰기 도중에 실제로 작동한 순간을 기기에서 본 것은 아닙니다.</p>
+      <p>경계 시간은 이 두 기기와 47쪽 문서 하나로 측정한 값입니다. 다른 기기나 다른 문서라면 경계도 달라지므로 격자를 다시 잡아야 합니다. 쓰기 시간 초과 경로는 기기에서 강제로 일으킬 방법이 없어 단위 테스트로만 확인했습니다. 문서 제공자가 일반 파일 대신 pipe를 주면 파일 크기가 -1로 나와 '크기 0이면 실패' 검사가 작동하지 않고, 이때는 WebView의 결과 콜백만 믿습니다.</p>
+      <p>WebView 인쇄 경로와 문서 222개 측정은 <a href="/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a>에 있습니다.</p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">6쪽 상한 기기와 Drive 저장은 아직 해 보지 않았습니다</h2>
+      <p>저사양 등급(6쪽 상한)에 해당하는 기기가 없어서 그 경로는 단위 테스트로만 확인했습니다. 저장 위치도 기본 다운로드 폴더만 봤고, Google Drive나 SD카드 같은 다른 문서 제공자에는 저장해 보지 않았습니다. S23, 태블릿과 폴드, 가로 화면, TalkBack을 사용한 상태의 저장도 아직 기록이 없습니다. Drive 저장은 앞 절의 pipe 경로를 실제로 타는지부터 봐야 합니다.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%27PDF%EB%A1%9C%20%EC%A0%80%EC%9E%A5%27%20%ED%95%98%EB%82%98%EB%A5%BC%20%EB%82%B4%EB%A0%A4%EA%B3%A0%20BACK%EC%9D%84%207%EA%B0%80%EC%A7%80%20%EC%8B%9C%EC%A0%90%EC%97%90%20%EB%88%8C%EB%A0%80%EB%8B%A4">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>SAF ACTION_CREATE_DOCUMENT에서 사용자가 취소하면 빈 파일이 남나요?</summary><div><p>고르는 화면에서 취소하면 결과 URI가 null이라 파일이 생기지 않습니다. 저장 버튼을 누른 뒤에는 문서 제공자가 빈 문서를 먼저 만들기 때문에, 그 뒤에 실패하거나 취소되면 앱이 <code>DocumentsContract.deleteDocument</code>로 직접 지워야 합니다.</p></div></details>
+        <details><summary>저장을 취소할 때 ParcelFileDescriptor를 바로 닫으면 안 되나요?</summary><div><p>쓰기가 시작되기 전이면 바로 닫아도 됩니다. WebView 인쇄 경로가 이미 쓰는 중이면 쓰기 결과가 올 때까지 열어 두십시오. 먼저 닫은 번호를 앱의 다른 파일이 받으면 늦게 온 PDF 바이트가 그 파일에 들어갈 수 있습니다.</p></div></details>
+        <details><summary>인쇄 대화상자 없이 WebView 내용을 PDF로 저장할 수 있나요?</summary><div><p><code>createPrintDocumentAdapter</code>가 돌려준 객체에 <code>onStart</code>, <code>onLayout</code>, <code>onWrite</code>, <code>onFinish</code>를 직접 부르면 대화상자 없이 저장됩니다. 결과 콜백 생성자가 SDK에서 패키지 전용이라 그 콜백을 만드는 파일만 <code>android.print</code> 패키지에 두어야 하고, 릴리스 빌드에서 숨김 API 경고와 R8 오류가 없는지 확인해야 합니다.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="/ax/hwpx-octet-stream-intent-filter/">안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</a></li>
+        <li><a href="/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="/ax/build-measures-contrast/">다크 hover 대비가 11앱 중 7앱에서 4.5:1 아래였고, 지금은 빌드가 143쌍을 계산한다</a></li>
+        <li><a href="/ax/greeting-card-removal/">AI로 붙인 기능을 AI로 걷어냈다: 인사카드 10,001줄과 형제 앱</a></li>
+      </ul>
+      <p><a href="/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="/ax/">AX 노트 전체 보기</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>한 가지 일을 간단하게 하는 Android 앱</p>
+        <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">앱</p>
+        <ul><li><a href="/apps/sugaralbum/">슈가앨범</a></li><li><a href="/apps/image-compress/">사진 용량 줄이기</a></li><li><a href="/apps/image-flip/">사진 반전·회전</a></li><li><a href="/apps/image-convert/">이미지 변환 JPG·PNG·WebP</a></li><li><a href="/apps/sugarspeller/">한글 띄어쓰기</a></li><li><a href="/apps/sugarclip/">SugarClip</a></li><li><a href="/apps/doc-viewer/">한글뷰어 슈가독</a></li><li><a href="/apps/sugarcard/">생생카드</a></li><li><a href="/apps/arrow-knots/">화살표 매듭풀기</a></li><li><a href="/apps/blocks/">한판블록</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">사이트</p>
+        <ul><li><a href="/apps/">모든 앱</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li><li><a href="/sitemap/">사이트맵</a></li><li><a href="/rss.xml">RSS 피드</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play 개발자 페이지</a></div>
+    </div>
+  </footer>
+</body>
+</html>

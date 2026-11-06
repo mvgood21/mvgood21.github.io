@@ -6,7 +6,328 @@
   <description>Small Android apps that each do one thing simply, from shrinking photos and opening Korean HWP documents to checking Korean spelling and playing puzzle games.</description>
   <language>en</language>
   <atom:link href="https://sugarmount21.com/en/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Wed, 04 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Fri, 06 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Measuring 4.5:1 colour contrast in the site build – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/build-measures-contrast/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/build-measures-contrast/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/build-measures-contrast-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Measurement</span>
+      <h1>4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</h1>
+      <p class="lead">One accent colour per app turns into 11 text-on-background pairs. Our site build computes every one of them, and its --check fails if any pair drops below 4.5:1.</p>
+      <p>In dark mode, putting the dark accent text colour on the pale accent background of a hovered outline button leaves 7 of our 11 apps below 4.5:1, the lowest at 4.17:1 (Arrow Knots). Commit <code>b82faac</code> (18 October 2026, the design-system rework) gave that spot its own text token, tuned against that background, and made the build compute 11 contrast pairs per app. With 13 apps today, the lowest of the 143 pairs is 4.60:1 (SugarCard).</p>
+      <p class="note">Sources: the site repository's git history and <code>tools/sds_apps.py</code>, and the design docs in our utilities app repository. All ratios were recomputed on 3 and 4 November 2026 in a copy of the site, using the contrast functions in <code>sds_apps.py</code>.</p>
+    </section>
+    <section aria-labelledby="dark-hover">
+      <h2 id="dark-hover">Dark hover contrast at b82faac: 4.17 to 4.66</h2>
+      <p>Each app on this site has a single accent hex in <code>data/apps.json</code>. <code>sds_apps.py</code> computes nine colour tokens from it as CSS text, and <code>build.py</code> writes that to a file. In dark mode the pale background <code>bg-accent-weak</code> is 24% accent mixed into the default dark surface <code>#172131</code>. The dark text colour <code>fg-accent</code> is the accent with its HSL lightness raised 1% at a time until it reaches 4.6:1 on <code>#1D2940</code>, the lightest of the three dark neutral surfaces.</p>
+      <p>Put <code>fg-accent</code> text on <code>bg-accent-weak</code>, as a hovered outline button would, and the 11 apps at <code>b82faac</code> score: Arrow Knots 4.17, SugarSpeller 4.20, Compress Image 4.27, Flip &amp; Rotate Image 4.31, SugarCard 4.40, SugarAlbum 4.41, AXFamily 4.41, Block Turn 4.58, SugarClip 4.59, Convert Image 4.64, SugarDoc 4.66. Seven are under 4.5 and nine under 4.6.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/build-measures-contrast-1-en.webp" width="1200" height="1058" alt="Bar chart: in dark mode, putting fg-accent text on the weak accent background of an outline-button hover leaves 7 of 11 apps below 4.5:1, the lowest being Arrow Knots at 4.17:1." loading="lazy"><figcaption>Reusing the dark accent as hover text puts 7 of 11 apps below 4.5:1.</figcaption></figure>
+      <p>Our working notes say a review agent checking the design spec flagged this pair: "7 of 11 apps, lowest 4.17". We could not find the review itself, so we recomputed it from the app list at <code>b82faac</code> and got the same numbers. The implementation commit already shipped the fixed pairing: in <code>site.css</code>, <code>.button--outline:hover</code> uses <code>fg-accent-contrast</code> for its text and border.</p>
+    </section>
+    <section aria-labelledby="sentence-rule">
+      <h2 id="sentence-rule">For 13 days the rule was one line of prose</h2>
+      <p>The commit that first added the site pages, <code>00b093f</code> on 20 September 2026, set the default accent in <code>site.css</code> to <code>#00897B</code> ("default accent: SugarCompress"). The same day, the first commit of the utilities app repository (<code>7885e3e</code>) listed "compress (temp) #00897B" in its design tokens. Both commits carry an AI co-author trailer. White text on that colour is 4.32:1, and the colour as text on the light background <code>#F6F8FB</code> is 4.06:1.</p>
+      <p>The next day, the "Design v2" commit <code>33e6cc0</code> in the utilities repository (also AI co-authored) caught it. Line 46 of its design spec reads "temporary #00897B (4.3:1, fails AA) is replaced by #0F766E.", and line 20 makes 4.5:1 text contrast in both themes a principle. The site picked up <code>#0F766E</code> (white text 5.47:1) on 5 October, when commit <code>bdbbe97</code> introduced <code>data/apps.json</code>.</p>
+      <p>The contrast rule that commit added to <code>AGENTS.md</code> was a field description: <code>accent</code> "(hex, white text on it must reach 4.5:1)". Searching that commit's <code>tools/build.py</code> for <code>lumin</code>, <code>contrast</code> or <code>4.5</code> finds nothing.</p>
+      <p>The first assumption matched the line: if white text clears 4.5:1 on the accent, the accent is safe. But one accent becomes nine tokens per theme, and those tokens meet as text and background in 11 pairs. Today every white-on-accent pair across the 13 apps is 5.45:1 or higher, while the dark hover pair from the same accents goes down to 4.17.</p>
+    </section>
+    <section aria-labelledby="cause">
+      <h2 id="cause">The dark accent was tuned against a different background</h2>
+      <p>The dark hover used <code>fg-accent</code> for text and <code>bg-accent-weak</code> for the background. <code>fg-accent</code> only guarantees 4.6:1 on <code>#1D2940</code> (relative luminance 0.0222), and for the blue and teal apps the pale background is lighter than that. Arrow Knots' <code>bg-accent-weak</code>, <code>#14344E</code>, has a luminance of 0.0315, and the same text colour <code>#0A99EE</code> falls from 4.71 to 4.17. The purple and magenta apps passed because their pale backgrounds sit close to <code>#1D2940</code>: Convert Image (<code>#2C2359</code>, 0.0246) at 4.64 and SugarDoc (<code>#32223C</code>, 0.0215) at 4.66.</p>
+      <p>A second assumption, made while writing this note, was that raising the target to 4.6 would cover the hover too, but the 4.6 target is measured on <code>#1D2940</code>, so with today's formula the pair on the pale background is still 4.17.</p>
+      <p>The fix is a token per pair. <code>fg-accent-contrast</code> takes the dark accent and lightens it again, 1% at a time, until it reaches 4.6:1 on the pale background. For Arrow Knots that moves <code>#0A99EE</code> to <code>#17A2F5</code> and 4.17 to 4.61. The header of <code>sds_apps.py</code> states the rule as T2: "text on bg-accent-weak is fg-accent-contrast".</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%204.5%3A1%20contrast%20in%20the%20site%20build%3A%20the%20dark%20hover%20pair%20that%20failed%20for%207%20of%2011%20apps">Email us</a></p></aside>
+    <section aria-labelledby="gate">
+      <h2 id="gate">The gate computes 11 pairs per app, 143 today</h2>
+      <p>Inside <code>python tools/build.py --check</code>, which <code>AGENTS.md</code> says to run before every commit, <code>sds_gates()</code> checks three things. The rest of that check is described in <a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a>.</p>
+      <ul>
+        <li>for each app, 11 pairs; any pair under 4.5:1 is an error, <code>SDS contrast &lt;app&gt;: &lt;pair names&gt;</code>. Pairs have names like <code>white on accent</code>, <code>accent on basement</code> and <code>d-contrast on d-weak</code>; the full list of 11 is in <code>audit()</code>;</li>
+        <li>the tokens read back from the generated <code>assets/sds-apps.css</code> must equal what <code>accent_tokens()</code> computes (rule T1: a literal hex per app);</li>
+        <li>the header mark colours in <code>site.css</code> must match the social-image generator <code>og.py</code>.</li>
+      </ul>
+      <p>The docstring explains the 4.6 target: "targets are 4.6:1 so rounding and browser blending never drop below 4.5:1". Every mix and lightness step rounds RGB to integers. Because of that margin, Block Turn (4.58) and SugarClip (4.59) also got their own token, and in the dark block of the generated CSS at <code>b82faac</code>, 9 of 11 apps declare a separate <code>fg-accent-contrast</code>.</p>
+      <p>We also ran a revert test. Setting Compress Image back to <code>#00897B</code> in the copy's <code>apps.json</code> made the gate print this (run with <code>--check</code> on 3 November, confirmed through <code>audit()</code> on 4 November):</p>
+      <pre><code>error: SDS contrast sugarcompress: white on accent, accent on basement
+1 gate error(s)</code></pre>
+      <p>Two apps arrived later, CarDrawer (<code>b79f2d1</code>, 19 October) and TrimBox (<code>7bb4744</code>, 31 October). Each added one hex to <code>apps.json</code>, and <code>sds_apps.py</code> has not changed since <code>b82faac</code>. The gate now computes 13 apps x 11 pairs = 143 pairs. Had the hover kept <code>fg-accent</code>, 9 of the 13 would be under 4.5, with TrimBox at 4.22 and CarDrawer at 4.39.</p>
+    </section>
+    <section aria-labelledby="blind-spot">
+      <h2 id="blind-spot">Swap the CSS pairing and the gate still passes</h2>
+      <p>On 3 November the agent that first drafted this note changed line 236 of the copy's <code>site.css</code> so the hover text was <code>var(--sds-fg-accent)</code> again, rebuilt, and ran <code>--check</code>, which printed <code>up to date; gates passed</code> with the 4.17:1 pair back in the stylesheet. The only thing <code>sds_gates()</code> reads from <code>site.css</code> is the header mark regex; contrast comes entirely from the token pairs listed in <code>audit()</code>.</p>
+      <p><code>site.css</code> uses <code>bg-accent-weak</code> as the background in six rules.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Line</th><th scope="col">Selector</th><th scope="col">Text token</th><th scope="col">In the gate's pairs?</th></tr></thead>
+          <tbody>
+            <tr><td>210</td><td><code>.app-tile:hover</code></td><td><code>fg-accent-contrast</code></td><td>Yes</td></tr>
+            <tr><td>236</td><td><code>.button--outline:hover</code></td><td><code>fg-accent-contrast</code></td><td>Yes</td></tr>
+            <tr><td>242</td><td><code>.badge</code></td><td><code>fg-accent-contrast</code></td><td>Yes</td></tr>
+            <tr><td>250</td><td><code>.trust li</code></td><td><code>fg-accent-contrast</code></td><td>Yes</td></tr>
+            <tr><td>356</td><td><code>[data-app] .note</code></td><td>body text <code>fg-neutral</code></td><td>No</td></tr>
+            <tr><td>449</td><td><code>.ax-cta</code></td><td>not set</td><td>No</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>On app pages, <code>.note</code> keeps <code>fg-neutral</code> body text (its border, links and the eyebrow use <code>fg-accent-contrast</code>: border on line 356, links and the eyebrow on line 358), and <code>.ax-cta</code> sets no text colour at all. Neither pair is among the 11, so neither is measured. We left both unfixed; that call belongs to whoever owns the build.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/build-measures-contrast-2-en.webp" width="1200" height="769" alt="Comparison: the contrast gate errors on the old accent #00897B, on any pair below 4.5:1 and on generated CSS that drifts, but passes a site.css change that puts fg-accent back on the hover, and the .note body text and .ax-cta text pairs." loading="lazy"><figcaption>The gate checks its fixed list of 11 pairs, not the text and background pairs the CSS actually uses.</figcaption></figure>
+      <p>Both the mistakes and the catches in this history are recorded in AI co-authored commits or agent work. The spec rule that a new accent should be at least dE00 12 (a colour-distance measure) from existing ones was left out of the gate because "the new-key dE00 &gt;= 12 rule needs a human to know which key is new"; the CLI only warns about pairs under dE00 8, currently 7 (smallest 2.2, Flip &amp; Rotate Image and Arrow Knots).</p>
+    </section>
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">color-mix() is banned by T3, and dark colours are not hand-picked</h2>
+      <p>Letting the browser blend hover colours with CSS <code>color-mix()</code> is banned by rule T3. The gate compares literal hex values in the generated CSS with computed ones, and a browser-blended colour gives it nothing to compare. Hand-picking dark colours per app was dropped too: the site went from 11 apps to 13, and that approach means a person picking nine tokens for every new app.</p>
+      <p>We measured rendered pixels in another app; that write-up is <a href="https://sugarmount21.com/en/ax/contrast-checker-missed-40-percent/">Our contrast checker passed while skipping 40% of the text</a>. <code>sds_apps.py</code> uses only the Python standard library and never starts a browser.</p>
+      <p>Without design tokens, with colours written per component, there is no pair list to compute in the first place. Gradients, text over photos and translucent layers don't reduce to two tokens, and this site doesn't measure them either.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">From one accent hex to a 143-pair gate in six steps</h2>
+      <ol>
+        <li>Keep one accent hex per brand or app in your source data and derive every other token with a function.</li>
+        <li>Write down every text-on-background pair. Then search the CSS for rules that use each background token (<code>grep -n "accent-weak" assets/site.css</code>) and check each rule's text token against your list, as in the table above.</li>
+        <li>Aim a little above 4.5 (we use 4.6), and give any pair that falls short its own token.</li>
+        <li>Fail the build check when any pair is under 4.5:1, and compare the generated CSS values with the computed ones.</li>
+        <li>Put an old failing colour into <code>apps.json</code> and run <code>python tools/build.py --check</code>: expect a line containing <code>1 gate error(s)</code>, and a line containing <code>up to date; gates passed</code> again once you revert. Then deliberately mismatch a CSS pairing, rebuild with <code>build.py</code> and run <code>--check</code>. Here it still says <code>gates passed</code>.</li>
+        <li>Run <code>python tools/sds_apps.py</code> to print the colour-distance warnings and have a person look; today it lists 7 pairs under dE00 8.</li>
+      </ol>
+      <p>Don't leave a contrast rule as a sentence in a doc. Make the build compute it from a list of colour pairs, and check that the list matches the pairs your CSS actually uses. We have only done the first half. The next step is a <code>--check</code> stage that extracts the text token of every rule with a <code>bg-accent-weak</code> background and compares it with the 11 pairs, and before that, measuring the <code>.note</code> body text and the <code>.ax-cta</code> text for the first time.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%204.5%3A1%20contrast%20in%20the%20site%20build%3A%20the%20dark%20hover%20pair%20that%20failed%20for%207%20of%2011%20apps">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Which text does the WCAG 4.5:1 contrast minimum apply to?</summary><div><p>Normal-size text. WCAG 2 success criterion 1.4.3 sets 4.5:1 for normal text and 3:1 for large text. Our gate ignores text size and applies 4.5:1 to all 11 pairs.</p></div></details>
+        <details><summary>How is a contrast ratio calculated?</summary><div><p>Take the relative luminance of both colours, L1 for the lighter and L2 for the darker, and compute (L1 + 0.05) / (L2 + 0.05). Relative luminance linearises the sRGB channels and sums 0.2126 R + 0.7152 G + 0.0722 B. The <code>contrast()</code> function in <code>sds_apps.py</code> is this formula.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Fri, 06 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Removing a feature after it moved to a sibling app – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/greeting-card-removal/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/greeting-card-removal/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/greeting-card-removal-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Retrospective</span>
+      <h1>10,001 lines of greeting cards: built with an AI agent, removed with one</h1>
+      <p class="lead">In 1.6.020, which shipped the greeting card removal together with R8 optimization, the APK went from 25.66 MB to 13.15 MB; about 11 MB of that drop was greeting card assets.</p>
+      <p>A single commit, f6ef50e, deleted 143 files and 10,001 lines and ended the greeting card feature in SugarSpeller, our Korean spell-check app. It landed on the night of September 20, 2026, 35 minutes after the operator said the feature had been forced into the app in the first place. The feature itself had arrived in 41 commits between August 31 and December 10, 2025, and 38 of those commits credit Claude. In January 2026 the code was taken into a sibling app, SugarCard, yet it stayed in the original app for eight more months.</p>
+      <p class="note">Sources: git history of the spell-check app and of SugarCard, the spell-check app's CHANGELOG entry for 1.6.020, a post-release monitoring document (GA4 counts), and the work session log of September 20 to 22, 2026. Numbers were recounted from git on November 4, 2026.</p>
+    </section>
+    <section aria-labelledby="bytes">
+      <h2 id="bytes">13.70 MB of deleted files, 0.22 MB of app Kotlin</h2>
+      <p>f6ef50e deleted 124 files, modified 18 and added one. The deletions covered three greeting screens (ActivityMainGreeting, a card editor and a card fragment), a Room database for cards, an MP4 encoder and audio muxer for a falling-snow video, the card images, seven carols, a handwriting font called Gamja Flower, 13 unit tests and one instrumented test. Of the 10,001 deleted lines, 7,857 were Kotlin and 2,124 were XML.</p>
+      <p>Summing the original blob sizes of the deleted files gives 13.70 MB, and the 15 app Kotlin sources account for 0.22 MB of it. The 69 files in the card image folder came to 6.68 MB, one background image, retro.png, to 3.91 MB, the font to 1.07 MB, the seven carols to 1.02 MB and the Lottie snow animation to 0.34 MB. (The commit message rounds the first three to 6.5, 3.8 and 1.1 MB.)</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/greeting-card-removal-1-en.webp" width="1200" height="728" alt="Bar chart: of the deleted files, 69 card images took 6.68 MB, retro.png 3.91 MB, the font 1.07 MB and seven carols 1.02 MB, while the 15 app Kotlin sources took 0.22 MB." loading="lazy"><figcaption>The commit removed 10,001 lines, but the size came out of images, a font and audio; the app's Kotlin sources were 0.22 MB.</figcaption></figure>
+      <p>The sizes below come from the CHANGELOG. The baseline is the pre-change HEAD (1.6.019) rebuilt in the same environment.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th></th><th>1.6.019 baseline</th><th>1.6.020</th></tr></thead>
+        <tbody>
+          <tr><td>APK (unsigned)</td><td>25.66 MB</td><td>13.15 MB (−48.7%)</td></tr>
+          <tr><td>AAB</td><td>29.95 MB</td><td>18.33 MB (−38.8%)</td></tr>
+          <tr><td>DEX (uncompressed)</td><td>16.31 MB</td><td>14.84 MB (−9.0%)</td></tr>
+        </tbody>
+      </table></div>
+      <p>Crediting that whole drop to the greeting cards would be wrong. The same release carried a597223, which deleted the single <code>-dontoptimize</code> line that had kept R8 from optimizing. The CHANGELOG splits the result: about 11 MB was greeting card assets, and the optimization's share sits inside the 1.5 MB DEX reduction. The optimization side has its own note, <a href="https://sugarmount21.com/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized</a>.</p>
+    </section>
+    <section aria-labelledby="added">
+      <h2 id="added">Commits claimed 95% coverage; the repo had no coverage tool</h2>
+      <p>The first commit, 0a0f404 on August 31, 2025, added 2,495 lines across 21 files, built the card list and a Room module, and claimed "95% coverage (30+ test cases)". Two more commits that day fixed a clash between Material 3 and the app's existing theme. On September 3, be41ccb, titled as a complete Y2K glitch-neon card editor, touched 60 files and reported "zero memory leaks and crashes". On September 10 greeting cards became a third screen mode, <code>UIMode.GREETING</code>, next to the chat and classic layouts. Holiday categories followed in late November, and on December 7 and 8 a ten-second falling-snow MP4 share and seven carols.</p>
+      <p>24 of the 41 commits landed in September 2025. Together they added 18,087 lines and deleted 9,188 (docs included, over 102 days).</p>
+      <p>Five of those commits (six, counting the docs commit db2ee27 from the same week) claim 95% or 99% test coverage. Neither <code>git log --all -S jacoco</code> nor <code>-S kover</code> returns a single line anywhere in the repository's history, so no coverage tool was ever installed. The habit of writing "complete" into commit subjects is counted in <a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits</a>. The Room database that the first commit called "a complete greeting module" had zero callers in the app code (main) outside its own four files when it was deleted. And on September 11, c05d669 made the greeting screen the default for users with no saved mode and forced that mode in debug builds. About 24 hours later 0c5ceab put the default back to chat. The next release tag was November 28, so no shipped version had the greeting default.</p>
+    </section>
+    <section aria-labelledby="third-screen">
+      <h2 id="third-screen">A third main screen, and a copy kept for eight months</h2>
+      <p>Greeting cards came in as one of three parallel main screens, not as a separate module. Card artwork and carols therefore shipped in the APK of every user who only wanted spell checks, and any fix to the main screen had to be made three times.</p>
+      <p>The structure stayed after the sibling app existed. SugarCard's first commit, c623dd8 on January 15, 2026, started with 297 files and 17,030 lines, and its message says "Greeting card functionality migrated from sugarspeller". Nobody removed the feature from the original app at that point. Between then and September 13, five commits in the spell-check app edited ActivityMainGreeting, and all five were shared fixes for ads or the back button made alongside the chat screen. The September 13 fix for "press back again to exit" (289ed55) changed 26, 23 and 22 lines in the three screens. We found no record of why the removal waited.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/greeting-card-removal-2-en.webp" width="1200" height="930" alt="Timeline: 41 commits added greeting cards from August to December 2025, the code moved to SugarCard in January 2026, and it was deleted from the original app only on September 20." loading="lazy"><figcaption>For eight months after SugarCard existed, the greeting cards still shipped inside the original app.</figcaption></figure>
+      <p>When a feature moves to another app, delete it from the original app in the same release. During those eight months this app got five shared fixes that also had to patch a screen that already lived in SugarCard.</p>
+    </section>
+    <section aria-labelledby="removal-day">
+      <h2 id="removal-day">Two menu entries became links; saved values fall back to chat</h2>
+      <p>On September 20 the operator asked to take greeting cards out of this app entirely, keep the two buttons in the side drawer and the top mode menu but send them to SugarCard, and focus the app on Korean spelling. The operator also expected the app to get much smaller. Six minutes later the operator added Play's code optimization requirement (deadline February 2027) to the same job, which became a597223.</p>
+      <p>The kept buttons now call a new <code>SugarCardLauncher</code>. If SugarCard is installed it opens the app; otherwise it tries <code>market://</code>, and if that fails, the https store page. Since Android 11 (API 30) an app has to declare another package under <code>&lt;queries&gt;</code> in its manifest to see whether it is installed, so the manifest gained one entry. Each tap logs <code>sugarcard_open(installed)</code> to GA4.</p>
+      <p>Users who had picked greeting mode before updating still have the string <code>"greeting"</code> in their settings. The code that reads the mode already sent unknown values to chat:</p>
+      <pre><code>fun fromString(value: String?): UIMode {
+    return values().find { it.value == value } ?: CHAT
+}</code></pre>
+      <p>So there is no migration code. <code>UIModeTest</code> gained one test asserting that <code>"greeting"</code> resolves to CHAT, with a comment saying these users must not get stuck behind the splash screen.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%2010%2C001%20lines%20of%20greeting%20cards%3A%20built%20with%20an%20AI%20agent%2C%20removed%20with%20one">Email us</a></p></aside>
+    <section aria-labelledby="ai-wrong">
+      <h2 id="ai-wrong">The agent guessed 10 MB and 9 tests; a person checked the device</h2>
+      <p>The agent's plan named the screens and modules to remove, but its numbers were low. It added card images (6.5 MB), retro.png (3.8 MB) and the snow animation (0.3 MB) to get "roughly 10 MB", and counted 9 unit tests to delete. The real commit also removed the font and the seven carols, and deleted 13 unit tests.</p>
+      <p>The agent had no device attached, said so, and left a release APK signed with the debug key. It asked the operator to try checks against Naver and Daum (two Korean portals whose spell-check results the app parses), history, subscriptions, KakaoTalk sharing and the greeting card menu. The operator replied the next day that everything worked, and 1.6.020 shipped on September 22.</p>
+      <p>One wrong assumption stayed in the launcher. If opening <code>market://</code> threw, it fell back to the browser, and the comment on that branch read "device without the Play Store app". On October 9 the same pattern was added for a games menu (efc0acf). On a Galaxy S21 the link showed a chooser instead of an exception, because three store apps accepted it. 8bbe179, 59 minutes after the games commit, made both the game and SugarCard links target the Play package first. The full account is in <a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones</a>.</p>
+    </section>
+    <section aria-labelledby="options">
+      <h2 id="options">The menus stayed, opened the app first, and shipped in one release</h2>
+      <p>Deleting the menus too was ruled out by the operator's first request. The Korean label lost its "switch to" wording, since tapping it no longer switches modes.</p>
+      <p>Sending every tap straight to the store was an option the agent raised in its plan. The operator kept the app-first order, which is why the manifest needs <code>&lt;queries&gt;</code>. As the launcher comment says, without that declaration the installed check always fails and every tap goes to the store.</p>
+      <p>Shipping the removal and the R8 change in separate releases would have made the size change easy to attribute. The operator chose to ship them together, which is why the size section uses a separately built baseline.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">Stored user data would change the order</h2>
+      <p>This removal needed no data migration only because no screen called the Room database by the time of removal (none had since September 3, 2025, and no release shipped while one did). If users had saved cards in it, an export path or a handoff to the sibling app would have to come first.</p>
+      <p>If the mode parser had thrown on unknown values, one test would not have been enough. Updated users could get stuck at launch, and a migration that rewrites the saved value would have to ship first.</p>
+      <p>We found no record of how often the greeting screens were used; the only numbers are menu taps after the removal. For a feature many people use, check screen usage before deleting it.</p>
+    </section>
+    <section aria-labelledby="steps">
+      <h2 id="steps">Steps for handing a feature to a sibling app</h2>
+      <ol>
+        <li>Count the files and bytes to be deleted with git. Get the deleted blobs from <code>git diff --raw</code> and sum them with <code>git cat-file -s</code>, so you know whether lines or bytes dominate.</li>
+        <li>Count the callers of the module with <code>git grep -l</code>. Zero callers outside the module means no data migration.</li>
+        <li>Read where a saved setting goes when its value no longer exists, and pin that path with one unit test.</li>
+        <li>If the menu stays, add a sibling-app launcher. Declare the package under <code>&lt;queries&gt;</code>, and open the store in this order: <code>market://</code> targeted at the Play package, plain <code>market://</code>, then the https page.</li>
+        <li>Compare sizes against the pre-change HEAD built in the same environment. If the release has other changes, split the shares.</li>
+        <li>Install the release APK on a real device and tap the kept menu with the sibling app installed and not installed.</li>
+        <li>Log menu taps with the installed state to see demand.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">We don't yet know whether the 54 taps became installs</h2>
+      <p>In the two weeks after release (September 22 to October 5), <code>sugarcard_open</code> fired 54 times from about 39 users, and SugarCard was installed at the moment of the tap in none of them, so every tap went to the store (GA4, per the monitoring document). Another 61 SugarCard taps came in from October 9 to 22; <code>installed</code> only records the state at tap time. Starting with 1.6.027 the event is called <code>sibling_app_open</code> (target=sugarcard); the next step is to line it up against SugarCard's install sources.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%2010%2C001%20lines%20of%20greeting%20cards%3A%20built%20with%20an%20AI%20agent%2C%20removed%20with%20one">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>What happens to users who saved a mode that the update removes?</summary><div><p>It depends on where the parser sends unknown values. This app's <code>fromString</code> already mapped unknown values to chat, so a leftover <code>"greeting"</code> opens the chat screen, and a unit test pins that path.</p></div></details>
+        <details><summary>I removed a feature and the APK barely shrank. What should I check?</summary><div><p>Check the bytes of the deleted files first. Here 10,001 lines went away but the app's Kotlin sources were 0.22 MB; the size came from images, a font and audio.</p></div></details>
+        <details><summary>Why does my check for another installed app always say "not installed"?</summary><div><p>Since Android 11 (API 30), <code>getLaunchIntentForPackage</code> only finds the other app if its package is declared under <code>&lt;queries&gt;</code> in the manifest. f6ef50e declared just SugarCard's package; more were added later for the games menu.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Fri, 06 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>SAF PDF save: cancelling without empty files – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/pdf-save-back-seven-points/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/pdf-save-back-seven-points/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/pdf-save-back-seven-points-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX note · How-to</span>
+      <h1>We pressed BACK at seven moments before shipping one 'Save as PDF' button</h1>
+      <p class="lead">BACK pressed at seven delays after the Save tap split cancel from done at 0.9 to 1.0 s on a Galaxy S20 and 0.75 to 0.9 s on a Galaxy S21, and left no empty file.</p>
+      <p>This is the release check of 'Save as PDF' in <a href="https://sugarmount21.com/en/apps/doc-viewer/">HWP Viewer SugarDoc</a> 1.2.0 on October 18, 2026, run on a minified release build. BACK went in between 0.3 and 1.8 s after the Save tap, and neither side of either boundary left a partial file. Only after that did 'PDF Save' go into the store title.</p>
+      <p class="note">Sources: the app repository's 1.2.0 release record, commits 6687cd0 and c4f1dd3 (Oct 18, 2026), the app store optimization (ASO) plan, and the Claude Code session logs from Oct 17-18 (reports from the implementing, reviewing and release-checking agents). Numbers rechecked against the repository on Nov 4, 2026. Device serials are left out.</p>
+    </section>
+    <section aria-labelledby="boundary">
+      <h2 id="boundary">The BACK boundary: 0.9 to 1.0 s on the S20, 0.75 to 0.9 s on the S21</h2>
+      <p>The test document was a 47-page HWP file (HWP is the Korean word processor format the app opens). SugarDoc saves at most the first 15 pages of a long document, so the save shows a notice that only the first 15 of 47 pages will be saved and then writes a 15-page PDF. After tapping Save in the system file picker, the script sent BACK at 0.3, 0.45, 0.6, 0.75, 0.9, 1.0 and 1.8 s, then checked the Download folder: was a file left, and if so, did it start with <code>%PDF-</code>, end with <code>%%EOF</code> and hold all 15 pages?</p>
+      <p>On the Galaxy S20 (Android 13), BACK up to 0.9 s cancelled the save and the file was deleted; from 1.0 s the save had already finished and the full 15-page PDF stayed. On the Galaxy S21 (Android 15), BACK cancelled up to 0.75 s and met a finished save from 0.9 s. Neither phone produced a zero-byte file, a header-only file or a crash.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/pdf-save-back-seven-points-1-en.webp" width="1200" height="806" alt="Comparison: of the first BACK delays 0.3, 1.0, 1.8, 2.6 and 3.5 s only 0.3 s cancelled the save; with 7 delays the switch from cancelled to finished fell between 0.9 and 1.0 s on the S20 and between 0.75 and 0.9 s on the S21." loading="lazy"><figcaption>Four of the first five delays came after the save had finished; packing delays in front of the boundary showed a different boundary on each phone.</figcaption></figure>
+    </section>
+    <section aria-labelledby="title-gate">
+      <h2 id="title-gate">Three conditions before 'PDF Save' could go in the title</h2>
+      <p>SugarDoc had a 'Print / Save as PDF' menu item since 1.0.0: it opened the system print screen, where the user picks 'Save as PDF' instead of a printer. On October 17 we started work on the app's Play search ranking, and the lead agent assumed PDF saving had never shipped. A research agent that read the code corrected it. What was missing was a direct save that skips the print screen, and a store title that says the app can do it.</p>
+      <p>The ASO plan written that day put three conditions on the new title, 'SugarDoc HWP Viewer &amp; PDF Save' in English: the direct save ships; a minified release build saves and reopens a PDF on recorded devices; the saved PDF opens in another PDF app. A user who arrives from that title and meets a print dialog is likely to leave a one-star "PDF save doesn't work" review, and with zero reviews at the time, that one review would be the whole rating.</p>
+      <p>Two ways of building it were dropped. Drawing pages into a <code>PdfDocument</code> inside the app had already failed an earlier spike: a 50-page manual peaked at 1.95 GB of memory and <code>writeTo</code> took 10.9 s, and bundling fonts would push the APK past its 26 MB size gate. Saving past the 15-page cap by writing 15-page chunks and merging them was out too: the WebView renderer holds about 7 to 8 MB per page until the document closes, and a PDF merge library would need its own license check. So the save keeps the WebView <code>PrintDocumentAdapter</code> the print path already used and only swaps the destination for a document SAF creates. The cap stays the same as printing: 15 pages, 6 on low-end phones.</p>
+    </section>
+    <section aria-labelledby="stages">
+      <h2 id="stages">One save passes five stages, and the empty file comes first</h2>
+      <p>'Save as PDF' starts the system picker with <code>ActivityResultContracts.CreateDocument("application/pdf")</code>, which is SAF's ACTION_CREATE_DOCUMENT. When the user names the file and taps Save, the document provider creates an empty document right there and returns its URI. The app records that URI as a just-picked target and refuses to write or delete any URI that is not on that list, because the app has a rule never to write to a user's original files.</p>
+      <p>Next the app lays out the pages through the same path as printing, opens the file on an IO thread with <code>openFileDescriptor(uri, "wt")</code> (falling back to <code>"w"</code> for providers that refuse truncation), and calls <code>onStart</code>, <code>onLayout</code>, <code>onWrite</code> and <code>onFinish</code> on the WebView print adapter itself, with no print dialog. The result callbacks have constructors that are package-private in the SDK, so only that piece lives in the <code>android.print</code> package, as a 99-line file; there is no reflection. When the write ends the app checks for a zero-byte file and closes it. A failed or cancelled save deletes the created document with <code>DocumentsContract.deleteDocument</code>.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/pdf-save-back-seven-points-2-en.webp" width="1200" height="966" alt="Steps: picker, page layout, open the file, WebView writes the fd, finish; defects 2 and 3 sat in the file-open stage and defect 1 in the fd write." loading="lazy"><figcaption>All three defects lived in a short gap between stages or in a stop during the write.</figcaption></figure>
+      <p>The document exists before any byte is written, so a stop at any later stage leaves a named, empty PDF in the user's folder unless the app deletes it. Close and delete is the default on any stop, but while the WebView is writing to the fd, closing it was the dangerous part.</p>
+    </section>
+    <section aria-labelledby="fd-close">
+      <h2 id="fd-close">Defect 1: the fd was closed while the WebView was still writing</h2>
+      <p>The implementing agent's first version closed the fd and deleted the file as soon as a save stopped, whether from BACK, a timeout or the reader closing, without waiting for the WebView's write result. Its report listed this as a risk and assumed that a late write would simply fail. The debug build passed 17/17 on both phones and all 504 unit tests were green.</p>
+      <p>A review agent started in a fresh context rated that assumption a High defect. According to the review and the code comment that now sits on the writer, the WebView (Chromium's <code>AwPrintManager</code>) writes to the raw fd number from a background thread without duplicating it. Once the app closes the number, another file the app opens next, a database or a document copy, can get the same number, and the late PDF bytes land in that file instead of failing. <code>onFinish</code> was also being called before the write ended. We did not open the Chromium source ourselves this time.</p>
+      <p>The fixed writer reports a <code>settled</code> flag with the result. A stop before the write starts is settled, so the app closes and deletes at once. A stop during the write is not settled: the app leaves the fd open, never counts it as saved and deletes the document, and the writer calls <code>onFinish</code> and closes the fd after the adapter's own write result arrives. If the WebView never answers, one fd stays open until the process ends; the review judged that a smaller harm than a corrupted file. Three Robolectric tests pin this rule.</p>
+      <p>No person edited this code. The review happened because of the operator's standing rules: get a review from a separate context after a large change, and do not call anything done before the minified release build has run on real phones.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20We%20pressed%20BACK%20at%20seven%20moments%20before%20shipping%20one%20%27Save%20as%20PDF%27%20button">Email us</a></p></aside>
+    <section aria-labelledby="open-gap">
+      <h2 id="open-gap">Defects 2 and 3 sat in the short gap while the file opened</h2>
+      <p>Defect 2 lost BACK presses. The cancel handle was registered when the write started, and while the file was opening on the IO thread after page layout, the handle was still empty, so a BACK in that gap was ignored and the save went on. The implementing agent had listed this gap among its risks. The review added a pending-cancel flag that stops the write the moment the handle is registered, plus one controller test.</p>
+      <p>Defect 3 was the Activity going away while the file opened. If the coroutine was cancelled there, the opened result could be dropped: the fd would leak, an empty PDF could stay in the user's folder and the progress cover could stay up. Now the cancellation handler closes the fd, deletes the document, ends the save as cancelled and rethrows. This is Activity code, so there is no JVM test; it was checked on the phones by recreating the screen and killing the process.</p>
+      <p>After the three fixes, unit tests stood at 508 debug (504 + 3 + 1) and 469 release, all passing. The guard-removal table, which deletes each guard in turn and expects a test to fail, grew from 29 to 32 rows. The review also noted that some existing rows only pinned source strings, so breaking the behaviour while keeping the string would still pass; the Robolectric tests cover that. The guard-removal method has its own note, <a href="https://sugarmount21.com/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</a>.</p>
+    </section>
+    <section aria-labelledby="grid">
+      <h2 id="grid">Four of the first five delays hit a finished save</h2>
+      <p>The release-checking agent first chose BACK delays of 0.3, 1.0, 1.8, 2.6 and 3.5 s. In the first S21 run, on an earlier build with the flag on, only 0.3 s cancelled. The other four all left a complete 15-page PDF of 851,990 bytes: BACK arrived after the save had finished and just closed the reader, leaving the launcher on top.</p>
+      <p>Seeing that, the agent packed six delays between 0.3 and 1.0 s and kept 1.8 s, which produced the boundaries at the top of this note. The same first run had two failures, both from the test method. The developer option <code>always_finish_activities</code> did not take effect when changed at run time, so Activity recreation moved to a <code>font_scale</code> change and process death to <code>am kill</code>. Chrome 155 on the phones would not open a <code>content://</code> PDF, so the Chrome check stopped counting as pass or fail.</p>
+      <p>On the 1.2.0 (5) build the 37 items passed 37/37 on the S21 and 36/37 on the S20. The S20 failure came from <code>uiautomator dump</code> dying with an NPE. The base script's crash filter did not match on the package name, so it counted the test tool's crash; that log had zero lines from the app's package. A rerun on the earlier flag-on build scored 37/37 on both phones.</p>
+    </section>
+    <section aria-labelledby="checklist">
+      <h2 id="checklist">The SAF save checklist we ran on the release build</h2>
+      <p>These are the items from the 37 that carry over to other apps, in order. Run all of them on a minified release build with the feature flag on; a debug build never exercises code that R8 removed or rewrote.</p>
+      <ol>
+        <li>Cancel in the picker and confirm no file appears.</li>
+        <li>Save a small document and check the <code>%PDF-</code> header, <code>%%EOF</code> and the page count. We used a 3-page HWPX.</li>
+        <li>Save a document over the cap and check the notice and the capped page count (15).</li>
+        <li>Reopen the saved PDF in the app twice. We got 15 drawn pages and 0 failed pages.</li>
+        <li>Find when the save finishes with a coarse grid of BACK delays, then press again every 0.15 s in front of that point. Each time, check for leftover files, zero bytes, header and end marker, and crashes.</li>
+        <li>Cancel with BACK after 0.15 s, then save again and confirm it works.</li>
+        <li>Recreate the Activity while the picker is up, and 0, 0.3 and 0.6 s after the save. Changing <code>font_scale</code> does it.</li>
+        <li>Kill the process with <code>am kill</code> while the picker is up and confirm no empty file is left when the result comes back.</li>
+        <li>Count <code>Accessing hidden</code> lines for the app process, StrictMode and R8 errors (ClassNotFound, NoSuchMethod) in logcat, and filter the crash buffer by the app's package. All were 0 on this build.</li>
+        <li>Open the saved PDF in another PDF app. The phone's Chrome refused it, so we checked all 15 pages in desktop Chrome.</li>
+      </ol>
+      <p>If you ship a SAF save, do not stop after pressing BACK at one moment. Here cancel and done were 0.1 to 0.15 s apart. On Oct 18, the day of this run, commit 6687cd0 went in at 10:53 KST, the operator ran the production promotion command by hand at 12:08, and commit c4f1dd3 applied the new title at 12:11 (the desktop Chrome check is recorded in that commit).</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">Whether BACK hit the write stage could not be seen from outside</h2>
+      <p>From outside the phone there was no way to tell whether BACK landed during page layout or while the bytes were being written to the file. What we know is that on both sides of the cancel-to-done boundary (0.75 to 1.0 s) there were no leftover files, no zero-byte files and no crashes. We did not watch the defect 1 fix act mid-write on a device.</p>
+      <p>The boundaries come from two phones and one 47-page document. Another phone or another document will have its own boundary, so the grid has to be found again. The write-timeout path cannot be forced on a device and was checked only by unit tests. If a document provider hands over a pipe instead of a regular file, the size reads as -1, the zero-byte check does nothing, and the app trusts the adapter's result callback alone.</p>
+      <p>The WebView print path and the 222-document measurements are in <a href="https://sugarmount21.com/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a>.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">A 6-page-cap phone and saving to Drive are still untested</h2>
+      <p>We had no phone in the low-end tier (6-page cap), so that path has only unit tests. Saves went only to the default Download folder; Google Drive, SD cards and other document providers were not tried. There are no records yet for an S23, tablets or foldables, landscape, or saving with TalkBack on. For Drive, the first question is whether it actually takes the pipe path above.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20We%20pressed%20BACK%20at%20seven%20moments%20before%20shipping%20one%20%27Save%20as%20PDF%27%20button">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Does cancelling ACTION_CREATE_DOCUMENT leave an empty file?</summary><div><p>Cancelling in the picker returns a null URI and creates no file. After the user taps Save, the provider creates an empty document first, so if your write fails or is cancelled after that, you must delete it yourself with <code>DocumentsContract.deleteDocument</code>.</p></div></details>
+        <details><summary>Can I close the ParcelFileDescriptor right away when the user cancels?</summary><div><p>Only if the write has not started. If a WebView print adapter is already writing, keep the fd open until the adapter's write result arrives. Another file of your app can reuse a number you closed early, and late PDF bytes can land in it.</p></div></details>
+        <details><summary>Can a WebView be saved as a PDF without the print dialog?</summary><div><p>It can: call <code>onStart</code>, <code>onLayout</code>, <code>onWrite</code> and <code>onFinish</code> on the adapter from <code>createPrintDocumentAdapter</code> yourself. The result callback constructors are package-private in the SDK, so the file that creates them must sit in the <code>android.print</code> package, and you should check a release build for hidden-API warnings and R8 errors.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Fri, 06 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>Gemini in an Android app: cost, eval, daily caps – SugarMount</title>
     <link>https://sugarmount21.com/en/ax/llm-explain-cost-limits/</link>
@@ -111,12 +432,12 @@ thinkingConfig: { thinkingBudget: 0 },</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -228,8 +549,8 @@ adb shell "dumpsys window | grep mCurrentFocus"</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -365,8 +686,8 @@ adb -s emulator-5554 logcat -d -b crash</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -489,8 +810,8 @@ How to apply: when setting or changing this campaign, the user's instruction bea
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -598,12 +919,12 @@ edge = if (next &lt; edge) next else edge - 1 // strictly decreasing</code></pre
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -740,8 +1061,8 @@ git log --diff-filter=A --format="%h %ad %s" --date=iso -- &lt;scoring file&gt;
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -843,12 +1164,12 @@ POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -971,9 +1292,9 @@ print("first", shows[:1], "gaps", [b - a for a, b in zip(inter, inter[1:])],
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1098,8 +1419,8 @@ Severity is exactly one of Blocker, High, Medium, Low</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1223,8 +1544,8 @@ def diff(a_png, b_png, top=300, bottom=330):
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1353,12 +1674,12 @@ def diff(a_png, b_png, top=300, bottom=330):
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1479,8 +1800,8 @@ expect(all.sort()).toEqual(files.sort());</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1764,12 +2085,12 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-uri-store-chooser/">A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1851,12 +2172,12 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1945,12 +2266,12 @@ git grep -nE "addOn(Complete|Success|Failure|Canceled)Listener\((this|requireAct
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2067,8 +2388,8 @@ depth(board):                   # peel
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2198,12 +2519,12 @@ depth(board):                   # peel
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2316,12 +2637,12 @@ if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2427,8 +2748,8 @@ git diff --name-only $(git merge-base &lt;base&gt; &lt;branch&gt;) &lt;branch&gt
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2515,12 +2836,12 @@ unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$TEST_PUB[~/][0-9]*" | sort -u | wc
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2655,9 +2976,9 @@ lifecycleScope.launch {
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2767,12 +3088,12 @@ lifecycleScope.launch {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2875,8 +3196,8 @@ three_star = cleared and time &lt;= par(base, scale, floor) and mistakes &lt;= a
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2988,12 +3309,12 @@ print(pages.most_common(), "FAQ questions:", questions)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3109,9 +3430,9 @@ NOT_TEST = {"notExpression": {"orGroup": {"expressions": [
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3216,8 +3537,8 @@ export function cacheKey(api, group, original, corrected, model) {
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3347,8 +3668,8 @@ const gaps = await agent(CTX + CHECKLIST + final + dossier, { schema: CRIT })</c
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3459,12 +3780,12 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(":core
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3587,8 +3908,8 @@ git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --gre
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3728,8 +4049,8 @@ adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3857,12 +4178,12 @@ print("my app in results:", MY_APP in ids)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3985,12 +4306,12 @@ out of date:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4108,8 +4429,8 @@ grep -rL --include='*Test.kt' -e 'assert' -e 'check(matches' app/src/</code></pr
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4246,12 +4567,12 @@ git log --until=2026-10-20 --format='%(trailers:key=Co-authored-by,valueonly)' \
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4357,8 +4678,8 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4524,8 +4845,8 @@ after_hint = win(board after the correct first move, 2 pieces left, lines it cle
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4643,8 +4964,8 @@ Schedule expires: YYYY-MM-DD / register again on: YYYY-MM-DD
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4781,12 +5102,12 @@ curl -s "$POLICY_URL" | grep -o 'data-policy-version="[0-9-]*"'</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4931,12 +5252,12 @@ font.save(dst)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5028,8 +5349,8 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5114,12 +5435,12 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5239,8 +5560,8 @@ flutter test test/theme_matrix/ --dart-define=Y2_NO_SETTLE=true
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5359,12 +5680,12 @@ FlowRow(
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5447,8 +5768,8 @@ Mem:              13           8           2           0           2           4
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5575,9 +5896,9 @@ if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFract
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5701,8 +6022,8 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5800,12 +6121,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5866,12 +6187,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6264,8 +6585,8 @@ room  = is there space for a 3×3 square, a 1×4 bar, a 4×1 bar (0–3)</code><
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6375,8 +6696,8 @@ done</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6482,12 +6803,12 @@ done</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6558,306 +6879,6 @@ done</code></pre>
       <p>Questions and bug reports go by email. Including the app name, device model and Android version helps us check faster.</p>
       <p>Email: sugarmount21@gmail.com (<a href="mailto:sugarmount21@gmail.com">write an email</a>)</p>
       <p>Google Play: <a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">sugarmount developer page</a></p>
-    </section>]]></description>
-    <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Convert an HWP file to PDF on Android – SugarMount</title>
-    <link>https://sugarmount21.com/en/apps/doc-viewer/hwp-to-pdf/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/apps/doc-viewer/hwp-to-pdf/</guid>
-    <description><![CDATA[<section class="hero">
-      <span class="eyebrow">Help · Android</span>
-      <h1>Convert an HWP file to PDF on Android</h1>
-      <p class="lead">Open the HWP or HWPX file in HWP Viewer SugarDoc, tap ⋮ (More options) and then Save as PDF, and pick a folder. The PDF is made on your phone without uploading the document. Long documents are cut to the first 15 pages.</p>
-      <p class="note">This guide is based on HWP Viewer SugarDoc 1.2.0, an Android app made by SugarMount. The Save as PDF menu item arrived in 1.2.0; on older versions use the print screen instead (see below). The screenshots show the app in Korean.</p>
-    </section>
-    <section aria-labelledby="without-app">
-      <h2 id="without-app">Without an app, and the catch</h2>
-      <p>HWP and HWPX are Korean word-processor formats, and Android phones usually have no app that opens them. If the phone cannot open the file, it cannot print it to PDF either, so the app-free options are all off the phone:</p>
-      <ul>
-        <li><strong>Ask the sender for a PDF.</strong> They export it from the program that made it, so the layout matches best. You have to wait for a reply.</li>
-        <li><strong>Save as PDF in a desktop HWP program.</strong> Good for long documents where layout matters. Needs a computer with the program.</li>
-        <li><strong>Upload to a web converter.</strong> Nothing to install, but the file goes to that site's server. Avoid it for letters or forms with names, phone numbers or addresses.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="app-steps">
-      <h2 id="app-steps">Save as PDF in HWP Viewer SugarDoc</h2>
-      <ol class="steps">
-        <li><strong>Open the document</strong> — tap the HWP or HWPX file in KakaoTalk, email or your file manager and choose HWP Viewer from Open with or Share, or pick it with Find in my files inside the app.</li>
-        <li><strong>⋮ → Save as PDF</strong> — tap ⋮ at the top right of the document and choose <strong>Save as PDF</strong>.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugardoc/hwp-to-pdf-1-ko.webp" width="270" height="324" loading="lazy" alt="With an HWPX document open, the More options menu lists Save as PDF and Print as separate items, shown here in the Korean interface."><figcaption class="muted">Document content is blurred.</figcaption></figure></li>
-        <li><strong>Check the page notice</strong> — if the document is longer than the limit, the app tells you how many pages will be saved first. Tap <strong>Save</strong> to go on or <strong>Cancel</strong> to stop without making a file.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugardoc/hwp-to-pdf-2-ko.webp" width="270" height="135" loading="lazy" alt="For a 47-page HWP document the app says only the first 15 pages will be saved as a PDF, with Cancel and Save buttons, in Korean."></figure></li>
-        <li><strong>Pick where to save</strong> — Android's save screen opens with the document's name plus .pdf filled in. Choose a folder and tap Save.</li>
-        <li><strong>Done</strong> — the message "Saved as a PDF." appears. The HWP or HWPX file you received is not changed.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugardoc/hwp-to-pdf-3-ko.webp" width="270" height="38" loading="lazy" alt="After saving, a message at the bottom of the screen confirms the PDF was saved, in Korean."></figure></li>
-      </ol>
-      <p class="muted">Checked on a Galaxy S21 (Android 15) with the SugarDoc 1.2.0 release build on October 18, 2026: a 47-page HWP document showed the notice and produced a 15-page PDF, and a 3-page HWPX document was saved with all 3 pages.</p>
-    </section>
-    <section aria-labelledby="print-route">
-      <h2 id="print-route">Save through the print screen</h2>
-      <p>Tap <strong>Print</strong> in the ⋮ menu to open Android's print screen (on versions before 1.2.0 the item is called <strong>Print or save as PDF</strong>). Under Select printer, choose the save-as-PDF option (its name varies by phone) to keep the result as a PDF file. Use this if Save as PDF fails; the same page limit applies.</p>
-      <blockquote cite="https://developer.android.com/training/printing"><p>"In Android 4.4 (API level 19) and higher, the framework provides services for printing images and documents directly from Android applications."</p></blockquote>
-      <p class="muted">Source: <a href="https://developer.android.com/training/printing" rel="noopener">Android Developers, Printing content</a></p>
-    </section>
-    <section aria-labelledby="compare">
-      <h2 id="compare">Which way to use</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Method</th><th scope="col">Phone only</th><th scope="col">Upload</th><th scope="col">Length</th><th scope="col">Use it when</th></tr></thead>
-          <tbody>
-            <tr><th scope="row">SugarDoc Save as PDF</th><td>Yes</td><td>None</td><td>First 15 pages (6 on low-memory phones)</td><td>You need a short notice or letter as a PDF right now</td></tr>
-            <tr><th scope="row">SugarDoc Print → PDF</th><td>Yes</td><td>None</td><td>Same as above</td><td>Save as PDF failed, or you are on a version before 1.2.0 (there the item is ‘Print or save as PDF’)</td></tr>
-            <tr><th scope="row">Ask the sender</th><td>Yes (you wait)</td><td>None</td><td>No limit</td><td>The layout must match, or it is longer than 15 pages</td></tr>
-            <tr><th scope="row">Desktop HWP program</th><td>No</td><td>None</td><td>Depends on the program</td><td>You need to edit a long document first</td></tr>
-            <tr><th scope="row">Web converter</th><td>Yes</td><td>To their server</td><td>Varies by site</td><td>The document has no personal information</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p><strong>Verdict:</strong> for a document of 15 pages or fewer that you need as a PDF now, Save as PDF in the app is the quickest. For longer documents or forms where layout matters, get a PDF from the sender or make it on a computer.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">Limits and what to do when it fails</h2>
-      <ul>
-        <li><strong>Only the first pages are saved.</strong> Usually the first 15, or the first 6 on phones with little memory. You cannot choose a page range.</li>
-        <li><strong>Distribution-only documents cannot be saved.</strong> When printing and copying are locked, Save as PDF and Print do not appear in the menu.</li>
-        <li><strong>PDF files have no Save as PDF.</strong> They are already PDFs, so only Print is offered, and a password-protected PDF cannot be printed.</li>
-        <li><strong>Layout may differ slightly.</strong> If the original fonts are not on your phone, similar fonts are used, so line breaks and spacing can shift. Open the saved PDF and check it before you submit it anywhere.</li>
-        <li><strong>If it will not open, it will not save.</strong> Documents locked by a company DRM program cannot be opened. If the file does not open at all, start with <a href="https://sugarmount21.com/en/apps/doc-viewer/hwpx-open/">what to check when an HWPX file will not open</a>.</li>
-        <li><strong>No PDF-to-HWP.</strong> SugarDoc is a viewer only.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="format">
-      <h2 id="format">About the HWP format</h2>
-      <p>HWP is the native format of the Hancom word processor widely used in Korea. Its specification is public, which is why other apps can read it. Hancom says (in Korean) that it published the HWP binary format and the HWPML markup language on June 29, 2010: "한컴은 2010년 6월 29일에 자사의 바이너리 포맷인 HWP와 마크업 언어인 HWPML을 공개하였습니다."</p>
-      <p class="muted">Source: <a href="https://www.hancom.com/support/downloadCenter/hwpOwpml" rel="noopener">Hancom download center, HWP and OWPML formats</a>. For how .hwp and .hwpx differ, see <a href="https://sugarmount21.com/en/apps/doc-viewer/hwp-vs-hwpx/">HWP vs HWPX</a>.</p>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Does saving as PDF cost anything?</summary><div><p>No. Save as PDF and Print need no payment, and the app has no ads.</p></div></details>
-        <details><summary>Is my document uploaded anywhere?</summary><div><p>No. SugarDoc does not send documents to a server; the PDF is made on your phone. See the <a href="https://sugarmount21.com/en/privacy/doc-viewer/">HWP Viewer SugarDoc privacy policy</a>.</p></div></details>
-        <details><summary>Where is the saved PDF?</summary><div><p>In the folder you picked on the save screen. The folder shown first can differ by phone, so check its name before you tap Save. Afterwards you can find the PDF in your phone's Files app.</p></div></details>
-        <details><summary>Can I convert a document longer than 15 pages in full?</summary><div><p>Not in SugarDoc. Only the first 15 pages (6 on low-memory phones) are saved. For the whole document, ask the sender for a PDF or make it on a computer.</p></div></details>
-        <details><summary>If I cancel on the save screen, is an empty file left behind?</summary><div><p>No. Cancelling on the save screen creates no file.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="related">
-      <h2 id="related">Related guides</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/apps/doc-viewer/hwpx-open/">When an HWPX file will not open on your phone</a></li>
-        <li><a href="https://sugarmount21.com/en/apps/doc-viewer/hwp-vs-hwpx/">HWP and HWPX: what is the difference</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="app">
-      <h2 id="app">Get HWP Viewer SugarDoc</h2>
-      <p>An Android app that opens Korean HWP and HWPX documents and PDFs straight from KakaoTalk or email, and reopens them on the page you were reading. No ads and no sign-up. Works on Android 10 and later.</p>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugardoc&amp;referrer=utm_source%3Dsugarmount21.com%26utm_medium%3Dhowto%26utm_campaign%3Dsugardoc&amp;hl=en" rel="noopener">Get HWP Viewer SugarDoc on Google Play</a><a class="button button--outline" href="https://sugarmount21.com/en/apps/doc-viewer/">About HWP Viewer SugarDoc</a></div>
-      <p class="muted">This product was developed with reference to Hancom's public HWP document file (.hwp) specification. SugarDoc is not affiliated with or endorsed by Hancom Inc. Hancom and HWP are trademarks of Hancom Inc.</p>
-    </section>]]></description>
-    <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>HWP vs HWPX: what differs and how to open both – SugarMount</title>
-    <link>https://sugarmount21.com/en/apps/doc-viewer/hwp-vs-hwpx/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/apps/doc-viewer/hwp-vs-hwpx/</guid>
-    <description><![CDATA[<section class="hero">
-      <span class="eyebrow">Help · Android</span>
-      <h1>HWP vs HWPX: what differs and how to open both</h1>
-      <p class="lead">HWP and HWPX are both Korean Hangul documents, but they are built differently, so renaming the file does not convert it. On an Android phone, open both with one viewer; converting HWPX to HWP needs the Hangul word processor on a PC.</p>
-      <p class="note">This article uses SugarMount's Android app HWP Viewer SugarDoc (SugarDoc for short; shown as "HWP Viewer" on your phone). <strong>It cannot convert HWPX to HWP or HWP to HWPX</strong>. Editing (Pro) covers body and table cell text in HWP documents only; HWPX documents cannot be edited yet.</p>
-    </section>
-    <section aria-labelledby="difference">
-      <h2 id="difference">How HWP and HWPX differ</h2>
-      <p><strong>.hwp</strong> is the long-standing format of Hancom's Hangul word processor, common in Korean schools, offices and government. It is a binary compound file, so its contents are not human-readable. <strong>.hwpx</strong> is the newer open format (OWPML): the document is written as XML files packed into one ZIP archive.</p>
-      <p>Hancom states which versions support each format:</p>
-      <blockquote cite="https://www.hancom.com/support/downloadCenter/hwpOwpml" lang="ko"><p>"HWP의 개방형 문서 형식인 OWPML은 HWP 2018 버전부터 ".owpml" 확장자로 지원하고 있으며, 하위 버전은 HWP 2010 버전부터 ".hwpx" 확장자로 지원하고 있습니다."</p></blockquote>
-      <p class="muted">In English: OWPML, HWP's open document format, is supported with the ".owpml" extension from HWP 2018, and with the ".hwpx" extension from HWP 2010. The same page describes the .hwp 5.x format as the one used from HWP 2002 through HWP 2018. Source: <a href="https://www.hancom.com/support/downloadCenter/hwpOwpml" rel="noopener">Hancom Download Center, HWP/OWPML format</a> (Korean, checked October 18, 2026).</p>
-      <p>So the same letter can arrive in either format. An app that reads only one of them cannot open the other, and changing the extension leaves the inside unchanged.</p>
-    </section>
-    <section aria-labelledby="compare">
-      <h2 id="compare">Side by side</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Item</th><th scope="col">.hwp</th><th scope="col">.hwpx</th></tr></thead>
-          <tbody>
-            <tr><th scope="row">Inside the file</th><td>Binary compound file</td><td>XML files in a ZIP (OWPML)</td></tr>
-            <tr><th scope="row">Hangul word processor support (per Hancom)</th><td>5.x format from HWP 2002</td><td>From HWP 2010</td></tr>
-            <tr><th scope="row">Rename the extension</th><td colspan="2">Does not work. The inside stays the same</td></tr>
-            <tr><th scope="row">Open in SugarDoc</th><td>Yes, including old HWP 3.0</td><td>Yes</td></tr>
-            <tr><th scope="row">Password-protected</th><td>Opens with the password. Password-protected HWP 3.0 files cannot be opened</td><td>Opens with the password</td></tr>
-            <tr><th scope="row">Convert between them in SugarDoc</th><td colspan="2">No</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p><strong>Verdict:</strong> if you only need to read the document, the difference does not matter; one app that opens both is enough. The format only matters when you must send the file on to someone using a Hangul version older than HWP 2010. Then re-save it as .hwp on a PC, or send a PDF.</p>
-    </section>
-    <section aria-labelledby="without-app">
-      <h2 id="without-app">Without an app, and the limits</h2>
-      <ul>
-        <li><strong>Renaming the file: does not work.</strong> A .hwpx renamed to .hwp is still a ZIP-based HWPX inside, so programs that cannot read HWPX still fail.</li>
-        <li><strong>Re-saving in the Hangul word processor on a PC: the usual way to get .hwp.</strong> Open the file in a version that supports .hwpx, then save a copy and choose the .hwp file type. Menu names vary by version, and you need a PC with the program.</li>
-        <li><strong>Asking the sender for another format: the most reliable.</strong> The author can re-save as .hwp or PDF with the fewest layout changes, but you have to wait for a reply.</li>
-        <li><strong>Your phone's built-in apps: usually open neither.</strong> Android phones generally have a PDF viewer but no app for .hwp or .hwpx.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="app-steps">
-      <h2 id="app-steps">Open either format with SugarDoc</h2>
-      <ol class="steps">
-        <li><strong>Tap the file</strong> — In KakaoTalk, email or your file manager, tap the .hwp or .hwpx file and pick <strong>HWP Viewer</strong> from "Open with" or "Share". For a file already saved on the phone, use <strong>Find in my files</strong> in the app.</li>
-        <li><strong>Don't choose a format</strong> — There is nothing to pick. The app tells HWP, HWPX and PDF apart by reading the file's contents, not by the extension at the end of its name.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugardoc/hwp-vs-hwpx-2-en.webp" width="300" height="427" loading="lazy" alt="SugarDoc showing a sample .hwpx letter to parents, with the file name at the top and the first page with a schedule table below."><figcaption class="muted">The sample document was made up for the screenshot.</figcaption></figure></li>
-        <li><strong>Find it again later</strong> — Every document you open is listed with its format (HWP, HWPX or PDF). When the list grows, search by file name.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugardoc/hwp-vs-hwpx-1-en.webp" width="300" height="333" loading="lazy" alt="The document search screen with the word notice typed in, listing two HWPX files and one HWP file, each tagged with its format."></figure></li>
-        <li><strong>Enter the password if asked</strong> — A password-protected HWP or HWPX file opens once you type its password. The password is not saved.</li>
-      </ol>
-      <p class="muted">Screenshots are real app screens captured for SugarDoc's store listing. Menu names can differ slightly by app version and phone model.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">What it cannot do</h2>
-      <ul>
-        <li><strong>No format conversion.</strong> SugarDoc cannot turn HWPX into HWP or the other way round, and it cannot create documents. Editing (Pro) covers body and table cell text in HWP documents only.</li>
-        <li><strong>You can keep a PDF.</strong> If the recipient has no Hangul word processor, or an old one, a PDF may be the easiest thing to send. See <a href="https://sugarmount21.com/en/apps/doc-viewer/hwp-to-pdf/">convert an HWP file to PDF on Android</a> for the steps and page limits.</li>
-        <li><strong>Layout may differ slightly.</strong> When the original font is not on your phone, a similar font is used, so line breaks and spacing can shift. Old HWP 3.0 files may differ more.</li>
-        <li><strong>Some files will not open.</strong> DRM-protected documents, password-protected HWP 3.0 files and files over 1 GB cannot be opened. Distribution-only documents may not open, or show only a preview.</li>
-        <li><strong>Other office formats are not supported.</strong> Excel, Word and PowerPoint files do not open.</li>
-      </ul>
-      <p>If a file does not open at all, the cause is usually your phone's app settings rather than the format. Start with <a href="https://sugarmount21.com/en/apps/doc-viewer/hwpx-open/">when an HWPX file won't open on your phone</a>.</p>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>If I rename .hwpx to .hwp, will it open?</summary><div><p>No. Only the name changes; the file is still HWPX inside, so programs that cannot read HWPX still fail. To get a real .hwp, re-save it as .hwp in a Hangul word processor that supports .hwpx.</p></div></details>
-        <details><summary>Can SugarDoc convert HWPX to HWP?</summary><div><p>No. SugarDoc has no format conversion. It opens both formats, and you can keep the document as a PDF.</p></div></details>
-        <details><summary>Which format should I ask for?</summary><div><p>For reading, either is fine; an app that opens both shows them the same way. If you must forward the file to someone using a Hangul version older than HWP 2010, .hwp or PDF is safer.</p></div></details>
-        <details><summary>Do very old HWP 3.0 files open?</summary><div><p>Yes, SugarDoc opens them, though they may look more different from the original. Password-protected HWP 3.0 files cannot be opened.</p></div></details>
-        <details><summary>Are my documents uploaded anywhere?</summary><div><p>No. SugarDoc opens documents on your phone without uploading them, and it never changes the original file. See the <a href="https://sugarmount21.com/en/privacy/doc-viewer/">privacy policy</a> for details.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="related">
-      <h2 id="related">Related articles</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/apps/doc-viewer/hwpx-open/">When an HWPX file won't open on your phone</a></li>
-        <li><a href="https://sugarmount21.com/en/apps/doc-viewer/hwp-to-pdf/">Convert an HWP file to PDF on Android</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="app">
-      <h2 id="app">Get SugarDoc</h2>
-      <p>An Android app that opens Korean HWP and HWPX files and PDFs straight from the app you received them in, and reopens at the page you were reading. No ads, no sign-up. Android 10 or later. Contact: sugarmount21@gmail.com</p>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugardoc&amp;referrer=utm_source%3Dsugarmount21.com%26utm_medium%3Dhowto%26utm_campaign%3Dsugardoc&amp;hl=en" rel="noopener">Get SugarDoc on Google Play</a><a class="button button--outline" href="https://sugarmount21.com/en/apps/doc-viewer/">About SugarDoc</a></div>
-      <p class="muted">This product was developed with reference to Hancom's public HWP file format documentation. SugarDoc is not affiliated with or endorsed by Hancom Inc. Hancom and HWP are trademarks of Hancom Inc.</p>
-    </section>]]></description>
-    <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>How to open an HWPX or HWP file on Android – SugarMount</title>
-    <link>https://sugarmount21.com/en/apps/doc-viewer/hwpx-open/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/apps/doc-viewer/hwpx-open/</guid>
-    <description><![CDATA[<section class="hero">
-      <span class="eyebrow">Help · Android</span>
-      <h1>How to open an HWPX or HWP file on Android</h1>
-      <p class="lead">An HWPX or HWP file usually will not open on Android because the phone has no app for Korean word-processor documents. Install an HWP viewer, then choose it from Open with in KakaoTalk, email or your file manager.</p>
-      <p class="note">This guide uses HWP Viewer SugarDoc, an Android app made by SugarMount; other HWP viewers work much the same way. Menu names vary a little by app version and phone. The screenshots are cropped from the app's Google Play screenshots of version 1.0.0.</p>
-    </section>
-    <section aria-labelledby="why">
-      <h2 id="why">Why the file will not open</h2>
-      <ul>
-        <li><strong>No app can read it.</strong> Android phones usually come with something that opens PDFs, but nothing for .hwp or .hwpx. Tapping the file ends with a message that no app can open it.</li>
-        <li><strong>The file arrives as an unknown type.</strong> Some apps hand over .hwpx as a generic file instead of a document, so a viewer you have installed may still be missing from the list of apps.</li>
-        <li><strong>Another app is the default.</strong> If you once tapped Always for a different app, that app opens straight away without asking. If it cannot read HWPX you see a blank screen or an error.</li>
-      </ul>
-      <p>HWPX is the newer of the two formats. Hancom, the maker of the Hangul word processor, says (in Korean) that its open format OWPML has been supported with the .hwpx extension since Hangul 2010:</p>
-      <blockquote cite="https://www.hancom.com/support/downloadCenter/hwpOwpml" lang="ko"><p>"HWP의 개방형 문서 형식인 OWPML은 HWP 2018 버전부터 ".owpml" 확장자로 지원하고 있으며, 하위 버전은 HWP 2010 버전부터 ".hwpx" 확장자로 지원하고 있습니다."</p></blockquote>
-      <p class="muted">Source: <a href="https://www.hancom.com/support/downloadCenter/hwpOwpml" rel="noopener">Hancom Download Center, HWP/OWPML format</a> (Korean, checked October 18, 2026). The two formats are built differently; see <a href="https://sugarmount21.com/en/apps/doc-viewer/hwp-vs-hwpx/">HWP vs HWPX</a>.</p>
-    </section>
-    <section aria-labelledby="without-app">
-      <h2 id="without-app">Without installing an app, and the catch</h2>
-      <ul>
-        <li><strong>Ask the sender for a PDF.</strong> Every Android phone can show a PDF, and the layout matches the original best. You have to wait for a reply.</li>
-        <li><strong>Open it on a computer</strong> with the Hangul word processor or another program that reads HWP. Not much help when you need the file on the go.</li>
-        <li><strong>Upload it to a web viewer or converter.</strong> Nothing to install, but the document goes to that site's server. Avoid it for school letters, forms or anything with names, phone numbers or addresses.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="kakaotalk">
-      <h2 id="kakaotalk">When an HWP file from KakaoTalk will not open</h2>
-      <ol class="steps">
-        <li><strong>Install an HWP viewer</strong> — get an app that opens HWP and HWPX from Google Play. HWP Viewer SugarDoc shows no permission prompts after installing and needs no sign-up.</li>
-        <li><strong>Tap the file in the chat</strong> — tap the file in the KakaoTalk chat to download it.</li>
-        <li><strong>Open with another app</strong> — from the file screen's menu (⋮ or the share button) choose Open with another app, then pick <strong>HWP Viewer</strong> from the list. Tap <strong>Always</strong> if you do not want to choose every time.</li>
-        <li><strong>Go back when you are done</strong> — Back returns you to KakaoTalk. Documents you open collect under <strong>Received documents</strong> in the app, so you can find them later by file name without scrolling back through the chat.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugardoc/hwpx-open-1-en.webp" width="360" height="464" loading="lazy" alt="The Search documents screen in HWP Viewer SugarDoc, where typing notice lists three received HWPX and HWP files whose names contain that word."></figure></li>
-      </ol>
-      <p class="muted">The menu names and their place differ by KakaoTalk version and phone. The app's own home screen shows the same three steps under Open documents from KakaoTalk.</p>
-    </section>
-    <section aria-labelledby="email">
-      <h2 id="email">Files attached to an email</h2>
-      <p>Tap the attachment in your mail app and a list of apps to open it with appears. Choose the HWP viewer there. If the mail app only downloads the file and shows no list, download it first and then use the steps in the next section. Each mail app shows attachments a little differently.</p>
-    </section>
-    <section aria-labelledby="not-in-list">
-      <h2 id="not-in-list">When the viewer is missing from the list</h2>
-      <ol class="steps">
-        <li><strong>Check the file-type setting</strong> — some apps send .hwpx without saying what kind of file it is. In HWP Viewer SugarDoc, <strong>Settings &gt; Opening files &gt; Show for all file types</strong> lets you pick the app even then. It is on by default; if you turned it off, turn it back on and tap the file again.</li>
-        <li><strong>Save the file to your phone</strong> — use Save or Download in the app you received it in. It usually goes to the Download folder.</li>
-        <li><strong>Pick it from inside the viewer</strong> — open HWP Viewer SugarDoc, tap <strong>Find in my files</strong> and choose the file. This uses Android's own file picker, so the app does not need access to all your storage.</li>
-        <li><strong>Or share it</strong> — if the app you received it in has Share, choose HWP Viewer from the share list.</li>
-      </ol>
-    </section>
-    <section aria-labelledby="default-app">
-      <h2 id="default-app">When a different app opens instead</h2>
-      <p>If another app opens with no list to choose from, that app is set as the default. Go to Android <strong>Settings &gt; Apps &gt; that app &gt; Open by default</strong> (or a similar name on your phone) and clear its defaults, then tap the file again; the list of apps comes back. Android's developer guide describes how a default gets set:</p>
-      <blockquote cite="https://developer.android.com/guide/components/intents-filters"><p>"When there is more than one app that responds to your implicit intent, the user can select which app to use and make that app the default choice for the action."</p></blockquote>
-      <p class="muted">Source: <a href="https://developer.android.com/guide/components/intents-filters" rel="noopener">Android Developers, Intents and intent filters</a> (checked October 18, 2026).</p>
-    </section>
-    <section aria-labelledby="compare">
-      <h2 id="compare">Which way to use</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Method</th><th scope="col">Phone only</th><th scope="col">Upload</th><th scope="col">Opens HWPX</th><th scope="col">Use it when</th></tr></thead>
-          <tbody>
-            <tr><th scope="row">HWP viewer app (such as SugarDoc)</th><td>Yes</td><td>None</td><td>Yes</td><td>You often receive HWP files on your phone</td></tr>
-            <tr><th scope="row">Ask the sender for a PDF</th><td>Yes (you wait)</td><td>None</td><td>Not needed</td><td>It is a one-off, or the layout must match exactly</td></tr>
-            <tr><th scope="row">Computer with an HWP program</th><td>No</td><td>None</td><td>Depends on the program</td><td>You need to edit the document</td></tr>
-            <tr><th scope="row">Web viewer or converter</th><td>Yes</td><td>To their server</td><td>Depends on the site</td><td>The document has no personal information</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p><strong>Verdict:</strong> if HWP files reach your phone more than once in a while, install a viewer that opens both HWP and HWPX; the document stays on your phone. For a one-off file or a form you have to edit, ask for a PDF or use a computer.</p>
-    </section>
-    <section aria-labelledby="still-not-opening">
-      <h2 id="still-not-opening">If it still will not open</h2>
-      <ul>
-        <li><strong>It takes a long time</strong> — if a document has not opened after 10 seconds, HWP Viewer SugarDoc lets you keep waiting or open it with another app. When the file has a built-in preview you can view that first.
-          <figure><img src="https://sugarmount21.com/assets/apps/sugardoc/hwpx-open-2-en.webp" width="360" height="260" loading="lazy" alt="A message says the document is taking a while to open, with Keep waiting, Show preview and Open with another app buttons."></figure></li>
-        <li><strong>It is password-protected</strong> — HWP, HWPX and PDF files with a password open once you enter it. Password-protected files in the old HWP 3.x format cannot be opened.</li>
-        <li><strong>It is locked by a company security program (DRM)</strong> — such files open only in that company's own viewer. The quickest fix is to ask the sender for an unlocked copy or a PDF.</li>
-        <li><strong>The download is incomplete or damaged</strong> — if the file size is zero or tiny, download it again. If the same file from someone else will not open either, the file itself may be damaged.</li>
-        <li><strong>It looks different from the original</strong> — when the original fonts are not on your phone a similar font is used, so line breaks and spacing can shift. Check documents where layout matters on a computer.</li>
-        <li><strong>You want to edit it</strong> — HWP Viewer SugarDoc Pro can change body and table cell text in HWP (Hangul 5.x) documents. It cannot edit HWPX documents yet or convert HWPX to HWP.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Will renaming .hwpx to .hwp make it open?</summary><div><p>No. The two formats are built differently, so changing the extension does not convert the file. Use an app that opens both.</p></div></details>
-        <details><summary>Is my document uploaded anywhere?</summary><div><p>No. HWP Viewer SugarDoc opens documents on your phone and does not send them to a server. See the <a href="https://sugarmount21.com/en/privacy/doc-viewer/">HWP Viewer SugarDoc privacy policy</a>.</p></div></details>
-        <details><summary>Can I save the document as a PDF?</summary><div><p>Yes. From version 1.2.0, tap ⋮ and then ‘Save as PDF’ to create a new PDF in a folder you choose; earlier versions save from the print screen. Long HWP documents are saved up to their first 15 pages. See <a href="https://sugarmount21.com/en/apps/doc-viewer/hwp-to-pdf/">converting an HWP file to PDF on Android</a>.</p></div></details>
-        <details><summary>Do I need to sign up or allow permissions?</summary><div><p>No. There is no sign-up and no permission prompt after installing. Files reach the app through Open with, Share or Android's file picker.</p></div></details>
-        <details><summary>Who do I contact if it still will not open?</summary><div><p>Email <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a> with your phone model, Android version and the app you received the file in. You do not need to send the document itself.</p></div></details>
-      </div>
-    </section>
-    <section aria-labelledby="related">
-      <h2 id="related">Related guides</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/apps/doc-viewer/hwp-vs-hwpx/">HWP vs HWPX: what differs and how to open both</a></li>
-        <li><a href="https://sugarmount21.com/en/apps/doc-viewer/hwp-to-pdf/">Convert an HWP file to PDF on Android</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">Developer note: on Android, HWPX can arrive as application/octet-stream</a></li>
-      </ul>
-    </section>
-    <section aria-labelledby="app">
-      <h2 id="app">Get HWP Viewer SugarDoc</h2>
-      <p>An Android app that opens Korean HWP and HWPX documents and PDFs straight from KakaoTalk or email, and reopens them on the page you were reading. No ads and no sign-up, and documents stay on your phone. With Pro you can change body and table cell text in HWP documents and save a new file. Works on Android 10 and later.</p>
-      <div class="actions"><a class="button play-badge" href="https://play.google.com/store/apps/details?id=com.sugarmount.sugardoc&amp;referrer=utm_source%3Dsugarmount21.com%26utm_medium%3Dhowto%26utm_campaign%3Dsugardoc&amp;hl=en" rel="noopener">Get HWP Viewer SugarDoc on Google Play</a><a class="button button--outline" href="https://sugarmount21.com/en/apps/doc-viewer/">About HWP Viewer SugarDoc</a></div>
-      <p class="muted">This product was developed with reference to Hancom's public HWP document file (.hwp) specification. HWP Viewer SugarDoc is not affiliated with or endorsed by Hancom Inc. Hancom and HWP are trademarks of Hancom Inc.</p>
     </section>]]></description>
     <pubDate>Sun, 18 Oct 2026 09:00:00 +0900</pubDate>
   </item>
