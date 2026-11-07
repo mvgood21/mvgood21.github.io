@@ -6,7 +6,350 @@
   <description>Small Android apps that each do one thing simply, from shrinking photos and opening Korean HWP documents to checking Korean spelling and playing puzzle games.</description>
   <language>en</language>
   <atom:link href="https://sugarmount21.com/en/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Sat, 07 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Sun, 08 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Agent reported zero GA4 users; the table said 43 – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/ga4-zero-report-reversed/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/ga4-zero-report-reversed/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/ga4-zero-report-reversed-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>An AI agent reported "GA4: zero in 28 days"; the table report had 43 users</h1>
+      <p class="lead">The zero came from reading the Firebase overview page as text, once. A table report for the last 28 days showed 43 active users and 10,522 events, and the app code had nothing to fix.</p>
+      <p>An AI agent told the operator that GA4 had recorded nothing for 28 days and that measurement was broken; 10 minutes and 26 seconds later the same agent took it back. It was 23:57 Korea time on Saturday, October 17, 2026, one week after our HWP document viewer <a href="https://sugarmount21.com/en/apps/doc-viewer/">SugarDoc</a> went public on Google Play, in a Claude Code session that was collecting the app's numbers through Chrome. The subagent sent to investigate read 43 active users and 10,522 events for the last 28 days from a GA4 table report, 34 users and 7,728 events of them on the Play release build.</p>
+      <p class="note">Sources: the Claude Code session logs (the main session and the investigating subagent, both jsonl), docs and commits in the sugar-utils and game repositories, and the GA4 page text captured in those logs. The logs store UTC; times here are converted to Korea time (UTC+9). GA4 property numbers and other account or app identifiers are left out. Checked again on 2026-11-03.</p>
+    </section>
+    <section aria-labelledby="overview-once">
+      <h2 id="overview-once">One read of the overview page after a 4-second wait</h2>
+      <p>At 23:50 the operator tried, in the same session, to re-authenticate gcloud Application Default Credentials (ADC) with an analytics scope. The command failed because the shell it ran in had no gcloud. The operator then told the agent to go through Chrome if the login didn't work, and at 23:52:56 the main agent opened the Firebase overview dashboard in GA4. The screenshot taken right after failed with "Can't interact with browser-internal or unparseable URLs", so it waited 4 seconds and pulled the page text once, at 23:53:06. That was its only look at GA4. Its next calls went to Play Console statistics and Android vitals.</p>
+      <p>The text it got was 1,736 characters long. It contained exactly one number that was a value, "active users in the last 30 minutes: 0"; the other digits were chart axis ticks. Ten places said "no data available", including the cards for event count by event name, users by country and users by device model. The first card, user activity over time, had no value in its text, only the date tick "17 Oct". In the 23:57 report this became a table row: "last 28 days: users 0, events 0, no records even from QA devices."</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/ga4-zero-report-reversed-1-en.webp" width="1200" height="1090" alt="Timeline: at 23:53 the agent read the overview page once, at 23:57 it reported zero GA4 data and suggested holding a release, and at 00:07 it retracted after the investigator saw an HTTP 204 upload and 43 users and 10,522 events in a table report." loading="lazy"><figcaption>The number that reversed the report came from a table report the investigator opened at 00:05, after checking the code and a phone.</figcaption></figure>
+      <p>The agent went wrong when it turned wording into a number. It combined "no data available" with a 30-minute zero into a 28-day total of zero, then set that next to Play Console's 2 to 3 daily active users. Side by side, "the app is not sending analytics at all" looked like a reasonable story.</p>
+    </section>
+    <section aria-labelledby="brief">
+      <h2 id="brief">The zero went into the subagent brief as a fact</h2>
+      <p>At 23:56:38 the main agent handed the root-cause hunt to a subagent. The brief opened by stating that the GA4 property showed zero users and zero events for the last 28 days, not even from QA devices. The five required checks (whether the google-services plugin was applied, the Firebase resources in the built bundle, FirebaseApp initialization, the consent default, the event call sites) were all code or build; a logcat check on a connected phone was listed as optional. Nothing asked it to confirm the zero in a GA4 report, and it was told to fix any bug it found in a separate git worktree.</p>
+      <p>Eighteen seconds later the main agent ran the production promotion for version 1.1.0 (versionCode 4), which the operator had approved earlier. Claude Code's auto-mode permission classifier blocked it as "[Production Deploy]". The 23:57 report, four minutes after the page-text read, passed the command to the operator with a caveat: if the analytics bug was also in 1.1.0, it would be better to ship a fixed 1.1.1 straight away. A worktree and branch for the fix were listed as work in progress.</p>
+      <p>No person corrected anything in those ten minutes. The permission classifier blocked the production promotion for its own reasons, unrelated to the zero; the hotfix and the hold that came from the zero were withdrawn after the investigating subagent's report. Do not change a release decision on the strength of a zero read off a dashboard. This zero reached the report and the brief without the name of the page or the date range it came from. More rules for writing subagent briefs are in <a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a>.</p>
+    </section>
+    <section aria-labelledby="investigator">
+      <h2 id="investigator">The investigator checked code, then a phone, then the report</h2>
+      <p>The subagent followed the brief's order and started with code and build. For about three minutes from 23:56 it checked the condition that applies the google-services plugin, the Firebase resources in the 1.1.0 release APK (key names only), the initialization provider, and the path that switches the consent default on. It found no defect. The static check of the 1.0.0 and 1.1.0 app bundles came later, at 00:04, after the phone test. At 23:59 the Firebase Management API showed both apps, release and debug, linked to two GA4 data streams.</p>
+      <p>Around midnight it moved to a Galaxy S21 with the 1.1.0 release build already installed. With Firebase debug mode switched on for the package, logcat showed initialization succeeding, collection enabled and <code>analytics_storage=granted</code>, and at 00:00:52 this line:</p>
+      <pre><code>V/FA-SVC: Network upload successful with code, uploadAttempted: 204, true</code></pre>
+      <p>At 00:01 it tried to pull the numbers through the GA4 Data API. Both tokens it had, the ADC token and the gcloud user token, lacked an analytics scope, so both calls returned 403. That left the GA4 pages in Chrome. The data streams page said "no data received in the past 48 hours" for both streams. The realtime overview showed 0 at 00:02:44 and, six seconds later on the same page, one app_entry and one session_start event. At 00:05:38 the subagent opened the "Pages and screens" table report; the text it read 11 seconds later had a total row with 43 active users and 10,522 events for the last 28 days.</p>
+    </section>
+    <section aria-labelledby="version-rows">
+      <h2 id="version-rows">34 of the 43 users were on the Play release</h2>
+      <p>At 00:06 it split the tech details table by app version: 1.0.0 (the Play release) 34 users and 7,728 events, 1.0.0-debug 6 users and 2,712 events, 1.1.0 (internal test track) 5 users and 82 events. The debug build alone accounted for 25.77% of events. The user counts per version add up to 45, while the total row said 43.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/ga4-zero-report-reversed-2-en.webp" width="1200" height="662" alt="Bar chart: the agent reported 0 users, while the table report showed 43 active users over 28 days: 34 on the 1.0.0 release, 6 on the debug build and 5 on 1.1.0." loading="lazy"><figcaption>During the 28 days reported as zero, the release build alone had 34 users and 7,728 events.</figcaption></figure>
+      <p>According to the subagent's report, GA4 had 5 users after the public launch on October 10 (3 on 1.0.0, 2 on 1.1.0): about 4 on the 10th and 0 or 1 a day after that. So 3 of the 34 users on 1.0.0 came after launch; who the rest, seen before launch, were was not broken down in that session. Midnight also passed between the two reads: the overview's "last 28 days" was September 19 to October 16, and the table's "last 28 days" was September 20 to October 17.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20An%20AI%20agent%20reported%20%22GA4%3A%20zero%20in%2028%20days%22%3B%20the%20table%20report%20had%2043%20users">Email us</a></p></aside>
+    <section aria-labelledby="two-guesses">
+      <h2 id="two-guesses">The loading guess was never checked; the streams guess contradicts the log</h2>
+      <p>In its 00:07:49 correction the main agent wrote that the zero came from reading the overview text before the cards had finished loading. That may be true, but nobody checked it. There is no record of the same overview page being opened again to see whether the cards filled in.</p>
+      <p>The subagent offered a different guess: the main agent had probably looked at the data streams page with its "no data in 48 hours" line, at the realtime zero, or at the wrong property or a filter. The session log rules that out. The only GA4 page the main agent opened was the Firebase overview. The streams message itself was accurate: the app really had zero users on October 16 and 17.</p>
+      <p>The main agent never opened a report with a total row and never checked the number by a second route. The Data API was blocked, so the browser was the only route, but in that same browser the subagent went from opening a table report to reading its total in 11 seconds.</p>
+    </section>
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">Data API, code review, a screenshot, a hotfix</h2>
+      <p>The Data API's runReport call returns activeUsers and eventCount as JSON, so it does not depend on whether a card has rendered. That night both tokens lacked the analytics scope and got 403, and the operator's re-login attempt at 23:50 had failed. The growth plan committed the next day (8475f45) still said Claude could not see GA4 numbers directly and left every cost-per-install and conversion figure as an estimate. The GA4 report tool in the game repository read GA4 with a service-account token; commit 7a61407 on October 22 made it mint that token from ADC alone, with no gcloud user login. Ten days after the incident the daily ops check (68215b5, covering October 27) was reading per-app GA4 Data API numbers through that tool's filter.</p>
+      <p>The brief sent the investigator to the code first, and that review only showed there was no defect; the 28-day total appeared once a table report was opened. The growth plan named an operator's GA4 screenshot as a fallback, which puts the decision on hold until a person opens the page. The 1.1.1 hotfix and the held promotion were dropped once the table report was on screen. Version 1.1.0 (4) never went to production; the next day 1.2.0 (5), which added direct PDF saving, did (6687cd0, c676b49).</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">Some zeros are real, and raw counts run high</h2>
+      <p>For an app with almost no traffic, many pages are right to show zero. According to the subagent's report, SugarDoc had zero GA4 users on October 11 to 14 and October 16 to 17. The steps below only tell you which page and which date range a zero belongs to.</p>
+      <p>Raw counts can also run high: in the October 27 daily check, SugarDoc's raw active users were 13; with test devices and Play pre-launch robots removed, there were 4. That was the day the robots tested the newly uploaded 1.3.3 (versionCode 9). How we filter raw counts is in <a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real</a>.</p>
+      <p>The on-device check used only the sideloaded 1.1.0 build. Neither connected phone had 1.0.0 installed from Play, so the evidence that 1.0.0 collected data is a static check of its app bundle and the 1.0.0 rows in GA4.</p>
+    </section>
+    <section aria-labelledby="checklist">
+      <h2 id="checklist">Overview card, total row, logcat 204, metric definitions</h2>
+      <p>We looked at four pages this time, and a zero or "no data" meant something different on each.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Page</th><th>Range</th><th>What we saw</th><th>How to read it</th></tr></thead>
+        <tbody>
+          <tr><td>Firebase overview cards</td><td>Page range (last 28 days)</td><td>one value (0 active users in the last 30 minutes) and "no data available" in 10 places</td><td>Not a value</td></tr>
+          <tr><td>Realtime overview</td><td>Last 30 minutes</td><td>0, then app_entry 1 and session_start 1 six seconds later</td><td>Only whether data is arriving now</td></tr>
+          <tr><td>Data stream status</td><td>Last 48 hours</td><td>"No data received"</td><td>Can be true for a low-traffic app</td></tr>
+          <tr><td>Table report total row</td><td>Last 28 days (to yesterday)</td><td>43 users, 10,522 events</td><td>The number to decide on</td></tr>
+        </tbody>
+      </table></div>
+      <ol>
+        <li>Find the page your zero came from in the table above and write down its range.</li>
+        <li>Read the total row of a report with a table. This time the subagent opened the "Pages and screens" report and the Tech details report (<code>r=user-technology-detail</code> in the URL), and in Tech details switched the primary dimension to "App version" to get the version rows. With the range set to 28daysAgo through yesterday, runReport returns the same range.</li>
+        <li>Watch an upload from a device. Turn on debug mode for the package, launch the app, find the upload response code in logcat, then look for the events in DebugView or the realtime report. This time the realtime report was used instead of DebugView; one app_entry appeared about two minutes after the upload.</li>
+        <li>Line up metric definitions. Play Console's active users and GA4's active users are counted differently. Inside GA4, the version rows summed to 45 against a total of 43, and debug builds, test devices and pre-launch robots sit in the raw numbers.</li>
+        <li>Only then open the code. When handing this to a subagent, do not state the zero as a fact; make steps 1 and 2 its first tasks.</li>
+      </ol>
+      <p>The runReport call for step 2 is the request that stopped at 403 that night, with identifiers removed; only endDate was changed to yesterday so the range matches the reports. The scopes are the ones in the re-login command the subagent left in its report.</p>
+      <pre><code>gcloud auth application-default login \
+  --scopes=https://www.googleapis.com/auth/analytics.readonly,https://www.googleapis.com/auth/cloud-platform
+curl -s -X POST \
+  -H "Authorization: Bearer $(gcloud auth application-default print-access-token)" \
+  -H "x-goog-user-project: &lt;cloud-project-id&gt;" \
+  -H "Content-Type: application/json" \
+  https://analyticsdata.googleapis.com/v1beta/properties/&lt;property-id&gt;:runReport \
+  -d '{"dateRanges":[{"startDate":"28daysAgo","endDate":"yesterday"}],
+       "metrics":[{"name":"activeUsers"},{"name":"eventCount"}]}'</code></pre>
+      <p>The device check for step 3 runs as below. According to the subagent's report, the two <code>log.tag</code> properties could not be set back to empty and stayed at VERBOSE; it noted they clear on reboot.</p>
+      <pre><code>adb shell setprop debug.firebase.analytics.app &lt;package-name&gt;
+adb shell setprop log.tag.FA VERBOSE
+adb shell setprop log.tag.FA-SVC VERBOSE
+adb logcat -s FA FA-SVC          # look for "Network upload successful with code"
+adb shell setprop debug.firebase.analytics.app .none.
+adb reboot                       # clears the two log.tag values (an empty setprop did not work in this session)</code></pre>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Play's 2 to 3 daily users against GA4's 0 to 1</h2>
+      <p>The gap between Play Console's 2 to 3 daily active users and GA4's 0 or 1 a day after launch was not settled by these steps; the session stopped once it found the two metrics are defined differently, without deciding whether it was a bug. The subagent's suggested next step was to split app_entry since October 10 by entry path (launcher or file open) and compare first_open with Play installs. That was not done in the session, and on November 3 we found no table in the sugar-utils docs that lines the two up by date.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20An%20AI%20agent%20reported%20%22GA4%3A%20zero%20in%2028%20days%22%3B%20the%20table%20report%20had%2043%20users">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>GA4 shows zero for my app. Should I start with the code?</summary><div><p>Read the total row of a table report first. Here, a 28-day value read as zero on the overview page was 43 users and 10,522 events in a table report, and three minutes of code and build review found no defect.</p></div></details>
+        <details><summary>A data stream says "no data received in the past 48 hours". Is collection broken?</summary><div><p>It can simply mean no events arrived in those 48 hours. SugarDoc had zero real users on October 16 and 17, which is why the message appeared; after the phone uploaded its events, app_entry showed up in the realtime report about two minutes later.</p></div></details>      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Sun, 08 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Google Ads for a puzzle game: CPI 30x break-even – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/google-ads-break-even-cpi/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/google-ads-break-even-cpi/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/google-ads-break-even-cpi-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Measurement</span>
+      <h1>Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</h1>
+      <p class="lead">Block Turn KR, the best of four first-round campaigns, paid $0.59 per install, about 30 times its break-even CPI, the ad revenue one installer brings in before leaving.</p>
+      <p>Four Google Ads app campaigns for two puzzle games spent $36.4 between launch and the morning of October 17, 2026, and GA4 attributed 105 installs to paid traffic (medium <code>cpc</code>). ROAS (ad revenue over ad spend) ran from 0.1% to about 3% per campaign. The go/no-go criteria set on October 15 had a CPI ceiling, D1 and same-day uninstalls, and no break-even line. A break-even CPI had been sitting in a September 30 document all along; we took it out again only after doubling the budget.</p>
+      <p class="note">Sources: the game repository's ad analysis and verdict documents and its git history, the promotion results and ad restart planning documents, and daily snapshots from a personal dashboard (Oct 24 to Nov 2), the operating harness's budget rule, and the daily analyses run on Nov 4 and Nov 6 (reporting Nov 3 and Nov 5). Dollar figures are Google Ads cost; won figures use the analysis documents' assumed rate of 1,400 won per dollar. Checked on 2026-11-06. Ad account and campaign identifiers are left out, and so are the amounts of break-even CPI and per-player ad revenue.</p>
+    </section>
+    <section aria-labelledby="first-round">
+      <h2 id="first-round">First round: four campaigns, $36.4, 105 installs</h2>
+      <p>The first round ran one Korean (KR) and one English campaign for each of <a href="https://sugarmount21.com/en/apps/arrow-knots/">Arrow Knots</a> and <a href="https://sugarmount21.com/en/apps/blocks/">Block Turn</a>; the English ones targeted Southeast Asia (SEA) or the whole world. On the morning of October 17 the agent joined GA4 paid installs to Google Ads cost per campaign. For Block Turn, GA4 logged about 35% less ad revenue than AdMob, so that revenue was corrected to AdMob's figures; the two Arrow Knots rows were not corrected.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Campaign</th><th>Spend</th><th>GA4 installs</th><th>CPI</th><th>ROAS</th></tr></thead>
+        <tbody>
+          <tr><td>Arrow Knots SEA EN (stopped Oct 15)</td><td>$10.56</td><td>54</td><td>$0.20</td><td>0.1%</td></tr>
+          <tr><td>Arrow Knots KR</td><td>$7.49</td><td>6</td><td>$1.25</td><td>0.7%</td></tr>
+          <tr><td>Block Turn EN / worldwide (stopped Oct 15)</td><td>$7.07</td><td>26</td><td>$0.27</td><td>0.4%</td></tr>
+          <tr><td>Block Turn KR</td><td>$11.24</td><td>19</td><td>$0.59</td><td>about 3%</td></tr>
+          <tr><td>Total</td><td>$36.4</td><td>105</td><td></td><td></td></tr>
+        </tbody>
+      </table></div>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/google-ads-break-even-cpi-1-en.webp" width="1200" height="662" alt="Bar chart: first-round ROAS was 0.1% for Arrow Knots SEA EN, 0.7% for Arrow Knots KR, 0.4% for Block Turn EN and about 3% for Block Turn KR, against a break-even ROAS of 100%." loading="lazy"><figcaption>Even Block Turn KR, the best campaign, got back about 3 cents per ad dollar.</figcaption></figure>
+      <p>By CPI the cheapest campaign was Arrow Knots SEA EN at $0.20; Block Turn KR cost three times as much. By ROAS the order flipped: Block Turn KR led at about 3% and Arrow Knots SEA EN came last at 0.1%.</p>
+    </section>
+    <section aria-labelledby="break-even">
+      <h2 id="break-even">Actual CPI about 30 times break-even</h2>
+      <p>Break-even CPI is the ad revenue one installer brings in before uninstalling: average revenue per daily active user (ARPDAU) times expected active days. The October 17 analysis computed it from the retention of a 22-player Block Turn KR cohort and Korean ARPDAU, and the actual CPI of $0.59 came out about 30 times higher.</p>
+      <p>The same document also tried D1 doubled and ARPDAU tripled, and still found a 7x loss. Its conclusion: at any budget, this funnel could not pay back its ad spend. Nor was there evidence that ads bought store ranking (the analysis counted one organic Block Turn install).</p>
+      <p>Expected active days were short because of the first session. When the analysis rebuilt the event sequences of 17 Block Turn KR paid players (16 device models), 7 of them (41%) finished the three tutorial boards and then left on board R004 without solving it once. It notes that they left before seeing a banner. How the stuck boards were found is in <a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a>.</p>
+      <p>Against the industry benchmarks gathered in the same analysis, our CPI was cheap and D1 sat near the median. Day-0 uninstalls (58%) ran about twice the benchmark, and ARPDAU was at the bottom of the range.</p>
+    </section>
+    <section aria-labelledby="ads-vs-ga4">
+      <h2 id="ads-vs-ga4">Ads counted 94 installs; GA4 saw 24 first opens</h2>
+      <p>The cost per install shown in the Google Ads console was far lower than the CPI above. In the October 17 promotion results document, Ads put it at 101 won for Block Turn EN and 371 won for Block Turn KR. Divided by GA4 installs, the same campaigns cost $0.27 (about 380 won) and $0.59 (about 830 won).</p>
+      <p>The gap is in the denominator. Against 94 install conversions Ads counted for Block Turn EN, GA4 logged 24 first opens in Indonesia (26%); for Block Turn KR it was 19 against 38 (50%). (Ads counted Sep 17 to Oct 16, GA4 from launch to Oct 17.) Three out of four Southeast Asian ad installs never showed up as a GA4 first open. In the October 17 to 23 retest the console had 55 conversions against 25 GA4 paid installs (45%), and for October 26 to November 1 it had 102 conversions against 50 GA4 installs on the dashboard.</p>
+      <p>We did not find out why Ads conversions exceed GA4 first opens. This record only gives the ratio, so the payback math uses GA4 first opens as the denominator. The device filter arrived midway: test phones were removed from October 18 and Play pre-launch devices from October 25, so the first-round table predates both. The filter is described in <a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real</a>.</p>
+    </section>
+    <section aria-labelledby="gate">
+      <h2 id="gate">The October 15 criteria had no break-even line</h2>
+      <p>The agent's October 15 analysis blamed the quality of Southeast Asian traffic. Indonesian players all had their phones set to Indonesian, the app only shipped Korean and English, and they played 84 to 92 seconds each. That diagnosis held up. The same document called Block Turn's Korean paid traffic "the only paid traffic that earns anything", and the operator stopped the SEA campaigns and raised Block Turn KR from 2,000 to 4,000 won a day.</p>
+      <p>The document's "decision (user)" section set the criteria for the October 22 verdict: keep or raise the budget if CPI was at most 1,500 won, D1 at least 25% and same-day uninstalls under 40%. A unit-economics document written on September 30 in the same repository had already computed a break-even CPI from assumed values, and the 1,500 won ceiling sat far above it. The retest's 1,107 won per install (27,681 won over 25 GA4 installs) clears that table's CPI line easily. Its D1 of 20% missed 25%, so the table would not have said keep or raise; it would have said extend a week.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/google-ads-break-even-cpi-2-en.webp" width="1200" height="1028" alt="Step diagram: Sep 30 break-even computed from assumptions, Oct 15 criterion of CPI at most 1,500 won, Oct 17 actual CPI about 30 times break-even, Oct 17 to 23 retest missing two of three criteria, second round from Oct 24, Nov 2 verdict at 10% 7-day ROAS under the cut line, resumed at 3,000 won a day." loading="lazy"><figcaption>The break-even CPI was recomputed 17 days after the Sep 30 doc, and even then it stayed out of the criteria table.</figcaption></figure>
+      <p>The October 17 analysis redid that calculation with measured retention and measured ARPDAU instead of assumptions, and break-even came out lower still. Compute break-even CPI before switching a campaign on, and put it in the first row of the go/no-go table. Don't raise a budget on a table that only has a CPI ceiling.</p>
+    </section>
+    <section aria-labelledby="learning-budget">
+      <h2 id="learning-budget">A 7-day learning budget instead of a stop</h2>
+      <p>The October 17 analysis recommended stopping Arrow Knots KR and pausing Block Turn KR until a fixed build shipped, on the grounds that more money into a leaking funnel would only confirm what we knew. That day the operator paused every campaign for both games, said the money should now go to learning who the players are, and turned Block Turn KR alone back on at 4,000 won a day with an end date of October 23.</p>
+      <p>The verdict used the three first-experience criteria the October 17 analysis had set (at least 80% solving the fourth board, at least 30% D1, under 40% same-day uninstalls), and that table had no CPI or break-even row either. On October 24 two of the three missed, and version 1.1.6, which moved the stuck fourth board R294 to position 41, shipped the same day. The board-level numbers are in <a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/#retest-2026-10-24">that note's October 24 addendum</a>.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Four%20Google%20Ads%20app%20campaigns%2C%20%2436.4%2C%20105%20installs%2C%20about%203%25%20ROAS%3A%20CPI%20ran%2030%20times%20break-even">Email us</a></p></aside>
+    <section aria-labelledby="second-round">
+      <h2 id="second-round">Second round: Block Turn KR alone, 7-day ROAS 8 to 10%</h2>
+      <p>On October 24 the operator switched Block Turn KR back on at 4,000 won a day until November 1, with an early-stop check on October 27 and a final verdict on November 2. The personal dashboard's daily snapshots use a rolling 7-day window, so values up to October 30 still include retest days. The October 31 and November 1 snapshots, which cover only second-round days, show 7-day ROAS of 8% and 10%.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Snapshot</th><th>10-24</th><th>10-27</th><th>10-29</th><th>10-31</th><th>11-01</th></tr></thead>
+        <tbody>
+          <tr><td>7-day ROAS</td><td>6%</td><td>8%</td><td>9%</td><td>8%</td><td>10%</td></tr>
+          <tr><td>7-day CPI (GA4 installs)</td><td>$0.74</td><td>$0.55</td><td>$0.45</td><td>$0.47</td><td>$0.41</td></tr>
+        </tbody>
+      </table></div>
+      <p>On version 1.1.8 (October 25 to 30), 39 of 46 players solved the first board R001 (85%), which the daily analysis judged level with 6 of 8 on 1.1.6, one player apart. The next wall was the fifth board, R085, solved by 12 of 23 on 1.1.8. The October 26 to 27 new-player cohort had a D1 of 0 out of 16. The October 30 daily analysis noted 7-day ROAS of 8% and kept the budget until the November 2 verdict, and that day version 1.1.9, which moves R085 to position 35, was submitted.</p>
+    </section>
+    <section aria-labelledby="verdict">
+      <h2 id="verdict">November 2 verdict: under the cut line, back on at 3,000 won</h2>
+      <p>The November 2 verdict used the cut line in the budget rule, which shrinks the budget when 7-day ROAS is under 30%; the first-experience criteria were not used. 7-day ROAS was 10%, and the campaign had already stopped at its end date. The Ads screen showed 27,705 won and 102 conversions for October 26 to November 1. The agent recommended not resuming; with the operator's approval it went back on at 14:25 the same day, at 3,000 won a day with no end date.</p>
+      <p>The first 1.1.9 cohort (October 30 to November 1) had fewer than 20 players, so it was read as fractions: R001 12 of 13, the fifth board R005 6 of 7, R364 8 of 10, judged the same as 1.1.8. By then the budget rule had a cut line and a raise condition (7-day ROAS of at least 100% with at least 20 installs in 7 days), but the verdict table had no break-even row at 100%. Both entered the budget rule on October 30.</p>
+    </section>
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">Why SEA, event bidding and a bigger budget were dropped</h2>
+      <p>Keeping the SEA English campaigns looked reasonable on one number. In the October 18 document, a player who finished the tutorial cost about 225 won from SEA and about 404 won from Korea. The same document put D1 at 4% for SEA against 22% for Korea; the October 17 comparison had already shown three in four SEA ad installs missing from GA4 first opens, and there was no Indonesian translation, so the option was dropped.</p>
+      <p>Switching the campaign goal from installs to tutorial completions was also considered. The bar written in that document was at least 10 conversions a day, and Block Turn KR produced about 3 tutorial completions a day. The goal stayed on installs, with tutorial completion and reaching level 10 added only as secondary conversions. Raising the budget was ruled out by the October 17 calculation: even with D1 doubled and ARPDAU tripled, the loss was 7x.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">The first-round 3% and the second-round 8% are different formulas</h2>
+      <p>First-round ROAS divides the ad revenue of everyone installed since launch by spend over the same period, with only Block Turn's revenue corrected to AdMob. The dashboard's 7-day ROAS uses GA4 ad revenue: the last 7 days of revenue from all players the campaign ever brought in, over the last 7 days of spend. GA4 logged about 35% less ad revenue than AdMob, so reading the two as "up from 3% to 8%" would be wrong.</p>
+      <p>The samples are small. Sixteen players started the fourth board in the October 24 verdict, so one player moved the rate by 6 points. The exchange rate is an assumption. Break-even here counts ad revenue only; an app that earns mostly from in-app purchases, or a genre that keeps players for weeks, puts different numbers into the same formula.</p>
+    </section>
+    <section aria-labelledby="steps">
+      <h2 id="steps">Five things to compute and compare before the next campaign</h2>
+      <ol>
+        <li>Compute break-even CPI from your own measurements. Expected ad revenue per installer = expected active days x ARPDAU, and that value is the break-even CPI. The September 30 document defines expected active days as the sum of the retention curve. Here, count install day as 1 and add 1 + D1 + D2 + D3 + … A made-up example, unrelated to this game: ARPDAU of 10 won with D1 40%, D2 20%, D3 10% and nothing after gives 1.7 days and a break-even CPI of 17 won.</li>
+        <li>Put break-even CPI or 100% ROAS in the first row of the go/no-go table, then the funnel criteria (first-board solve rate, D1, same-day uninstalls), the verdict date and where the verdict will be written.</li>
+        <li>Per campaign, set the conversions (installs) column on the Ads campaign screen next to GA4 <code>first_open</code> split by <code>firstUserMedium=cpc</code> and country, and take the ratio.</li>
+        <li>Remove test phones and Play pre-launch devices before counting. The first figure in the October 25 midpoint check, 6 of 12 solving R001, included four pre-launch robots; without them it was 6 of 8.</li>
+        <li>Run a fixed budget for 7 days and change one thing between runs. Between the retest and the second round only the fourth board changed (R294 to R364), but during the second round 1.1.8 went live and 1.1.9 was submitted, so this rule was broken.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Cut on November 6: 7-day ROAS 6%, down to 2,000 won a day</h2>
+      <p>Block Turn KR, back on at 3,000 won a day, was first set for a verdict on November 4. The November 4 daily analysis corrected that: the date had counted the start day as day one, and with the last budget change on November 2 the rule that a campaign's budget changes only once every three days lands on November 5. That analysis put 7-day ROAS at 9%, under the cut line.</p>
+      <p>Scheduled game jobs then started failing on the evening of November 4, the November 5 daily analysis never ran, and the November 5 verdict was applied in the November 6 rerun. 7-day ROAS was 6%, 7-day CPI $0.47, 7-day installs 38, and the budget dropped to 2,000 won a day. On 1.1.9, 15 of 18 players solved R005 between October 30 and November 5. This verdict also used the cut line. In the budget rule, 7-day ROAS of 100% appears only as a condition for raising the budget, and the daily analyses' verdicts have no break-even row. The next verdict is due November 9, and its table should have that row.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Four%20Google%20Ads%20app%20campaigns%2C%20%2436.4%2C%20105%20installs%2C%20about%203%25%20ROAS%3A%20CPI%20ran%2030%20times%20break-even">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Is a low CPI on game ads a reason to spend more?</summary><div><p>Only if it is below break-even CPI. The cheapest CPI here was $0.20 with 0.1% ROAS, and the best campaign, Block Turn KR, still paid about 30 times its break-even.</p></div></details>
+        <details><summary>Why do Google Ads install conversions and GA4 first_open differ?</summary><div><p>We did not find the cause; we measured the ratio. Block Turn EN had 94 Ads conversions to 24 GA4 first opens (26%), KR had 38 to 19 (50%), and the October 17 to 23 KR retest had 55 to 25 (45%).</p></div></details>
+        <details><summary>How do you compute break-even CPI for an ad-funded game?</summary><div><p>Break-even CPI is the expected ad revenue per installer: expected active days x ARPDAU. Expected active days are 1 for install day plus the daily return rates (D1, D2, D3 and on).</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Sun, 08 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Silently skipped Flutter tests and a green CI – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/silent-skip-green-ci/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/silent-skip-green-ci/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/silent-skip-green-ci-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · How-to</span>
+      <h1>Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</h1>
+      <p class="lead">Make a required test fail in CI instead of skipping. Our three crypto cross-check tests skipped when a Python module was missing, and the CI job had no step to install it.</p>
+      <p>The skip count from <code>flutter test</code> was 13 on September 11, 13 and 15, 2026. One of those 13 was a relay integration test that had been broken for six days. Outside the 13 sat three crypto cross-check tests that would join them if one Python module was missing. On the night of September 15 we added an install-and-check step to CI, so in CI those three can no longer drop out unnoticed for lack of the module.</p>
+      <p class="note">Sources: git history of our Flutter peer-to-peer chat app (commits b559ba0, 32ce058, cab4bed, 7048e46), its CI workflow, the test files and the September 15 E2E report. Skip counts were recounted from the tree at commit 7048e46; the tests were not rerun. Checked November 3, 2026.</p>
+    </section>
+    <section aria-labelledby="skip-13">
+      <h2 id="skip-13">Three crypto tests outside the 13 skips</h2>
+      <p>Recounting the <code>skip:</code> declarations at commit 7048e46 gives 13 tests that drop out when an environment variable or server is missing: 9 soak tests (<code>BOS_SOAK</code>), 2 signaling server integration tests, 1 DB benchmark and 1 live two-process E2E. The September 13 record of 3,160 passed / 13 skipped is covered in <a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What "100% E2E pass" really meant</a>; the September 15 release cross-check read 3,186 passed / 13 skipped.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/silent-skip-green-ci-1-en.webp" width="1200" height="690" alt="Bar chart: tests skipped for missing environment are 9 soak tests, 2 signaling server integration tests, 1 DB benchmark and 1 live two-process E2E, 13 in all, and 3 crypto cross-check tests join them when the Python module is missing." loading="lazy"><figcaption>On a machine without the module the count becomes 16 and the exit code is still 0.</figcaption></figure>
+      <p>The three crypto tests run when they find the Python <code>cryptography</code> package and skip when they don't. On September 15 the development machine had it (version 50.0.1) and all three ran; the skip count of 13 recorded since September 11 matches the 13 environment-gated tests, so nothing suggests these three were among the skips.</p>
+    </section>
+    <section aria-labelledby="cause">
+      <h2 id="cause">The CI Flutter job installed only SQLite before testing</h2>
+      <p>The cross-check recomputes the app's X25519, HKDF, AES-256-GCM and frame layout with Python <code>cryptography</code> and compares the results. According to the file's header comment, it is the only test that can catch both sides being wrong in the same way, and the same comment settles what happens without the module:</p>
+      <pre><code>// External-process dependency: this test SKIPS (it does not fail) when
+// `python3 -c "import cryptography"` does not succeed, so it is safe on
+// machines and CI images without the module.</code></pre>
+      <p>Until September 15 the CI Flutter job installed nothing but SQLite before running <code>flutter test</code>. From there to a green check:</p>
+      <ol>
+        <li>The CI job looks only at the exit code of <code>flutter test</code>.</li>
+        <li>That exit code ignores skips; the count appears only as <code>~N</code> on the result line.</li>
+        <li>The test skipped without the module, and CI had no step that installed or checked it.</li>
+        <li>Nothing compared the skip count against a baseline, so 13 turning into 16 had nowhere to raise an alarm.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="ai-wrong">
+      <h2 id="ai-wrong">"Safe" in a comment, and a browser guard the same day</h2>
+      <p>That comment and the test arrived in commit b559ba0 at 10:45 on September 11, co-authored by Claude. At 14:32, commit 8f5a0a5, also co-authored by Claude, fixed message eviction guards that sat behind an environment variable CI never set, so switching eviction off left 659 tests green (that commit's story is in <a href="https://sugarmount21.com/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database</a>). 8f5a0a5 also gave the CI web step a guard that fails loudly when no browser exists. The same rule never reached the crypto test written four hours earlier.</p>
+      <p>On September 15 the operator asked whether the E2E tests were done. Checking showed that since the UI redesign of September 13 and 14, only the in-process E2E tests had been running; everything else was skipping behind environment gates. That night the gates were opened one at a time, and at 22:12 commit 7048e46 added this step to CI:</p>
+      <pre><code>- name: Ensure python cryptography exists (the crypto cross-check must never silently skip)
+  run: |
+    python3 -m pip install --quiet --upgrade cryptography || true
+    python3 -c 'import cryptography; print("cryptography", cryptography.__version__)' || {
+      echo "::error::(message: cryptography is missing, so the cross-check would skip and CI would pass)"
+      exit 1
+    }</code></pre>
+    </section>
+    <section aria-labelledby="rotted">
+      <h2 id="rotted">While skipped, the relay test fell behind two rules</h2>
+      <p>The relay integration test, one of the 13, had not been touched since September 6. On September 9 two rules landed in production: a fingerprint gate that refuses to send when no approval hook is wired (df1dddc, 684ff8c), and a room binding that drops frames whose roomId is not the session's room (684ff8c, 6c99027). When the test finally ran against a live signaling server on September 15, it hit both. <code>sendMessage</code> without the hook was refused with "Peer identity is not verified yet", and a message sent to the literal <code>'room-relay'</code> was dropped with no error.</p>
+      <p>Commit 32ce058 at 21:13 put it as "the product is right and the test is stale" (translated from Korean). The fix wired an approval hook into the test and read the room the handshake had bound through <code>debugSessionRoomId</code>, rather than copying the naming rule into the test where the next rule change would break it again. With the server running, all 13 tests in <code>test/integration</code> passed.</p>
+      <p>The device smoke test (emulator, API 35) stalled on the settings screen the same night. <code>tester.pageBack()</code> looks for a back button by the English tooltip "Back", and since the app was pinned to Korean that tooltip reads "뒤로" (Korean for "back"). Finding the widget with <code>find.byType(BackButton)</code> made it pass 2 of 2 (cab4bed).</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/silent-skip-green-ci-2-en.webp" width="1200" height="956" alt="Step diagram: relay test last edited September 6, fingerprint gate and room binding added September 9, crypto cross-check tests and a browser guard added September 11, 13 skipped on September 13, and on the evening of September 15 integration 13/13, device smoke 2/2 and a CI guard." loading="lazy"><figcaption>After the two rules landed on September 9, the relay test did not run once for six days.</figcaption></figure>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Silently%20skipped%20tests%20keep%20CI%20green%3A%20three%20crypto%20cross-checks%20and%20an%20integration%20test%20that%20went%20stale%20for%20six%20days">Email us</a></p></aside>
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">Why a skip-count check or "always fail" falls short</h2>
+      <p>The judgment below is our own analysis while writing this note; the repository has no record of it. Failing the build when the skip count differs from 13 would catch 13 becoming 16, but not a test that is always skipped going stale, which is what the relay test did (the count was 13 on all three recorded dates). Making the test fail whenever the module is missing would turn the whole suite red on any development machine without it, the case the original comment chose skipping to avoid. What the repository added was a CI step guard, and the commit says it follows the same pattern as the browser guard on the web job.</p>
+      <p>Starting the signaling server inside CI to run the integration tests was also possible. It wasn't done, and no reason is recorded. Instead, the commands for the three kinds CI does not run (live two-process, signaling integration, device smoke) went into section 4.1.1 of the deployment doc, to be run by a person before each release.</p>
+      <p>GitHub Actions sets <code>CI=true</code> on every run. If the test stops skipping when it sees that value, a missing prerequisite turns the run red on the spot, and development machines behave as before. We have not run this in the repository; it is a proposal.</p>
+      <pre><code>final onCi = Platform.environment['CI'] == 'true';
+test('bidirectional cross-check against python cryptography', () async {
+  // ...
+}, skip: onCi ? false : skipReason);</code></pre>
+      <p>The branch uses <code>dart:io</code>, so it cannot go into a test that runs in a browser. This repository's web step runs only <code>test/web/</code> in the browser, which does not include the crypto file.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">One skip path the guard misses, and no CI run on record</h2>
+      <p>The guard in 7048e46 checks only that python3 runs and the package imports. The test has three skip paths, and one of them, failing to find <code>tool/crypto_vectors/cross_check.py</code> within the working directory or the four folders above it, sits outside the guard. CI runs from the repository root, so the script is found today, but nothing pins that down.</p>
+      <p>The repository keeps no results from the CI Flutter job, and the deployment doc says the CI web step could not be run locally, so a green CI run has not been demonstrated yet. So we could not confirm that these three tests were ever actually skipped in CI. Since 7048e46, if the module still cannot be imported after the install attempt, the CI job stops with exit 1.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Four steps to find required skips and make them fail</h2>
+      <ol>
+        <li>Find them with <code>grep -rn "skip:" test/</code> and <code>grep -rn "markTestSkipped" test/</code> (why the skip count belongs in every report is covered in <a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What "100% E2E pass" really meant</a>). Line counts are not skip counts: this app's 17 <code>skip:</code> lines become 13 only after dropping the 3 conditional crypto lines, 1 line that skips only on the web and runs on the VM and 1 helper parameter, and counting 1 relay group line as 2 tests. The 6 <code>markTestSkipped</code> calls are decided at run time.</li>
+        <li>Mark each one required or optional. Required means no other test would catch what it catches, such as a cross-check against an independent implementation or a real server path.</li>
+        <li>For required tests, add a CI step that installs and verifies the prerequisite, or stop skipping when <code>CI=true</code> as in the snippet above. With this app's guard, if the install fails and the module is absent, the check command turns CI red.</li>
+        <li>Put tests CI cannot run on a pre-release checklist with the command and the date of the last run. When a long-skipped test fails on its first run back, check whether the test went stale before blaming the product; all 3 failures in this app were stale tests.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Still open: the test's own skip condition and two-device E2E</h2>
+      <p>The crypto cross-check file has not changed since September 11, so it still skips without the module. Once a <code>CI=true</code> branch is added, a GitHub Actions run should show the same skip count as the development machine. There is also no automated E2E across two devices yet.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Silently%20skipped%20tests%20keep%20CI%20green%3A%20three%20crypto%20cross-checks%20and%20an%20integration%20test%20that%20went%20stale%20for%20six%20days">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Does a skipped test make flutter test fail in CI?</summary><div><p>A skip never fails the run: the exit code stays 0 and the count shows up only as <code>~N</code> on the result line. This app's own records list a run with 13 skipped as 0 failed.</p></div></details>
+        <details><summary>How do I fail a GitHub Actions step when a Python module is missing?</summary><div><p>Install it, then run <code>python3 -c 'import module'</code>; if that fails, print an <code>::error::</code> line and <code>exit 1</code>. The install command can carry <code>|| true</code>, but the check must not.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Sun, 08 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>Game feel fix: a heart that fell 109 ms early – SugarMount</title>
     <link>https://sugarmount21.com/en/ax/game-feel-frame-review/</link>
@@ -149,8 +492,8 @@ while True:
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -303,8 +646,8 @@ Report: what you fixed, what remains uncertain.</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -441,8 +784,8 @@ private val codePopulated = setOf("com.example.Response#requestId")
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -550,8 +893,8 @@ private val codePopulated = setOf("com.example.Response#requestId")
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -660,8 +1003,8 @@ private val codePopulated = setOf("com.example.Response#requestId")
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -762,8 +1105,8 @@ private val codePopulated = setOf("com.example.Response#requestId")
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -877,8 +1220,8 @@ thinkingConfig: { thinkingBudget: 0 },</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -990,8 +1333,8 @@ adb shell "dumpsys window | grep mCurrentFocus"</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1123,12 +1466,12 @@ adb -s emulator-5554 logcat -d -b crash</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1247,12 +1590,12 @@ How to apply: when setting or changing this campaign, the user's instruction bea
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1364,8 +1707,8 @@ edge = if (next &lt; edge) next else edge - 1 // strictly decreasing</code></pre
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1498,12 +1841,12 @@ git log --diff-filter=A --format="%h %ad %s" --date=iso -- &lt;scoring file&gt;
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1609,8 +1952,8 @@ POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1730,12 +2073,12 @@ print("first", shows[:1], "gaps", [b - a for a, b in zip(inter, inter[1:])],
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1856,12 +2199,12 @@ Severity is exactly one of Blocker, High, Medium, Low</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1981,12 +2324,12 @@ def diff(a_png, b_png, top=300, bottom=330):
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2119,8 +2462,8 @@ def diff(a_png, b_png, top=300, bottom=330):
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2237,12 +2580,12 @@ expect(all.sort()).toEqual(files.sort());</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/file-owner-table/">Several Claude Code sessions, one repo: the file owner table, checked against 13 merges</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2540,8 +2883,8 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2627,8 +2970,8 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2721,8 +3064,8 @@ git grep -nE "addOn(Complete|Success|Failure|Canceled)Listener\((this|requireAct
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2839,8 +3182,8 @@ depth(board):                   # peel
         <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2974,8 +3317,8 @@ depth(board):                   # peel
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3092,8 +3435,8 @@ if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3195,12 +3538,12 @@ git diff --name-only $(git merge-base &lt;base&gt; &lt;branch&gt;) &lt;branch&gt
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3291,8 +3634,8 @@ unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$TEST_PUB[~/][0-9]*" | sort -u | wc
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3424,12 +3767,12 @@ lifecycleScope.launch {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3543,8 +3886,8 @@ lifecycleScope.launch {
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3647,8 +3990,8 @@ three_star = cleared and time &lt;= par(base, scale, floor) and mistakes &lt;= a
         <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3764,8 +4107,8 @@ print(pages.most_common(), "FAQ questions:", questions)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3878,12 +4221,12 @@ NOT_TEST = {"notExpression": {"orGroup": {"expressions": [
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3984,12 +4327,12 @@ export function cacheKey(api, group, original, corrected, model) {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4115,12 +4458,12 @@ const gaps = await agent(CTX + CHECKLIST + final + dossier, { schema: CRIT })</c
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4235,8 +4578,8 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(":core
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4355,12 +4698,12 @@ git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --gre
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4496,12 +4839,12 @@ adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What &quot;100% E2E pass&quot; really meant: deleting seven runners with zero expect() calls</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4633,8 +4976,8 @@ print("my app in results:", MY_APP in ids)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4761,8 +5104,8 @@ out of date:
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4876,12 +5219,12 @@ grep -rL --include='*Test.kt' -e 'assert' -e 'check(matches' app/src/</code></pr
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5022,8 +5365,8 @@ git log --until=2026-10-20 --format='%(trailers:key=Co-authored-by,valueonly)' \
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5125,12 +5468,12 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5296,8 +5639,8 @@ after_hint = win(board after the correct first move, 2 pieces left, lines it cle
         <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5411,12 +5754,12 @@ Schedule expires: YYYY-MM-DD / register again on: YYYY-MM-DD
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5557,8 +5900,8 @@ curl -s "$POLICY_URL" | grep -o 'data-policy-version="[0-9-]*"'</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5707,8 +6050,8 @@ font.save(dst)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5796,12 +6139,12 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5890,8 +6233,8 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6007,12 +6350,12 @@ flutter test test/theme_matrix/ --dart-define=Y2_NO_SETTLE=true
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6135,8 +6478,8 @@ FlowRow(
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6215,12 +6558,12 @@ Mem:              13           8           2           0           2           4
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">13 parallel AI agent branches passed review and CI; a review of the merged code still confirmed 12 defects</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6344,12 +6687,12 @@ if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFract
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6469,12 +6812,12 @@ for mid, rel, edits, kind, target in MUT:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6576,8 +6919,8 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6642,8 +6985,8 @@ for mid, rel, edits, kind, target in MUT:
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6832,215 +7175,6 @@ for mid, rel, edits, kind, target in MUT:
       </ul>
     </section>
     <p class="meta updated">Last updated <time datetime="2026-10-19">October 19, 2026</time></p>]]></description>
-    <pubDate>Mon, 19 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>CarDrawer pilot application | SugarMount</title>
-    <link>https://sugarmount21.com/en/apps/cardrawer/pilot/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/apps/cardrawer/pilot/</guid>
-    <description><![CDATA[<link rel="stylesheet" href="https://sugarmount21.com/assets/apps/cardrawer/page.css?v=1">
-    <div class="cd">
-    <header class="hero">
-      <span class="eyebrow"><a href="https://sugarmount21.com/en/apps/cardrawer/">CarDrawer</a> · Pilot</span>
-      <h1>We're looking for 5 pilot dealerships</h1>
-      <p class="lead">Use it on real deals for 4 weeks while we measure the time it saves together. If it saves none, you don't pay.</p>
-    </header>
-    <div class="two-col">
-      <div><h3>Who it's for</h3><ul>
-        <li>Shops of 2 to 10 people that buy and resell their own stock</li>
-        <li>Buying through two or more channels (platform auctions, auction houses, direct)</li>
-        <li>Matching receipts and papers in chat rooms or spreadsheets today</li>
-        <li>We visit Suwon and Gangseo (Seoul) complexes first; other areas welcome</li></ul></div>
-      <div><h3>Terms</h3><ul>
-        <li>First 4 weeks free, then the Team rate of ₩149,000 a month (excl. VAT)</li>
-        <li>A 12-month founding-customer price lock instead of a discount</li>
-        <li>We set up members, cost items and deadline rules for you</li>
-        <li>Bank transfer against a tax invoice; we ask for consent again before billing</li></ul></div>
-    </div>
-    <h2 id="steps">How it runs</h2>
-    <ol class="steps">
-      <li><strong>Apply</strong> with your shop details and how to reach you.</li>
-      <li><strong>15-minute demo</strong>: with masked copies from one recently closed deal, we build a per-car cost sheet and a missing-papers list.</li>
-      <li><strong>Contract and setup</strong>: sign the pilot agreement and the data processing agreement, install the app and set it up together.</li>
-      <li><strong>Four weeks of use</strong>: we check in weekly, fix what blocks you and log the time spent.</li>
-      <li><strong>Decision</strong>: look at the time saved together and decide whether to continue.</li>
-    </ol>
-    <h2 id="form-h">Application form</h2>
-    <div class="cd-form-slot" id="cd-form-slot" data-title="CarDrawer pilot application form">
-      <h3>The form is coming soon</h3>
-      <p>For now, please apply by email with your shop name, area (complex), team size and how to reach you. We reply as soon as we can.</p>
-      <p><a class="button" href="mailto:sugarmount21@gmail.com?subject=CarDrawer%20pilot" data-cd-cta="pilot_email">Apply by email</a></p>
-      <p class="muted">Please don't send ID numbers, customer details or passwords.</p>
-    </div>
-    <div class="cd-consent">
-      <h3>Personal information notice</h3>
-      <div class="table-wrap"><table><tbody>
-        <tr><th scope="row">Items</th><td>(Required) shop name, your name, contact (mobile or email), area · (Optional) team size, monthly purchases, buying channels, current tools, message</td></tr>
-        <tr><th scope="row">Purpose</th><td>Confirming applications, scheduling demos, selecting pilot shops</td></tr>
-        <tr><th scope="row">Retention</th><td>6 months after pilot selection ends. If you sign, the data moves to contract records under our terms and privacy policy</td></tr>
-        <tr><th scope="row">Your right to refuse</th><td>You may refuse; we then cannot accept the application. Email applications are handled the same way</td></tr>
-        <tr><th scope="row">Processor and transfer</th><td>The form is stored in Google Forms (Google LLC, USA and other countries)</td></tr>
-      </tbody></table></div>
-      <p class="muted">Product news (marketing) goes only to people who opt in separately; you can apply without it. We never cold-contact public dealership numbers with marketing.</p>
-    </div>
-    <p style="margin-top:24px"><a href="https://sugarmount21.com/en/apps/cardrawer/" data-cd-keep-src>About CarDrawer</a> · <a href="https://sugarmount21.com/en/apps/cardrawer/pricing/" data-cd-keep-src>Pricing</a> · <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
-    </div>]]></description>
-    <pubDate>Mon, 19 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>CarDrawer pricing | SugarMount</title>
-    <link>https://sugarmount21.com/en/apps/cardrawer/pricing/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/apps/cardrawer/pricing/</guid>
-    <description><![CDATA[<link rel="stylesheet" href="https://sugarmount21.com/assets/apps/cardrawer/page.css?v=1">
-    <div class="cd">
-    <header class="hero">
-      <span class="eyebrow"><a href="https://sugarmount21.com/en/apps/cardrawer/">CarDrawer</a> · Pricing</span>
-      <h1>Pricing</h1>
-      <p class="lead">Start a 14-day trial with no card. It never turns into a paid plan on its own.</p>
-    </header>
-    <ul class="cd-plans">
-      <li>
-        <h2 id="plan-solo">Solo</h2><p class="who">One independent dealer</p>
-        <p class="price tnum">₩59,000 <small>/ month</small></p><p class="vat tnum">Excl. VAT · ₩64,900 incl. VAT</p>
-        <ul><li>1 seat</li><li>10 new deals a month</li><li>100 document pages a month</li></ul>
-      </li>
-      <li class="featured">
-        <span class="tag cd-pill cd-pill--amber">Pilot plan</span>
-        <h2 id="plan-team">Team</h2><p class="who">Dealerships of 2–5 people</p>
-        <p class="price tnum">₩149,000 <small>/ month</small></p><p class="vat tnum">Excl. VAT · ₩163,900 incl. VAT</p>
-        <ul><li>5 seats (up to 3 more)</li><li>30 new deals a month</li><li>300 document pages a month</li><li>Permission-based cost visibility, approvals</li></ul>
-      </li>
-      <li>
-        <h2 id="plan-dealer">Dealership</h2><p class="who">Dealerships of 6 or more</p>
-        <p class="price tnum">₩299,000 <small>/ month</small></p><p class="vat tnum">Excl. VAT · ₩328,900 incl. VAT</p>
-        <ul><li>10 seats (more available)</li><li>80 new deals a month</li><li>800 document pages a month</li><li>All Team features</li></ul>
-      </li>
-    </ul>
-    <p class="muted">Extra seats are ₩25,000 per person per month (excl. VAT; ₩27,500 incl.). A document page is one photo or PDF page read by AI. Manual entry, viewing and export are never limited.</p>
-    <h2 id="promises">Our promises</h2>
-    <ul>
-      <li><strong>No overage charges without consent.</strong> Admins are notified at 80% and 100%; at 100% only AI reading of new documents and new purchase registration pause for the month.</li>
-      <li><strong>14-day trial, no card.</strong> Trial limits are 5 new deals and 50 pages with all Team features. Without a paid contract you keep read-only access and export for 30 days, then data is deleted (with email notice 7 days before).</li>
-      <li><strong>Price increases or moving from free to paid</strong> are announced 30 days ahead and need your explicit consent.</li>
-      <li><strong>Cancel with one email.</strong> Use it to the end of that month and download your data for 30 days.</li>
-    </ul>
-    <h2 id="payment">How to pay</h2>
-    <p>There are no payments in the app. We agree the plan and start date in an order (quote), issue a Korean electronic tax invoice each month, and you pay by bank transfer. Web card payment will be announced when ready.</p>
-    <h2 id="pilot">Pilot</h2>
-    <p>Pilot shops use CarDrawer free for the first 4 weeks and pay the Team rate (₩149,000 a month excl. VAT) from week 5. Instead of a discount, founding customers get a 12-month price lock and we set everything up for them. We ask for consent again before billing starts.</p>
-    <div class="actions"><a class="button" href="https://sugarmount21.com/en/apps/cardrawer/pilot/" data-cd-cta="pricing_pilot" data-cd-keep-src>Apply for the pilot</a><a class="button button--outline" href="mailto:sugarmount21@gmail.com?subject=CarDrawer%20quote" data-cd-cta="pricing_quote">Ask for a quote</a></div>
-    <p class="muted" style="margin-top:24px">As of October 2026. Actual terms follow your order and the <a href="https://sugarmount21.com/en/privacy/cardrawer/terms/">terms of service</a>. Amounts in Korean won. <a href="https://sugarmount21.com/en/apps/cardrawer/">Back to CarDrawer</a></p>
-    </div>]]></description>
-    <pubDate>Mon, 19 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Block puzzle difficulty tuned with simulation bots – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/block-puzzle-bot-playtest-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · How-to</span>
-      <h1>Block puzzle difficulty: how simulation bots caught a game you could never lose</h1>
-      <p class="lead">If every tray of three pieces is guaranteed to fit, a player who finds each tray's solution never loses. Block Turn now keeps that guarantee for the first 10 trays only.</p>
-      <p>As first specified, the classic mode of <a href="https://sugarmount21.com/en/apps/blocks/">Block Turn</a> had no game over. We found out from bots: on October 3, 2026, under the supply rule written in the spec (v1), a bot that plans the whole tray played 80 games, and all 80 hit the 3,000-move cap. The shipped rule, v7, ends a planner's game after a median of 122 moves and a greedy bot's after 47.</p>
-      <p class="note">Numbers come from the sugar-game repository: the supply experiment log (<code>docs/block/lab.md</code>, measured 2026-10-03), the spec review, and the engine code and tests. Checked on October 19, 2026.</p>
-    </section>
-    <section aria-labelledby="unlosable-promise">
-      <h2 id="unlosable-promise">One friendly promise removed the game over</h2>
-      <p>Block Turn is an 8×8 block puzzle in the Block Blast mold: you get three pieces, place them, full rows and columns clear, and then you get three more. The spec we started from (v2.0) promised this in section 7.1: "When a new set of three pieces is dealt, there is at least one order in which all three fit on the current board." It was meant to answer players who feel the piece supply is rigged. The spec even added that a player can still get stuck by placing badly.</p>
-      <p>That caveat only covers weak play. For a player who finds the solution, the promise turns into a loop:</p>
-      <ol>
-        <li>When a tray arrives, some order places all three pieces.</li>
-        <li>Play that order and the tray is empty.</li>
-        <li>The next tray gets the same guarantee. Back to step 1.</li>
-      </ol>
-      <p>The run never ends. Nothing in that argument depends on piece weights, so dealing more awkward pieces cannot break it. The bots confirmed that too (v3 and v4 below).</p>
-    </section>
-    <section aria-labelledby="two-bots">
-      <h2 id="two-bots">A greedy bot and a planning bot on the same seeds</h2>
-      <p>The engine stores the board as a single 64-bit integer, so scoring a position takes a handful of bit operations.</p>
-      <ul>
-        <li>Greedy bot: it scores every legal move right now with the formula below and plays the best one. A cleared line is worth 10, so it usually picks the move that clears the most lines.</li>
-        <li>Planning bot: it searches every order and placement of the pieces left in the tray, plays the first move of the best plan, and searches again on the next move.</li>
-      </ul>
-      <p>Both use the same board score:</p>
-      <pre><code>score = lines cleared × 10 − 3 × holes − 0.3 × filled cells + 2 × room
-holes = empty cells boxed in on all four sides
-room  = is there space for a 3×3 square, a 1×4 bar, a 4×1 bar (0–3)</code></pre>
-      <p>In the final comparison each supply version got 160 greedy games and 80 planner games, and every version used the same seeds. A game stops at 3,000 moves. The bots are not models of people. We assume a person lands somewhere between them, and we use the bot numbers only to rank supply rules against each other.</p>
-    </section>
-    <section aria-labelledby="metrics">
-      <h2 id="metrics">The four numbers that decided it</h2>
-      <ul>
-        <li>Planner games that hit the 3,000-move cap. Anything above zero rejects the version, because it means the game cannot be lost.</li>
-        <li>Planner median divided by greedy median. In a high-score mode, "play better, last longer" is most of the fun, so we wanted skill to show up as run length.</li>
-        <li>Greedy run length, so a careless player doesn't wash out in a few trays.</li>
-        <li>Tray generation time at p95, to see whether supply cost matters on a phone.</li>
-      </ul>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Block%20puzzle%20difficulty%3A%20how%20simulation%20bots%20caught%20a%20game%20you%20could%20never%20lose">Email us</a></p></aside>
-    <section aria-labelledby="versions">
-      <h2 id="versions">Supply rules v1 to v7, side by side</h2>
-      <p>The awkward pieces are the 3×3 square, the 2×3 rectangle in both orientations and the four-cell bar in both orientations. "Pressure" means that every N moves those pieces gain one more multiple of their base weight, up to a cap.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Version</th><th scope="col">Supply rule</th><th scope="col">Greedy median</th><th scope="col">Planner median</th><th scope="col">Planner games at cap</th><th scope="col">Outcome</th></tr></thead>
-          <tbody>
-            <tr><td>v1</td><td>The spec: every tray fully placeable</td><td>56 moves</td><td>3,000 moves</td><td>80/80</td><td>Rejected</td></tr>
-            <tr><td>v2</td><td>v1, plus 3× weight for pieces of 3 cells or fewer when fewer than 28 cells are empty</td><td colspan="3">Not in the results table</td><td>Dropped (made the game easier)</td></tr>
-            <tr><td>v3</td><td>v1 plus pressure every 30 moves, up to 5×</td><td colspan="2">Not in the results table</td><td>60/60</td><td>Rejected</td></tr>
-            <tr><td>v4</td><td>v1 plus pressure every 20 moves, up to 8×</td><td colspan="2">Not in the results table</td><td>60/60</td><td>Rejected</td></tr>
-            <tr><td>v5</td><td>v7 plus pressure every 30 moves, up to 5×</td><td>44 moves</td><td>80 moves</td><td>0</td><td>A/B candidate</td></tr>
-            <tr><td>v6</td><td>v7 plus pressure every 20 moves, up to 8×</td><td>44 moves</td><td>82 moves</td><td>0</td><td>Not used</td></tr>
-            <tr><td>v7</td><td>Full guarantee for the first 10 trays, then only "at least one piece fits"</td><td>47 moves</td><td>122 moves</td><td>0</td><td>Default</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>Under v1 the planner's median game lasted 1,001 trays and scored 26,772 points. Under v7 it was 41 trays and 998 points. In the four versions with full numbers (v1, v5, v6, v7), the greedy bot never reached the cap.</p>
-      <p>We picked v7 for the skill gap: 122 moves against 47 is 2.6×. Adding pressure (v5, v6) cut that gap to 1.8 to 1.9×, mostly by cutting the strong player's runs short. Shorter runs mean more game-over screens, but they also mean a good player gets less for being good. So v7 shipped as the default, and v5 is parked as an A/B candidate.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/block-puzzle-bot-playtest-1-en.webp" width="1200" height="728" alt="Bar chart: under v1 the planning bot ran to the 3,000-move cap; under v7 the planner&#x27;s median is 122 moves and the greedy bot&#x27;s 47." loading="lazy"><figcaption>Under v7 the planner no longer reaches the cap, and its runs are still 2.6x as long as the greedy bot's.</figcaption></figure>
-      <p>Supply cost turned out to be a non-issue. Tray generation stayed at or under 0.2 ms at p95 for every version with timings in the table, and the spec's last-resort fallback (deal three single cells) never fired in 2,710 trays of the earlier Python simulation.</p>
-      <p>If a game spec says the player can "always" do something, run a bot that exploits that promise to the end before you build on it. Reading the sentence will not show you the problem.</p>
-    </section>
-    <section aria-labelledby="ai-mistake">
-      <h2 id="ai-mistake">The AI's first review pushed the other way</h2>
-      <p>Earlier the same day, the spec review written by our AI coding agent had already simulated the supply rule in Python. It ran a random bot and a one-move greedy bot for 150 games each, with medians of 17 and 26 moves. It also tried a bot that reads the whole tray, then gave up on it: searching a single tray on an empty board took more than ten minutes in Python.</p>
-      <p>From those short runs, the review concluded that a solvable tray does not guarantee a long game, and recommended "relief" supply: deal smaller pieces when the board gets crowded. That is v2 in the table.</p>
-      <p>A promise that only matters to the strongest player had been tested with the weakest bots. Once the Kotlin engine existed, the planning bot ran in reasonable time and every v1 planner game hit the cap. v2 was dropped, and spec v2.1 rewrote the supply promise as v7. The engine, the experiment tool and the tests landed together in commit <code>cd62087</code> (October 4, 2026, Korea time).</p>
-      <p>(The Python greedy bot used a different board score with no "room" term, so its 26 moves and the Kotlin greedy bot's 56 under v1 are not a like-for-like comparison.)</p>
-      <p>The v1 finding is pinned by a unit test, <code>a planner cannot be stopped under the full guarantee</code>: on 20 seeds, playing each tray's solution must pass 300 moves.</p>
-    </section>
-    <section aria-labelledby="next-checks">
-      <h2 id="next-checks">What we still have to check</h2>
-      <ul>
-        <li>We don't know how long a human run is yet. The target is a median of 60 to 150 moves (roughly 4 to 10 minutes), and if real runs fall outside it we switch to v5. The end-of-run event that carries the move count, <code>post_score</code>, had fired only twice in total as of our October 17 GA4 review. The same review noted that the first-run flow never showed classic mode, so commit <code>d1f6de1</code> (1.1.2) added a button into classic mode after the last tutorial.</li>
-        <li>Since 1.1.4 (<code>b2d305d</code>, October 17) a classic run allows two revives. The supply experiment ran without revives, so run length with revives needs measuring again.</li>
-        <li>The default supply rule itself is pinned by a test (<code>default supply guarantees the first ten trays fully and never deals a dead tray after</code>), so switching the default back to v1 would fail it. What no test checks is that a planner actually loses before the cap under the default supply. Today only a fresh supply experiment run shows that.</li>
-      </ul>
-      <p>How the earlier apps came out of the same agent-driven workflow is in <a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a>.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Block%20puzzle%20difficulty%3A%20how%20simulation%20bots%20caught%20a%20game%20you%20could%20never%20lose">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>What should the game over condition be in a block puzzle?</summary><div><p>The game ends when none of the remaining pieces fits anywhere. If the supply only ever deals trays that fully fit, a strong player never meets that condition. Block Turn guarantees full trays for the first 10 and, after that, only that at least one piece fits.</p></div></details>
-        <details><summary>Can't you fix it by dealing more hard pieces?</summary><div><p>No. Even with awkward pieces weighted up to 8× (v4), every planner game reached the 3,000-move cap. While the full guarantee stands, weights only change which solvable tray you get.</p></div></details>
-        <details><summary>How many games does a balance simulation need?</summary><div><p>In the final comparison we ran 160 greedy and 80 planner games per version, on the same seeds for every version (the earlier v3 and v4 runs used 60 planner games). That was enough to separate results like 80/80 games at the cap versus 0/80.</p></div></details>
-      </div>
-    </section>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
     <pubDate>Mon, 19 Oct 2026 09:00:00 +0900</pubDate>
   </item>
 </channel>
