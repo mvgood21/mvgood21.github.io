@@ -28,6 +28,7 @@ import sds_apps  # noqa: E402  (generated CSS text: assets/sds-apps.css, assets/
 import checks  # noqa: E402  (site gates run by --check)
 import legal_chrome  # noqa: E402  (isolated header/footer for legal pages an app opens; standalone pages)
 import ax_extras  # noqa: E402  (AX hub search, note types, inquiry boxes, figures)
+import app_shots  # noqa: E402  (store screenshots on an app page once their files exist)
 from html.parser import HTMLParser  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -177,6 +178,7 @@ def read(path):
 
 DATA = json.load(open(rel("data/apps.json"), encoding="utf-8"))
 APPS = DATA["apps"]
+app_shots.fill(APPS, ROOT)  # a[lang]["shots"] from assets/apps/<id>/shots/<lang>/NN.webp (apps with shot_captions)
 BY_APP_PATH = {a["app_path"]: a for a in APPS if a.get("app_path")}
 BY_PRIVACY_PATH = {a["privacy_path"]: a for a in APPS if a.get("privacy_path")}
 BY_PACKAGE = {a["package"]: a for a in APPS}
@@ -1203,6 +1205,8 @@ def wrap_hand(relpath):
             feats = [plain(x) for x in re.findall(r"<h3[^>]*>(.*?)</h3>", fs.group(1), re.S)] if fs else []
             if feats and "featureList" not in ld["@graph"][1]: ld["@graph"][1]["featureList"] = feats
             lds.append(ld); og = app_og(a, lang)
+            if BLOCK_RE("shots").search(main):  # only where the page placed the marker (app_shots)
+                main = set_block(main, "shots", app_shots.block(a, lang, t["shots_label"].format(name=a[lang]["name"])))
             main = set_block(main, "tasks", tasks_block(a, lang), after_hero(main))
             main = set_block(main, "extra", app_extra(a, lang, relpath))
         if re.search(r'^\s*<section class="facts"', dates.strip_build_blocks(main), re.M):
@@ -1510,6 +1514,11 @@ def feed_body(content, page_url):
         body = BLOCK_RE(name).sub("", body)
     body = re.sub(r"<script\b.*?</script>", "", body, flags=re.S)
     body = re.sub(r"<!-- /?build:[\w-]+ -->", "", body)
+    # feed readers drop page CSS and the hidden attribute: no stylesheet links, notes to editors, hidden links
+    # (axfamily's Play button waits hidden until launch) or decorative SVG (it would show at full width)
+    body = re.sub(r"<link\b[^>]*>|<!--.*?-->", "", body, flags=re.S)
+    body = re.sub(r"<a\b[^>]*\shidden\b[^>]*>.*?</a>", "", body, flags=re.S)
+    body = re.sub(r'<svg\b[^>]*aria-hidden="true"[^>]*>.*?</svg>', "", body, flags=re.S)
     def absol(u):
         u = u.strip()
         if u.startswith("#"): return page_url + u
@@ -1616,7 +1625,8 @@ def build_llms(outputs):
         st = {"live": "on Google Play", "soon": "coming soon", "review": "in Play review"}[a["status"]]
         link = SITE + (app_url(a, "en") or privacy_url(a, "en"))
         name = d["name"] if d["name"] == k["name"] else f"{d['name']} / {k['name']}"
-        lines.append(f"- [{name}]({link}): {d['tagline']} Package {a['package']}, {st}.")
+        tag = d["tagline"] if d["tagline"][-1:] in ".!?" else d["tagline"] + "."  # brand taglines may end bare (axfamily)
+        lines.append(f"- [{name}]({link}): {tag} Package {a['package']}, {st}.")
     lines += ["", "## Privacy policies", ""]
     for a in APPS:
         if a.get("privacy_path"):
