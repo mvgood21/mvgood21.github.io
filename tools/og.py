@@ -10,7 +10,8 @@ Writes
   assets/logo.png (512), assets/icon-192.png, assets/icon-maskable-512.png (web manifest)
                                               3-cube mountain mark (SDS 6.0.3)
   assets/og/app-<id>-<lang>.png               app pages: real screenshots on a neutral ground, no text
-                                              (an app with a page but no captures yet: text card with its icon)
+                                              (an app with a page but no captures yet: text card with its icon;
+                                              an app in BRAND_CARDS: its brand card, e.g. axfamily)
   assets/og/article-<id>-<slug>-<16x9|4x3|1x1>-<lang>.png   help articles: the article's largest real
                                               screen on a neutral ground, no text (IA 3.2(4)); ≤ 200 KB
   assets/og.png, assets/og/home-en.png        home text cards, ko and en (icon mountain); --home writes only these
@@ -26,7 +27,7 @@ Needs Pillow. Fonts: tools/fonts/NanumSquare (SIL Open Font License, see tools/f
 Run it after adding an app, changing its screenshots or icon, adding an AX note or changing a title.
 """
 import glob, hashlib, html, json, os, re, sys
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import glyphcheck  # noqa: E402
@@ -138,7 +139,8 @@ def rounded(im, radius):
     im = im.convert("RGBA")
     mask = Image.new("L", im.size, 0)
     ImageDraw.Draw(mask).rounded_rectangle((0, 0, im.width - 1, im.height - 1), radius=radius, fill=255)
-    im.putalpha(mask)
+    # keep the source's own transparency (axfamily's icon has transparent corners): replacing it would paint them black
+    im.putalpha(ImageChops.multiply(im.getchannel("A"), mask))
     return im
 
 def rounded_icon(path, size):
@@ -197,6 +199,40 @@ def app_image(a, lang, out):
         r = rounded(s.resize((w, hh), Image.LANCZOS), 20)
         img.paste(r, (x, y), r)
         dr.rounded_rectangle((x, y, x + w - 1, y + hh - 1), radius=20, outline=LINE, width=2)
+    save_png_budget(img, out)
+
+# ---------- brand cards (an app whose own brand guide fixes its share image) ----------
+# AXFamily (brand fixed 2026-11-09, app repo docs/brand/brand-guide.md §4-6, §10): Apricot ground, Night Navy text
+# (5.67:1), the apricot lockup (bare symbol + wordmark + descriptor) from tools/brand/ (tools/axfamily_brand.py copies it
+# from the app repo's make_brand.draw_lockup), the tagline in two lines of NanumSquare ExtraBold. Same frame as the
+# text cards (eyebrow, rule at y 520, SugarMount footer); the rule is a darker apricot, the footer text Night Navy.
+BRAND_CARDS = {
+    "axfamily": {"bg": "#F2A65A", "ink": "#1F3A5F", "rule": "#D98C43", "lockup": "tools/brand/axfamily-lockup-{lang}.png",
+                 "tagline": {"ko": ["가족 일, 누가 챙길지까지", "한 화면에"], "en": ["Your family's week,", "and who's on each one"]}},
+}
+
+def brand_card(a, lang, out):
+    b = BRAND_CARDS[a["id"]]
+    bg, ink, rule = hex2rgb(b["bg"]), hex2rgb(b["ink"]), hex2rgb(b["rule"])
+    img = Image.new("RGB", (W, H), bg)
+    dr = ImageDraw.Draw(img)
+    f_eye, f_tag, f_small = ImageFont.truetype(FONT_EB, 30), ImageFont.truetype(FONT_EB, 62), ImageFont.truetype(FONT_EB, 28)
+    lock = Image.open(p(b["lockup"].format(lang=lang))).convert("RGB")
+    T = 132                                             # symbol height in the card (guide §5: T >= 110 px)
+    lock = lock.resize((round(lock.width * T / lock.height), T), Image.LANCZOS)
+    lines, lh = b["tagline"][lang], 80
+    block = 30 + 26 + len(lines) * lh + 44 + T          # eyebrow, gap, tagline, gap, lockup
+    y = (520 - block) // 2 + 4
+    dr.text((80, y), "Android 앱" if lang == "ko" else "Android app", font=f_eye, fill=ink); y += 30 + 26
+    for line in lines:
+        dr.text((80, y), line, font=f_tag, fill=ink); y += lh
+    y += 44
+    img.paste(lock, (80, y))
+    dr.line((80, 520, W - 80, 520), fill=rule, width=2)
+    m = mark_image(44, pad=0)
+    img.paste(m, (80, 548), m)
+    dr.text((136, 556), "SugarMount", font=f_small, fill=ink)
+    dr.text((W - 80, 556), DOMAIN, font=f_small, fill=ink, anchor="ra")
     save_png_budget(img, out)
 
 # ---------- text cards ----------
@@ -383,7 +419,11 @@ def main():
         return
     files = brand_files()
     for a in apps:
-        if not a["ko"].get("shots"):                   # no real captures yet (axfamily): text card with the icon
+        if a["id"] in BRAND_CARDS:                     # the app's brand guide fixes its share image (axfamily)
+            for lang in ("ko", "en"):
+                f = f"assets/og/app-{a['id']}-{lang}.png"; brand_card(a, lang, p(f)); files.append(f)
+            continue
+        if not a["ko"].get("shots"):                   # no real captures yet: text card with the icon
             if a.get("page") in ("hand", "generated"):
                 for lang in ("ko", "en"):
                     f = f"assets/og/app-{a['id']}-{lang}.png"
