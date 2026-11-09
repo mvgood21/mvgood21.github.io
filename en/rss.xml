@@ -6,7 +6,251 @@
   <description>Small Android apps that each do one thing simply, from shrinking photos and opening Korean HWP documents to checking Korean spelling and playing puzzle games.</description>
   <language>en</language>
   <atom:link href="https://sugarmount21.com/en/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Mon, 09 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Tue, 10 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Malicious file set for a document viewer – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/docviewer-malicious-file-set/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/docviewer-malicious-file-set/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/docviewer-malicious-file-set-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX note · How-to</span>
+      <h1>A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</h1>
+      <p class="lead">If your app opens received files, commit a generator and an expected-verdict table instead of hostile samples. The unit test task checks 50 rows, but XSS rendering checks live outside that loop.</p>
+      <p><a href="https://sugarmount21.com/en/apps/doc-viewer/">SugarDoc</a>, our Android viewer for HWP (the Korean word-processor format), HWPX and PDF, generates 50 hostile documents with nothing but the Python standard library and compares each file's expected verdict with the Kotlin guards. The set started at 36 files on October 5, 2026 and reached 50 the same day after a review. On October 23 we fixed the whole test skipping on our Windows build machine. What runs on the set's files in the unit test task is the container verdict. Whether XSS executes on screen is checked by device instrumentation with staged documents and a conditional node test.</p>
+      <p class="note">Sources: this app's git history (origin/main 512dbef), code, ADR-0002, the implementation plan, device E2E reports and GitHub Actions history and repository settings (queried November 7, 2026; log read for one run). Compression ratios were recomputed with Python 3.12 zlib while writing this note; the tests and the generator were not run.</p>
+    </section>
+    <section aria-labelledby="generator">
+      <h2 id="generator">One row holds the file and its expected verdict</h2>
+      <p><code>generate.py</code> is 682 lines. It writes ZIP, CFB (Compound File Binary, the container inside HWP 5 files), HWPX and PDF by hand with the standard library and emits 50 files plus <code>manifest.tsv</code>. It is deterministic and its output is never committed. There are 10 families, among them ZIP bombs, parser differences, pixel bombs and CFB, plus 2 control rows.</p>
+      <pre><code>file                   family    sniff    guard        preview
+bomb_1gb_lying.hwpx    zip_bomb  HWPX     RATIO        shown
+multi_bomb_noisy.hwpx  zip_bomb  HWPX     TOTAL_BYTES  shown
+cfb_bomb.hwp           cfb_bomb  HWP5     LOOP         shown
+xss_text.hwpx          content   HWPX     OK           shown</code></pre>
+      <p><code>MaliciousSetTest</code> reads the table row by row and compares it with <code>DocSniffer</code>, <code>ZipGuard</code>/<code>Hwp5Guard</code> and <code>HwpPreview</code>. It collects every mismatch into one failure, and it also fails if a single file takes 1,000 ms or the table has fewer than 30 rows. The Gradle task <code>generateMaliciousSet</code> builds the set ahead of the <code>:core:docs</code> unit tests, and <code>release_gate.sh</code> calls the same tests. On bomb rows, "shown" means the viewer refuses the engine and shows the preview instead.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/docviewer-malicious-file-set-1-en.webp" width="1200" height="669" alt="Comparison: MaliciousSetTest checks verdicts for 50 rows, a 1,000 ms per-file cap and a 30-row floor; the XSS DOM audit, canary test, rendering of generated files and extents() loops sit outside the set." loading="lazy"><figcaption>The unit test task checks the set's files for container verdicts only; rendering checks on those files live elsewhere.</figcaption></figure>
+    </section>
+    <section aria-labelledby="ratio-rule">
+      <h2 id="ratio-rule">The ratio rule stops some bombs; budgets stop the rest</h2>
+      <p>ZIP bombs meet three layers. A 1 GiB entry with an honest size ends at ENTRY_TOO_LARGE before anything inflates. <code>bomb_1gb_lying.hwpx</code> declares 1000 bytes, so it reaches the ratio rule, which counts real output: past 1 MiB, more than 1000:1 is refused. In the October 5 JVM run both took 2 ms, and the file carrying the 1 GiB was 1.07 MB.</p>
+      <p>The rule only just catches the set's zero bomb. Recomputing the generator's deflate in memory gives about 1,012:1, 1.2% over the limit. The code comment's 1030:1 is closer to deflating the same zeros in one pass, about 1,029:1 when recomputed; the generator writes separate blocks, so it lands a little lower. <code>multi_bomb_noisy.hwpx</code> scatters random bytes between the zeros and lands near 103.8:1 per entry, far under the rule. It has 16 entries of 40 MiB, 640 MiB in all, and the fourth pushes it past the 128 MiB real-byte total for everything outside <code>BinData/</code>. <code>BinData/</code> is the folder for images inside a document, with its own total limit (256 MiB by default); everything else counts against the 128 MiB, including images placed outside that folder.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/docviewer-malicious-file-set-2-en.webp" width="1200" height="530" alt="Bar chart: the generator's zero bomb compresses at about 1,012:1, 1.2% over the 1,000:1 limit, and the noisy bomb at about 103.8:1, far below it." loading="lazy"><figcaption>The ratio rule only catches the cheapest bombs. Real-byte budgets handle the rest.</figcaption></figure>
+      <p>The 64 MiB per-entry and 128 MiB total budgets are normal-document maximums plus a margin. Across 46 HWPX files in a local corpus, the largest entry outside <code>BinData/</code> was 2.9 MB and the largest total 3.4 MB, which the code records as a 20x margin.</p>
+    </section>
+    <section aria-labelledby="cfb-loop">
+      <h2 id="cfb-loop">A visited set stops CFB loops, but each path needs its own row</h2>
+      <p>In <code>cfb_bomb.hwp</code> a stream's FAT chain (the sector link table) points back to its own start. <code>CfbReader</code> walks chains and directories with a visited set and a length cap, so the second visit to a sector ends in LOOP.</p>
+      <p><code>MaliciousSetTest</code> never calls <code>extents()</code>, and that gap surfaced on October 24. We split one guard-table row into <code>forEachChunk</code> and <code>extents</code>, and the new <code>cfb.streamingLoopCopy</code> row passed at first with the guard removed. <code>extents()</code> is what <code>PreviewScrubber</code> uses to overwrite the preview streams of a received file, and it had no loop test. <code>CfbReaderTest</code> covers it now (afd5b8d).</p>
+    </section>
+    <section aria-labelledby="xss">
+      <h2 id="xss">XSS rows only get a container verdict</h2>
+      <p><code>xss_text.hwpx</code> carries markup as body text and <code>xss_font.hwpx</code> carries it in a font name. <code>MaliciousSetTest</code> only decides that both are containers the viewer may open. Our topic list said XSS ran on every build; reading the code again showed that rendering is checked in three other places.</p>
+      <ul>
+        <li>Device instrumentation, <code>RhwpHostTest</code>, opens each document and audits the DOM. It needs the documents staged on the device and skips without them, and neither CI nor <code>release_gate.sh</code> runs it. On October 5, on debug builds on a Galaxy S21 (WebView 153) and an API 33 emulator (WebView 103), xss_text, xss_font and nest had one script (viewer.js) and zero on* attributes, javascript: values, banned elements or CSS url() rules.</li>
+        <li>The node test <code>test_web_engine.mjs</code> renders the generated files with rhwp and inspects the first two sanitized pages. If the files aren't in a home cache it skips, and <code>webTests</code> doesn't pass the set's path.</li>
+        <li>The node test <code>test_web_units.mjs</code> runs under <code>webTests</code> but uses only inline strings.</li>
+      </ul>
+      <p>In the WebView, <code>SecurePathHandler</code> answers every request with a bundled asset, a one-time document token or a 403. The early test build returned null, which left only <code>blockNetworkLoads</code> and the CSP in the way, so the product forbids null.</p>
+      <p>The CSP goes on every response, 403s included, because a module Worker obeys the CSP of its own response; a CSP on <code>viewer.html</code> alone would leave the Worker unrestricted. Raw SVG from the engine is parsed into an inert document and sanitized against an allow-list before it reaches the page.</p>
+      <p>The canary test tries to reach a local server. The main thread's 14 paths, the Worker's 9 and the <code>external_link</code> document all scored 0 hits, while an unhardened control WebView scored 1. Without the control, you can't tell a hardened page from a broken test that never reaches the server.</p>
+    </section>
+    <section aria-labelledby="ai-wrong">
+      <h2 id="ai-wrong">A review showed the 75/75 report did not cover every guard</h2>
+      <p>Commit ca1ade4, which brought in the set and the guards, is co-authored by Claude. The October 5 M2 result said removing 75 guards failed all 75 and marked four completion criteria as met. Those 75 were hand-picked. A review the same day found about 15 guards in <code>ZipArchive</code> and <code>CfbReader</code> with no test, plus <code>PIXELS_TOTAL</code> in <code>Hwp5Guard</code>.</p>
+      <p><code>Hwp5Guard</code> had a gap too. It counted only the compressed size of HWP 5 streams. After the review it inflates chunk by chunk and counts real bytes. <code>ZipGuard</code> gained the budget outside <code>BinData/</code>, and an image whose size can't be read is now refused. The set grew from 36 to 50 files and guard removal reached 146/146.</p>
+      <p>The generator was wrong too. A bug in how it wrote CFB sibling links surfaced on the first comparison with the Kotlin verdicts.</p>
+      <p>The repository doesn't record who did that review, and it has no record of a person editing the code. The operator's rule that a guard must fail when removed went into the M2 criteria and produced the 75/75 measurement. The 64 MiB and 128 MiB budgets still carry an owner-confirmation tag in the code.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20malicious%20file%20set%20for%20a%20document%20viewer%3A%20ZIP%20bombs%2C%20CFB%20loops%20and%20XSS%2C%20generated%20and%20wired%20into%20tests">Email us</a></p></aside>
+    <section aria-labelledby="windows-skip">
+      <h2 id="windows-skip">On Windows, the test was silently skipping</h2>
+      <p>We moved the build machine to Windows on October 18, 2026. <code>core/docs</code> looked on PATH for a file named exactly <code>python3</code>, Windows has <code>python.exe</code>, so <code>generateMaliciousSet</code> was never registered, the set's directory property stayed empty and <code>assumeTrue</code> skipped the test.</p>
+      <p>Commit 62488f2 at 05:02 on October 23 says the tests had never run on Windows since the move, and logs a full unit run as 1,254 tests, 0 failed, 7 skipped. It doesn't name the seven. About eight hours later d573f8a fixed the lookup. We found nothing in the records we read that compared skips by name. The skip was fixed during an automated check run on a Windows-built release; the log doesn't say how it was noticed.</p>
+      <p>d573f8a's verification line reads "1 test run, 0 skipped, 51 set files", the same as 50 documents plus the manifest. How a skip disappears into a green run is covered in <a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green</a>. With no python, this test still skips; only <code>release_gate.sh</code> stops with BLOCK. The same script calls a missing node a "failure, never a skip".</p>
+      <p>The operations log says it doesn't know which machine built the 1.2.0 and 1.3.0 AABs, so we can't say whether a release between October 18 and 23 skipped the set.</p>
+    </section>
+    <section aria-labelledby="ci-gate">
+      <h2 id="ci-gate">0 of 99 CI runs passed: CI can't gate the set</h2>
+      <p>As of November 7, 2026, GitHub Actions lists 99 CI runs and none succeeded (78 failed, 21 cancelled). The one run whose log we read, 512dbef, did not fail on python. <code>generateMaliciousSet</code> printed <code>wrote 50 files</code>, the build failed on one unit test in <code>:core:designsystem</code>, and the log has no task line for <code>:core:docs:testDebugUnitTest</code>. All 99 runs are pushes to main, and main has no branch protection, so a failing CI doesn't hold code back. What stops a release AAB when the set fails is <code>release_gate.sh</code>, and running that script is left to the release checklist.</p>
+    </section>
+    <section aria-labelledby="rejected">
+      <h2 id="rejected">A generator instead of samples, and rhwp's unmeasured limits</h2>
+      <p>The generator's docstring says "no real documents, no binary blobs", so what stays in the repository is 682 lines and the expected verdicts. The test compares every row, so in the docstring's words the generator and guards "cannot drift apart". Unlike sample files, a changed verdict or file content shows up as a code diff rather than a binary, and no hostile file stays in the repository. The same files go into device E2E, where the S21 and S20 each passed the manifest 50/50.</p>
+      <p>The set only covers known patterns, so it guards against regressions; finding unknown inputs is a fuzzer's job, and we found no fuzzing record in the repository's docs or tests.</p>
+      <p>Leaving limits to rhwp was rejected. The wasm contains text about an inflate limit, but nobody measured it, so the <code>Hwp5Guard</code> comment says the guard "does not rely on them".</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">No real encrypted files, and a 29.1 s TIMEOUT on the S21</h2>
+      <p>The flags family only sets flag bits; real encrypted and DRM documents aren't in the set.</p>
+      <p>The 1,000 ms cap is JVM time on a development machine. paras_50k.hwpx, 50,000 paragraphs, came to 1,220 pages and parsed in about 21 s under node 20 with rhwp 0.8.6 on a desktop on October 5, 2026, between the 10 s slow prompt and the 30 s forced fallback. On the S21 its first page took 26.1 to 27.9 s or hit TIMEOUT at 29.1 s, and the emulator hit TIMEOUT at 29.3 s.</p>
+      <p>In the October 5-6 device E2E run, the 64-level nested table in <code>nest.hwpx</code> reported itself drawn while showing a blank page. After the follow-up fix, release builds ended on the damaged-file screen with "open with another app" in 3 of 3 runs. <code>MaliciousSetTest</code> can't see this defect.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Write the verdicts first, then remove guards to check them</h2>
+      <ol>
+        <li>Split threats into families and write each file's expected verdict first.</li>
+        <li>Write a deterministic generator with no outside dependencies that emits the files and the manifest together and prints how many it wrote.</li>
+        <li>Have a test compare the manifest row by row, and assert a per-file time cap and a minimum row count.</li>
+        <li>Set budgets from a corpus of normal documents: take the maximums and multiply by a margin. This app went from 46 files, 2.9 MB and 3.4 MB to 64 MiB and 128 MiB.</li>
+        <li>Attach it to the unit test task. This app still skips when python is missing, but don't leave a security set skippable. The snippet below is a proposal, not code from the repository.
+          <pre><code>val dir = System.getProperty("sugardoc.malicious")?.let(::File)
+if (System.getenv("CI") == "true") check(dir?.isDirectory == true) { "security set missing" }
+assumeTrue(dir != null &amp;&amp; dir.isDirectory)</code></pre></li>
+        <li>Measure rendering on a device, and first confirm an unhardened control WebView scores a hit.</li>
+        <li>Remove guards one at a time and watch tests fail. If a guard sits on two paths, give it two rows.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Still to do: a green CI, no skips, and the webTests wiring</h2>
+      <p>Three things were not done as of November 7, 2026: fixing the test failure in another module so CI runs to the end, turning the skip into a failure on a CI machine with no python, and passing the <code>generateMaliciousSet</code> output to <code>webTests</code>. The log we read doesn't show whether <code>MaliciousSetTest</code> runs in CI without a skip, and we did not download the report files.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20malicious%20file%20set%20for%20a%20document%20viewer%3A%20ZIP%20bombs%2C%20CFB%20loops%20and%20XSS%2C%20generated%20and%20wired%20into%20tests">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">Frequently asked questions</h2>
+      <div class="faq">
+        <details><summary>How do you stop ZIP bombs in an Android app?</summary><div><p>Ignore declared sizes and count real bytes while inflating. This app combines a per-entry cap, a 1000:1 ratio rule past 1 MiB and total budgets.</p></div></details>
+        <details><summary>Can HWP or HWPX files be decompression bombs?</summary><div><p>Yes. HWPX is a ZIP, and HWP 5 keeps deflate streams inside CFB. The set has rows that inflate to 1 GiB in both formats.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Tue, 10 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>GMA Next-Gen ad callbacks run off the main thread – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/gma-next-gen-callback-thread-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX Notes · Incident</span>
+      <h1>GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</h1>
+      <p class="lead">In our app, GMA Next-Gen called the ad-shown callback on its own background thread, GMA(BG) 4. Code that navigated from it passed every test and crashed on the emulator.</p>
+      <p>Four minutes after 243 unit tests finished with zero failures, <a href="https://sugarmount21.com/en/apps/image-compress/">Compress Image</a> dropped to the launcher on the emulator when we tapped Start over after a second job. That was 16:10 on September 23, 2026, and the crash log named the thread <code>GMA(BG) 4</code>. We hit two traps that afternoon while adding three ad formats. One is this crash. The other is that UMP, Google's ad consent SDK, returned false from <code>canRequestAds()</code> at every launch, so the splash screen never waited for an app open ad. Commit 254313b fixed both.</p>
+      <p>The same app also crashed that night because R8 stripped a constructor; that story is in <a href="https://sugarmount21.com/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>. How often our block puzzle game shows interstitials is a separate note: <a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines</a>. Both defects here appeared in an unminified debug build and have nothing to do with frequency rules.</p>
+      <p class="note">Sources: the app repository's git history (254313b, 5107152, bf62e81, 8e5bd25), the CHANGELOG entry for 2026-09-23, the ad design document, code and tests, the agent session log from that day and three independent review reports. Times are Korea Standard Time; checked on November 8, 2026.</p>
+    </section>
+    <section aria-labelledby="crash-log">
+      <h2 id="crash-log">popBackStack threw on GMA(BG) 4</h2>
+      <p>The crash was caught by a journey script the agent wrote that afternoon. It launches the debug build against AdMob test ad units and walks six steps (listed in step 4 of the procedure below). Step 6 finishes the second job and taps Start over, the first place an interstitial can appear. In the first journey, finished at 15:31, the interstitial showed there without trouble. In the 16:10 run the app vanished and left the launcher on screen, so the agent read the crash buffer.</p>
+      <pre><code>FATAL EXCEPTION: GMA(BG) 4
+java.lang.IllegalStateException: Method setCurrentState must be called on the main thread
+  at androidx.lifecycle.LifecycleRegistry.enforceMainThreadIfNeeded(LifecycleRegistry.kt:382)
+  at androidx.lifecycle.LifecycleRegistry.setCurrentState(LifecycleRegistry.kt:139)
+  at androidx.navigation.NavBackStackEntry.updateState(NavBackStackEntry.kt:161)
+  ...
+  at androidx.navigation.NavController.popBackStack(NavController.android.kt:244)
+  at ...SugarCompressNavHost...(SugarCompressNavHost.kt:135)</code></pre>
+      <p>The result screen's Start over handler called <code>popBackStack()</code> to return HOME. Navigation then changed the lifecycle of the screen being popped, and <code>LifecycleRegistry</code> refused because it was not on the main thread. The caller was the SDK's <code>onAdShowedFullScreenContent</code> callback, which, in our log, GMA Next-Gen invoked on its own background thread. Nothing caught the exception, so the whole process died.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/gma-next-gen-callback-thread-1-en.webp" width="1200" height="986" alt="Timeline: 15:33 splash not held, 15:45 UMP measured, 16:06 243 unit tests pass, 16:07 review marks the fix resolved, 16:10 crash on a GMA(BG) thread, 16:12 fix, 16:28 commit 254313b." loading="lazy"><figcaption>A change that passed the unit tests and a code review died the first time it actually showed an ad.</figcaption></figure>
+    </section>
+    <section aria-labelledby="moved-into-callback">
+      <h2 id="moved-into-callback">A review fix moved navigation into the callback</h2>
+      <p>The interstitial code from the night before, commit 5107152, received the same callback and never crashed. All the callback did was complete a <code>CompletableDeferred</code>, which is safe from any thread. Commit bf62e81, at 00:26 on September 23, confirmed on the emulator that an interstitial showed after the third job and that closing it returned to HOME. Back then the app navigated after the ad closed.</p>
+      <p>On the afternoon of September 23 the operator proposed shipping all three ad formats at once, and asked for a version that had been analyzed in depth and cross-checked. That proposal and request are the operator's whole part on record; no person edited the code afterward. The agent brought in a separate reviewer agent told to report, not edit (it only ever read code). By then the working tree navigated to HOME first and showed the ad second. The second review, at 16:02, said HOME was drawn and tappable before the interstitial appeared. That is the "ad appears unexpectedly while the user is interacting" pattern AdMob warns about, and a quick tap could open the photo picker together with the ad. The reviewer's fix: stay on the result screen and navigate to HOME the moment the ad covers it.</p>
+      <p>The agent took that moment from the SDK's <code>onAdShowedFullScreenContent</code> and passed the navigation function into it. Both installing the callback and calling <code>show()</code> happen inside <code>withContext(Dispatchers.Main.immediate)</code>, which fixes the thread of the code doing the installing, not the thread the SDK later calls back on.</p>
+      <p>The banner loader from commit 8e5bd25 on September 20 had posted <code>adView.destroy()</code> to a main-looper Handler from day one. That handling never made it to the full-screen code.</p>
+    </section>
+    <section aria-labelledby="why-missed">
+      <h2 id="why-missed">Why 243 tests and the third review missed it</h2>
+      <p>A unit test covered exactly this behavior. <code>FullScreenControllersTest</code> has a test that checks navigation happens only once the ad covers the screen ("Start over navigates only once the ad covers the screen, or right away without one"). Its fake ad, though, calls <code>onAppeared()</code> directly on the test thread. A single-threaded fake cannot reproduce a threading bug, so the test passed.</p>
+      <p>The first and second reviews came before the callback navigated at all; only the third saw that code. At 16:07 it marked "Navigate under the ad: resolved", and opened its report by saying it had only read code and had built or run nothing. The crash three minutes later is the log above.</p>
+      <p>The cross-check found the eight pacing defects the CHANGELOG lists, including an interstitial after a failed job, a retried job counted twice, ad requests for a Pro user with a stale cache, and an ad shown on a stopped Activity.</p>
+      <p>We don't call an ad build done until it has run on an emulator or device up to the point where a real ad appears.</p>
+    </section>
+    <section aria-labelledby="fix">
+      <h2 id="fix">All four callbacks now go through one main-looper Handler</h2>
+      <p>The 16:12 threading fix lives in one file, <code>GmaFullScreen.kt</code>, which interstitials and app open ads share (other third-review findings were fixed across several files at the same time). The shown, failed-to-show, dismissed and paid callbacks all hand their work to the same main-looper Handler.</p>
+      <pre><code>private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
+onShowed = {
+    mainHandler.post {
+        onAppeared()          // navigates to HOME here
+        appeared.complete(true)
+    }
+},
+onDismissed = {
+    mainHandler.post {
+        onDismissed()
+        dismissed.complete(true)
+    }
+},</code></pre>
+      <p>Posting only the shown callback would have stopped the crash. The code comment gives the reason for moving all four: queued on one looper in arrival order, "shown" is always handled before "dismissed". Going back to the pre-review order, navigating first and showing the ad second, was off the table, since the second review had flagged it as a policy risk.</p>
+      <p>The 16:17 rerun reached step 6, showed the ad screen (<code>AdActivity</code>), and returned to the app after it closed. The crash buffer had no FATAL entries. The ad design document gained a line saying anything new hooked to an SDK callback must assume a background thread.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20GMA%20Next-Gen%20called%20our%20full-screen%20ad%20callback%20on%20a%20background%20thread%3A%20how%20a%20photo%20app%20crashed%20after%20243%20passing%20unit%20tests">Email us</a></p></aside>
+    <section aria-labelledby="ump">
+      <h2 id="ump">UMP starts every cold launch with canRequestAds() false</h2>
+      <p>The UMP problem showed up about 40 minutes before the crash. In the first journey, finished at 15:31, the cold-start app open ad never held the splash. A 15:33 cold start with added logging printed <code>splash not held: BlockedNoConsent</code>. Holding the splash depended on consent state, and a code comment assumed that in Korea, where no consent form is required, consent from the previous session would already allow ads.</p>
+      <p>The agent's next suspect was UMP's debug settings. At 15:45 it cold-started a build with them and a build without them, twice each. All four runs began with <code>canRequestAds=false</code> and status 0 (UNKNOWN). The consent update took 2,246 to 2,413 ms, SDK initialization another 1,266 to 1,412 ms, finishing 4,767 to 5,116 ms after process start. All four timed out the 2 s wait with "consent/SDK not ready in 2000 ms". UMP did not carry "consent not required" into the next launch, so every cold start paid the round trip again.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/gma-next-gen-callback-thread-2-en.webp" width="1200" height="696" alt="Bar chart: the consent round trip took 2,246 to 2,413 ms in all four runs, over the old 2,000 ms budget; the budget became 3,000 ms." loading="lazy"><figcaption>Every cold start pays the consent round trip again, so the SDK could not even start initializing within 2 s.</figcaption></figure>
+      <p>A new <code>AdGate.wants()</code> decides whether to hold the splash from the Pro state and the feature flag alone. Actual ad requests still go through <code>decide()</code>, which checks consent and initialization first. The wait went from 2 s to 3 s. The 2 s came from our Korean spell-check app, which initializes the SDK before consent, an order this app's ad rules forbid. Google's app open sample waits 5 s. A fill that arrives after the budget is kept for the next return.</p>
+      <p>Even 3 s was not enough on the emulator. The final 16:25 journey logged "consent/SDK not ready in 3000 ms" at step 2, with the Play purchase check taking 4,139 ms. The ad design document records this limit with the emulator's 3.4 to 4.1 s for the purchase check.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">Measured only on an API 35 emulator with no consent required</h2>
+      <p>We have not measured the startup state or round trip in the EEA or other regions where the consent form appears, and we have not checked callback threads in the older, pre-Next-Gen GMA SDK. Google's Next-Gen interstitial page and migration guide don't say which thread callbacks arrive on (checked November 8, 2026). The only threading advice in the migration guide is to initialize the SDK on a background thread.</p>
+      <p>Code whose callbacks only do thread-safe work, like 5107152 above, doesn't need this fix. The ad design document's October 4 notes say a sideloaded Galaxy S20 got its Play answer in 3.34 s, so it showed no cold-start ad either way, while a Galaxy S21 showed cold-start ads from the second launch. The S21's Play latency wasn't measured.</p>
+    </section>
+    <section aria-labelledby="procedure">
+      <h2 id="procedure">Five steps before hooking an SDK callback</h2>
+      <ol>
+        <li>Find every ad SDK callback body and mark calls that touch navigation, lifecycle or views. <code>rg -n "onAd(Showed|Dismissed|FailedToShow)FullScreenContent"</code> is a start.</li>
+        <li>Post the marked calls to a main-looper Handler, and send all callbacks of one ad through the same Handler so their order holds.</li>
+        <li>Add a test that fires callbacks from another thread. A controller-level fake skips everything below the Handler, so this has to be a Robolectric test that calls the SDK-side function, <code>GmaFullScreen</code> here, directly. The module has no Robolectric dependency yet, and the function waits for dismissal, so the thread should call <code>onDismissed()</code> too. An untested sketch:
+          <pre><code>var onMain: Boolean? = null
+// fire shown and dismissed from another thread, like the SDK, and wait for it
+install = { cb -> thread(name = "fake-GMA(BG)") { cb.onShowed(); cb.onDismissed() }.join() },
+onAppeared = { onMain = Looper.myLooper() == Looper.getMainLooper() },
+// then drain the posts queued on the main looper
+shadowOf(Looper.getMainLooper()).idle()
+assertEquals(true, onMain)  // false once mainHandler.post is removed</code></pre></li>
+        <li>Run the debug build against test ad units up to the point where an interstitial really appears. Our journey has six steps: first launch, cold start, Home key and back after 35 s, open the photo picker and cancel after 35 s, Start over after the first job, Start over after the second job. Then check that <code>adb logcat -b crash</code> has no FATAL entries.</li>
+        <li>Log <code>canRequestAds()</code>, the consent status, the consent round trip and SDK init time at process start, and set the splash wait and its budget from those numbers. These are the lines our app wrote (collected from different runs):
+          <pre><code>GmaAdsAdapter: UMP at start: canRequestAds=false status=0 debugSettings=false
+GmaAdsAdapter: UMP consent update took 2246 ms
+GmaAdsAdapter: GMA initialized in 1295 ms, 4767 ms after process start
+AppOpen: app open skipped (cold): consent/SDK not ready in 2000 ms
+AppOpen: cold: entitlement answered in 4139 ms</code></pre></li>
+      </ol>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Nothing in 465d85b tests the main-looper post</h2>
+      <p>As of origin/main on November 7, 2026 (465d85b), what protects this fix is a comment in <code>GmaFullScreen.kt</code> and one sentence in the ad design document. Deleting <code>mainHandler.post</code> would leave every unit test green, so the test in step 3 is the next thing to add. Backlog item C-12, tuning the cold-start budget from real-device logs, is still open, and whether to shorten the wait for the Play purchase check is waiting on an operator decision.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20GMA%20Next-Gen%20called%20our%20full-screen%20ad%20callback%20on%20a%20background%20thread%3A%20how%20a%20photo%20app%20crashed%20after%20243%20passing%20unit%20tests">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Which thread do GMA Next-Gen full-screen ad callbacks run on?</summary><div><p>In our crash log it was one of the SDK's background threads, <code>GMA(BG) 4</code>. The Next-Gen guides we checked (interstitial, app open, banner, migration) don't say, so post any UI work from those callbacks to the main looper.</p></div></details>
+        <details><summary>Why does "setCurrentState must be called on the main thread" crash the app?</summary><div><p>Calling Navigation's <code>popBackStack()</code> off the main thread made <code>LifecycleRegistry</code> throw when it tried to change a screen's lifecycle. In this app, the call came from the ad-shown callback returning to HOME.</p></div></details>
+        <details><summary>Is it normal for UMP canRequestAds() to be false at app start?</summary><div><p>In our measurements it was false, with status UNKNOWN, at the start of every cold launch, even where consent is not required. It changed only after the consent update finished, about 2.3 s on the emulator.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Tue, 10 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>CLAUDE.md rules: why the same incident came back – SugarMount</title>
     <link>https://sugarmount21.com/en/ax/claude-md-rule-incidents/</link>
@@ -140,8 +384,8 @@ print(len(ids))</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -264,8 +508,8 @@ answers per open  = quiz_answer(mode!=chat) events / quiz_open events</code></pr
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -383,8 +627,8 @@ adb reboot                       # clears the two log.tag values (an empty setpr
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -499,12 +743,12 @@ adb reboot                       # clears the two log.tag values (an empty setpr
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -603,12 +847,12 @@ test('bidirectional cross-check against python cryptography', () async {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -756,8 +1000,8 @@ while True:
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -910,8 +1154,8 @@ Report: what you fixed, what remains uncertain.</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1048,8 +1292,8 @@ private val codePopulated = setOf("com.example.Response#requestId")
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1157,8 +1401,8 @@ private val codePopulated = setOf("com.example.Response#requestId")
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1267,8 +1511,8 @@ private val codePopulated = setOf("com.example.Response#requestId")
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1369,8 +1613,8 @@ private val codePopulated = setOf("com.example.Response#requestId")
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1484,8 +1728,8 @@ thinkingConfig: { thinkingBudget: 0 },</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1597,8 +1841,8 @@ adb shell "dumpsys window | grep mCurrentFocus"</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1734,8 +1978,8 @@ adb -s emulator-5554 logcat -d -b crash</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1858,8 +2102,8 @@ How to apply: when setting or changing this campaign, the user's instruction bea
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1971,8 +2215,8 @@ edge = if (next &lt; edge) next else edge - 1 // strictly decreasing</code></pre
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2105,12 +2349,12 @@ git log --diff-filter=A --format="%h %ad %s" --date=iso -- &lt;scoring file&gt;
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2216,8 +2460,8 @@ POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2337,12 +2581,12 @@ print("first", shows[:1], "gaps", [b - a for a, b in zip(inter, inter[1:])],
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2467,8 +2711,8 @@ Severity is exactly one of Blocker, High, Medium, Low</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2588,12 +2832,12 @@ def diff(a_png, b_png, top=300, bottom=330):
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2726,8 +2970,8 @@ def diff(a_png, b_png, top=300, bottom=330):
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2848,8 +3092,8 @@ expect(all.sort()).toEqual(files.sort());</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3147,8 +3391,8 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3234,8 +3478,8 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3328,8 +3572,8 @@ git grep -nE "addOn(Complete|Success|Failure|Canceled)Listener\((this|requireAct
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3446,8 +3690,8 @@ depth(board):                   # peel
         <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3582,8 +3826,8 @@ depth(board):                   # peel
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3700,8 +3944,8 @@ if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3807,8 +4051,8 @@ git diff --name-only $(git merge-base &lt;base&gt; &lt;branch&gt;) &lt;branch&gt
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3899,8 +4143,8 @@ unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$TEST_PUB[~/][0-9]*" | sort -u | wc
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4032,12 +4276,12 @@ lifecycleScope.launch {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4151,8 +4395,8 @@ lifecycleScope.launch {
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4255,8 +4499,8 @@ three_star = cleared and time &lt;= par(base, scale, floor) and mistakes &lt;= a
         <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4372,8 +4616,8 @@ print(pages.most_common(), "FAQ questions:", questions)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4486,12 +4730,12 @@ NOT_TEST = {"notExpression": {"orGroup": {"expressions": [
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4592,12 +4836,12 @@ export function cacheKey(api, group, original, corrected, model) {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/secrets-three-layers/">AI coding agents and secrets: one rule in chat, logs and token permissions, and the two exceptions a copied masking regex missed</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4727,8 +4971,8 @@ const gaps = await agent(CTX + CHECKLIST + final + dossier, { schema: CRIT })</c
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4843,8 +5087,8 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(":core
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4967,8 +5211,8 @@ git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --gre
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5104,12 +5348,12 @@ adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5241,8 +5485,8 @@ print("my app in results:", MY_APP in ids)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5369,8 +5613,8 @@ out of date:
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5484,12 +5728,12 @@ grep -rL --include='*Test.kt' -e 'assert' -e 'check(matches' app/src/</code></pr
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5630,8 +5874,8 @@ git log --until=2026-10-20 --format='%(trailers:key=Co-authored-by,valueonly)' \
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5733,12 +5977,12 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5904,8 +6148,8 @@ after_hint = win(board after the correct first move, 2 pieces left, lines it cle
         <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6023,8 +6267,8 @@ Schedule expires: YYYY-MM-DD / register again on: YYYY-MM-DD
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6165,8 +6409,8 @@ curl -s "$POLICY_URL" | grep -o 'data-policy-version="[0-9-]*"'</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6315,8 +6559,8 @@ font.save(dst)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6408,8 +6652,8 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6498,8 +6742,8 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6615,12 +6859,12 @@ flutter test test/theme_matrix/ --dart-define=Y2_NO_SETTLE=true
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6743,8 +6987,8 @@ FlowRow(
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6827,8 +7071,8 @@ Mem:              13           8           2           0           2           4
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6952,244 +7196,16 @@ if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFract
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
     <pubDate>Wed, 21 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Finding fake tests by deleting their guards – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/guard-removal-test/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/guard-removal-test/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/guard-removal-test-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · Incident</span>
-      <h1>3,066 green tests hid a line that breaks opening the database: checking tests by deleting the guard</h1>
-      <p class="lead">A pass count proves nothing on its own. We only count a test once we have deleted the code it protects and watched it fail.</p>
-      <p>3,066 tests were passing when the review found a blocker. The fourth adversarial review of our P2P chat app (Flutter) flagged one new SQLite setting that, traced through the plugin source, stops the database from opening on a device; the fix landed on September 11, 2026. The test SQLite hid the failure completely: reverting the fix left all 13 storage tests green. The app already had a rule that a test must fail when its guard is deleted, and the same review still caught two fixes that broke it. Our HWP viewer SugarDoc keeps that check as 12 Python scripts with 970 mutation rows and runs them at release.</p>
-      <p class="note">Sources: the chat app's commit <code>8f5a0a5</code> and the verification notes in that commit, plus SugarDoc's <code>scripts/qa</code> scripts and its 1.2.0 and 1.3.0 release records. All counts were taken again from git on October 20, 2026.</p>
-    </section>
-    <section aria-labelledby="pragma-blocker">
-      <h2 id="pragma-blocker">A row-returning PRAGMA sent through execute</h2>
-      <p>The blocker was a single line, <code>PRAGMA secure_delete = ON</code>. It was added that round so deleted messages get overwritten with zeros, and the code sent it through <code>db.execute()</code>, which expects no result rows. This pragma returns one. We reran all five pragmas from that function on October 20, 2026 with Python's <code>sqlite3</code> module (SQLite 3.45.1, in-memory database):</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">pragma</th><th scope="col">rows returned</th><th scope="col">call before the fix</th></tr></thead>
-          <tbody>
-            <tr><td><code>secure_delete = ON</code></td><td><code>[(1,)]</code></td><td><code>execute</code> (wrong)</td></tr>
-            <tr><td><code>foreign_keys = ON</code></td><td><code>[]</code></td><td><code>execute</code></td></tr>
-            <tr><td><code>synchronous = NORMAL</code></td><td><code>[]</code></td><td><code>execute</code></td></tr>
-            <tr><td><code>journal_mode = WAL</code></td><td><code>[('memory',)]</code></td><td><code>rawQuery</code></td></tr>
-            <tr><td><code>wal_autocheckpoint = 0</code></td><td><code>[(0,)]</code></td><td><code>rawQuery</code></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>In the same function, the two other pragmas that return rows already used <code>rawQuery</code>; only the new line did not. That setup code runs on every database open, before the version check. The review traced the iOS path through the plugin source: the <code>execute</code> path treats <code>SQLITE_ROW</code> as an error, so <code>openDatabase</code> itself fails and the whole storage layer goes with it. The Android side rests on the API contract of <code>SQLiteDatabase.execSQL</code>, which rejects statements that return rows. Neither platform has actually thrown the exception on a device yet.</p>
-      <p>The fix was one word:</p>
-      <pre><code>- await db.execute('PRAGMA secure_delete = ON');
-+ await db.rawQuery('PRAGMA secure_delete = ON');</code></pre>
-    </section>
-    <section aria-labelledby="why-green">
-      <h2 id="why-green">The test SQLite could not see the failure</h2>
-      <p>Unit tests run on <code>sqflite_common_ffi</code>, a desktop backend, not on the phone's SQLite. Its <code>execute</code> runs a statement without arguments and silently drops whatever rows come back. No exception, so the 3,066 tests could never have said anything about this bug. The commit message records that with the fix reverted, only the new guard fails.</p>
-      <p>Because no behavioural test can catch it, the guard reads source instead. <code>pragma_execute_guard_test.dart</code> pulls every string literal passed to <code>.execute(</code> under <code>lib/</code>, and runs each one that starts with PRAGMA through <code>rawQuery</code> on a real SQLite to see whether rows come back. The ffi backend returns rows normally from <code>rawQuery</code>, so the check tells the truth even inside the test environment. At the time <code>lib/</code> had 14 such calls: 3 pragmas and 11 table or index statements.</p>
-      <p>The scanner also checks itself. If it finds fewer than 5 <code>execute</code> literals, it assumes its regex broke and fails, so an empty scan cannot pass for free. (The pragma list is not hard-coded either; the guard asks SQLite.)</p>
-    </section>
-    <section aria-labelledby="ai-wrong">
-      <h2 id="ai-wrong">Two fixes reported as verified had guards that guarded nothing</h2>
-      <p>The same review ran revert checks: undo each fix and see whether the test said to protect it turns red. Two fixes that the AI coding agent had reported as verified in the previous round failed this check.</p>
-      <ul>
-        <li>Removing the localisation wiring from the app (the part that makes screen readers speak the framework's labels in Korean) left its test green. The test launched the test harness's own <code>MaterialApp</code>, not the real app. It now drives the actual app widget and checks the localisations resolved beneath it.</li>
-        <li>Every message-eviction guard sat behind an environment variable that CI never sets. With eviction disabled, all 659 tests that run without that variable stayed green. They now run by default, and every revert in that area goes red.</li>
-      </ul>
-      <p>The review logged 26 findings, and 24 of them had been introduced by that round's own fixes. Its notes say the pattern of the previous fix creating new defects had now repeated four times. What the agent got wrong was the report more than the code. It really had added tests, and they really passed; nobody had checked what they measured.</p>
-      <p>The reviewer was an agent too. It changed no code, and it restored the tree after every revert experiment. Its brief carried this rule: if a test still passes after you revert the fix, the test is wrong. After the fixes the suite stood at 3,099 passed, 13 skipped, 0 failed.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/guard-removal-test-1-en.webp" width="1200" height="966" alt="Timeline: notes from September 9 said every fix was pinned by a guard test, yet the review two days later found a blocker under 3,066 passing tests and two fixes whose guards guarded nothing; after the fixes 3,099 tests passed." loading="lazy"><figcaption>A written rule did not catch the fake tests; reverting each fix did.</figcaption></figure>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%203%2C066%20green%20tests%20hid%20a%20line%20that%20breaks%20opening%20the%20database%3A%20checking%20tests%20by%20deleting%20the%20guard">Email us</a></p></aside>
-    <section aria-labelledby="done-rule">
-      <h2 id="done-rule">The rule had been written down two days earlier</h2>
-      <p>When an agent says it added a test, delete the code that test is meant to protect and run it again. If it stays green, it does not count. The chat app's instruction file ties "done" to three conditions: zero analyzer errors, code reachable from <code>main.dart</code>, and code protected by a test. The release-readiness notes from September 9 already said every fix in that round was pinned by a test that fails when its guard is removed; two days later a second agent actually reverted the fixes and caught two that did not.</p>
-      <p>The order of checks we run before a release is in <a href="https://sugarmount21.com/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>.</p>
-    </section>
-    <section aria-labelledby="harness">
-      <h2 id="harness">The guard-removal harness: plain Python, one guard per row</h2>
-      <p>SugarDoc has shipped a guard-removal script beside each feature since its first commit on October 8, 2026. As of October 18 there are 12 scripts, 970 mutation rows and 1,919 lines. Each row is a promise: change this string in this file, and this test class must fail. Below is a real row from the 1.2.0 PDF export script, followed by the core of the harness, trimmed.</p>
-      <pre><code># (id, file, [(original, replacement)], module, test class that must fail)
-("ctl.logOnlySaved", P + "ReaderController.kt",
- [("if (result == PdfWriteResult.SAVED) log(...)", "log(...)")],
- "sugardoc", "ReaderControllerTest"),
-for mid, rel, edits, kind, target in MUT:
-    path, orig = mutate(rel, edits)          # only ever in the copy
-    try:
-        ok, fails, out = run_row(kind, target)  # gradlew --no-daemon --tests *.target
-        if "e: file://" in out:
-            verdict = "COMPILE-ERROR"
-        else:
-            verdict = "FAILS-AS-EXPECTED" if ok else "STILL-PASSES"
-    finally:
-        open(path, "w", encoding="utf-8").write(orig)</code></pre>
-      <p>(The <code>log(...)</code> is shortened here; the real row spells out the analytics event.) Five decisions carry the design:</p>
-      <ul>
-        <li>The working tree is never touched. The repository is copied to a separate folder without <code>.git</code>, build outputs or signing keys, and every mutation happens there. Another agent session may be working in the same tree.</li>
-        <li>Each original string must match exactly once. Anything other than one match marks the row <code>BAD-PATTERN</code>, meaning the source moved and the row needs updating.</li>
-        <li>A catch needs two signals: Gradle exits with failure and the JUnit XML contains a failed test case. Compile errors are reported separately as <code>COMPILE-ERROR</code>. Going by exit code alone would count a typo in the mutation as a catch.</li>
-        <li>One Gradle run at a time, no daemon, only the named test class, with a lock file holding the process ID so two runs never share a copy.</li>
-        <li>The mutated file is always restored in <code>finally</code>.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="still-passes">
-      <h2 id="still-passes">Two rows that stayed green in 1.3.0</h2>
-      <p>The SugarDoc 1.3.0 release record from October 18 holds real catches. After confirming that all 147 rows of the editing script still matched once, the 37 rows added or changed that day were run. Two came back <code>STILL-PASSES</code> on the first run.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/guard-removal-test-2-en.webp" width="1200" height="596" alt="Bar chart: of the editing script&#x27;s 147 mutation rows, 37 were run for 1.3.0 and 110 were not rerun; 2 of the 37 came back STILL-PASSES on the first run." loading="lazy"><figcaption>Release 1.3.0 ran only the 37 changed rows, and 2 of them stayed green on the first run.</figcaption></figure>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Row</th><th scope="col">Mutation</th><th scope="col">Cause</th><th scope="col">Fix</th></tr></thead>
-          <tbody>
-            <tr><td><code>retry.partialFails</code></td><td>drop <code>partial ||</code> from the retry-save condition</td><td>weak test</td><td>test now loses only the second edit during replay</td></tr>
-            <tr><td><code>retry.cancelStops</code></td><td>delete the cancel check</td><td>the same defence existed in two places</td><td>removed the duplicate and aimed the row at the guard that remained</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>The rerun after the fixes came back 4 of 4 failing, as it should. The PDF export script went 32 of 32 <code>FAILS-AS-EXPECTED</code> the same day. STILL-PASSES does not always mean a weak test. If the code defends the same thing twice, deleting one copy changes nothing, and the fix belongs in the code. (An agent wrote the tests for both features, too.)</p>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">What is still open</h2>
-      <p>The Android failure in the chat app has not been measured. The verification notes list it as open: build an APK from the commit before the fix, install it on an emulator and read logcat at the first database open. iOS needs a macOS machine we do not have. On the SugarDoc side, 1.3.0 reran only the 37 changed rows of the editing script; the 110 untouched rows were not rerun. Whether those older rows still go red will show at the next full run.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%203%2C066%20green%20tests%20hid%20a%20line%20that%20breaks%20opening%20the%20database%3A%20checking%20tests%20by%20deleting%20the%20guard">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>How do you find a fake test?</summary><div><p>Delete or invert the code the test claims to protect, then run only that test. If it stays green, it does not protect that code. We write each such check down as a mutation row and rerun the rows at release.</p></div></details>
-        <details><summary>Can I trust tests an AI agent wrote?</summary><div><p>Not by the pass count. In the chat app 3,066 passing tests sat on top of a blocker, and two fixes reported as verified kept their tests green after the fix was deleted. We only count a test once we have seen it fail with its guard removed.</p></div></details>
-        <details><summary>Why a hand-written script instead of a mutation testing tool?</summary><div><p>The question we needed answered was whether this test guards this line. Each row pairs one guard with the one test class that should catch it, and runs only that class. We have not compared it with off-the-shelf tools for speed or catch rate.</p></div></details>
-        <details><summary>Does STILL-PASSES always mean the test is weak?</summary><div><p>No. Of the two rows that stayed green in SugarDoc 1.3.0, one had a weak test and the other guarded code that was defended twice. In the second case we removed the duplicate defence and pointed the row at the guard that remained.</p></div></details>
-      </div>
-    </section>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Tue, 20 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Play Console DEX optimization and an R8 keep rule – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/r8-dex-optimization-keep-rule/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/r8-dex-optimization-keep-rule/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/r8-dex-optimization-keep-rule-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · Measurement</span>
-      <h1>Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</h1>
-      <p class="lead">A leftover Kakao SDK ProGuard file kept every public member of every class out of R8; deleting it moved the bundle's r8.json numbers from 39% to 85%.</p>
-      <p>Play Console still rated the latest bundle of <a href="https://sugarmount21.com/en/apps/sugarspeller/">SugarSpeller</a>, our Korean spelling checker, as "intermediate" on September 25, 2026: optimization 36%, obfuscation 39%, shrinking 39%. Five days earlier we had removed the <code>-dontoptimize</code> line that kept R8 from optimizing at all. The rest of the gap came from one seven-line ProGuard file for the Kakao SDK, which the app does not use. With it gone the same day, the unshrunk share in the bundle's r8.json fell from 61.47% to 15.18% (85% once subtracted from 100), and the AAB went from 18.4 MB to 11.6 MB.</p>
-      <p class="note">Numbers come from SugarMount's app repository (sugarspeller): commits a597223 (2026-09-20) and e05f8e3 (2026-09-25), the changelog entries for 1.6.020 and 1.6.023, the post-release watch log, and an r8.json read again from a local release AAB while writing this note. Checked on October 20, 2026.</p>
-    </section>
-    <section aria-labelledby="play-metric">
-      <h2 id="play-metric">The Play Console figure is r8.json turned upside down</h2>
-      <p>Those percentages line up with a file the Android Gradle Plugin (AGP) already puts in every R8-processed release bundle: <code>BUNDLE-METADATA/com.android.tools/r8.json</code>. Its <code>stats</code> block records the share of code that was <em>not</em> shrunk, obfuscated or optimized.</p>
-<pre><code>unzip -p app-release.aab BUNDLE-METADATA/com.android.tools/r8.json
-"stats":{"noObfuscationPercentage":61.48,
-         "noOptimizationPercentage":64.27,
-         "noShrinkingPercentage":61.47}</code></pre>
-      <p>Subtract each value from 100 and you get what Play shows: 61.47 became 39% shrunk, 64.27 became 36% optimized. We matched that from our own before-and-after numbers, not from a Google spec, but it held for the two Play readings we have (0% before, 36/39/39% after the first fix). That lets you read the metric locally before uploading anything.</p>
-      <p>The build used AGP 9.4.0 with R8 full mode, resource shrinking and the stock <code>proguard-android-optimize.txt</code>. Our repository notes say Play wants this metric addressed by February 2027; we could not re-check the wording on the Play screen for this note.</p>
-    </section>
-    <section aria-labelledby="dontoptimize">
-      <h2 id="dontoptimize">Dropping -dontoptimize took optimization from 0% to 36%</h2>
-      <p>Commit a597223 on September 20 removed <code>-dontoptimize</code> from <code>proguard-common.pro</code>. It had been added on purpose, out of fear that optimization would break the Gson reflection that parses spelling results, and it pinned Play's optimization figure at 0%. The comparison baseline was the previous HEAD (1.6.019) built in the same environment.</p>
-      <p>Unoptimized code went from 100% to 64.25%, and uncompressed DEX from 16.31 MB to 14.84 MB. The AAB dropped from 29.95 MB to 18.33 MB, but most of that was a greeting-card editor and roughly 11 MB of its assets leaving in the same release. Optimization's own share sits inside the 1.5 MB of DEX.</p>
-      <p>Unobfuscated code <em>rose</em> from 54.16% to 61.46%. The commit put that down to "app code shrank, so the SDK keep rules weigh more" and moved on. Version 1.6.020 shipped on September 22. Three days later came the 36/39/39% reading from the top of this note.</p>
-    </section>
-    <section aria-labelledby="merged-config">
-      <h2 id="merged-config">The merged configuration.txt had a rule on class *</h2>
-      <p>Every rule R8 actually applied ends up in one file, <code>app/build/outputs/mapping/release/configuration.txt</code>: the defaults, the app's six .pro files, and the consumer rules each library AAR brings along. The merged file from the October 9, 2026 release build is 1,369 lines, short enough to read end to end. Reading through it on September 25 turned up this block.</p>
-<pre><code># proguard-kakao.pro (in the repo since the first commit, 2020-12-16)
--keep class com.kakao.** { *; }
--keepattributes Signature
--keepclassmembers class * {
-  public static &lt;fields&gt;;
-  public *;
-}
--dontwarn android.support.v4.**,org.slf4j.**,com.google.android.gms.**</code></pre>
-      <p>In the third rule, <code>class *</code> has no condition, so it matches every class in the app and in every library. Their public fields and methods can then not be removed, renamed or inlined. And the Kakao SDK (the SDK for KakaoTalk login and sharing) was not a dependency at all; even its Maven repository line in the root build script was commented out.</p>
-      <p>Commit e05f8e3 deleted the file and both build references to it, release and debug. It also deleted <code>proguard-retrofit2.pro</code>, which no build had ever referenced.</p>
-      <p>Do not ship an unconditional keep rule on <code>class *</code> in an Android app. Libraries that need rules already ship them as consumer rules inside their AAR.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Play%20Console%20said%20our%20DEX%20was%2039%25%20optimized.%20The%20culprit%20was%20a%20keep%20rule%20for%20an%20SDK%20we%20never%20used">Email us</a></p></aside>
-    <section aria-labelledby="before-after">
-      <h2 id="before-after">Before and after: r8.json and sizes for both changes</h2>
-      <p>Each pair of columns comes from a different day and a different commit, so compare within a pair. Even the same configuration drifts in the second decimal: 64.25% on September 20, 64.27% on September 25.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Metric</th><th scope="col">1.6.019 baseline</th><th scope="col"><code>-dontoptimize</code> removed (Sep 20)</th><th scope="col">Before kakao file removal (Sep 25)</th><th scope="col">After (Sep 25)</th></tr></thead>
-          <tbody>
-            <tr><td>Not optimized</td><td>100%</td><td>64.25%</td><td>64.27%</td><td>15.68%</td></tr>
-            <tr><td>Not obfuscated</td><td>54.16%</td><td>61.46%</td><td>61.48%</td><td>15.14%</td></tr>
-            <tr><td>Not shrunk</td><td>not recorded</td><td>not recorded</td><td>61.47%</td><td>15.18%</td></tr>
-            <tr><td>As Play shows it (opt/obf/shrink)</td><td>optimization 0% (Play screen)</td><td>36/39/- (derived from r8.json)</td><td>36/39/39% (Play screen)</td><td>84/85/85 (derived from r8.json, not yet seen on Play)</td></tr>
-            <tr><td>DEX</td><td>16.31 MB (uncompressed)</td><td>14.84 MB</td><td>15.6 MB (total)</td><td>8.2 MB</td></tr>
-            <tr><td>AAB</td><td>29.95 MB</td><td>18.33 MB (asset removal included)</td><td>18.4 MB</td><td>11.6 MB</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/r8-dex-optimization-keep-rule-1-en.webp" width="1200" height="728" alt="Bar chart: after the kakao file was removed, r8.json&#x27;s unoptimized share fell from 64.27% to 15.68%, unobfuscated from 61.48% to 15.14% and unshrunk from 61.47% to 15.18%." loading="lazy"><figcaption>Deleting one seven-line Kakao SDK file took the unshrunk share from 61.47% to 15.18%.</figcaption></figure>
-      <p>Measured by DEX size, deleting one rule did about five times what removing <code>-dontoptimize</code> did. DEX shrank by 1.5 MB on September 20 and by 7.4 MB (47%) on September 25, and the AAB lost another 6.8 MB.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/r8-dex-optimization-keep-rule-2-en.webp" width="1200" height="596" alt="Bar chart: removing -dontoptimize took DEX from 16.31 MB to 14.84 MB; removing the kakao file took it from 15.6 MB to 8.2 MB." loading="lazy"><figcaption>By DEX saved, deleting one rule file did about five times what removing -dontoptimize did.</figcaption></figure>
-      <p>Before release, a release APK signed with the debug key ran on an API 34 emulator. A spelling check against Naver (Korea's largest web portal) came back with the two corrections the server reported, and the post-check quiz bubble, the quiz screen and Remote Config content injection all worked. The five JSON key strings Gson reads were still present verbatim in the release DEX. (A headless emulator returns black screenshots, so we read screen text with <code>uiautomator dump</code> instead.)</p>
-      <p>From September 22 to October 3 the post-release watch log recorded zero crashes for 1.6.020, for 1.6.024 (the first release without the kakao rule) and for 1.6.025, and closed the item as "no regression".</p>
-    </section>
-    <section aria-labelledby="ai-errors">
-      <h2 id="ai-errors">The clue the agent explained away</h2>
-      <p>An AI coding agent (Claude) wrote both commits. On September 20 it declared in the commit message that the <code>-dontoptimize</code> line was the cause. It also recorded, accurately, that unobfuscated code had gone up by more than 7 points. It did not check which rule was holding that code; it filled the gap with a guess that the keep rules had not changed and the SDKs simply weighed more.</p>
-      <p>On the afternoon of September 25 the operator pasted a Play Console screenshot, noted that the bundle still looked unoptimized, and asked for a deeper analysis. Only then did the agent open the merged configuration, and the seven-line file from 2020 surfaced. Opening <code>configuration.txt</code> first instead of guessing would have saved five days.</p>
-      <p>Two lines went into the repository's agent instructions afterwards: never add a keep rule on <code>class *</code>, and check the merged result in configuration.txt. The checks we run to catch release-only R8 failures before shipping are in <a href="https://sugarmount21.com/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>.</p>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">Still open</h2>
-      <ul>
-        <li>Confirming the Play screen. The repository holds only the 85% derived from r8.json; nothing records the Play Console figure after release. We will capture it on the next upload.</li>
-        <li>The ratio creeping back. A new Firebase dependency in 1.6.025 pulled the build down about 5 points, to roughly 80%. The release AAB left on disk from October 9, 2026 reads 20.23% unoptimized with 9.30 MB of DEX (9,302,488 bytes). Next step: diff configuration.txt to see which consumer rule arrived.</li>
-      </ul>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Play%20Console%20said%20our%20DEX%20was%2039%25%20optimized.%20The%20culprit%20was%20a%20keep%20rule%20for%20an%20SDK%20we%20never%20used">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Does the Play Console DEX optimization warning block uploads?</summary><div><p>It did not in September 2026: bundles at 0% and at 36% optimization both shipped normally. Our repository notes say Play expects it fixed by February 2027, so it is not something to leave for later.</p></div></details>
-        <details><summary>Can I see the optimization percentage before uploading to Play?</summary><div><p>Yes. Extract <code>BUNDLE-METADATA/com.android.tools/r8.json</code> from the release AAB and subtract the three <code>stats</code> values from 100. For this app, 61.47 matched Play's 39%. That mapping is our inference from repository records, and nothing yet records whether Play showed the 85% that 15.18 implies.</p></div></details>
-        <details><summary>How do I find the keep rule that is holding the metric down?</summary><div><p>Search the merged <code>configuration.txt</code> for <code>-keep</code> or <code>-keepclassmembers</code> rules on wide patterns such as <code>class *</code> or <code>**</code> with no condition attached. Here it was a single <code>-keepclassmembers class * { public *; }</code> block in a file for an SDK the app did not use.</p></div></details>
-      </div>
-    </section>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Tue, 20 Oct 2026 09:00:00 +0900</pubDate>
   </item>
 </channel>
 </rss>

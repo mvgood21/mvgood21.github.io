@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GMA Next-Gen 전면 광고 콜백 스레드 크래시 – SugarMount</title>
+  <meta name="description" content="단위 테스트 243개를 통과한 전면 광고 코드가 에뮬레이터에서 죽었습니다. GMA Next-Gen의 백그라운드 콜백과, 실행마다 false인 UMP canRequestAds()를 적었습니다.">
+  <meta name="robots" content="max-image-preview:large">
+  <link rel="canonical" href="https://sugarmount21.com/ax/gma-next-gen-callback-thread/">
+  <link rel="alternate" hreflang="ko" href="https://sugarmount21.com/ax/gma-next-gen-callback-thread/">
+  <link rel="alternate" hreflang="en" href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">
+  <link rel="alternate" hreflang="x-default" href="https://sugarmount21.com/ax/gma-next-gen-callback-thread/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="GMA Next-Gen 전면 광고 콜백 스레드 크래시 – SugarMount">
+  <meta property="og:description" content="단위 테스트 243개를 통과한 전면 광고 코드가 에뮬레이터에서 죽었습니다. GMA Next-Gen의 백그라운드 콜백과, 실행마다 false인 UMP canRequestAds()를 적었습니다.">
+  <meta property="og:url" content="https://sugarmount21.com/ax/gma-next-gen-callback-thread/">
+  <meta property="og:image" content="https://sugarmount21.com/assets/og/ax-gma-next-gen-callback-thread-ko.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="https://sugarmount21.com/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/svg+xml" href="https://sugarmount21.com/assets/favicon.svg">
+  <link rel="apple-touch-icon" href="https://sugarmount21.com/assets/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://sugarmount21.com/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/site.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=e2770b30">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://sugarmount21.com/ax/gma-next-gen-callback-thread/#article","headline":"GMA Next-Gen 전면 광고 콜백은 백그라운드 스레드에서 왔다: 사진 앱이 단위 테스트 243개 통과 뒤 죽은 기록","description":"단위 테스트 243개를 통과한 전면 광고 코드가 에뮬레이터에서 죽었습니다. GMA Next-Gen의 백그라운드 콜백과, 실행마다 false인 UMP canRequestAds()를 적었습니다.","url":"https://sugarmount21.com/ax/gma-next-gen-callback-thread/","mainEntityOfPage":"https://sugarmount21.com/ax/gma-next-gen-callback-thread/","inLanguage":"ko","articleSection":"스토어와 수익화","datePublished":"2026-11-10T09:00:00+09:00","dateModified":"2026-11-10T09:00:00+09:00","image":["https://sugarmount21.com/assets/og/ax-gma-next-gen-callback-thread-ko.png","https://sugarmount21.com/assets/ax/cover/gma-next-gen-callback-thread-ko.webp","https://sugarmount21.com/assets/ax/gma-next-gen-callback-thread-1-ko.webp","https://sugarmount21.com/assets/ax/gma-next-gen-callback-thread-2-ko.webp"],"author":{"@id":"https://sugarmount21.com/#org"},"publisher":{"@id":"https://sugarmount21.com/#org"},"isPartOf":{"@id":"https://sugarmount21.com/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"GMA Next-Gen 전면 광고 콜백은 어느 스레드에서 오나요?","acceptedAnswer":{"@type":"Answer","text":"이 앱의 크래시 로그에서는 SDK의 백그라운드 스레드( GMA(BG) 4 )였습니다. 확인한 공식 가이드(전면·앱 오프닝·배너·마이그레이션)는 이 점을 적지 않으므로, 콜백 안에서 UI를 건드리는 일은 메인 루퍼로 넘기는 편이 안전합니다."}},{"@type":"Question","name":"\"setCurrentState must be called on the main thread\" 크래시는 왜 나나요?","acceptedAnswer":{"@type":"Answer","text":"Navigation의 popBackStack() 을 메인이 아닌 스레드에서 부르자, 화면 생명주기를 바꾸는 LifecycleRegistry 의 메인 스레드 검사가 예외를 던졌습니다. 이 앱에서는 광고 표시 콜백에서 HOME으로 돌아가는 호출이 원인이었습니다."}},{"@type":"Question","name":"UMP canRequestAds()가 앱 시작 때 false인데 정상인가요?","acceptedAnswer":{"@type":"Answer","text":"이 앱의 측정에서는 동의가 필요 없는 환경에서도 매 콜드 스타트 시작 때 false, 상태 UNKNOWN이었습니다. 동의 갱신 요청이 끝나야 바뀌었고, 에뮬레이터에서 약 2.3초 걸렸습니다."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://sugarmount21.com/"},{"@type":"ListItem","position":2,"name":"AX 노트","item":"https://sugarmount21.com/ax/"},{"@type":"ListItem","position":3,"name":"스토어와 수익화","item":"https://sugarmount21.com/ax/topic/store/"},{"@type":"ListItem","position":4,"name":"GMA Next-Gen 전면 광고 콜백은 백그라운드 스레드에서 왔다: 사진 앱이 단위 테스트 243개 통과 뒤 죽은 기록"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=e2770b30">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a class="nav-apps" href="/apps/">앱</a>
+        <a class="nav-ax" href="/ax/" aria-current="page">AX 노트</a>
+        <a class="nav-about" href="/about/">소개</a>
+        <a class="nav-privacy" href="/privacy/">개인정보처리방침</a>
+      </nav>
+      <a class="lang" href="/en/ax/gma-next-gen-callback-thread/" lang="en" hreflang="en">English</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>메뉴</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="전체 메뉴">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">닫기</button>
+      <p class="menu-title" id="m-photo">사진·영상</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>슈가앨범</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 용량 줄이기</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 반전·회전</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>이미지 변환 JPG·PNG·WebP</span></a></li></ul>
+      <p class="menu-title" id="m-document">문서·글</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글 띄어쓰기</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글뷰어 슈가독</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">생활</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>생생카드</span></a></li></ul>
+      <p class="menu-title" id="m-games">게임</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>화살표 매듭풀기</span></a></li><li><a class="app-tile" data-app="blocks" href="/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한판블록</span></a></li></ul>
+      <p><a href="/apps/">모든 앱 보기</a></p>
+      <ul class="menu-links"><li><a href="/ax/" aria-current="page">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-store">
+    <nav class="crumbs" aria-label="이동 경로"><ol><li><a href="/">SugarMount</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/ax/topic/store/">스토어와 수익화</a></li><li><span aria-current="page">GMA Next-Gen 전면 광고 콜백은 백그라운드 스레드에서 왔다: 사진 앱이 단위 테스트 243개 통과 뒤 죽은 기록</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/gma-next-gen-callback-thread-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX 노트 · 사고 기록</span>
+      <h1>GMA Next-Gen 전면 광고 콜백은 백그라운드 스레드에서 왔다: 사진 앱이 단위 테스트 243개 통과 뒤 죽은 기록</h1>
+      <p class="lead">이 앱에서 GMA Next-Gen은 전면 광고 표시 콜백을 백그라운드 스레드에서 불렀고, 거기서 화면을 옮긴 코드가 테스트를 통과하고 에뮬레이터에서 죽었습니다.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/about/">작성 SugarMount</a> <span aria-hidden="true">·</span> <span>스토어와 수익화</span> <span aria-hidden="true">·</span> <span>읽는 시간 14분</span> <span aria-hidden="true">·</span> 최종 업데이트 <time datetime="2026-11-10">2026년 11월 10일</time></p><!-- /build:meta -->
+      <p>단위 테스트 243개가 실패 0으로 끝나고 4분 뒤, 에뮬레이터에서 두 번째 작업을 마치고 [처음으로]를 누르자 <a href="/apps/image-compress/">사진 용량 줄이기</a>가 죽고 런처 화면이 나왔습니다. 2026년 9월 23일 16시 10분, 크래시 로그의 스레드 이름은 <code>GMA(BG) 4</code>였습니다. 그날 광고 3종을 붙이며 함정 두 개를 만났습니다. 하나는 이 크래시이고, 다른 하나는 UMP(Google의 광고 동의 SDK)가 앱을 실행할 때마다 <code>canRequestAds()</code>를 false로 돌려줘서 스플래시 위 광고 대기가 한 번도 걸리지 않은 일입니다. 둘 다 커밋 254313b에서 고쳤습니다.</p>
+      <p>같은 앱이 같은 날 밤 R8 때문에 실행 직후 죽은 일은 <a href="/ax/release-gate/">AI가 만든 Android 앱, 출시 전에 무엇을 검사하나: 릴리스 게이트와 R8 크래시</a>에 있습니다. 블록 퍼즐 게임 한판블록에서 전면 광고를 몇 판마다 띄울지 정한 과정은 <a href="/ax/interstitial-frequency-timeline/">전면 광고 빈도를 기기 타임라인으로 정했다</a>에 따로 적었습니다. 이 글의 두 결함은 축소하지 않은 디버그 빌드에서 났고, 빈도 규칙과도 관계가 없습니다.</p>
+      <p class="note">출처: 앱 저장소의 git 기록(254313b, 5107152, bf62e81, 8e5bd25), CHANGELOG 2026-09-23 절, 광고 설계 문서, 코드와 테스트, 당시 에이전트 세션 기록과 독립 리뷰 보고 3회. 시각은 한국 시간이고, 기준일은 2026년 11월 8일입니다.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>목차 (9)</summary><ol><li><a href="#crash-log">GMA(BG) 4 스레드에서 popBackStack이 예외를 던졌습니다</a></li><li><a href="#moved-into-callback">리뷰 지적을 고치다 화면 이동이 콜백 안으로 갔습니다</a></li><li><a href="#why-missed">테스트 243개와 3차 리뷰가 놓친 자리</a></li><li><a href="#fix">콜백 네 개를 같은 메인 루퍼 Handler로 넘겼습니다</a></li><li><a href="#ump">UMP는 콜드 스타트마다 canRequestAds()=false로 시작했습니다</a></li><li><a href="#limits">측정은 API 35 에뮬레이터, 동의 불필요 환경뿐입니다</a></li><li><a href="#procedure">SDK 콜백을 붙일 때 거치는 다섯 단계</a></li><li><a href="#next">465d85b에도 mainHandler.post를 지키는 테스트는 없습니다</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">목차</p><ol><li><a href="#crash-log">GMA(BG) 4 스레드에서 popBackStack이 예외를 던졌습니다</a></li><li><a href="#moved-into-callback">리뷰 지적을 고치다 화면 이동이 콜백 안으로 갔습니다</a></li><li><a href="#why-missed">테스트 243개와 3차 리뷰가 놓친 자리</a></li><li><a href="#fix">콜백 네 개를 같은 메인 루퍼 Handler로 넘겼습니다</a></li><li><a href="#ump">UMP는 콜드 스타트마다 canRequestAds()=false로 시작했습니다</a></li><li><a href="#limits">측정은 API 35 에뮬레이터, 동의 불필요 환경뿐입니다</a></li><li><a href="#procedure">SDK 콜백을 붙일 때 거치는 다섯 단계</a></li><li><a href="#next">465d85b에도 mainHandler.post를 지키는 테스트는 없습니다</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="crash-log">
+      <h2 id="crash-log">GMA(BG) 4 스레드에서 popBackStack이 예외를 던졌습니다</h2>
+      <p>크래시를 잡은 것은 에이전트가 같은 날 오후에 만든 여정 스크립트입니다. 디버그 빌드를 AdMob 테스트 광고 단위로 띄우고 여섯 단계를 차례로 실행합니다(단계 구성은 아래 절차 4단계). 6단계는 두 번째 작업을 마치고 [처음으로]를 누르는 자리라, 전면 광고가 처음으로 뜰 수 있는 곳입니다. 15시 31분에 끝난 첫 여정에서는 여기서 전면 광고가 탈 없이 떴습니다. 16시 10분 실행에서는 앱이 광고 대신 런처를 남기고 사라졌고, 에이전트가 크래시 버퍼를 읽었습니다.</p>
+      <pre><code>FATAL EXCEPTION: GMA(BG) 4
+java.lang.IllegalStateException: Method setCurrentState must be called on the main thread
+  at androidx.lifecycle.LifecycleRegistry.enforceMainThreadIfNeeded(LifecycleRegistry.kt:382)
+  at androidx.lifecycle.LifecycleRegistry.setCurrentState(LifecycleRegistry.kt:139)
+  at androidx.navigation.NavBackStackEntry.updateState(NavBackStackEntry.kt:161)
+  ...
+  at androidx.navigation.NavController.popBackStack(NavController.android.kt:244)
+  at ...SugarCompressNavHost...(SugarCompressNavHost.kt:135)</code></pre>
+      <p>결과 화면의 [처음으로] 처리 코드가 <code>popBackStack()</code>으로 HOME에 돌아가려 했고, Navigation이 뒤로 빠지는 화면의 생명주기를 바꾸려다 <code>LifecycleRegistry</code>의 메인 스레드 검사에 걸렸습니다. 그 호출이 메인 스레드가 아니었던 이유는 호출한 곳이 SDK의 <code>onAdShowedFullScreenContent</code> 콜백이었기 때문입니다. 이 앱의 로그에서 GMA Next-Gen은 이 콜백을 자기 백그라운드 스레드에서 불렀습니다. 예외를 받아 줄 곳이 없으니 프로세스가 통째로 죽었습니다.</p>
+      <figure class="ax-fig"><img src="/assets/ax/gma-next-gen-callback-thread-1-ko.webp" width="1200" height="934" alt="타임라인: 15시 33분 스플래시 대기 실패 로그, 15시 45분 UMP 측정, 16시 6분 단위 테스트 243개 통과, 16시 7분 리뷰 해결 판정, 16시 10분 GMA(BG) 스레드 크래시, 16시 12분 수정, 16시 28분 커밋 254313b." loading="lazy"><figcaption>단위 테스트와 코드 리뷰를 모두 통과한 수정이, 고친 뒤 광고를 실제로 띄운 첫 실행에서 죽었습니다.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="moved-into-callback">
+      <h2 id="moved-into-callback">리뷰 지적을 고치다 화면 이동이 콜백 안으로 갔습니다</h2>
+      <p>전날 밤 커밋 5107152의 전면 광고 코드도 같은 콜백을 받았지만 죽지 않았습니다. 콜백이 하는 일이 <code>CompletableDeferred</code>를 완료하는 것뿐이었고, 그 호출은 어느 스레드에서 해도 됩니다. 9월 23일 0시 26분 커밋 bf62e81은 에뮬레이터에서 세 번째 작업 뒤 전면 광고가 뜨고 닫으면 HOME으로 돌아오는 것까지 확인했습니다. 그때 HOME 이동은 광고를 닫은 뒤에 했습니다.</p>
+      <p>9월 23일 오후, 운영자는 광고 3종을 한 번에 넣자고 제안하면서 심층 분석과 교차검증을 거친 문제 없는 버전을 요청했습니다. 기록에서 사람이 한 일은 이 제안과 요청까지이고, 이후 코드는 사람이 고치지 않았습니다. 에이전트는 파일을 고치지 않고 보고만 하는 별도 리뷰 에이전트를 붙였습니다(리뷰는 세 번 모두 코드만 읽었습니다). 그사이 작업 트리는 HOME으로 먼저 옮기고 광고를 띄우는 순서로 바뀌어 있었고, 16시 2분 2차 리뷰는 HOME이 전면 광고보다 먼저 그려져 사용자가 누를 수 있다고 지적했습니다. 광고가 예고 없이 뜨는 패턴이라 AdMob 정책 위험이 있고, 사진 선택기와 광고가 함께 열릴 수도 있었습니다. 리뷰가 낸 처방은 결과 화면에 머물다가 광고가 화면을 덮는 순간 HOME으로 옮기라는 것이었습니다.</p>
+      <p>에이전트는 이 순간을 SDK가 알려 주는 <code>onAdShowedFullScreenContent</code>로 잡았고, HOME 이동 함수를 그 콜백에 넘겼습니다. 콜백을 다는 코드와 <code>show()</code> 호출이 <code>withContext(Dispatchers.Main.immediate)</code> 안에 있으니 콜백도 메인에서 불릴 것처럼 읽히지만, <code>withContext</code>가 정하는 것은 콜백을 다는 쪽의 스레드뿐이고 SDK가 콜백을 부르는 스레드는 SDK가 정합니다.</p>
+      <p>9월 20일 커밋 8e5bd25의 배너 로더는 처음부터 <code>adView.destroy()</code>를 메인 루퍼 Handler로 넘겨 불렀습니다. 전면 광고 코드에는 이 처리가 옮겨지지 않았습니다.</p>
+    </section>
+
+    <section aria-labelledby="why-missed">
+      <h2 id="why-missed">테스트 243개와 3차 리뷰가 놓친 자리</h2>
+      <p>단위 테스트는 바로 그 동작을 검사하고 있었습니다. <code>FullScreenControllersTest</code>에는 광고가 화면을 덮을 때만 이동하는지 보는 테스트(Start over navigates only once the ad covers the screen, or right away without one)가 있습니다. 그런데 이 테스트의 가짜 광고는 <code>onAppeared()</code>를 테스트 스레드에서 바로 부릅니다. 스레드가 하나뿐인 가짜로는 스레드 결함이 재현되지 않으니, 테스트는 통과했습니다.</p>
+      <p>1차와 2차 리뷰 때는 콜백 안에서 이동하는 코드가 아직 없었습니다. 그 코드를 본 것은 3차 리뷰뿐입니다. 16시 7분 3차 리뷰는 "Navigate under the ad: resolved"라고 판정했고, 보고 첫머리에 코드만 읽었고 아무것도 빌드하거나 실행하지 않았다고 적었습니다. 판정 3분 뒤의 크래시가 위 로그입니다.</p>
+      <p>CHANGELOG에 적힌 페이싱 결함 8종은 그 교차검증의 리뷰가 찾았습니다. 실패한 작업 뒤의 전면 광고, "실패한 것 다시"의 이중 계수, 오래된 캐시를 가진 Pro 사용자의 광고 요청, 멈춘 화면 위 광고, 광고 중 회전으로 생긴 기록 유실, 사진 선택기 뒤 회전, 광고보다 먼저 누를 수 있는 HOME, 늦게 뜬 광고의 미기록입니다.</p>
+      <p>광고를 붙인 빌드는 광고가 실제로 뜨는 지점까지 에뮬레이터나 기기에서 돌리기 전에 완료라고 하지 않습니다.</p>
+    </section>
+
+    <section aria-labelledby="fix">
+      <h2 id="fix">콜백 네 개를 같은 메인 루퍼 Handler로 넘겼습니다</h2>
+      <p>16시 12분 스레드 수정은 전면 광고와 앱 오프닝 광고가 함께 쓰는 <code>GmaFullScreen.kt</code> 한 곳에 들어갔습니다(같은 시각 3차 리뷰의 다른 지적도 여러 파일에서 함께 고쳤습니다). 표시, 표시 실패, 닫힘, 수익 이벤트 콜백 네 개가 모두 메인 루퍼의 같은 Handler로 일을 보냅니다.</p>
+      <pre><code>private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
+
+onShowed = {
+    mainHandler.post {
+        onAppeared()          // 여기서 HOME으로 이동
+        appeared.complete(true)
+    }
+},
+onDismissed = {
+    mainHandler.post {
+        onDismissed()
+        dismissed.complete(true)
+    }
+},</code></pre>
+      <p>화면을 옮기는 표시 콜백만 넘기면 크래시는 사라집니다. 코드 주석은 네 개를 모두 넘긴 이유를 순서로 적었습니다. 같은 루퍼에 도착 순서대로 넣어야 "표시"가 늘 "닫힘"보다 먼저 처리됩니다. 2차 리뷰 전 방식대로 HOME으로 먼저 옮기고 광고를 띄우는 길은 2차 리뷰가 정책 위험으로 막았으니 돌아가지 않았습니다.</p>
+      <p>16시 17분 다시 돌린 여정에서 6단계는 광고 화면(<code>AdActivity</code>)을 띄웠고, 닫자 앱 화면으로 돌아왔고, 크래시 버퍼에 FATAL은 0건이었습니다. 광고 설계 문서에는 "SDK 콜백에 새로 거는 일은 백그라운드 스레드를 가정한다"는 문장이 들어갔습니다.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20GMA%20Next-Gen%20%EC%A0%84%EB%A9%B4%20%EA%B4%91%EA%B3%A0%20%EC%BD%9C%EB%B0%B1%EC%9D%80%20%EB%B0%B1%EA%B7%B8%EB%9D%BC%EC%9A%B4%EB%93%9C%20%EC%8A%A4%EB%A0%88%EB%93%9C%EC%97%90%EC%84%9C%20%EC%99%94%EB%8B%A4%3A%20%EC%82%AC%EC%A7%84%20%EC%95%B1%EC%9D%B4%20%EB%8B%A8%EC%9C%84%20%ED%85%8C%EC%8A%A4%ED%8A%B8%20243%EA%B0%9C%20%ED%86%B5%EA%B3%BC%20%EB%92%A4%20%EC%A3%BD%EC%9D%80%20%EA%B8%B0%EB%A1%9D">메일로 문의하기</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="ump">
+      <h2 id="ump">UMP는 콜드 스타트마다 canRequestAds()=false로 시작했습니다</h2>
+      <p>UMP 쪽 문제는 크래시보다 약 40분 먼저 나왔습니다. 15시 31분에 끝난 첫 여정에서 콜드 스타트 앱 오프닝 광고가 스플래시를 붙잡지 않았고, 15시 33분 로그를 넣고 다시 띄우자 <code>splash not held: BlockedNoConsent</code>가 찍혔습니다. 스플래시를 붙잡을지는 동의 상태로 정하고 있었고, 코드 주석은 동의가 필요 없는 국내에서는 지난 세션의 동의 상태가 이미 광고를 허락한다고 가정했습니다.</p>
+      <p>에이전트는 다음으로 UMP 디버그 설정을 의심했고, 15시 45분 설정을 넣은 빌드와 넣지 않은 빌드를 두 번씩 콜드 스타트했습니다. 네 번 모두 시작 시점 값은 같았습니다: <code>canRequestAds=false</code>, 상태 0(UNKNOWN). 동의 갱신 요청이 끝나는 데 2,246~2,413ms가 걸렸고, 그 뒤에 SDK 초기화가 1,266~1,412ms 이어졌습니다. 초기화가 끝난 시점은 프로세스 시작 뒤 4,767~5,116ms였고, 2초 대기는 네 번 모두 "consent/SDK not ready in 2000 ms"로 끝났습니다. UMP는 "동의 필요 없음"을 다음 실행으로 넘기지 않았고, 콜드 스타트마다 동의 왕복을 처음부터 다시 했습니다.</p>
+      <figure class="ax-fig"><img src="/assets/ax/gma-next-gen-callback-thread-2-ko.webp" width="1200" height="696" alt="막대그래프: 동의 왕복은 2,246~2,413ms로 네 번 모두 이전 예산 2,000ms를 넘었고, 예산은 3,000ms로 늘렸다." loading="lazy"><figcaption>실행마다 동의 왕복을 다시 치르므로 2초 안에는 SDK 초기화조차 시작하지 못했습니다.</figcaption></figure>
+      <p>스플래시를 붙잡을지는 새로 만든 <code>AdGate.wants()</code>가 Pro 여부와 기능 플래그만 보고 정합니다. 실제 광고 요청은 전처럼 <code>decide()</code>가 동의와 초기화 상태를 확인한 뒤에만 나갑니다. 대기 예산은 2초에서 3초로 늘렸습니다. 2초는 맞춤법 앱 한글 띄어쓰기에서 가져온 값인데, 그 앱은 동의 전에 SDK를 초기화하고 이 앱의 광고 규칙은 그 순서를 금지합니다. Google의 앱 오프닝 예제는 5초를 기다립니다. 예산 뒤에 도착한 광고는 버리지 않고 다음 복귀 때 보여 줍니다.</p>
+      <p>3초로도 에뮬레이터에서는 콜드 스타트 광고가 뜨지 않았습니다. 16시 25분 최종 여정의 2단계 로그는 "consent/SDK not ready in 3000 ms"였고, Play 결제 권한 조회가 4,139ms 걸렸습니다. 광고 설계 문서는 에뮬레이터 측정값(권한 조회 3.4~4.1초)으로 이 한계를 적어 두었습니다.</p>
+    </section>
+
+    <section aria-labelledby="limits">
+      <h2 id="limits">측정은 API 35 에뮬레이터, 동의 불필요 환경뿐입니다</h2>
+      <p>EEA처럼 동의 양식이 뜨는 지역의 시작 상태와 왕복 시간은 재지 않았고, 기존 GMA SDK(Next-Gen 이전)의 콜백 스레드도 확인하지 않았습니다. Google의 Next-Gen 전면 광고 문서와 마이그레이션 가이드에는 콜백이 어느 스레드에서 오는지 적혀 있지 않습니다(2026년 11월 8일 확인). 마이그레이션 가이드가 스레드를 언급하는 곳은 SDK 초기화를 백그라운드에서 하라는 대목뿐입니다.</p>
+      <p>콜백이 스레드를 가리지 않는 일만 하는 코드(앞의 5107152)에는 이 수정이 필요 없습니다. 광고 설계 문서의 10월 4일 기록에 따르면 사이드로드한 S20은 Play 응답이 3.34초여서 어느 쪽이든 콜드 스타트 광고가 없었고, S21은 두 번째 실행부터 콜드 스타트 광고를 띄웠습니다. S21의 Play 지연은 재지 않았습니다.</p>
+    </section>
+
+    <section aria-labelledby="procedure">
+      <h2 id="procedure">SDK 콜백을 붙일 때 거치는 다섯 단계</h2>
+      <ol>
+        <li>광고 SDK 콜백 본문을 모두 찾아, 화면 이동·생명주기·뷰를 건드리는 호출을 표시합니다. <code>rg -n "onAd(Showed|Dismissed|FailedToShow)FullScreenContent"</code>로 시작하면 됩니다.</li>
+        <li>표시한 호출은 메인 루퍼 Handler로 넘기고, 같은 광고의 콜백은 모두 같은 Handler에 넣어 도착 순서를 유지합니다.</li>
+        <li>콜백을 다른 스레드에서 부르는 테스트를 만듭니다. 컨트롤러의 가짜 광고는 Handler 아래를 통째로 건너뛰므로, <code>GmaFullScreen</code> 같은 SDK 쪽 함수를 직접 부르는 Robolectric 테스트여야 합니다. 이 모듈에는 아직 Robolectric 의존성이 없고, 함수가 닫힘까지 기다리므로 스레드에서 <code>onDismissed()</code>도 이어서 불러야 합니다. 아래는 실행해 보지 않은 스케치입니다.
+          <pre><code>var onMain: Boolean? = null
+// SDK처럼 다른 스레드에서 표시와 닫힘을 부르고, 그 스레드가 끝날 때까지 기다린다
+install = { cb -> thread(name = "fake-GMA(BG)") { cb.onShowed(); cb.onDismissed() }.join() },
+onAppeared = { onMain = Looper.myLooper() == Looper.getMainLooper() },
+// 메인 루퍼에 쌓인 post를 비운 뒤
+shadowOf(Looper.getMainLooper()).idle()
+assertEquals(true, onMain)  // mainHandler.post를 지우면 false</code></pre></li>
+        <li>디버그 빌드를 테스트 광고 단위로 띄워 전면 광고가 실제로 뜨는 지점까지 여정을 돌립니다. 이 앱의 여정은 첫 실행, 콜드 스타트, 홈 키 뒤 35초 만에 복귀, 사진 선택기 열고 35초 뒤 취소, 첫 작업 뒤 [처음으로], 둘째 작업 뒤 [처음으로] 여섯 단계입니다. 끝에 <code>adb logcat -b crash</code>에서 FATAL이 0건인지 확인합니다.</li>
+        <li>프로세스 시작 때 <code>canRequestAds()</code>, 동의 상태, 동의 왕복 시간, SDK 초기화 시간을 로그로 남기고, 스플래시 대기 여부와 예산은 그 숫자를 보고 정합니다. 이 앱이 남긴 줄은 아래와 같습니다(서로 다른 실행에서 모음).
+          <pre><code>GmaAdsAdapter: UMP at start: canRequestAds=false status=0 debugSettings=false
+GmaAdsAdapter: UMP consent update took 2246 ms
+GmaAdsAdapter: GMA initialized in 1295 ms, 4767 ms after process start
+AppOpen: app open skipped (cold): consent/SDK not ready in 2000 ms
+AppOpen: cold: entitlement answered in 4139 ms</code></pre></li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">465d85b에도 mainHandler.post를 지키는 테스트는 없습니다</h2>
+      <p>2026년 11월 7일 origin/main(465d85b) 기준으로, 이 수정을 지키는 것은 <code>GmaFullScreen.kt</code>의 주석과 광고 설계 문서의 한 문장뿐입니다. 누군가 <code>mainHandler.post</code>를 지워도 단위 테스트는 그대로 통과하므로, 위 3단계의 테스트를 넣는 것이 다음 할 일입니다. 콜드 스타트 대기 예산을 실기기 로그로 다시 정하는 백로그 C-12도 열려 있고, Play 권한 조회 대기를 줄일지는 운영자 결정을 기다리고 있습니다.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20GMA%20Next-Gen%20%EC%A0%84%EB%A9%B4%20%EA%B4%91%EA%B3%A0%20%EC%BD%9C%EB%B0%B1%EC%9D%80%20%EB%B0%B1%EA%B7%B8%EB%9D%BC%EC%9A%B4%EB%93%9C%20%EC%8A%A4%EB%A0%88%EB%93%9C%EC%97%90%EC%84%9C%20%EC%99%94%EB%8B%A4%3A%20%EC%82%AC%EC%A7%84%20%EC%95%B1%EC%9D%B4%20%EB%8B%A8%EC%9C%84%20%ED%85%8C%EC%8A%A4%ED%8A%B8%20243%EA%B0%9C%20%ED%86%B5%EA%B3%BC%20%EB%92%A4%20%EC%A3%BD%EC%9D%80%20%EA%B8%B0%EB%A1%9D">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>GMA Next-Gen 전면 광고 콜백은 어느 스레드에서 오나요?</summary><div><p>이 앱의 크래시 로그에서는 SDK의 백그라운드 스레드(<code>GMA(BG) 4</code>)였습니다. 확인한 공식 가이드(전면·앱 오프닝·배너·마이그레이션)는 이 점을 적지 않으므로, 콜백 안에서 UI를 건드리는 일은 메인 루퍼로 넘기는 편이 안전합니다.</p></div></details>
+        <details><summary>"setCurrentState must be called on the main thread" 크래시는 왜 나나요?</summary><div><p>Navigation의 <code>popBackStack()</code>을 메인이 아닌 스레드에서 부르자, 화면 생명주기를 바꾸는 <code>LifecycleRegistry</code>의 메인 스레드 검사가 예외를 던졌습니다. 이 앱에서는 광고 표시 콜백에서 HOME으로 돌아가는 호출이 원인이었습니다.</p></div></details>
+        <details><summary>UMP canRequestAds()가 앱 시작 때 false인데 정상인가요?</summary><div><p>이 앱의 측정에서는 동의가 필요 없는 환경에서도 매 콜드 스타트 시작 때 false, 상태 UNKNOWN이었습니다. 동의 갱신 요청이 끝나야 바뀌었고, 에뮬레이터에서 약 2.3초 걸렸습니다.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="/ax/google-ads-break-even-cpi/">Google Ads 앱 캠페인 4개에 $36.4, 설치 105건, ROAS 약 3%: CPI가 손익분기의 30배였다</a></li>
+        <li><a href="/ax/interstitial-frequency-timeline/">전면 광고 빈도를 기기 타임라인으로 정했다: 안내 퍼즐은 세지 않는다</a></li>
+        <li><a href="/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="/ax/ga4-test-device-filter/">GA4의 &#x27;어제 설치 19건&#x27;은 사실 8건이었다: 테스트 기기와 Play 사전 출시·심사 기기 걸러 내기</a></li>
+        <li><a href="/ax/docviewer-malicious-file-set/">문서 뷰어 악성 파일 세트: ZIP 폭탄·CFB 루프·XSS를 생성기로 만들어 테스트에 묶기</a></li>
+        <li><a href="/ax/claude-md-rule-incidents/">CLAUDE.md 규칙은 대개 사고에서 나왔고, 적은 뒤에도 같은 사고가 났다</a></li>
+      </ul>
+      <p><a href="/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="/ax/">AX 노트 전체 보기</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>한 가지 일을 간단하게 하는 Android 앱</p>
+        <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">앱</p>
+        <ul><li><a href="/apps/sugaralbum/">슈가앨범</a></li><li><a href="/apps/image-compress/">사진 용량 줄이기</a></li><li><a href="/apps/image-flip/">사진 반전·회전</a></li><li><a href="/apps/image-convert/">이미지 변환 JPG·PNG·WebP</a></li><li><a href="/apps/sugarspeller/">한글 띄어쓰기</a></li><li><a href="/apps/sugarclip/">SugarClip</a></li><li><a href="/apps/doc-viewer/">한글뷰어 슈가독</a></li><li><a href="/apps/sugarcard/">생생카드</a></li><li><a href="/apps/arrow-knots/">화살표 매듭풀기</a></li><li><a href="/apps/blocks/">한판블록</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">사이트</p>
+        <ul><li><a href="/apps/">모든 앱</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li><li><a href="/sitemap/">사이트맵</a></li><li><a href="/rss.xml">RSS 피드</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play 개발자 페이지</a></div>
+    </div>
+  </footer>
+</body>
+</html>
