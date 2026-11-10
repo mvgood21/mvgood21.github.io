@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vertex AI test costs: hard caps in code – SugarMount</title>
+  <meta name="description" content="Our evaluation runner stopped at 2,500 KRW, yet billing showed 2,956 KRW: its ledger counted only responses. Deploys now dry-run and a missing cap means zero.">
+  <meta name="robots" content="max-image-preview:large">
+  <link rel="canonical" href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">
+  <link rel="alternate" hreflang="ko" href="https://sugarmount21.com/ax/vertex-test-cost-hard-cap/">
+  <link rel="alternate" hreflang="en" href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">
+  <link rel="alternate" hreflang="x-default" href="https://sugarmount21.com/ax/vertex-test-cost-hard-cap/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Vertex AI test costs: hard caps in code – SugarMount">
+  <meta property="og:description" content="Our evaluation runner stopped at 2,500 KRW, yet billing showed 2,956 KRW: its ledger counted only responses. Deploys now dry-run and a missing cap means zero.">
+  <meta property="og:url" content="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">
+  <meta property="og:image" content="https://sugarmount21.com/assets/og/ax-vertex-test-cost-hard-cap-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="https://sugarmount21.com/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/svg+xml" href="https://sugarmount21.com/assets/favicon.svg">
+  <link rel="apple-touch-icon" href="https://sugarmount21.com/assets/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://sugarmount21.com/en/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/site.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=e2770b30">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/#article","headline":"Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults","description":"Our evaluation runner stopped at 2,500 KRW, yet billing showed 2,956 KRW: its ledger counted only responses. Deploys now dry-run and a missing cap means zero.","url":"https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/","mainEntityOfPage":"https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/","inLanguage":"en","articleSection":"Working with agents","datePublished":"2026-11-11T09:00:00+09:00","dateModified":"2026-11-11T09:00:00+09:00","image":["https://sugarmount21.com/assets/og/ax-vertex-test-cost-hard-cap-en.png","https://sugarmount21.com/assets/ax/cover/vertex-test-cost-hard-cap-en.webp","https://sugarmount21.com/assets/ax/vertex-test-cost-hard-cap-1-en.webp","https://sugarmount21.com/assets/ax/vertex-test-cost-hard-cap-2-en.webp"],"author":{"@id":"https://sugarmount21.com/#org"},"publisher":{"@id":"https://sugarmount21.com/#org"},"isPartOf":{"@id":"https://sugarmount21.com/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does a Firebase budget alert stop Vertex AI charges at the limit?","acceptedAnswer":{"@type":"Answer","text":"An alert alone doesn't stop billing. We have a function that switches features off at 50% and unlinks billing at 100%, but because alerts arrive late, the app function's daily limit comes first."}},{"@type":"Question","name":"Does lowering a Vertex AI quota cap spending?","acceptedAnswer":{"@type":"Answer","text":"Not in our test. Right after we cut the per-minute input token quota to 1,000, four requests of 1,581 tokens all succeeded."}},{"@type":"Question","name":"Is the Vertex AI countTokens call billed?","acceptedAnswer":{"@type":"Answer","text":"No; it isn't a generation call. Our pre-deploy check sends the single word \"ping\" just to see whether the model answers in that location."}},{"@type":"Question","name":"Does thinkingBudget 0 mean no thinking-token cost?","acceptedAnswer":{"@type":"Answer","text":"Not with 3.8 Flash. With 0 it still produced 50 to 166 thinking tokens per call on average, up to 526, billed at the output rate."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://sugarmount21.com/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://sugarmount21.com/en/ax/"},{"@type":"ListItem","position":3,"name":"Working with agents","item":"https://sugarmount21.com/en/ax/topic/workflow/"},{"@type":"ListItem","position":4,"name":"Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=e2770b30">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/vertex-test-cost-hard-cap/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-workflow">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/workflow/">Working with agents</a></li><li><span aria-current="page">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/vertex-test-cost-hard-cap-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX notes · How-to</span>
+      <h1>Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</h1>
+      <p class="lead">On every path where a coding agent can spend money, make a missing value mean zero, make deploys dry-run by default, and count usage by what gets billed.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Working with agents</span> <span aria-hidden="true">·</span> <span>10 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-11-11">November 11, 2026</time></p><!-- /build:meta -->
+      <p>Our model evaluation runner had a code cap that stopped it at 2,500 KRW (about $1.80 at 1,400 KRW per dollar). On October 11, 2026, the budget alert showed 2,956 KRW actually billed. Almost all of it went on the Vertex AI model evaluation an AI coding agent ran on October 8 and 9 (about 330 call attempts in the main run, plus follow-up runs) while choosing a model for AXFamily, a family schedule app that hadn't launched yet. The runner's ledger counted the responses it received, and it badly underestimated the output of 62 attempts that ended with no response, 61 of them on 3.8 Flash. After that, we went through each path where the agent could spend money and changed what happens when a value is missing.</p>
+      <p class="note">Sources: the AXFamily app repository's internal-test release plan (written Oct 9, corrected Oct 11), model evaluation notes, cost and security status doc, decision record, and commits cc54a82, 5c9e018 and 04a5cf3. Billed amounts come from the budget alert's costAmount; token counts come from Cloud Monitoring, priced at 1,400 KRW per dollar. Rechecked against the repository on 2026-11-10. Times are KST. Project and billing account identifiers are left out.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (9)</summary><ol><li><a href="#ledger-gap">A 2,500 KRW stop line in code, 2,956 KRW on the bill</a></li><li><a href="#plan-estimate">The plan&#x27;s 1,700 KRW estimate came from the ledger</a></li><li><a href="#quota-test">A quota lowered to 1,000 let all 4 requests through</a></li><li><a href="#defaults">A default for each path that spends money</a></li><li><a href="#discarded">budget-guard logged four 429s after its redeploy</a></li><li><a href="#exceptions">The circuit breaker defaults the other way</a></li><li><a href="#how-to">Seven defaults that spend nothing when a value is missing</a></li><li><a href="#next">Still open: the 10,000 KRW custom budget is pending</a></li><li><a href="#faq">FAQ</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#ledger-gap">A 2,500 KRW stop line in code, 2,956 KRW on the bill</a></li><li><a href="#plan-estimate">The plan&#x27;s 1,700 KRW estimate came from the ledger</a></li><li><a href="#quota-test">A quota lowered to 1,000 let all 4 requests through</a></li><li><a href="#defaults">A default for each path that spends money</a></li><li><a href="#discarded">budget-guard logged four 429s after its redeploy</a></li><li><a href="#exceptions">The circuit breaker defaults the other way</a></li><li><a href="#how-to">Seven defaults that spend nothing when a value is missing</a></li><li><a href="#next">Still open: the 10,000 KRW custom budget is pending</a></li><li><a href="#faq">FAQ</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="ledger-gap">
+      <h2 id="ledger-gap">A 2,500 KRW stop line in code, 2,956 KRW on the bill</h2>
+      <p>For each call, the runner added the cost from the response's <code>usageMetadata</code> to a ledger and refused to make the next call once the total passed 2,500 KRW. Attempts that ended without a response were counted at an estimated 1,500 output tokens each. When the evaluation finished, the ledger held 918.1 KRW from responses plus 666 KRW for 62 such attempts (61 of them on 3.8 Flash), 1,584.2 KRW in total. It never reached the stop line.</p>
+      <p>On October 11 the agent read the budget alert during an operations audit: 2,956 KRW for October. Pricing Cloud Monitoring's token counts for October 6 to 11 gives about 3,490 KRW, and about 72% of that, roughly 2,520 KRW, is 3.8 Flash output. The ledger had 595.6 KRW for 3.8 Flash, and that figure already included thinking tokens. So no further 3.8 Flash tests were run.</p>
+      <p>The three numbers cover slightly different ground. The 1,584.2 KRW ledger covers the main evaluation only; the 2,956 KRW bill and the token counts also include follow-up runs on October 9 (229.7 KRW by the ledger plus about 2.7 KRW for the quota test, about 232 KRW in all). We haven't confirmed why the token-count estimate of about 3,490 KRW is higher than the 2,956 KRW billed. The cost status doc only notes that billing may not have caught up yet and that the real total could rise to around 3,500 KRW.</p>
+      <figure class="ax-fig"><img src="/assets/ax/vertex-test-cost-hard-cap-1-en.webp" width="1200" height="694" alt="Bar chart: the evaluation ledger read 918 KRW from responses and 1,584 KRW with the cut-off estimate, below the 2,500 KRW stop line, while billing showed 2,956 KRW and token counts priced out at about 3,490 KRW." loading="lazy"><figcaption>While the ledger sat below the stop line, billing had already passed it.</figcaption></figure>
+      <p>In one run, 17% of 3.8 Flash attempts (10 of 59) went past the 60-second timeout, and a request the client abandons returns no response and so no usage. The agent had even written in the evaluation notes that it could not confirm from public docs whether the server keeps processing and billing a request the client dropped at 60 seconds. The cap still priced each of those attempts at only 1,500 output tokens.</p>
+      <p>The app's Cloud Function had a hole of the same kind. It counted output tokens from <code>candidatesTokenCount</code> alone, but 3.8 Flash produced thinking tokens even with <code>thinkingBudget</code> set to 0: 50 to 166 per call on average, up to 526. Thinking tokens are billed at the output rate. Commit 5c9e018 (Oct 11, 14:17) made output tokens the sum of response and thinking tokens. If the response token count is missing, the new code doesn't build a number from thinking tokens alone; it returns <code>null</code>, and that call is charged against the full unit cap. That rule was already in place, because returning 0 would leave the token budget open. The evaluation notes gained a line saying the ledger is a lower bound and is never used to judge cost, and the remaining ten or fewer real calls were limited to 3.5 Flash-Lite at 2 to 3 KRW each.</p>
+    </section>
+
+    <section aria-labelledby="plan-estimate">
+      <h2 id="plan-estimate">The plan's 1,700 KRW estimate came from the ledger</h2>
+      <p>The agent wrote the internal-test release plan (04a5cf3) at 18:35 on October 9. Its second conclusion read: keep costs near zero with hard caps in code; budget alerts arrive hours late, so treat them as a backup. Its fifth conclusion put expected test spend at about 1,700 KRW, worst case 8,000 KRW plus whatever the alert delay lets through, and the cost table's first row put the evaluation already spent at the ledger value, 504 KRW, in a column labelled "confirmed". The total came to about 1,726 KRW.</p>
+      <p>By billing, 2,956 KRW had been spent before the plan was written; the running total had been flat since the morning of October 9. Had the test-period budget been created at 8,000 KRW as planned, the 50% line at 4,000 KRW would switch off AI, photo upload, notifications and media viewing, with only 1,044 KRW of room left.</p>
+      <p>On October 9 the operator lowered the monthly budget from 20,000 to 10,000 KRW, with two lines: switch features off at 50%, unlink billing at 100%. The agent applied the operator's October 11 instruction (features off at 5,000 KRW, billing unlinked at 10,000 KRW) to the test period's total in the plan as well. The status doc written that day explains why a monthly budget can't do it alone: it restarts from zero on November 1, so it can't cap a test that runs into November. The agent changed the planned custom-period budget to 10,000 KRW (October 8 to December 31, credits excluded) and added a correction under the plan's cost table.</p>
+    </section>
+
+    <section aria-labelledby="quota-test">
+      <h2 id="quota-test">A quota lowered to 1,000 let all 4 requests through</h2>
+      <p>On October 8 the per-model input token quotas for Vertex AI were lowered to 2,000,000 a day and 200,000 a minute, which put the worst day at roughly 3,000 to 4,000 KRW per model. On October 9 we tested whether the quota actually bites. With 3.5 Flash-Lite's per-minute input token quota set to 1,000, the granted value showed 1,000 within two seconds. Two requests with 1,581 input tokens went out, then two more two minutes later. All four returned 200, with no 429. The quota went straight back to 200,000; the test cost about 2.7 KRW.</p>
+      <p>We couldn't tell whether enforcement was delayed or whether this quota doesn't apply to calls on the global endpoint. Since then the quota doesn't count as a cost block, and the app function's daily limit is the first line.</p>
+    </section>
+
+    <section aria-labelledby="defaults">
+      <h2 id="defaults">A default for each path that spends money</h2>
+      <p>The evaluation runner, the deploy script, the production switches and CI are all paths the agent runs. For each one we decided what happens when a value is missing or wrong.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Path</th><th>When the value is missing or wrong</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td>Production deploy script</td><td>Dry-run (read only). A real deploy needs <code>--execute</code>; <code>--force</code> is an error</td><td>cc54a82</td></tr>
+          <tr><td>Deploy preflight</td><td>Any failed check stops the deploy. Model and location are confirmed with one free countTokens call</td><td>cc54a82</td></tr>
+          <tr><td>Daily AI service cap</td><td>0 (no AI). Test values: 10 units and 15 Vertex calls a day</td><td>Plan, function config</td></tr>
+          <tr><td>Production switches</td><td>Preflight fails if the AI or photo switches are on at deploy time</td><td>cc54a82</td></tr>
+          <tr><td>Model usage</td><td>No token count means the full unit cap. Output = response + thinking tokens</td><td>5c9e018</td></tr>
+          <tr><td>Test-period budget</td><td>Preflight error if the custom-period budget doesn't exist</td><td>5c9e018</td></tr>
+          <tr><td>CI</td><td>Only the demo emulator project. Deploy or login commands, or cloud credentials, fail the build</td><td>f43326e, e42f657</td></tr>
+        </tbody>
+      </table></div>
+      <p>Run with no arguments, the deploy script from cc54a82 (Oct 10, 15:20) collects facts, runs the preflight, prints the deploy commands and stops with "DRY-RUN: checks passed. Use --execute to deploy." (translated from Korean). The commit added 987 lines across 11 files, and its message lists 44 fixture tests for the checks. The preflight includes a countTokens call that sends the single word "ping" and isn't billed. A check of that kind the same day found that both models returned 404 in the locations this commit allowed (Seoul and Tokyo), and the operator picked global. What that did to the privacy policy is in <a href="/en/ax/ai-region-privacy-policy/">our note on the AI processing location in the privacy policy</a>.</p>
+      <p>Commands that change production settings were blocked by the agent's auto mode, so the operator ran them, and the result is checked with another dry-run preflight. Which clicks a person makes is covered in <a href="/en/ax/agent-permission-table/">the AI agent permission table note</a>.</p>
+      <figure class="ax-fig"><img src="/assets/ax/vertex-test-cost-hard-cap-2-en.webp" width="1200" height="638" alt="Comparison: budget alerts can arrive hours late and a quota cut to 1,000 still let all 4 requests through, while code defaults block spending with a dry-run deploy, a daily cap of 0 and missing usage counted as the unit cap." loading="lazy"><figcaption>Alerts and quotas are the backup; code defaults do the blocking.</figcaption></figure>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Capping%20Vertex%20AI%20test%20costs%3A%20a%202%2C500%20KRW%20stop%20line%20missed%20a%202%2C956%20KRW%20bill%2C%20so%20we%20changed%20the%20defaults">Email us</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="discarded">
+      <h2 id="discarded">budget-guard logged four 429s after its redeploy</h2>
+      <p>This project's budget alerts also go to Pub/Sub, where a budget-guard function switches off four features (AI, upload, notifications, media) at 50% of the budget and unlinks billing from the project at 100%. We still don't make it the first line. Alerts can arrive hours late, and the function itself can lag: after its October 10 redeploy it logged four "no available instance" 429s alongside 122 successful runs. Alerts are redelivered, so the block isn't lost.</p>
+    </section>
+
+    <section aria-labelledby="exceptions">
+      <h2 id="exceptions">The circuit breaker defaults the other way</h2>
+      <p>Zero-when-missing and dry-run-by-default fit only the side that spends money. The budget-guard function runs in test mode only when the <code>DRY_RUN</code> environment variable is exactly <code>true</code>; with it unset, it really switches features off and unlinks billing. A breaker that defaulted to test mode would block nothing the day someone forgot a setting.</p>
+      <p>None of this reaches services outside the Google Cloud budget. Photo storage on Cloudflare R2 and Workers is designed to be held by free-plan limits and a daily automatic pause (the Worker isn't deployed yet), watched by a $0.5 billing alert. Billing data shows up the next day, so while an evaluation runs the ledger is the only number you have. Keep its stop line well below the budget and estimate cut-off attempts generously. Once real users arrive, a test-period budget isn't enough and you need a per-day call cap; we did that for our spelling app in <a href="/en/ax/llm-explain-cost-limits/">the note on LLM explanation costs and limits</a>.</p>
+    </section>
+
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Seven defaults that spend nothing when a value is missing</h2>
+      <ol>
+        <li>Make any script that calls a paid command dry-run when run with no arguments, and act only on an explicit flag such as <code>--execute</code>. Don't accept <code>--force</code>.</li>
+        <li>Stop on any failed preflight check. Confirm model and location with a call that isn't billed, such as countTokens.</li>
+        <li>Set the server's daily AI cap to 0 in code, and close it when the config document is missing the value or holds a string. Refuse to deploy while the AI switch is on.</li>
+        <li>Count output as response plus thinking tokens, and count a call with no token count as the full unit cap, never 0.</li>
+        <li>Let the evaluation runner judge its stop line from the ledger, then compare against billing the next day and treat the ledger as a lower bound.</li>
+        <li>Set two budgets, monthly and a custom test period, and wire 50% to switching features off and 100% to unlinking billing. Make the deploy preflight fail if the custom-period budget is missing.</li>
+        <li>Keep CI on emulator projects only, and fail the build when deploy or login commands show up in the repository's scripts or workflows.</li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">Still open: the 10,000 KRW custom budget is pending</h2>
+      <p>The repository's cost status doc (updated October 11) still lists the 10,000 KRW custom-period budget as pending. The deploy preflight errors without it, so it has to exist before any production deploy. The 100% path that unlinks billing has been checked only by 13 unit tests and a permissions review; we haven't actually cut billing. Whether the cut-off 3.8 Flash requests were billed is still unconfirmed at the SKU level, because billing export isn't turned on.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Capping%20Vertex%20AI%20test%20costs%3A%20a%202%2C500%20KRW%20stop%20line%20missed%20a%202%2C956%20KRW%20bill%2C%20so%20we%20changed%20the%20defaults">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Does a Firebase budget alert stop Vertex AI charges at the limit?</summary><div><p>An alert alone doesn't stop billing. We have a function that switches features off at 50% and unlinks billing at 100%, but because alerts arrive late, the app function's daily limit comes first.</p></div></details>
+        <details><summary>Does lowering a Vertex AI quota cap spending?</summary><div><p>Not in our test. Right after we cut the per-minute input token quota to 1,000, four requests of 1,581 tokens all succeeded.</p></div></details>
+        <details><summary>Is the Vertex AI countTokens call billed?</summary><div><p>No; it isn't a generation call. Our pre-deploy check sends the single word "ping" just to see whether the model answers in that location.</p></div></details>
+        <details><summary>Does thinkingBudget 0 mean no thinking-token cost?</summary><div><p>Not with 3.8 Flash. With 0 it still produced 50 to 166 thinking tokens per call on average, up to 526, billed at the output rate.</p></div></details>
+      </div>
+    </section>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
+        <li><a href="/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
+        <li><a href="/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+      </ul>
+      <p><a href="/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/sitemap/">Site map</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>

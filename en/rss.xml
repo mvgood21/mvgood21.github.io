@@ -6,7 +6,224 @@
   <description>Small Android apps that each do one thing simply, from shrinking photos and opening Korean HWP documents to checking Korean spelling and playing puzzle games.</description>
   <language>en</language>
   <atom:link href="https://sugarmount21.com/en/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Tue, 10 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Wed, 11 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Game difficulty tests: two speed fixes that failed – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/spell-rain-difficulty-recall-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX Notes · Incident</span>
+      <h1>We slowed a mini game down twice before checking why it was hard: players couldn't recall the answers</h1>
+      <p class="lead">Beginners in Spell Rain were stuck on remembering the correct spelling, not on the falling speed. We changed the speed twice before a player model showed us that.</p>
+      <p>When we replayed the October 15, 2026 build (vc99, words falling in 24 seconds instead of 12) through a player model, the beginner profile lost a heart within the first minute in 100% of 300 runs. That build existed because the operator had said the on-screen keyboard covered half the sky and they "couldn't type anything." On the morning of October 17 the operator came back with "even 62 points is hard" and "I can't think of the answers." The rebuilt version (vc100) kept the model's beginner alive for 3.4 minutes and to level 3, but finished games in the first two weeks after release averaged level 2.0.</p>
+      <p class="note">Sources: git history of the <a href="https://sugarmount21.com/en/apps/sugarspeller/">SugarSpeller</a> repository (4867e24, 73d8ce8, 1948777, 78d7283), the October 14 to 17 working-session log, the release note, and the monitoring log (GA4, October 17 to 31). Constants were rechecked on the remote default branch on November 9, 2026.</p>
+    </section>
+    <section aria-labelledby="timeline">
+      <h2 id="timeline">Two speed changes in two days; after the first one, still too hard</h2>
+      <p>Spell Rain is a mini game inside SugarSpeller, our Korean spelling checker. Misspelled words fall from the top, for example 되요 (the common misspelling of 돼요, "it works"), and the player types the correct form to clear them. A word that reaches the ground costs one of five hearts; every 10 correct words raise the level. The first build on October 14 (4867e24) dropped a word every 3.2 seconds with a 12-second fall, and a code comment reasoned that typing "안 돼요" on a phone takes 2 to 4 seconds, so a first-timer would clear the first ten comfortably.</p>
+      <p>At 21:39 KST on October 15 the operator, playing on a real phone, said the keyboard halved the visible sky and the words came too fast, and asked for 50% slower. The agent answered "I'll halve the fall speed" and committed 73d8ce8 48 minutes later: 24-second fall, 9-second floor, a new word every 4 seconds. Slower words bunched up and overlapped on a Galaxy S20, so the same commit also forced consecutive words at least two lanes apart.</p>
+      <p>At 07:56 on October 17 the operator wrote that every word on screen is wrong, 62 points is hard, and the answers just don't come to mind. This time the agent named the cause: the screen only shows the wrong form, so a player who doesn't know where a word like 희안하다 is wrong can't type it no matter how much time there is. Then at 08:05 the operator also asked for slower words and fewer at once, and at 08:06 the agent changed the constants first: 30-second fall, 6-second spawn, three words on screen. A moment later the operator wrote again, roughly: you're supposed to be the level-design expert, do I have to keep asking like this, do it properly.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/spell-rain-difficulty-recall-1-en.webp" width="1200" height="920" alt="Step diagram: Oct 14 first build with a 12-second fall, Oct 15 21:39 'too fast', 22:28 vc99 with a 24-second fall, Oct 17 07:56 'can't think of the answers', 08:06 constants changed first, 08:08 to 08:27 a 300-run player model and commit 1948777." loading="lazy"><figcaption>The speed changed twice, and the player model only appeared after the second change.</figcaption></figure>
+    </section>
+    <section aria-labelledby="recall">
+      <h2 id="recall">An unknown word reaches the ground even with a 24-second fall</h2>
+      <p><code>SpellRainBalanceTest</code>, written at 08:08, runs the real game engine 300 times each with a beginner, an average and a skilled player model. The model looks at the lowest word first. If it knows the answer, it spends a recall time, a per-syllable typing time and a submit time; the beginner uses 2.5 s, 0.9 s per syllable and 0.8 s. Whether it knows a word is decided once per word: the beginner knows easy words with probability 0.80, medium 0.50 and hard 0.25. Words it doesn't know are left alone until a hint appears.</p>
+      <p>vc99 had no hints and no tiers, so every word could fall from level 1, and the screen showed only the wrong form: a player who doesn't already know the right one has nothing to work from. Over the 124 bundled words the model uses (hand-rated that day as 47 easy, 40 medium, 37 hard), the beginner knows about 54%. The other 46% reach the ground untyped whether the fall takes 12 seconds or 24, and each costs a heart. Slowing down only moves the moment the heart is lost, which is why this build's beginner lost a heart within the first minute in 100% of runs.</p>
+      <p>The October 15 complaint about speed was real (the keyboard did hide half the sky), but the recall problem sat underneath it the whole time.</p>
+      <p>vc100 added help with recall. Levels 1 and 2 use only easy words, levels 3 and 4 add medium ones, and level 5 opens everything. The differing letters of each wrong word are drawn red and underlined; the code comment says this tells the player where to fix the word but leaves how to them. Once a word passes the halfway line, the correct form appears faintly under it, and typing it then earns half points. Each level-up returns one heart, up to five.</p>
+      <p>The speed relief the operator asked for went in too. On October 15 the spawn interval had stopped at 4 seconds because doubling it seemed boring; this time it went to 6 seconds, and the on-screen cap went from 8 to 3 at level 1. Below are the options on record, plus the comparisons nobody ran:</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Option</th><th>Beginner model result</th><th>Decision and reason</th></tr></thead>
+        <tbody>
+          <tr><td>Speed only, halved (vc99, Oct 15)</td><td>1.1 min, level 1, 100% first-minute heart loss</td><td>Dropped: the operator played it and still found it hard</td></tr>
+          <tr><td>vc100 minus the level 1–2 easy-only rule and the level-up heart</td><td>3.2 min (08:14, 0.2 min below full vc100)</td><td>Both kept (two engine tests failed; the balance test still passed)</td></tr>
+          <tr><td>Full vc100</td><td>3.4 min, level 3, 0%</td><td>Adopted (Oct 17)</td></tr>
+          <tr><td>Remove only the hint, or only restore vc99 speed</td><td>Model not run</td><td>Never split, even inside the model</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+    <section aria-labelledby="typist-model">
+      <h2 id="typist-model">The first test modeled a typist who knows every answer</h2>
+      <p>The first build's test (4867e24), <code>처음_하는_사람도_첫_10개는_하트를_안_잃는다</code> ("a first-timer loses no heart in the first ten") assumes a player who looks at the lowest word and always types the correct answer 3.5 seconds later.</p>
+      <pre><code>if (typingUntil &lt; 0) typingUntil = e.elapsedMs + 3_500
+if (e.elapsedMs &gt;= typingUntil) {
+    assertEquals(Result.HIT, e.submit(e.lowest()!!.word.right))</code></pre>
+      <p>In that model the player knows everything, so the only difficulty knobs are fall time and spawn interval. When the operator said "too fast," those were the only numbers the agent had to turn. The October 17 model put the chance of not knowing into the same spot:</p>
+      <pre><code>// lowest first: a word it knows, or one already showing the hint
+val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
+    knows.getOrPut(d.id) { rnd.nextDouble() &lt; p.know(d.word.tier) } || d.hinted
+} ?: continue</code></pre>
+      <p>When players say a game is too hard, don't start by changing the speed. Write down the steps a player takes for one item (see, recall, type, submit) and put the probability of not knowing into the model first. The rule saved to the agent's project memory that day says the same: split difficulty feedback into speed, density, cognitive load and learning aids before touching numbers, and ship the change with a simulation table.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20We%20slowed%20a%20mini%20game%20down%20twice%20before%20checking%20why%20it%20was%20hard%3A%20players%20couldn%27t%20recall%20the%20answers">Email us</a></p></aside>
+    <section aria-labelledby="ai-wrong">
+      <h2 id="ai-wrong">The record says "reproduced, then tuned"; the session shows the reverse order</h2>
+      <p>The 1948777 commit message says the curve was tuned to targets after reproducing vc99 (beginner 86 points), and the changelog says the numbers were not changed by feel. The session log has a different order.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Oct 17, KST</th><th>Action</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>08:06</td><td>Constants changed (30 s, 6 s, three on screen)</td><td>No model yet</td></tr>
+          <tr><td>08:08</td><td>Balance test written, target assertions included</td><td>Before the first run</td></tr>
+          <tr><td>08:09</td><td>First run</td><td>Beginner 3.4 min, level 3, 675 points, 0% first-minute heart loss</td></tr>
+          <tr><td>08:10</td><td>Same model on the vc99 engine</td><td>Beginner 1.1 min, level 1, 86 points, 100%</td></tr>
+          <tr><td>08:14</td><td>Run with the level 1–2 easy-only rule and level-up heart removed</td><td>Two engine tests fail; beginner 3.2 min</td></tr>
+          <tr><td>08:27</td><td>Commit 1948777, internal test upload</td><td>Unit tests 531/531</td></tr>
+        </tbody>
+      </table></div>
+      <p>The constants were set before the model existed and never changed after the first run passed. The simulator checked a hand-picked curve; it did not find one. Because the targets were written before the first run, the check still means something, but anyone reading only the commit would assume the model produced the numbers.</p>
+      <p>The release note says the replay "matches the user's 62 points." In the vc99 replay the beginner's median score was 86, 24 points above what the operator scored by hand. The average and skilled profiles scored 216 and 1,066, so the beginner was simply the closest of the three; the model still played better than the person.</p>
+      <p>The operator's "I can't think of the answers" at 07:56 named the bottleneck first. Right after the 08:06 constant change the operator asked whether they had to keep asking like this, and instead of shipping another build for the operator to try, the agent wrote the balance test at 08:08.</p>
+    </section>
+    <section aria-labelledby="real-data">
+      <h2 id="real-data">Real players averaged level 2.0, below the model's 3</h2>
+      <p>Version 1.6.030 began a staged production rollout on October 17, and the November 1 review (78d7283) recorded GA4 numbers for October 17 to 31. 133 users opened the game (267 times), 87 started it (207 games), and 35 users finished 93 games, 45% of the games started. Finished games averaged level 189/93 = 2.0 and 127 seconds (2.1 minutes). The review marked the design target (beginner median of at least 3 minutes and level 3) as missed.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/spell-rain-difficulty-recall-2-en.webp" width="1200" height="586" alt="Bar chart: time survived per game is 1.1 minutes for the vc99 beginner model, 3.4 minutes for the vc100 beginner model, and a 2.1-minute average for finished games after release." loading="lazy"><figcaption>vc100 lasted 3.4 minutes in the model; finished games after release averaged 2.1 minutes.</figcaption></figure>
+      <p>The two numbers are not directly comparable. The model value is a median over 300 beginner runs; the field value is a mean over all players, beginners and experts mixed. <code>level</code> was registered in GA4 only as a metric, so no median was available, and <code>rain_over</code> counts only finished games.</p>
+      <p>The knowledge probabilities (0.80, 0.50, 0.25 for the beginner) and the word tiers were set by hand, and the only real score used to calibrate them was one person's 62 points. The model also has no screen: it knows nothing about the keyboard covering half the sky, which is where the October 15 complaint started.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">We copied the 73d8ce8 engine to replay the 62-point build</h2>
+      <ol>
+        <li>Write down the steps for one item and give each a time and a probability of not knowing. This game used recall, per-syllable typing, submit and hint-reading times, plus a knowledge probability per tier.</li>
+        <li>Take the engine from the build the person actually played and run the same model on it. Here the 73d8ce8 engine file was copied into the test folder under a new class name. If the result is far from their score, fix the model before the constants.</li>
+        <li>Write the targets as test assertions before the first run: here, at most 10% of beginner runs losing a heart in the first minute, a median of 3 minutes and level 3, average players at level 5 to 8, skilled players finishing within 25 minutes.</li>
+        <li>Pick constants after running the model. If you picked them first, as happened here, say so in the commit message.</li>
+        <li>Remove each device in turn and confirm the balance test fails, not just an engine test.</li>
+        <li>After release, log the same measures as events and register them so a median is available.</li>
+      </ol>
+      <p>The method of choosing difficulty numbers with a player model, with a full table of candidate values, is in <a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Puzzle game time limits: 3-star par by simulation</a>.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Still open: a 36-second easy stretch and a refit model</h2>
+      <p>The November 1 review set the next task: widen the easy stretch, for example by lengthening the level 1 and 2 fall from 30 to 36 seconds, and recalibrate <code>SpellRainBalanceTest</code>. On November 9 the remote default branch still has 30 seconds, 6 seconds and three words. The review's rule says that if the real median level is below 2, the simulator model gets refit to field data before the easy stretch grows, but that median can't be read yet because of how <code>level</code> was registered. The events also don't record hint use or missed words by tier, so a refit still couldn't correct the knowledge probabilities from field data.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20We%20slowed%20a%20mini%20game%20down%20twice%20before%20checking%20why%20it%20was%20hard%3A%20players%20couldn%27t%20recall%20the%20answers">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Can game difficulty balance be checked with test code?</summary><div><p>If the engine is plain logic with no Android dependency, a JUnit test can play hundreds of games through a player model. This game runs 300 games each for beginner, average and skilled profiles and asserts on median survival time and level.</p></div></details>
+        <details><summary>If players say a typing game is too hard, should I slow it down?</summary><div><p>Not if some items are ones players don't know: those reach the ground at any speed. Our earlier build lost a heart in the first minute in 100% of beginner-model runs even with a 24-second fall; the rebuild combined slower pacing with highlighted wrong letters, a halfway hint and easy words first.</p></div></details>
+        <details><summary>What do you calibrate a player model against?</summary><div><p>The build the complaining player actually played, and their score on it. We ran the same model on the vc99 engine the operator had scored 62 on, and it scored 86.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 11 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Vertex AI test costs: hard caps in code – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/vertex-test-cost-hard-cap-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · How-to</span>
+      <h1>Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</h1>
+      <p class="lead">On every path where a coding agent can spend money, make a missing value mean zero, make deploys dry-run by default, and count usage by what gets billed.</p>
+      <p>Our model evaluation runner had a code cap that stopped it at 2,500 KRW (about $1.80 at 1,400 KRW per dollar). On October 11, 2026, the budget alert showed 2,956 KRW actually billed. Almost all of it went on the Vertex AI model evaluation an AI coding agent ran on October 8 and 9 (about 330 call attempts in the main run, plus follow-up runs) while choosing a model for AXFamily, a family schedule app that hadn't launched yet. The runner's ledger counted the responses it received, and it badly underestimated the output of 62 attempts that ended with no response, 61 of them on 3.8 Flash. After that, we went through each path where the agent could spend money and changed what happens when a value is missing.</p>
+      <p class="note">Sources: the AXFamily app repository's internal-test release plan (written Oct 9, corrected Oct 11), model evaluation notes, cost and security status doc, decision record, and commits cc54a82, 5c9e018 and 04a5cf3. Billed amounts come from the budget alert's costAmount; token counts come from Cloud Monitoring, priced at 1,400 KRW per dollar. Rechecked against the repository on 2026-11-10. Times are KST. Project and billing account identifiers are left out.</p>
+    </section>
+    <section aria-labelledby="ledger-gap">
+      <h2 id="ledger-gap">A 2,500 KRW stop line in code, 2,956 KRW on the bill</h2>
+      <p>For each call, the runner added the cost from the response's <code>usageMetadata</code> to a ledger and refused to make the next call once the total passed 2,500 KRW. Attempts that ended without a response were counted at an estimated 1,500 output tokens each. When the evaluation finished, the ledger held 918.1 KRW from responses plus 666 KRW for 62 such attempts (61 of them on 3.8 Flash), 1,584.2 KRW in total. It never reached the stop line.</p>
+      <p>On October 11 the agent read the budget alert during an operations audit: 2,956 KRW for October. Pricing Cloud Monitoring's token counts for October 6 to 11 gives about 3,490 KRW, and about 72% of that, roughly 2,520 KRW, is 3.8 Flash output. The ledger had 595.6 KRW for 3.8 Flash, and that figure already included thinking tokens. So no further 3.8 Flash tests were run.</p>
+      <p>The three numbers cover slightly different ground. The 1,584.2 KRW ledger covers the main evaluation only; the 2,956 KRW bill and the token counts also include follow-up runs on October 9 (229.7 KRW by the ledger plus about 2.7 KRW for the quota test, about 232 KRW in all). We haven't confirmed why the token-count estimate of about 3,490 KRW is higher than the 2,956 KRW billed. The cost status doc only notes that billing may not have caught up yet and that the real total could rise to around 3,500 KRW.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/vertex-test-cost-hard-cap-1-en.webp" width="1200" height="694" alt="Bar chart: the evaluation ledger read 918 KRW from responses and 1,584 KRW with the cut-off estimate, below the 2,500 KRW stop line, while billing showed 2,956 KRW and token counts priced out at about 3,490 KRW." loading="lazy"><figcaption>While the ledger sat below the stop line, billing had already passed it.</figcaption></figure>
+      <p>In one run, 17% of 3.8 Flash attempts (10 of 59) went past the 60-second timeout, and a request the client abandons returns no response and so no usage. The agent had even written in the evaluation notes that it could not confirm from public docs whether the server keeps processing and billing a request the client dropped at 60 seconds. The cap still priced each of those attempts at only 1,500 output tokens.</p>
+      <p>The app's Cloud Function had a hole of the same kind. It counted output tokens from <code>candidatesTokenCount</code> alone, but 3.8 Flash produced thinking tokens even with <code>thinkingBudget</code> set to 0: 50 to 166 per call on average, up to 526. Thinking tokens are billed at the output rate. Commit 5c9e018 (Oct 11, 14:17) made output tokens the sum of response and thinking tokens. If the response token count is missing, the new code doesn't build a number from thinking tokens alone; it returns <code>null</code>, and that call is charged against the full unit cap. That rule was already in place, because returning 0 would leave the token budget open. The evaluation notes gained a line saying the ledger is a lower bound and is never used to judge cost, and the remaining ten or fewer real calls were limited to 3.5 Flash-Lite at 2 to 3 KRW each.</p>
+    </section>
+    <section aria-labelledby="plan-estimate">
+      <h2 id="plan-estimate">The plan's 1,700 KRW estimate came from the ledger</h2>
+      <p>The agent wrote the internal-test release plan (04a5cf3) at 18:35 on October 9. Its second conclusion read: keep costs near zero with hard caps in code; budget alerts arrive hours late, so treat them as a backup. Its fifth conclusion put expected test spend at about 1,700 KRW, worst case 8,000 KRW plus whatever the alert delay lets through, and the cost table's first row put the evaluation already spent at the ledger value, 504 KRW, in a column labelled "confirmed". The total came to about 1,726 KRW.</p>
+      <p>By billing, 2,956 KRW had been spent before the plan was written; the running total had been flat since the morning of October 9. Had the test-period budget been created at 8,000 KRW as planned, the 50% line at 4,000 KRW would switch off AI, photo upload, notifications and media viewing, with only 1,044 KRW of room left.</p>
+      <p>On October 9 the operator lowered the monthly budget from 20,000 to 10,000 KRW, with two lines: switch features off at 50%, unlink billing at 100%. The agent applied the operator's October 11 instruction (features off at 5,000 KRW, billing unlinked at 10,000 KRW) to the test period's total in the plan as well. The status doc written that day explains why a monthly budget can't do it alone: it restarts from zero on November 1, so it can't cap a test that runs into November. The agent changed the planned custom-period budget to 10,000 KRW (October 8 to December 31, credits excluded) and added a correction under the plan's cost table.</p>
+    </section>
+    <section aria-labelledby="quota-test">
+      <h2 id="quota-test">A quota lowered to 1,000 let all 4 requests through</h2>
+      <p>On October 8 the per-model input token quotas for Vertex AI were lowered to 2,000,000 a day and 200,000 a minute, which put the worst day at roughly 3,000 to 4,000 KRW per model. On October 9 we tested whether the quota actually bites. With 3.5 Flash-Lite's per-minute input token quota set to 1,000, the granted value showed 1,000 within two seconds. Two requests with 1,581 input tokens went out, then two more two minutes later. All four returned 200, with no 429. The quota went straight back to 200,000; the test cost about 2.7 KRW.</p>
+      <p>We couldn't tell whether enforcement was delayed or whether this quota doesn't apply to calls on the global endpoint. Since then the quota doesn't count as a cost block, and the app function's daily limit is the first line.</p>
+    </section>
+    <section aria-labelledby="defaults">
+      <h2 id="defaults">A default for each path that spends money</h2>
+      <p>The evaluation runner, the deploy script, the production switches and CI are all paths the agent runs. For each one we decided what happens when a value is missing or wrong.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Path</th><th>When the value is missing or wrong</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td>Production deploy script</td><td>Dry-run (read only). A real deploy needs <code>--execute</code>; <code>--force</code> is an error</td><td>cc54a82</td></tr>
+          <tr><td>Deploy preflight</td><td>Any failed check stops the deploy. Model and location are confirmed with one free countTokens call</td><td>cc54a82</td></tr>
+          <tr><td>Daily AI service cap</td><td>0 (no AI). Test values: 10 units and 15 Vertex calls a day</td><td>Plan, function config</td></tr>
+          <tr><td>Production switches</td><td>Preflight fails if the AI or photo switches are on at deploy time</td><td>cc54a82</td></tr>
+          <tr><td>Model usage</td><td>No token count means the full unit cap. Output = response + thinking tokens</td><td>5c9e018</td></tr>
+          <tr><td>Test-period budget</td><td>Preflight error if the custom-period budget doesn't exist</td><td>5c9e018</td></tr>
+          <tr><td>CI</td><td>Only the demo emulator project. Deploy or login commands, or cloud credentials, fail the build</td><td>f43326e, e42f657</td></tr>
+        </tbody>
+      </table></div>
+      <p>Run with no arguments, the deploy script from cc54a82 (Oct 10, 15:20) collects facts, runs the preflight, prints the deploy commands and stops with "DRY-RUN: checks passed. Use --execute to deploy." (translated from Korean). The commit added 987 lines across 11 files, and its message lists 44 fixture tests for the checks. The preflight includes a countTokens call that sends the single word "ping" and isn't billed. A check of that kind the same day found that both models returned 404 in the locations this commit allowed (Seoul and Tokyo), and the operator picked global. What that did to the privacy policy is in <a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">our note on the AI processing location in the privacy policy</a>.</p>
+      <p>Commands that change production settings were blocked by the agent's auto mode, so the operator ran them, and the result is checked with another dry-run preflight. Which clicks a person makes is covered in <a href="https://sugarmount21.com/en/ax/agent-permission-table/">the AI agent permission table note</a>.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/vertex-test-cost-hard-cap-2-en.webp" width="1200" height="638" alt="Comparison: budget alerts can arrive hours late and a quota cut to 1,000 still let all 4 requests through, while code defaults block spending with a dry-run deploy, a daily cap of 0 and missing usage counted as the unit cap." loading="lazy"><figcaption>Alerts and quotas are the backup; code defaults do the blocking.</figcaption></figure>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Capping%20Vertex%20AI%20test%20costs%3A%20a%202%2C500%20KRW%20stop%20line%20missed%20a%202%2C956%20KRW%20bill%2C%20so%20we%20changed%20the%20defaults">Email us</a></p></aside>
+    <section aria-labelledby="discarded">
+      <h2 id="discarded">budget-guard logged four 429s after its redeploy</h2>
+      <p>This project's budget alerts also go to Pub/Sub, where a budget-guard function switches off four features (AI, upload, notifications, media) at 50% of the budget and unlinks billing from the project at 100%. We still don't make it the first line. Alerts can arrive hours late, and the function itself can lag: after its October 10 redeploy it logged four "no available instance" 429s alongside 122 successful runs. Alerts are redelivered, so the block isn't lost.</p>
+    </section>
+    <section aria-labelledby="exceptions">
+      <h2 id="exceptions">The circuit breaker defaults the other way</h2>
+      <p>Zero-when-missing and dry-run-by-default fit only the side that spends money. The budget-guard function runs in test mode only when the <code>DRY_RUN</code> environment variable is exactly <code>true</code>; with it unset, it really switches features off and unlinks billing. A breaker that defaulted to test mode would block nothing the day someone forgot a setting.</p>
+      <p>None of this reaches services outside the Google Cloud budget. Photo storage on Cloudflare R2 and Workers is designed to be held by free-plan limits and a daily automatic pause (the Worker isn't deployed yet), watched by a $0.5 billing alert. Billing data shows up the next day, so while an evaluation runs the ledger is the only number you have. Keep its stop line well below the budget and estimate cut-off attempts generously. Once real users arrive, a test-period budget isn't enough and you need a per-day call cap; we did that for our spelling app in <a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">the note on LLM explanation costs and limits</a>.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Seven defaults that spend nothing when a value is missing</h2>
+      <ol>
+        <li>Make any script that calls a paid command dry-run when run with no arguments, and act only on an explicit flag such as <code>--execute</code>. Don't accept <code>--force</code>.</li>
+        <li>Stop on any failed preflight check. Confirm model and location with a call that isn't billed, such as countTokens.</li>
+        <li>Set the server's daily AI cap to 0 in code, and close it when the config document is missing the value or holds a string. Refuse to deploy while the AI switch is on.</li>
+        <li>Count output as response plus thinking tokens, and count a call with no token count as the full unit cap, never 0.</li>
+        <li>Let the evaluation runner judge its stop line from the ledger, then compare against billing the next day and treat the ledger as a lower bound.</li>
+        <li>Set two budgets, monthly and a custom test period, and wire 50% to switching features off and 100% to unlinking billing. Make the deploy preflight fail if the custom-period budget is missing.</li>
+        <li>Keep CI on emulator projects only, and fail the build when deploy or login commands show up in the repository's scripts or workflows.</li>
+      </ol>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Still open: the 10,000 KRW custom budget is pending</h2>
+      <p>The repository's cost status doc (updated October 11) still lists the 10,000 KRW custom-period budget as pending. The deploy preflight errors without it, so it has to exist before any production deploy. The 100% path that unlinks billing has been checked only by 13 unit tests and a permissions review; we haven't actually cut billing. Whether the cut-off 3.8 Flash requests were billed is still unconfirmed at the SKU level, because billing export isn't turned on.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Capping%20Vertex%20AI%20test%20costs%3A%20a%202%2C500%20KRW%20stop%20line%20missed%20a%202%2C956%20KRW%20bill%2C%20so%20we%20changed%20the%20defaults">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Does a Firebase budget alert stop Vertex AI charges at the limit?</summary><div><p>An alert alone doesn't stop billing. We have a function that switches features off at 50% and unlinks billing at 100%, but because alerts arrive late, the app function's daily limit comes first.</p></div></details>
+        <details><summary>Does lowering a Vertex AI quota cap spending?</summary><div><p>Not in our test. Right after we cut the per-minute input token quota to 1,000, four requests of 1,581 tokens all succeeded.</p></div></details>
+        <details><summary>Is the Vertex AI countTokens call billed?</summary><div><p>No; it isn't a generation call. Our pre-deploy check sends the single word "ping" just to see whether the model answers in that location.</p></div></details>
+        <details><summary>Does thinkingBudget 0 mean no thinking-token cost?</summary><div><p>Not with 3.8 Flash. With 0 it still produced 50 to 166 thinking tokens per call on average, up to 526, billed at the output rate.</p></div></details>
+      </div>
+    </section>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 11 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>Malicious file set for a document viewer – SugarMount</title>
     <link>https://sugarmount21.com/en/ax/docviewer-malicious-file-set/</link>
@@ -120,8 +337,8 @@ assumeTrue(dir != null &amp;&amp; dir.isDirectory)</code></pre></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -244,8 +461,8 @@ AppOpen: cold: entitlement answered in 4139 ms</code></pre></li>
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -380,12 +597,12 @@ print(len(ids))</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -508,8 +725,8 @@ answers per open  = quiz_answer(mode!=chat) events / quiz_open events</code></pr
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -623,12 +840,12 @@ adb reboot                       # clears the two log.tag values (an empty setpr
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -747,8 +964,8 @@ adb reboot                       # clears the two log.tag values (an empty setpr
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -851,8 +1068,8 @@ test('bidirectional cross-check against python cryptography', () async {
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -996,12 +1213,12 @@ while True:
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
         <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1154,8 +1371,8 @@ Report: what you fixed, what remains uncertain.</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1292,8 +1509,8 @@ private val codePopulated = setOf("com.example.Response#requestId")
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1401,8 +1618,8 @@ private val codePopulated = setOf("com.example.Response#requestId")
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1511,8 +1728,8 @@ private val codePopulated = setOf("com.example.Response#requestId")
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1613,8 +1830,8 @@ private val codePopulated = setOf("com.example.Response#requestId")
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1728,8 +1945,8 @@ thinkingConfig: { thinkingBudget: 0 },</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1837,12 +2054,12 @@ adb shell "dumpsys window | grep mCurrentFocus"</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1974,12 +2191,12 @@ adb -s emulator-5554 logcat -d -b crash</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2098,12 +2315,12 @@ How to apply: when setting or changing this campaign, the user's instruction bea
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Six hard rules in one subagent brief, and five agents cut off by usage limits</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2215,8 +2432,8 @@ edge = if (next &lt; edge) next else edge - 1 // strictly decreasing</code></pre
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2353,8 +2570,8 @@ git log --diff-filter=A --format="%h %ad %s" --date=iso -- &lt;scoring file&gt;
         <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2460,8 +2677,8 @@ POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2585,8 +2802,8 @@ print("first", shows[:1], "gaps", [b - a for a, b in zip(inter, inter[1:])],
         <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2707,12 +2924,12 @@ Severity is exactly one of Blocker, High, Medium, Low</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2836,8 +3053,8 @@ def diff(a_png, b_png, top=300, bottom=330):
         <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2970,8 +3187,8 @@ def diff(a_png, b_png, top=300, bottom=330):
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3088,12 +3305,12 @@ expect(all.sort()).toEqual(files.sort());</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3391,8 +3608,8 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3478,8 +3695,8 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3572,8 +3789,8 @@ git grep -nE "addOn(Complete|Success|Failure|Canceled)Listener\((this|requireAct
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3686,12 +3903,12 @@ depth(board):                   # peel
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
         <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3826,8 +4043,8 @@ depth(board):                   # peel
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3944,8 +4161,8 @@ if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4047,12 +4264,12 @@ git diff --name-only $(git merge-base &lt;base&gt; &lt;branch&gt;) &lt;branch&gt
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4143,8 +4360,8 @@ unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$TEST_PUB[~/][0-9]*" | sort -u | wc
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4280,8 +4497,8 @@ lifecycleScope.launch {
         <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4395,8 +4612,8 @@ lifecycleScope.launch {
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4495,12 +4712,12 @@ three_star = cleared and time &lt;= par(base, scale, floor) and mistakes &lt;= a
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
         <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4616,8 +4833,8 @@ print(pages.most_common(), "FAQ questions:", questions)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4734,8 +4951,8 @@ NOT_TEST = {"notExpression": {"orGroup": {"expressions": [
         <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
         <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4840,8 +5057,8 @@ export function cacheKey(api, group, original, corrected, model) {
         <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4967,12 +5184,12 @@ const gaps = await agent(CTX + CHECKLIST + final + dossier, { schema: CRIT })</c
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5087,8 +5304,8 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(":core
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5207,12 +5424,12 @@ git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --gre
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5352,8 +5569,8 @@ adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5485,8 +5702,8 @@ print("my app in results:", MY_APP in ids)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5613,8 +5830,8 @@ out of date:
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5732,8 +5949,8 @@ grep -rL --include='*Test.kt' -e 'assert' -e 'check(matches' app/src/</code></pr
         <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5874,8 +6091,8 @@ git log --until=2026-10-20 --format='%(trailers:key=Co-authored-by,valueonly)' \
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5981,8 +6198,8 @@ if (!BuildConfig.DEBUG) assertEquals(false, BuildConfig.FLAG_EDIT)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6144,12 +6361,12 @@ after_hint = win(board after the correct first move, 2 pieces left, lines it cle
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
         <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6263,12 +6480,12 @@ Schedule expires: YYYY-MM-DD / register again on: YYYY-MM-DD
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6409,8 +6626,8 @@ curl -s "$POLICY_URL" | grep -o 'data-policy-version="[0-9-]*"'</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6559,8 +6776,8 @@ font.save(dst)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6648,12 +6865,12 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6742,8 +6959,8 @@ expect(calls[0].contents).toContain(MARK);</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6863,8 +7080,8 @@ flutter test test/theme_matrix/ --dart-define=Y2_NO_SETTLE=true
         <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6987,223 +7204,10 @@ FlowRow(
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Wed, 21 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Parallel AI agents: 10 workstreams, 3 at a time – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/parallel-agent-workstreams/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/parallel-agent-workstreams/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/parallel-agent-workstreams-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · Measurement</span>
-      <h1>"Use hundreds of agents" in practice: 10 workstreams, 59 commits in a day, three running at once</h1>
-      <p class="lead">Only three code-writing agents ever ran at the same time. The limit came from 4 GB of free RAM and two shared phones, not from the model or from how many agents the operator allowed.</p>
-      <p>"Use hundreds of agents if you like, take as long as it needs, and analyze it properly." The operator wrote that at 4:08 pm on October 3 (Korea time), after deciding that <a href="https://sugarmount21.com/en/apps/arrow-knots/">Arrow Knots</a> had to grow from 300 levels to 1,000. That day the repository logged 59 commits, and ten workstreams (ws0 to ws9) had been merged from their own branches into one integration branch. Yet no more than three code-writing agents ever ran at once. The machine had 13 GB of RAM and only 4 GB of it free.</p>
-      <p class="note">Numbers come from the git history of SugarMount's game repository (sugar-game), counted per day in Korea time, including merge commits 206881a through 427cb92; the spec docs/09-parts-1000-spec.md and the implementation notes docs/09b-impl-notes.md; and a script that counted tool calls in the Claude Code session logs for this repository. Checked on October 21, 2026.</p>
-    </section>
-    <section aria-labelledby="request-vs-run">
-      <h2 id="request-vs-run">Hundreds were allowed; three wrote code at the same time</h2>
-      <p>A minute after the request, the agent started a design Workflow. Workflow is the Claude Code tool that runs many subagents from a single script. This run split the problem by topic (difficulty curve, zoom camera, in-game economy, visual design, store copy, localization) and used 24 agents between 16:09 and 17:01. Because nothing in that phase touched code, eleven of them ran in parallel in the first phase.</p>
-      <p>The merged spec was committed at 17:18; with a later addendum it is now 1,327 lines. In the implementation Workflow, started three minutes later, forty-one agents handled implementation, adversarial review, fixes and merges for 5 hours 6 minutes, until 22:27. Peak concurrency was three, in stage one: engine rules (ws0), the level generator (ws1), and strings plus build config (ws6). Stages two and three ran two at a time. Screen integration (ws7) and the test harness (ws8) ran alone. Store copy (ws9) went to a single subagent outside the Workflow, which started at 22:36 and finished in 11 minutes.</p>
-      <p>The agent picked the number three itself. Just before starting, it noted that the machine had 16 cores and 13 GB of RAM with 4 GB free, so it would cap Android builds at two or three at a time. One workstream agent checked memory at 17:28 and saw the same thing:</p>
-<pre><code>$ free -g
-               total        used        free      shared  buff/cache   available
-Mem:              13           8           2           0           2           4</code></pre>
-    </section>
-    <section aria-labelledby="two-days">
-      <h2 id="two-days">Commits, merges and agents on October 3 and 4</h2>
-      <p>Three sessions worked in this repository over those two days: the Arrow Knots session, an ads-and-release session, and the Block Turn session. The Agent and Workflow columns count calls those three sessions made directly; the last column counts agents launched inside each Workflow. Peak concurrency is the largest number of agents whose first and last log timestamps overlapped.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Date (KST)</th><th scope="col">Commits</th><th scope="col">Merge commits</th><th scope="col">Agent calls</th><th scope="col">Workflow runs</th><th scope="col">Agents inside Workflows (peak concurrent)</th></tr></thead>
-          <tbody>
-            <tr><td>Oct 3</td><td>59</td><td>11</td><td>11</td><td>2</td><td>design 24 (11), implementation 41 (3)</td></tr>
-            <tr><td>Oct 4</td><td>52</td><td>6</td><td>14</td><td>3</td><td>E2E fixes 10 (3), launch-prep research 150 (14)</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>All 11 merges on October 3 were workstream branches. The simulation workstream (ws2) went in twice because the generator was retuned, which is why there are 11 and not 10. On October 4, three merges were E2E fix branches and three brought in main. One of that day's three Workflow calls resumed the Block Turn research run, and its 150 is a count of log files, so retries are included.</p>
-      <p>Across this repository's six sessions (September 30 to October 17), the operator asked five times for lots of agents, with phrases like "dozens", "hundreds" and "as many as you like". The main sessions made 53 Agent calls in total, never more than 20 in one session, plus 10 Workflow runs.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20%22Use%20hundreds%20of%20agents%22%20in%20practice%3A%2010%20workstreams%2C%2059%20commits%20in%20a%20day%2C%20three%20running%20at%20once">Email us</a></p></aside>
-    <section aria-labelledby="bottlenecks">
-      <h2 id="bottlenecks">RAM, two phones and a file-ownership table set the pace</h2>
-      <p>Build memory was the first wall. The implementation notes say to run <code>./gradlew --max-workers=4</code> and to keep one Gradle build at a time per worktree. Every workstream had to pass the engine and app unit tests plus a debug build before each commit, so the number of parallel workstreams was the number of parallel Gradle builds. Research and design Workflows that never build are another matter: this repository ran six of them, and they reached 11 to 14 agents at once.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/parallel-agent-workstreams-1-en.webp" width="1200" height="624" alt="Bar chart: peak concurrent agents were 11 for design, 3 for implementation, 3 for E2E fixes and 14 for launch-prep research." loading="lazy"><figcaption>Workflows that changed code never ran more than three agents at once; design and research, which never build, reached 11 to 14.</figcaption></figure>
-      <p>The phones were a Galaxy S21 and a Galaxy S20, shared by five sessions: the three game-repository sessions plus two sessions from the utility-app repository. So the implementation notes said no workstream touches a device, and E2E happens later on the S21 only. On October 3 and 4 the three game sessions received 148 messages from other sessions, and 114 of them mentioned the S20 or S21. Many were plain turn-taking: "I need it for 10 minutes", "I'm done, it's yours". (From 16:14 to 17:17 that afternoon the S21 belonged to another app's session, running an HWP document-viewer benchmark. The Arrow Knots session lent it on condition that its app data and global settings such as font scale stayed untouched.)</p>
-      <p>Files got owners too. The workstream table in section 11 of the spec has an "Owns (exclusive)" column. The camera workstream (ws3) edits only Camera.kt, BoardView.kt and CameraMathTest.kt. The ads code and the shared platform module belonged to another session, so workstreams could only read them. Each workstream commits in its own git worktree, and only one integrator agent merges into the integration branch. Splitting agents across worktrees started with <a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a>; this time we added the ownership table.</p>
-    </section>
-    <section aria-labelledby="ai-errors">
-      <h2 id="ai-errors">Forty-one agents reported zero failures, and the app crashed on launch</h2>
-      <p>The implementation Workflow ended at 22:27 with "41 agents completed, none failed". Every workstream inside the Workflow except the simulation (ws2) had been through at least one adversarial review, and the final merge agent had passed the full JVM suite and a debug build. A minute later the app went onto the S21 and crashed right after launch. The level files were the cause: the Android build tool (aapt) strips a trailing <code>.gz</code> from asset names, so the file the code asked for wasn't in the APK. Commit 4d46413 at 22:31 shipped the level packs uncompressed and added a regression test that fails on any asset name ending in .gz.</p>
-      <p>The detailed E2E pass had 33 items and kept the S21 to itself from 00:36 to 01:41. Thirty-one passed. One failed (stutter while panning large boards), and one was skipped because a debug build can't show it. It turned up 10 bugs and design problems. The Workflow that fixed them used 10 agents, again three at a time, and its three fix branches were merged at 02:23.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/parallel-agent-workstreams-2-en.webp" width="1200" height="1296" alt="Timeline: request at 16:08 on October 3, 41 agents done with no failures at 22:27, crash on the S21 a minute later, fix commit 4d46413 at 22:31, E2E 00:36 to 01:41 with 31 of 33 items passing, three fix branches merged at 02:23." loading="lazy"><figcaption>A minute after 41 agents reported zero failures, the app crashed on the S21; device-only defects all landed in the E2E pass at the very end.</figcaption></figure>
-      <p>What the agent got wrong was the meaning of "done". Keeping workstreams off the phones was the right call. The cost was that 41 "done" reports meant only "JVM tests and compile pass", and every defect that shows up only on a device was pushed into a single queue at the very end. What caught it was one phrase in the operator's original request: install it on the S21 and run E2E. At 01:43 the operator also freed up the S20 for testing. That let a release-build random-input check (3,000 events × 3 seeds, zero crashes) run on the S20 alongside the fix Workflow.</p>
-      <p>Before deciding how many agents to launch, count how many builds and devices you can run at the same time.</p>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">Next experiment</h2>
-      <ul>
-        <li>Would four fit? This time free memory was only sampled a few times, whenever an agent happened to check. On the next parallel implementation run we will log available memory and the number of Gradle daemons every minute, to see whether three was a safety margin or wasted capacity.</li>
-        <li>A device lock instead of messages. Replace the 114 device-related messages with a single lock file (who, until when) and measure how much device waiting time drops.</li>
-        <li>Where 14 comes from. Five research Workflows all stopped at exactly 14 concurrent agents. We have not yet checked whether that is a tool setting.</li>
-      </ul>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20%22Use%20hundreds%20of%20agents%22%20in%20practice%3A%2010%20workstreams%2C%2059%20commits%20in%20a%20day%2C%20three%20running%20at%20once">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>How many Claude Code subagents can run in parallel?</summary><div><p>In this repository's logs, research Workflows that never build reached 14 agents at once. Implementation agents that run Gradle were capped at three to fit 4 GB of free RAM.</p></div></details>
-        <details><summary>Does a separate git worktree per agent remove conflicts?</summary><div><p>It reduces git conflicts, but contention for phones and memory remains. This run handled git with a per-workstream file-ownership table and a single integrator doing all merges; turns on the two phones were still negotiated in messages between sessions.</p></div></details>
-        <details><summary>How were ten workstreams merged in one day?</summary><div><p>The work was split into stages in dependency order. After each stage an integrator agent merged the branches one by one with --no-ff, then ran the unit tests and a debug build. That produced 11 merge commits between 19:10 and 22:47 on October 3.</p></div></details>
-      </div>
-    </section>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">An AI agent reported &quot;GA4: zero in 28 days&quot;; the table report had 43 users</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Leaving WSL for native Windows: a checklist for moving a Claude Code dev environment</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">Nine auto-compactions in a 13-day Claude Code session, and the memory index line that came back after each one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Wed, 21 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Play staged rollout API: 20% went out as 100% – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/play-staged-rollout-completed/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/play-staged-rollout-completed/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/play-staged-rollout-completed-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · Incident</span>
-      <h1>A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</h1>
-      <p class="lead">Once a production release is committed as completed, Play will not turn it back into a 20% rollout. Before you commit a staged rollout, read back its status and userFraction.</p>
-      <p>The line in the agent's terminal read <code>track production [('97 (1.6.029)', 'completed')]</code>, and the commit result was printed right under it. At 15:50 KST on October 11, 2026, a command meant to ship SugarSpeller 1.6.029 (versionCode 97) to 20% of the Google Play production track had just shipped it to everyone. Thirty-five seconds later, a request to set it back to 20% came back HTTP 403. The cause was one argument-count check in an upload script the agent had written. The next two versions, 1.6.030 and 1.6.031, went through the internal testing track, out to 20% of production, and up to 100% after a day of watching, on October 18 and 19.</p>
-      <p class="note">Sources: SugarSpeller's release records for 1.6.029, 1.6.030 and 1.6.031, commit <code>e64cd83</code>, the command output from that day's release session, and the Google Play Developer API docs (edits.tracks updated 2026-09-28, APKs and Tracks updated 2025-12-18). Rechecked on October 21, 2026.</p>
-    </section>
-    <section aria-labelledby="off-by-one">
-      <h2 id="off-by-one">The command got 0.2 and sent completed</h2>
-      <p>The agent ran <code>play3.py promote 97 "97 (1.6.029)" notes29.json production 0.2</code>. The trailing <code>0.2</code> was the rollout fraction. This is how the script picked it up:</p>
-      <pre><code>a=sys.argv; FR=None
-if a[1] in ("upload","promote") and len(a)&gt;(8 if a[1]=="upload" else 7): FR=a.pop()
-...
-**({"status":"inProgress","userFraction":float(FR)} if FR else {"status":"completed"})</code></pre>
-      <p>That command produces seven entries in <code>sys.argv</code>, counting the script name. The check wanted more than seven before it would take the fraction. Off by one, <code>FR</code> stayed empty, and the default for "no fraction" was <code>completed</code>. The upload branch was off by one the same way.</p>
-      <p>The script was never in the repository. The agent had made it earlier in the same session by patching an older script with sed, and since the internal-track upload passed no fraction, nothing had exposed the bug. (vc97 was itself a same-day rebuild. A deep check on a Galaxy S21 that afternoon found an old bug where launching with the screen off left the app stuck on a black splash, so vc96 was dropped and the fix went into a new build.)</p>
-    </section>
-    <section aria-labelledby="refused">
-      <h2 id="refused">The PUT back to 20% got 403 PERMISSION_DENIED</h2>
-      <p>The agent opened a new edit straight away and tried to set the production track to "vc97 inProgress 0.2, previous vc94 completed". Play answered:</p>
-      <pre><code>before [('97 (1.6.029)', 'completed', ['97'], None)]
-put [('97 (1.6.029)', 'inProgress', 0.2), ('94 (1.6.027)', 'completed', None)]
-HTTP 403 {
-  "error": {
-    "code": 403,
-    "message": "You cannot rollout this release because it does not allow any existing users to upgrade to the newly added APKs.",
-    "status": "PERMISSION_DENIED"
-  }
-}</code></pre>
-      <p>The edits.tracks reference defines <code>completed</code> as a release that "will have no further changes" and is served to all users. <code>userFraction</code> can only be set when the status is <code>inProgress</code> or <code>halted</code>, and must sit between 0 and 1. Nothing in the docs describes putting a fraction back on a release that has already gone to everyone, and we found no paragraph explaining this particular 403 message.</p>
-    </section>
-    <section aria-labelledby="ai-wrong">
-      <h2 id="ai-wrong">The agent printed completed and committed anyway</h2>
-      <p>There were two mistakes, and the second was bigger than the off-by-one above. The script printed the track from the PUT response as <code>track production [('97 (1.6.029)', 'completed')]</code> and went on to commit in the same run without checking it.</p>
-      <p>Afterwards the agent tried to fix the check with sed, and Claude Code's automatic permission check blocked the edit. The agent told the operator it would stop using that script and wrote the incident into the release record, which is commit <code>e64cd83</code> at 15:52.</p>
-      <p>That record says a hotfix was the only way to stop the rollout. The docs describe one more route. Per the "Halt a completed rollout" section of Google's APKs and Tracks guide, a completed release can be set to <code>halted</code> if the track already has an earlier published completed release; new users and existing users who update then get that earlier release. The completed release before 1.6.029 was vc94. We never tried this, so we do not know whether Play would have accepted it. What we did instead was add +1 day and +3 day stability rows to the monitoring doc. The late check on October 15 found no regression signal, though Play's crash numbers were out of reach because the reporting API lacked permissions.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/play-staged-rollout-completed-1-en.webp" width="1200" height="724" alt="Timeline: at 15:50 on October 11 vc97 was committed as completed, 35 seconds later the PUT back to 20% got HTTP 403, commit e64cd83 at 15:52, no regression signal on October 15." loading="lazy"><figcaption>1.6.029 was meant to reach 20% and was committed as completed; 35 seconds later Play refused to put it back with a 403.</figcaption></figure>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%2020%25%20staged%20rollout%20went%20out%20at%20100%25%3A%20a%20completed%20release%20in%20the%20Play%20Publisher%20API%20cannot%20go%20back%20to%20staged">Email us</a></p></aside>
-    <section aria-labelledby="internal-first">
-      <h2 id="internal-first">Internal track first, then promote the same build</h2>
-      <p>One rule was already two days old when this happened. On October 9, 1.6.026 went straight to 100% of production through the Publisher API, and the operator asked that next time the build go to internal testing first and be promoted from there. A sideloaded APK cannot show the Play path end to end: Play signing, billing, Play's automatic protection. The bundle is uploaded once, and production gets the same versionCode in a new edit.</p>
-      <p>1.6.029 did follow that order, but the fraction was lost in the second step, the promotion from internal to production. The two versions after it kept the fraction too.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Version</th><th scope="col">First production step</th><th scope="col">100%</th><th scope="col">Basis for the call</th></tr></thead>
-          <tbody>
-            <tr><td>1.6.029 (vc97)</td><td>Oct 11, completed (meant to be 20%)</td><td>from the start</td><td>late check Oct 15: no regression signal, crash numbers not seen</td></tr>
-            <tr><td>1.6.030 (vc102 → vc103)</td><td>Oct 17, inProgress 0.2</td><td>Oct 18</td><td>+1 day: zero crashes, no change to ad code</td></tr>
-            <tr><td>1.6.031 (vc105)</td><td>Oct 18, inProgress 0.2</td><td>Oct 19</td><td>+1 day: zero crashes, zero failed checks</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>The 20% day for 1.6.030 did not collect enough real users to compare anything. Most of the 1.6.030 users in GA4 were Play pre-launch report test devices and our own development phones. So the 100% call rested on zero crashes and a diff showing no ad code had changed.</p>
-    </section>
-    <section aria-labelledby="guard">
-      <h2 id="guard">The promotion script now never reads the fraction by position</h2>
-      <p>From 1.6.031 on, each version folder has its own <code>release_production.py</code>, and promotion goes through it. Trimmed to the core:</p>
-      <pre><code>commit = '--commit' in sys.argv          # dry run unless given
-fraction = float(sys.argv[sys.argv.index('--fraction') + 1]) if '--fraction' in sys.argv else 0.2
-edit = call('POST', f'{API}/edits', {})['id']
-done = False
-try:
-    internal = call('GET', f'{API}/edits/{edit}/tracks/internal')['releases']
-    new = [r for r in internal if r.get('versionCodes') == [NEW]]
-    if len(new) != 1:
-        sys.exit(f'vc{NEW} is not on internal')
-    prod = call('GET', f'{API}/edits/{edit}/tracks/production')['releases']
-    old = [r for r in prod if r.get('versionCodes') == [OLD] and r['status'] == 'completed']
-    if len(old) != 1:
-        sys.exit(f'no completed vc{OLD} on production')
-    call('PUT', f'{API}/edits/{edit}/tracks/production', {'track': 'production', 'releases': [
-        {'versionCodes': [NEW], 'status': 'inProgress', 'userFraction': fraction, ...},
-        old[0]]})
-    call('POST', f'{API}/edits/{edit}:validate')
-    if commit:
-        call('POST', f'{API}/edits/{edit}:commit'); done = True
-finally:
-    if not done:
-        call('DELETE', f'{API}/edits/{edit}')   # dry run or failure: throw the edit away</code></pre>
-      <p>(The real script's messages are in Korean; they are translated here.) Four things changed:</p>
-      <ul>
-        <li><code>status</code> is hard-coded as <code>inProgress</code>. A missing fraction cannot fall through to completed, and the fraction only changes through the named <code>--fraction</code> flag.</li>
-        <li>The internal testing track must hold exactly one release with that versionCode. A promotion that skipped internal stops here.</li>
-        <li>Production must hold exactly one completed release of the previous version. That is what the other 80% keep getting while the new release sits at 20%.</li>
-        <li>The default is a dry run: it validates and then deletes the edit. The only run that changes anything is the one with <code>--commit</code>, after the operator has checked. 1.6.031 shipped that way on October 18, after the operator confirmed.</li>
-      </ul>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/play-staged-rollout-completed-2-en.webp" width="1200" height="775" alt="Comparison: the old play3.py read the fraction by position and fell back to completed, while release_production.py hard-codes inProgress and runs dry unless given --commit." loading="lazy"><figcaption>With the current script a missing fraction cannot fall through to completed, and nothing ships without --commit.</figcaption></figure>
-      <p>The PUT body has the same shape as the request that got the 403 on October 11: new release inProgress, previous release completed. For 1.6.031 the new release had not been served to anyone yet, and this request passed validate and commit.</p>
-    </section>
-    <section aria-labelledby="prevention">
-      <h2 id="prevention">The rule now, and a check not yet in code</h2>
-      <p>If you give an agent permission to ship to production, do not let it use a script that takes the rollout fraction as a positional argument. Code that defaults to completed when the fraction is missing turns one slip into a full release. The rule now: uploads go to the internal testing track only, the operator installs from Play and checks, and then the same build is promoted. Promotion runs as a dry run first, sits at 20% of production for a day, and only then goes to 100%.</p>
-      <p>One line is still missing from the code. The project notes say to confirm, before commit, that the PUT response shows status inProgress and the right userFraction. The current script builds the PUT body itself and never reads the response. The next version of the script gets this check:</p>
-      <pre><code>tr = call('PUT', f'{API}/edits/{edit}/tracks/production', body)
-mine = [r for r in tr['releases'] if r.get('versionCodes') == [NEW]]
-if len(mine) != 1 or mine[0]['status'] != 'inProgress' or mine[0].get('userFraction') != fraction:
-    sys.exit(f'PUT response does not match: {mine}')   # stop before commit</code></pre>
-      <p>We will also write down the halt procedure from the docs at the next staged release, and check then whether a stray completed could send new installs back to the previous version without waiting for a hotfix build. Our release checks, in order, are in <a href="https://sugarmount21.com/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>, and the app itself is on the <a href="https://sugarmount21.com/en/apps/sugarspeller/">SugarSpeller</a> page.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%2020%25%20staged%20rollout%20went%20out%20at%20100%25%3A%20a%20completed%20release%20in%20the%20Play%20Publisher%20API%20cannot%20go%20back%20to%20staged">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Can a completed Play release be turned back into a staged rollout?</summary><div><p>We could not do it. The PUT that set the completed vc97 to inProgress 0.2 was refused with 403 PERMISSION_DENIED. The documented option left is to halt the completed release when the track has an earlier completed release, which we did not try, so we do not know if it works.</p></div></details>
-        <details><summary>How do you set userFraction in the Publisher API?</summary><div><p>In edits.tracks, give the release status inProgress and a userFraction between 0 and 1 (0.2 for 20%), then commit the edit. userFraction can only be set while the status is inProgress or halted. Put the previous completed release in the same releases array so the remaining users keep getting it.</p></div></details>
-        <details><summary>How do you take a staged rollout to 100%?</summary><div><p>In a new edit, change the same release's status to completed and commit. SugarSpeller does this after one day at 20% of production with zero crashes and zero failed checks: October 18 for 1.6.030 and October 19 for 1.6.031.</p></div></details>
-      </div>
-    </section>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-md-rule-incidents/">Most CLAUDE.md rules came from an incident, and some incidents came back anyway</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
     <pubDate>Wed, 21 Oct 2026 09:00:00 +0900</pubDate>
   </item>
