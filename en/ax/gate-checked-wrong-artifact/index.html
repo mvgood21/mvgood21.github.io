@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Release gates that checked the wrong input – SugarMount</title>
+  <meta name="description" content="A plaintext-signaling AAB passed one gate; another judged a classpath the intended build never used. How to match gate inputs and keep a must-fail fixture.">
+  <meta name="robots" content="max-image-preview:large">
+  <link rel="canonical" href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">
+  <link rel="alternate" hreflang="ko" href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">
+  <link rel="alternate" hreflang="en" href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">
+  <link rel="alternate" hreflang="x-default" href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="Release gates that checked the wrong input – SugarMount">
+  <meta property="og:description" content="A plaintext-signaling AAB passed one gate; another judged a classpath the intended build never used. How to match gate inputs and keep a must-fail fixture.">
+  <meta property="og:url" content="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">
+  <meta property="og:image" content="https://sugarmount21.com/assets/og/ax-gate-checked-wrong-artifact-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ko_KR">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="https://sugarmount21.com/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/svg+xml" href="https://sugarmount21.com/assets/favicon.svg">
+  <link rel="apple-touch-icon" href="https://sugarmount21.com/assets/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://sugarmount21.com/en/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/site.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=e2770b30">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/#article","headline":"Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define","description":"A plaintext-signaling AAB passed one gate; another judged a classpath the intended build never used. How to match gate inputs and keep a must-fail fixture.","url":"https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/","mainEntityOfPage":"https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/","inLanguage":"en","articleSection":"Testing and release","datePublished":"2026-11-12T09:00:00+09:00","dateModified":"2026-11-12T09:00:00+09:00","image":["https://sugarmount21.com/assets/og/ax-gate-checked-wrong-artifact-en.png","https://sugarmount21.com/assets/ax/cover/gate-checked-wrong-artifact-en.webp","https://sugarmount21.com/assets/ax/gate-checked-wrong-artifact-1-en.webp","https://sugarmount21.com/assets/ax/gate-checked-wrong-artifact-shot1-en.webp","https://sugarmount21.com/assets/ax/gate-checked-wrong-artifact-2-en.webp"],"author":{"@id":"https://sugarmount21.com/#org"},"publisher":{"@id":"https://sugarmount21.com/#org"},"isPartOf":{"@id":"https://sugarmount21.com/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Can flutter build --dart-define change Android dependencies?","acceptedAnswer":{"@type":"Answer","text":"It can, depending on the plugin. google_mobile_ads 9.1.0 reads USE_NEXT_GEN_SDK from the Gradle property dart-defines and attaches either the Next-Gen or the Legacy ad SDK, so a separate Gradle call needs the same values through -Pdart-defines to resolve the same dependencies."}},{"@type":"Question","name":"Does USE_NEXT_GEN_SDK=false give you the Legacy SDK?","acceptedAnswer":{"@type":"Answer","text":"Not in 9.1.0. The plugin treats any non-empty string as true, so 'false' still means Next-Gen; to get Legacy you have to leave the key out."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://sugarmount21.com/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://sugarmount21.com/en/ax/"},{"@type":"ListItem","position":3,"name":"Testing and release","item":"https://sugarmount21.com/en/ax/topic/quality/"},{"@type":"ListItem","position":4,"name":"Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=e2770b30">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="Main menu">
+        <a class="nav-apps" href="/en/apps/">Apps</a>
+        <a class="nav-ax" href="/en/ax/" aria-current="page">AX notes</a>
+        <a class="nav-about" href="/en/about/">About</a>
+        <a class="nav-privacy" href="/en/privacy/">Privacy policies</a>
+      </nav>
+      <a class="lang" href="/ax/gate-checked-wrong-artifact/" lang="ko" hreflang="ko">한국어</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>Menu</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="Full menu">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">Close</button>
+      <p class="menu-title" id="m-photo">Photo &amp; video</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
+      <p class="menu-title" id="m-document">Documents &amp; text</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">Everyday</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li></ul>
+      <p class="menu-title" id="m-games">Games</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/en/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Arrow Knots</span></a></li><li><a class="app-tile" data-app="blocks" href="/en/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Block Turn</span></a></li></ul>
+      <p><a href="/en/apps/">See all apps</a></p>
+      <ul class="menu-links"><li><a href="/en/ax/" aria-current="page">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-quality">
+    <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/en/">SugarMount</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/ax/topic/quality/">Testing and release</a></li><li><span aria-current="page">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/gate-checked-wrong-artifact-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</h1>
+      <p class="lead">A plaintext-signaling AAB passed one of our release gates, and another gate's ad SDK check compared a dependency list (classpath) the intended release never used. Both gates read inputs built next to the release, not the release.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Testing and release</span> <span aria-hidden="true">·</span> <span>10 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-11-12">November 12, 2026</time></p><!-- /build:meta -->
+      <p>An Android app bundle (AAB) built from a development config, one our own deployment doc called "not for submission", got a PASS from a release gate. That was September 13, 2026, in our Flutter peer-to-peer chat app. The server address was localhost, and the signaling that sets up connections ran unencrypted. A month later, in AXFamily, a family schedule app, the gate's ad SDK check turned out to be comparing a dependency list from a different build than the one we meant to ship.</p>
+      <p>We built both gates with an AI coding agent, and both judged an input produced next to the release instead of the release itself. If you read a green gate as proof the release was checked, the first question is what that PASS actually read.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>Contents (9)</summary><ol><li><a href="#chat-plaintext">A plaintext-signaling AAB passed</a></li><li><a href="#axfamily-classpath">AXFamily&#x27;s gate judged another ad SDK</a></li><li><a href="#cause-chain">One command made the snapshot too</a></li><li><a href="#wrong-assumption">The missing check was in the decision record</a></li><li><a href="#alternatives">Required values, not banned strings</a></li><li><a href="#limits">Checks that read a side file skip locally</a></li><li><a href="#next">The fixed gate inputs have no tests</a></li><li><a href="#fixture-procedure">One must-fail fixture per gate</a></li><li><a href="#faq">FAQ</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">Contents</p><ol><li><a href="#chat-plaintext">A plaintext-signaling AAB passed</a></li><li><a href="#axfamily-classpath">AXFamily&#x27;s gate judged another ad SDK</a></li><li><a href="#cause-chain">One command made the snapshot too</a></li><li><a href="#wrong-assumption">The missing check was in the decision record</a></li><li><a href="#alternatives">Required values, not banned strings</a></li><li><a href="#limits">Checks that read a side file skip locally</a></li><li><a href="#next">The fixed gate inputs have no tests</a></li><li><a href="#fixture-procedure">One must-fail fixture per gate</a></li><li><a href="#faq">FAQ</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="chat-plaintext">
+      <h2 id="chat-plaintext">A plaintext-signaling AAB passed</h2>
+      <p>Before building, the chat app's release workflow checked its dart-define file (the key=value settings Flutter compiles into the app) with one line:</p>
+      <pre><code>grep -Eq 'example\.invalid|CHANGE_ME' "$f"   # fail if found</code></pre>
+      <p>The production config still had a placeholder host, so it was blocked. The development config points at localhost with TLS off, but contains neither string, so it passed. On September 13, CI built a 43 MB test AAB from exactly that config, signed with the upload key, and the bundle verification script said PASS.</p>
+      <p>The deployment doc written that day called the AAB "a pipeline test build, not for submission", and still summarized that there were no blockers left on the code side. Per the repository's own release rules, nothing outside the app config stops plaintext <code>ws://</code> signaling, so the same workflow could have shipped a signed, submittable AAB with plaintext signaling.</p>
+      <p>The cross-check two days later opens with its reason: judging whether to ship from documents its own author wrote would be self-confirmation, not a cross-check. So it didn't rely on the deployment doc's claims, re-measured the repository, and concluded "not ready to ship yet" (held back by three operational decisions, with three defects found along the way).</p>
+      <p>That night, commit 184e5ee put the same rule into both the workflow and the verification script: TLS must be on, and an empty host, localhost, or a private, loopback or link-local IP fails. A pipeline rehearsal has to turn on <code>allow_insecure_signaling</code>, a flag that defaults to false, and then passes with a warning. Six fixtures (inputs made on purpose to test the rule) were run by hand and the results written into the doc; a re-run of the same check appears further down.</p>
+      <p>The same commit fixed the signature check. The certificate tool keytool writes its errors to standard output, so the 'could not read signature' branch never ran and the script quit without a reason, skipping the checks after it. No bad build got through. The script now looks for the certificate owner line (<code>Owner:</code>). The crypto tests CI skipped that night are covered in <a href="/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green</a>.</p>
+      <figure class="ax-fig"><img src="/assets/ax/gate-checked-wrong-artifact-1-en.webp" width="1200" height="658" alt="Comparison: what the two gates read before the fixes (a classpath without dart-defines, placeholder strings) versus the inputs that built the releases." loading="lazy"><figcaption>Before the fixes, the two gates looked only at a classpath listed without dart-defines and at placeholder strings.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="axfamily-classpath">
+      <h2 id="axfamily-classpath">AXFamily's gate judged another ad SDK</h2>
+      <p>AXFamily shows ads through the google_mobile_ads 9.1.0 plugin, which picks the Android ad SDK from the build's dart-defines. Its build.gradle decodes the Gradle property <code>dart-defines</code> (base64-encoded <code>KEY=VALUE</code> pairs joined by commas) and decides like this:</p>
+      <pre><code>def useNextGenSdk = dartEnvironmentVariables.USE_NEXT_GEN_SDK ? dartEnvironmentVariables.USE_NEXT_GEN_SDK : false</code></pre>
+      <p>With a value you get the Next-Gen SDK (ads-mobile-sdk); without one, the Legacy SDK (play-services-ads). <code>flutter build</code> hands dart-defines to Gradle through that property. Call Gradle on its own and the property isn't there, so you always get Legacy.</p>
+      <p>Commit 5427191 added the gate on October 9 in four steps: wipe the build folder, build a fresh AAB, have Gradle list the release dependencies, then judge. Step three passed no dart-defines. Whatever values built the AAB, the gate judged the Legacy list, and the committed reference list (the snapshot) it compared against came from the same command, so the comparison could only ever match.</p>
+      <p>The dart-define check was off the other way. The gate only accepted keys on its allow list, and <code>USE_NEXT_GEN_SDK</code> wasn't on it.</p>
+      <p>The build that survived 2,000 random-input events on a Galaxy S21 that day was Next-Gen. The only build this gate could pass was Legacy, which that test never touched, and the verified config would have been blocked for carrying an unknown key.</p>
+      <p>On October 10, commit c38703b made step three pass the same values as the AAB build, as <code>-Pdart-defines</code> in the format flutter build uses, without printing the values. The dart-define check now accepts <code>USE_NEXT_GEN_SDK</code> only when it is exactly 'true'. The plugin's ternary follows the truthiness rules of Groovy, the language build.gradle is written in, where any non-empty string is true, so 'false' also gives you Next-Gen.</p>
+      <p>Regenerating the snapshot with the fixed command changed it as below, and the tests gained three cases that must fail: 'false', an empty string, and a missing key.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Snapshot lines that changed</th><th>Before</th><th>After</th></tr></thead>
+        <tbody>
+          <tr><td>Lines</td><td>211</td><td>214 (5 removed, 8 added)</td></tr>
+          <tr><td>Ad SDK</td><td>play-services-ads, play-services-ads-api</td><td>ads-mobile-sdk</td></tr>
+          <tr><td>Companions</td><td>3 measurement and ad-services modules</td><td>6 Cronet (Chrome's network stack) modules, kotlinx-coroutines-guava</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section aria-labelledby="cause-chain">
+      <h2 id="cause-chain">One command made the snapshot too</h2>
+      <p>On the AXFamily side the cause had three layers. The gate listed dependencies with a different command from the one that built the release, and since the plugin picks dependencies from dart-defines, that changed the result. The commit that added the gate shows no check that the two commands got the same inputs. The last layer is that the reference, the snapshot and the test fixture, came out of that same command. There's no record of a full gate run before the fix.</p>
+      <p>In the chat app, the development config already in the repository did go through the gate, but until the fix nobody treated it as an input that had to fail.</p>
+      <p>About six and a half hours before c38703b, commit 1fcc1e1 gave the AXFamily gate a step that opens the AAB's dex files (the compiled app code) and libapp.so (where Flutter's compiled Dart code lives) directly to make sure no end-to-end test mode leaked in. The gate already had a way to read the release, and the SDK list was still judged from a Gradle report.</p>
+    </section>
+
+    <section aria-labelledby="wrong-assumption">
+      <h2 id="wrong-assumption">The missing check was in the decision record</h2>
+      <p>AXFamily's October 5 decision record already had the condition: Next-Gen is opt-in, so CI pins <code>USE_NEXT_GEN_SDK=true</code> and checks that the release APK contains ads-mobile-sdk. The item's status is "recommendation, presumed accepted": one the operator did not object to. The backlog's acceptance criteria asked for the same dart-define. The October 9 gate had neither, and committed a Legacy list as its snapshot instead.</p>
+      <p>Both gates, both fixes, and the wrong deployment summary all came from commits co-authored by Claude. The cross-check doc, not a person, corrected the summary; on the record the human part ends at not objecting to the decision record's recommendation.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Our%20release%20gates%20were%20checking%20something%20other%20than%20the%20release%3A%20a%20plaintext%20AAB%20and%20one%20missing%20dart-define">Email us</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">Required values, not banned strings</h2>
+      <p>Had we only added localhost to the placeholder list, 192.168.0.10 and 172.20.1.5 from the fixtures would still pass with TLS on. Instead of listing addresses to block, the fix requires what a release must have (TLS on, a public host), and because the pipeline still needs rehearsals, the exception opens only through the default-false flag.</p>
+      <p>For AXFamily, the gate could have accepted any non-empty <code>USE_NEXT_GEN_SDK</code>. That matches the plugin, but a config reading 'false' would produce a Next-Gen build and the gate would say nothing. Only an exact 'true' passes.</p>
+    </section>
+
+    <section aria-labelledby="limits">
+      <h2 id="limits">Checks that read a side file skip locally</h2>
+      <p>The chat app's new TLS check and the older dart-define record check don't open the AAB. They read <code>dart_defines.txt</code>, a record the workflow writes from the config and leaves next to the AAB. Run the script locally without that file and both checks print SKIP; if everything else passes, the result is PASS. Nor does the script confirm the AAB and the record belong together.</p>
+      <p>Below is the new TLS check alone, re-run on November 11 against seven fixtures. The first six match the September 15 results; the seventh has no record file. signal.example.com is a reserved placeholder domain.</p>
+      <figure><img src="/assets/ax/gate-checked-wrong-artifact-shot1-en.webp" width="1155" height="855" alt="Terminal output of check 6 on seven fixtures: public host and rehearsal flag give fail=0, localhost, private IPs and a missing TLS key give fail=1, and no record file gives SKIP with fail=0." loading="lazy"><figcaption>Without the record file, check 6 prints SKIP and the failure count stays at 0. BOS_SIGNALING_TLS and _HOST are the chat app's dart-define keys (source: check 6 from commit 184e5ee in the chat app repository, re-run 2026-11-11).</figcaption></figure>
+      <p>The AXFamily gate builds its own AAB, which made passing it the same inputs easy. The chat app workflow's host check only judges IP literals, so a name that looks public but resolves to a private IP is not caught.</p>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">The fixed gate inputs have no tests</h2>
+      <p>The chat app's fixtures were run by hand, and only the results went into the doc. 184e5ee touched just the workflow and the verification script, and no commit has changed either file since. In AXFamily, no test looks at whether the gate passes <code>-Pdart-defines</code> to Gradle.</p>
+      <p>Drop that argument and the SDK step now fails against the Next-Gen snapshot. But the usage comment of the snapshot script that the error points to also omits it, so regenerating the snapshot as that comment says would put the gate back where it started. The gate also still lacks the check the decision record asked for: ads-mobile-sdk inside the release (the record says APK).</p>
+    </section>
+
+    <section aria-labelledby="fixture-procedure">
+      <h2 id="fixture-procedure">One must-fail fixture per gate</h2>
+      <p>So this is the order we now use to check the gate itself. The three-stage pre-upload check we use for a separate set of Android apps is in <a href="/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>.</p>
+      <ol>
+        <li>For each gate step, write down what it reads: the release itself (the AAB's manifest, dex, signature), the inputs that built the release, or an input built separately.</li>
+        <li>If it's built separately, confirm it uses the same arguments as the command that built the release. In Flutter, pass the same values to Gradle with <code>-Pdart-defines</code>. The AXFamily gate does it like this from the android folder (locking and output capture left out), where <code>$DEFINES</code> is the JSON file given to <code>--dart-define-from-file</code>:
+          <pre><code>DD="$(node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(Object.entries(d).map(([k,v])=&gt;Buffer.from(k+"="+v).toString("base64")).join(","))' "$DEFINES")"
+./gradlew --no-daemon -q :app:dependencies --configuration releaseRuntimeClasspath "-Pdart-defines=$DD"</code></pre></li>
+        <li>For a step that compares against a snapshot, check that the snapshot came from a command with the same arguments. At least once, confirm the SDK from the release side. The October 9 device test confirmed Next-Gen by finding the Next-Gen package on 111 lines of mapping.txt, the name map R8 leaves behind.
+          <pre><code>grep -c 'com.google.android.libraries.ads.mobile.sdk' build/app/outputs/mapping/release/mapping.txt</code></pre>
+          Don't use <code>com.google.android.gms.ads</code> to detect Legacy: Next-Gen ships compatibility classes under that name (37 lines in the same record). The line above restates that check; there's no record of it being run exactly as written.</li>
+        <li>Require the values a release must have (TLS on, a switch exactly 'true') instead of listing banned strings. Open exceptions only through a flag that defaults to false and warns when on.</li>
+        <li>Give every gate one fixture that must fail: the development config already in the repository, a dart-define file missing a switch, an unsigned AAB. Check that it fails and that the reason gets printed.</li>
+        <li>Commit that fixture as a test. When you fix a gate, put the input it should have blocked into the same commit.</li>
+      </ol>
+      <figure class="ax-fig"><img src="/assets/ax/gate-checked-wrong-artifact-2-en.webp" width="1200" height="980" alt="Procedure in six steps: list what each step reads, match arguments to the release build, check the snapshot and the release itself, require values, make a must-fail fixture, commit it as a test." loading="lazy"><figcaption>A gate fix should commit the input that gate should have blocked, as a fixture.</figcaption></figure>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Our%20release%20gates%20were%20checking%20something%20other%20than%20the%20release%3A%20a%20plaintext%20AAB%20and%20one%20missing%20dart-define">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Can flutter build --dart-define change Android dependencies?</summary><div><p>It can, depending on the plugin. google_mobile_ads 9.1.0 reads USE_NEXT_GEN_SDK from the Gradle property dart-defines and attaches either the Next-Gen or the Legacy ad SDK, so a separate Gradle call needs the same values through -Pdart-defines to resolve the same dependencies.</p></div></details>
+        <details><summary>Does USE_NEXT_GEN_SDK=false give you the Legacy SDK?</summary><div><p>Not in 9.1.0. The plugin treats any non-empty string as true, so 'false' still means Next-Gen; to get Legacy you have to leave the key out.</p></div></details>
+      </div>
+    </section>
+
+    <p class="note">As of 2026-11-11, rechecked against the git history of both app repositories, the cross-check doc, the ad SDK device-test notes, the decision record and the plugin source. Server addresses, signing key details and the app's package name are left out.</p>
+
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
+        <li><a href="/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
+      </ul>
+      <p><a href="/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="/en/ax/">All AX notes</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/en/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>Small Android apps that each do one thing simply</p>
+        <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">Apps</p>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">Site</p>
+        <ul><li><a href="/en/apps/">All apps</a></li><li><a href="/en/ax/">AX notes</a></li><li><a href="/en/about/">About</a></li><li><a href="/en/privacy/">Privacy policies</a></li><li><a href="/en/sitemap/">Site map</a></li><li><a href="/en/rss.xml">RSS feed</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play developer page</a></div>
+    </div>
+  </footer>
+</body>
+</html>

@@ -8,6 +8,214 @@
   <atom:link href="https://sugarmount21.com/en/rss.xml" rel="self" type="application/rss+xml"/>
   <lastBuildDate>Thu, 12 Nov 2026 09:00:00 +0900</lastBuildDate>
   <item>
+    <title>Where an Android theme colour leaks into dialogs – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/android-theme-color-leak/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/android-theme-color-leak/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/android-theme-color-leak-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · How-to</span>
+      <h1>No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</h1>
+      <p class="lead">Our dialog and bottom-sheet buttons inherited the app bar colour. We now override the theme for those windows only and measure contrast on the shown view.</p>
+      <p>In SugarSpeller, our Korean spelling app, the Cancel and OK buttons on a delete confirmation were drawn almost white on a white dialog. The contrast ratio was 1.02:1, far below the 4.5:1 that body text needs. When we fixed it on September 16, 2026, no layout XML set that text to white: the theme colour picked to keep the app bar light had flowed into the button labels.</p>
+      <p>Eleven days later the same colour came back in two new bottom sheets, and this time it only showed up on a Galaxy S21 running the release build. The first fix had covered dialogs only; the correction sheet's test only checked that the text colour matched the intended one, and the mini window's test did not check colour at all. If your app uses its app bar colour as the theme's primary colour, any new dialog or sheet can leak the same way.</p>
+    </section>
+    <section aria-labelledby="three-leaks">
+      <h2 id="three-leaks">The app bar colour reached button text in three places</h2>
+      <p>At 13:25 KST on September 16 the operator reported that the buttons on the activity-history delete popup were white and unreadable in light mode. The agent (Claude) followed the style definitions in Material Components 1.14.0, Google's Android UI library, and found that the button text colour ends in a single theme attribute:</p>
+      <pre><code>AlertDialog button
+  → buttonBarButtonStyle
+  → Widget.MaterialComponents.Button.TextButton
+  → mtrl_text_btn_text_color_selector (enabled colour)
+  → ?attr/colorPrimary</code></pre>
+      <p><code>colorPrimary</code> is the theme's main colour slot, and our app theme (<code>AppTheme</code>) put the app bar colour there: #fafdff in light, black in dark. Black on the white dialog is 21:1, which is why only light mode broke.</p>
+      <p>Changing the global <code>colorPrimary</code> would have recoloured the app bar, so that was out. Our accent blue only reaches 3.80:1 on white, short of the bar. The first fix (c3f4f87) added a theme overlay that applies to dialog windows only, <code>alertDialogTheme</code>, in both light and dark, and inside it overrode just <code>colorPrimary</code> with a darker blue. The overlay keeps the original dialog theme as its parent.</p>
+      <p>The two screens added on September 27 picked up the same colour another way. The correction sheet that opens when you tap a coloured word and the mini window behind the text-selection menu are both <code>BottomSheetDialog</code>s, panels that slide up from the bottom, and both inflated their content (built view objects from layout XML) with the activity context. Views inflated that way never pass through the sheet's theme overlay, so they read <code>colorPrimary</code> straight from the activity's <code>AppTheme</code>. The fill of the "Why is this wrong?" button and the text of OK, Copy correction and Open in app all came out #fafdff, 1.00 to 1.02:1 on the white sheet.</p>
+      <p>Dark mode had one more cause. This app's dark <code>AppTheme</code> also inherits from a light theme (<code>Theme.MaterialComponents.Light</code>), so the correction sheet stayed white in dark mode, and the correction text colours made brighter for dark mode sat on it at 3.2:1. The mini window was the reverse: a dark #212121 surface, but its result text took the theme's default black (1.30:1 by our calculation).</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/android-theme-color-leak-1-en.webp" width="1200" height="888" alt="Step diagram: AlertDialog buttons at 1.02:1 on September 16; the correction sheet at 1.02:1 and 3.2:1 in dark, and the mini window at 1.00:1 with black text in dark, both added September 27 and found September 28; and AppTheme.NoActionBar, which has not leaked yet." loading="lazy"><figcaption>The colorPrimary leak fixed in dialogs on September 16 came back at 1.00 to 1.02:1 in two sheets added on September 27, and surfaced on a device on September 28.</figcaption></figure>
+      <p>The fix was to inflate the sheet content with the sheet's own context (<code>dialog.context</code>) and add a sheet-only overlay (<code>bottomSheetDialogTheme</code>) to <code>AppTheme</code> that sets the sheet surface and a dedicated button colour. On September 28 the correction sheet was fixed first, together with the overlay (4c27ac7); twenty-one minutes later the mini window, already under that overlay, only needed its context and button colour changed.</p>
+    </section>
+    <section aria-labelledby="runtime-test">
+      <h2 id="runtime-test">The first test read XML; the rewrite reads the shown button</h2>
+      <p>The test in the first commit (c3f4f87, 13:54) read resource XML as text: it checked that the overlay line existed and that the button colour value cleared 4.5:1 on white. The white text only exists after the theme resolves its attributes at runtime, so a check on XML values can't see this bug.</p>
+      <p>At 14:10 the operator asked whether everything had really changed and told the agent to cross-check before release. Only then did the agent write a Robolectric test (99e6bf4; Robolectric runs Android code on the JVM without a device), on the grounds that what the XML says and what the widget draws are different things. The test builds a dialog on a context themed with <code>AppTheme</code>, calls <code>show()</code> and reads the colour each button actually draws (<code>currentTextColor</code>). With the one overlay line deleted from the light theme, the original symptom came back as numbers:</p>
+      <pre><code>OK     #fafdff on #ffffff = 1.02:1   FAIL
+Cancel #fafdff on #ffffff = 1.02:1   FAIL
+buttons readable in dark mode        pass</code></pre>
+      <p>The September 27 correction sheet did ship with a Robolectric test, but it only compared the corrected word's <code>currentTextColor</code> with the intended red highlight colour. If the colour matches, the test passes whether that word sits on a white sheet or a dark one. After the September 28 check on the S21, the rewritten test first reads the sheet's real surface colour (the first <code>check</code> argument is a Korean label meaning "correction, type colour"):</p>
+      <pre><code>// sheet surface view
+val sheet = dialog.findViewById&lt;View&gt;(com.google.android.material.R.id.design_bottom_sheet)
+// fill colour of the sheet's background shape
+val bg = (sheet.background as MaterialShapeDrawable).fillColor!!.defaultColor
+check("교정(유형 색)", dialog.findViewById&lt;TextView&gt;(R.id.correction_corrected).currentTextColor, bg, 4.5)</code></pre>
+      <p>It measures the sheet's text and buttons this way, in light and dark. Filled buttons get two checks: text on fill at 4.5:1 and fill on sheet at 3:1. Measure theme colour bugs from the shown view's <code>currentTextColor</code> and the surface actually behind it, not from XML values.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20No%20XML%20file%20said%20white%2C%20yet%20the%20dialog%20buttons%20vanished%3A%20three%20places%20a%20theme%20colour%20leaked">Email us</a></p></aside>
+    <section aria-labelledby="lightness-only">
+      <h2 id="lightness-only">The highlight colours kept their hue; only lightness moved</h2>
+      <p>A separate problem, one the agent had flagged four minutes before the dialog report, was in the spelling highlights, where colour tells the user the error type: red for spelling, teal for spacing, blue for statistics-based corrections, orange for possible non-standard words, and violet for a type that Naver (Korea's largest portal, whose checker the app calls) marks separately. The dark-mode colour folder (<code>values-night</code>) defined none of the five, so dark mode used the light values, and violet on the #212121 background was 2.70:1.</p>
+      <p>At 13:21, answering the operator's question about whether anything else needed testing, the agent flagged that violet and said a single lighter violet for dark mode would fix it. That clears the bar easily, but in HSL the hue turns by nearly 5 degrees and saturation goes to 100%, a different violet. When the operator asked for a proper fix, the agent added all five dark values but changed only orange in light mode, leaving red, teal and blue as they were and keeping red and teal as the app's familiar colours.</p>
+      <p>At 13:40 its own 4.5:1 test failed all three, and the agent reported that the test had refuted its judgement. In the output, temp1 is blue, temp2 teal and temp4 red:</p>
+      <pre><code>light/temp1 #3982ff on #fafdff = 3.54:1
+light/temp2 #009a9a on #fafdff = 3.38:1
+light/temp4 #ee4b4b on #fafdff = 3.58:1</code></pre>
+      <p>Only light violet and dark orange stayed as they were; the other eight values (the seven under 4.5:1, plus dark teal at a thin 4.67:1) kept their hue and moved lightness only: darker for light mode, lighter for dark. Recomputed, the largest hue shift is 0.2 degrees (blue). The agent first computed values that landed just over 4.5:1, then retargeted dark mode at 5.0:1 for some margin.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/android-theme-color-leak-shot1-en.webp" width="1100" height="682" alt="Dot plot of contrast recomputed from colors.xml before and after the fix: seven highlight values below 4.5:1 and the dialog button at 1.02:1 all end between 4.71 and 5.83:1." loading="lazy"><figcaption>The light red, teal and blue the agent first left unchanged were all under 4.5:1; moving lightness alone, with the hue fixed, took every value over the line. (Source: SugarSpeller repository colors.xml before and after c3f4f87, recomputed 2026-11-11)</figcaption></figure>
+      <p>The c3f4f87 message records the decision as "red stays red, green stays green" (its green is the teal above). Don't rotate the hue of a colour that means something. Move lightness, and define the value in both <code>values</code> and <code>values-night</code>. On the web side we search for dark text colours the same way, one lightness percent at a time, as described in <a href="https://sugarmount21.com/en/ax/build-measures-contrast/">Measuring 4.5:1 colour contrast in the site build</a>.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Measuring contrast on the shown view, step by step</h2>
+      <ol>
+        <li>Follow the widget style of the unreadable text until it ends. If it ends in a theme attribute such as <code>?attr/colorPrimary</code>, check whether that attribute holds a colour chosen for something else (here, the app bar).</li>
+        <li>Leave the global theme colour alone and override it for that window only (<code>alertDialogTheme</code>, <code>bottomSheetDialogTheme</code>). Inflate the content with <code>dialog.context</code>. The dialog side looked like this:
+<pre><code>&lt;!-- inside AppTheme (both values and values-night) --&gt;
+&lt;item name="alertDialogTheme"&gt;@style/AlertDialogTheme&lt;/item&gt;
+&lt;style name="AlertDialogTheme" parent="ThemeOverlay.MaterialComponents.Dialog.Alert"&gt;
+    &lt;item name="colorPrimary"&gt;@color/dialog_button_text&lt;/item&gt; &lt;!-- #0063c6 --&gt;
+&lt;/style&gt;</code></pre></li>
+        <li>Check that every theme the manifest names gets the overlays, and that no <code>parent="Theme.…"</code> cuts it off from the theme before the dot.</li>
+        <li>For colours that carry meaning, lock the HSL hue and move lightness, finding light and dark values separately.</li>
+        <li>In Robolectric, <code>show()</code> the screen and measure <code>currentTextColor</code> against the real surface (for a sheet, the <code>fillColor</code> of its <code>MaterialShapeDrawable</code>) in light and dark.</li>
+        <li>Revert one line of the fix and confirm the test fails with the original number, 1.02:1 in our case. On September 16, six such reverts were all caught.</li>
+        <li>Install the release APK on a real device and open each new screen once in light and dark.</li>
+      </ol>
+      <p>Each screen needs its own measuring test, so a new screen without one surfaces on a device first, as the sheets did on September 28. That day's S21 check is in <a href="https://sugarmount21.com/en/ax/agent-review-refutation/">Agent code review: fix what survives refutation</a>. Robolectric does not reproduce device rendering, and this app is built from XML views; we have not measured Jetpack Compose screens.</p>
+    </section>
+    <section aria-labelledby="not-reached">
+      <h2 id="not-reached">Two places the overlay doesn't reach: NoActionBar and the framework AlertDialog</h2>
+      <p>At 14:19 on September 16, while matching every dialog call to its manifest theme, the agent flagged one more thing. <code>AppTheme.NoActionBar</code> reads like a child of <code>AppTheme</code>, but it is declared with <code>parent="Theme.AppCompat.NoActionBar"</code>. In Android styles, an explicit <code>parent</code> attribute replaces the inheritance implied by the dotted name. This theme therefore carries neither of the two overlays.</p>
+      <p>One screen uses it: the launch screen. Its version and permission popups are a custom-layout window that never touches <code>colorPrimary</code>, so nothing has leaked there yet. The changelog for app version 1.6.018 warns that adding an <code>AlertDialog</code> to that screen would bypass the fix, and on November 10 the parent was unchanged.</p>
+      <p>The September 16 audit counted three places that build a dialog (activity-history delete, greeting cards, the subscription screen) as covered because all ran under <code>AppTheme</code>. Only the activity-history one, the dialog in the report, was an androidx dialog; the other two used the framework's built-in <code>android.app.AlertDialog</code>. The greeting-card call has since been removed, but on the remote develop branch as of November 10 one call on the subscription screen (shown only when a user holds more than one subscription) is still the framework class. The September 16 measuring test shows the androidx dialog, so that one call's button colour has not been measured on a shown dialog yet.</p>
+    </section>
+    <p class="note">As of November 11, 2026. Based on the <a href="https://sugarmount21.com/en/apps/sugarspeller/">SugarSpeller</a> repository history, the 1.6.018 changelog and the September 16 session log; contrast ratios were recomputed with the WCAG relative-luminance formula. The current state is as of the remote develop branch on November 10.</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20No%20XML%20file%20said%20white%2C%20yet%20the%20dialog%20buttons%20vanished%3A%20three%20places%20a%20theme%20colour%20leaked">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Thu, 12 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Release gates that checked the wrong input – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/gate-checked-wrong-artifact-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</h1>
+      <p class="lead">A plaintext-signaling AAB passed one of our release gates, and another gate's ad SDK check compared a dependency list (classpath) the intended release never used. Both gates read inputs built next to the release, not the release.</p>
+      <p>An Android app bundle (AAB) built from a development config, one our own deployment doc called "not for submission", got a PASS from a release gate. That was September 13, 2026, in our Flutter peer-to-peer chat app. The server address was localhost, and the signaling that sets up connections ran unencrypted. A month later, in AXFamily, a family schedule app, the gate's ad SDK check turned out to be comparing a dependency list from a different build than the one we meant to ship.</p>
+      <p>We built both gates with an AI coding agent, and both judged an input produced next to the release instead of the release itself. If you read a green gate as proof the release was checked, the first question is what that PASS actually read.</p>
+    </section>
+    <section aria-labelledby="chat-plaintext">
+      <h2 id="chat-plaintext">A plaintext-signaling AAB passed</h2>
+      <p>Before building, the chat app's release workflow checked its dart-define file (the key=value settings Flutter compiles into the app) with one line:</p>
+      <pre><code>grep -Eq 'example\.invalid|CHANGE_ME' "$f"   # fail if found</code></pre>
+      <p>The production config still had a placeholder host, so it was blocked. The development config points at localhost with TLS off, but contains neither string, so it passed. On September 13, CI built a 43 MB test AAB from exactly that config, signed with the upload key, and the bundle verification script said PASS.</p>
+      <p>The deployment doc written that day called the AAB "a pipeline test build, not for submission", and still summarized that there were no blockers left on the code side. Per the repository's own release rules, nothing outside the app config stops plaintext <code>ws://</code> signaling, so the same workflow could have shipped a signed, submittable AAB with plaintext signaling.</p>
+      <p>The cross-check two days later opens with its reason: judging whether to ship from documents its own author wrote would be self-confirmation, not a cross-check. So it didn't rely on the deployment doc's claims, re-measured the repository, and concluded "not ready to ship yet" (held back by three operational decisions, with three defects found along the way).</p>
+      <p>That night, commit 184e5ee put the same rule into both the workflow and the verification script: TLS must be on, and an empty host, localhost, or a private, loopback or link-local IP fails. A pipeline rehearsal has to turn on <code>allow_insecure_signaling</code>, a flag that defaults to false, and then passes with a warning. Six fixtures (inputs made on purpose to test the rule) were run by hand and the results written into the doc; a re-run of the same check appears further down.</p>
+      <p>The same commit fixed the signature check. The certificate tool keytool writes its errors to standard output, so the 'could not read signature' branch never ran and the script quit without a reason, skipping the checks after it. No bad build got through. The script now looks for the certificate owner line (<code>Owner:</code>). The crypto tests CI skipped that night are covered in <a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green</a>.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/gate-checked-wrong-artifact-1-en.webp" width="1200" height="658" alt="Comparison: what the two gates read before the fixes (a classpath without dart-defines, placeholder strings) versus the inputs that built the releases." loading="lazy"><figcaption>Before the fixes, the two gates looked only at a classpath listed without dart-defines and at placeholder strings.</figcaption></figure>
+    </section>
+    <section aria-labelledby="axfamily-classpath">
+      <h2 id="axfamily-classpath">AXFamily's gate judged another ad SDK</h2>
+      <p>AXFamily shows ads through the google_mobile_ads 9.1.0 plugin, which picks the Android ad SDK from the build's dart-defines. Its build.gradle decodes the Gradle property <code>dart-defines</code> (base64-encoded <code>KEY=VALUE</code> pairs joined by commas) and decides like this:</p>
+      <pre><code>def useNextGenSdk = dartEnvironmentVariables.USE_NEXT_GEN_SDK ? dartEnvironmentVariables.USE_NEXT_GEN_SDK : false</code></pre>
+      <p>With a value you get the Next-Gen SDK (ads-mobile-sdk); without one, the Legacy SDK (play-services-ads). <code>flutter build</code> hands dart-defines to Gradle through that property. Call Gradle on its own and the property isn't there, so you always get Legacy.</p>
+      <p>Commit 5427191 added the gate on October 9 in four steps: wipe the build folder, build a fresh AAB, have Gradle list the release dependencies, then judge. Step three passed no dart-defines. Whatever values built the AAB, the gate judged the Legacy list, and the committed reference list (the snapshot) it compared against came from the same command, so the comparison could only ever match.</p>
+      <p>The dart-define check was off the other way. The gate only accepted keys on its allow list, and <code>USE_NEXT_GEN_SDK</code> wasn't on it.</p>
+      <p>The build that survived 2,000 random-input events on a Galaxy S21 that day was Next-Gen. The only build this gate could pass was Legacy, which that test never touched, and the verified config would have been blocked for carrying an unknown key.</p>
+      <p>On October 10, commit c38703b made step three pass the same values as the AAB build, as <code>-Pdart-defines</code> in the format flutter build uses, without printing the values. The dart-define check now accepts <code>USE_NEXT_GEN_SDK</code> only when it is exactly 'true'. The plugin's ternary follows the truthiness rules of Groovy, the language build.gradle is written in, where any non-empty string is true, so 'false' also gives you Next-Gen.</p>
+      <p>Regenerating the snapshot with the fixed command changed it as below, and the tests gained three cases that must fail: 'false', an empty string, and a missing key.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Snapshot lines that changed</th><th>Before</th><th>After</th></tr></thead>
+        <tbody>
+          <tr><td>Lines</td><td>211</td><td>214 (5 removed, 8 added)</td></tr>
+          <tr><td>Ad SDK</td><td>play-services-ads, play-services-ads-api</td><td>ads-mobile-sdk</td></tr>
+          <tr><td>Companions</td><td>3 measurement and ad-services modules</td><td>6 Cronet (Chrome's network stack) modules, kotlinx-coroutines-guava</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+    <section aria-labelledby="cause-chain">
+      <h2 id="cause-chain">One command made the snapshot too</h2>
+      <p>On the AXFamily side the cause had three layers. The gate listed dependencies with a different command from the one that built the release, and since the plugin picks dependencies from dart-defines, that changed the result. The commit that added the gate shows no check that the two commands got the same inputs. The last layer is that the reference, the snapshot and the test fixture, came out of that same command. There's no record of a full gate run before the fix.</p>
+      <p>In the chat app, the development config already in the repository did go through the gate, but until the fix nobody treated it as an input that had to fail.</p>
+      <p>About six and a half hours before c38703b, commit 1fcc1e1 gave the AXFamily gate a step that opens the AAB's dex files (the compiled app code) and libapp.so (where Flutter's compiled Dart code lives) directly to make sure no end-to-end test mode leaked in. The gate already had a way to read the release, and the SDK list was still judged from a Gradle report.</p>
+    </section>
+    <section aria-labelledby="wrong-assumption">
+      <h2 id="wrong-assumption">The missing check was in the decision record</h2>
+      <p>AXFamily's October 5 decision record already had the condition: Next-Gen is opt-in, so CI pins <code>USE_NEXT_GEN_SDK=true</code> and checks that the release APK contains ads-mobile-sdk. The item's status is "recommendation, presumed accepted": one the operator did not object to. The backlog's acceptance criteria asked for the same dart-define. The October 9 gate had neither, and committed a Legacy list as its snapshot instead.</p>
+      <p>Both gates, both fixes, and the wrong deployment summary all came from commits co-authored by Claude. The cross-check doc, not a person, corrected the summary; on the record the human part ends at not objecting to the decision record's recommendation.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Our%20release%20gates%20were%20checking%20something%20other%20than%20the%20release%3A%20a%20plaintext%20AAB%20and%20one%20missing%20dart-define">Email us</a></p></aside>
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">Required values, not banned strings</h2>
+      <p>Had we only added localhost to the placeholder list, 192.168.0.10 and 172.20.1.5 from the fixtures would still pass with TLS on. Instead of listing addresses to block, the fix requires what a release must have (TLS on, a public host), and because the pipeline still needs rehearsals, the exception opens only through the default-false flag.</p>
+      <p>For AXFamily, the gate could have accepted any non-empty <code>USE_NEXT_GEN_SDK</code>. That matches the plugin, but a config reading 'false' would produce a Next-Gen build and the gate would say nothing. Only an exact 'true' passes.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">Checks that read a side file skip locally</h2>
+      <p>The chat app's new TLS check and the older dart-define record check don't open the AAB. They read <code>dart_defines.txt</code>, a record the workflow writes from the config and leaves next to the AAB. Run the script locally without that file and both checks print SKIP; if everything else passes, the result is PASS. Nor does the script confirm the AAB and the record belong together.</p>
+      <p>Below is the new TLS check alone, re-run on November 11 against seven fixtures. The first six match the September 15 results; the seventh has no record file. signal.example.com is a reserved placeholder domain.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/gate-checked-wrong-artifact-shot1-en.webp" width="1155" height="855" alt="Terminal output of check 6 on seven fixtures: public host and rehearsal flag give fail=0, localhost, private IPs and a missing TLS key give fail=1, and no record file gives SKIP with fail=0." loading="lazy"><figcaption>Without the record file, check 6 prints SKIP and the failure count stays at 0. BOS_SIGNALING_TLS and _HOST are the chat app's dart-define keys (source: check 6 from commit 184e5ee in the chat app repository, re-run 2026-11-11).</figcaption></figure>
+      <p>The AXFamily gate builds its own AAB, which made passing it the same inputs easy. The chat app workflow's host check only judges IP literals, so a name that looks public but resolves to a private IP is not caught.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">The fixed gate inputs have no tests</h2>
+      <p>The chat app's fixtures were run by hand, and only the results went into the doc. 184e5ee touched just the workflow and the verification script, and no commit has changed either file since. In AXFamily, no test looks at whether the gate passes <code>-Pdart-defines</code> to Gradle.</p>
+      <p>Drop that argument and the SDK step now fails against the Next-Gen snapshot. But the usage comment of the snapshot script that the error points to also omits it, so regenerating the snapshot as that comment says would put the gate back where it started. The gate also still lacks the check the decision record asked for: ads-mobile-sdk inside the release (the record says APK).</p>
+    </section>
+    <section aria-labelledby="fixture-procedure">
+      <h2 id="fixture-procedure">One must-fail fixture per gate</h2>
+      <p>So this is the order we now use to check the gate itself. The three-stage pre-upload check we use for a separate set of Android apps is in <a href="https://sugarmount21.com/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>.</p>
+      <ol>
+        <li>For each gate step, write down what it reads: the release itself (the AAB's manifest, dex, signature), the inputs that built the release, or an input built separately.</li>
+        <li>If it's built separately, confirm it uses the same arguments as the command that built the release. In Flutter, pass the same values to Gradle with <code>-Pdart-defines</code>. The AXFamily gate does it like this from the android folder (locking and output capture left out), where <code>$DEFINES</code> is the JSON file given to <code>--dart-define-from-file</code>:
+          <pre><code>DD="$(node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(Object.entries(d).map(([k,v])=&gt;Buffer.from(k+"="+v).toString("base64")).join(","))' "$DEFINES")"
+./gradlew --no-daemon -q :app:dependencies --configuration releaseRuntimeClasspath "-Pdart-defines=$DD"</code></pre></li>
+        <li>For a step that compares against a snapshot, check that the snapshot came from a command with the same arguments. At least once, confirm the SDK from the release side. The October 9 device test confirmed Next-Gen by finding the Next-Gen package on 111 lines of mapping.txt, the name map R8 leaves behind.
+          <pre><code>grep -c 'com.google.android.libraries.ads.mobile.sdk' build/app/outputs/mapping/release/mapping.txt</code></pre>
+          Don't use <code>com.google.android.gms.ads</code> to detect Legacy: Next-Gen ships compatibility classes under that name (37 lines in the same record). The line above restates that check; there's no record of it being run exactly as written.</li>
+        <li>Require the values a release must have (TLS on, a switch exactly 'true') instead of listing banned strings. Open exceptions only through a flag that defaults to false and warns when on.</li>
+        <li>Give every gate one fixture that must fail: the development config already in the repository, a dart-define file missing a switch, an unsigned AAB. Check that it fails and that the reason gets printed.</li>
+        <li>Commit that fixture as a test. When you fix a gate, put the input it should have blocked into the same commit.</li>
+      </ol>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/gate-checked-wrong-artifact-2-en.webp" width="1200" height="980" alt="Procedure in six steps: list what each step reads, match arguments to the release build, check the snapshot and the release itself, require values, make a must-fail fixture, commit it as a test." loading="lazy"><figcaption>A gate fix should commit the input that gate should have blocked, as a fixture.</figcaption></figure>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Our%20release%20gates%20were%20checking%20something%20other%20than%20the%20release%3A%20a%20plaintext%20AAB%20and%20one%20missing%20dart-define">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">FAQ</h2>
+      <div class="faq">
+        <details><summary>Can flutter build --dart-define change Android dependencies?</summary><div><p>It can, depending on the plugin. google_mobile_ads 9.1.0 reads USE_NEXT_GEN_SDK from the Gradle property dart-defines and attaches either the Next-Gen or the Legacy ad SDK, so a separate Gradle call needs the same values through -Pdart-defines to resolve the same dependencies.</p></div></details>
+        <details><summary>Does USE_NEXT_GEN_SDK=false give you the Legacy SDK?</summary><div><p>Not in 9.1.0. The plugin treats any non-empty string as true, so 'false' still means Next-Gen; to get Legacy you have to leave the key out.</p></div></details>
+      </div>
+    </section>
+    <p class="note">As of 2026-11-11, rechecked against the git history of both app repositories, the cross-check doc, the ad SDK device-test notes, the decision record and the plugin source. Server addresses, signing key details and the app's package name are left out.</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Thu, 12 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
     <title>Claude Code login and a first unattended question – SugarMount</title>
     <link>https://sugarmount21.com/en/ax/windows-harness-claude-code-login/</link>
     <guid isPermaLink="true">https://sugarmount21.com/en/ax/windows-harness-claude-code-login/</guid>
@@ -87,8 +295,8 @@
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">Open PowerShell and paste your first command</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-install/">Install Git and Claude Code on Windows</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">GA4 CSV export to a daily morning report</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -196,8 +404,8 @@ Get-Content .\logs\hello.log -Tail 3</code></pre><figure><img src="https://sugar
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">Open PowerShell and paste your first command</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-install/">Install Git and Claude Code on Windows</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">GA4 CSV export to a daily morning report</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -287,8 +495,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-shorts/">TikTok, Reels and Shorts plans with Claude Code</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-game-marketing/">17 days of a Claude Code harness: how to start</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -385,8 +593,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-shorts/">TikTok, Reels and Shorts plans with Claude Code</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-game-marketing/">17 days of a Claude Code harness: how to start</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -460,8 +668,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-install/">Install Git and Claude Code on Windows</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">GA4 CSV export to a daily morning report</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -544,8 +752,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-game-marketing/">17 days of a Claude Code harness: how to start</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -659,8 +867,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
         <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -761,8 +969,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">Open PowerShell and paste your first command</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-install/">Install Git and Claude Code on Windows</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">GA4 CSV export to a daily morning report</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -838,8 +1046,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">Open PowerShell and paste your first command</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">GA4 CSV export to a daily morning report</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -924,8 +1132,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">Open PowerShell and paste your first command</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">GA4 CSV export to a daily morning report</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1007,8 +1215,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-shorts/">TikTok, Reels and Shorts plans with Claude Code</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1085,8 +1293,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">Open PowerShell and paste your first command</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">GA4 CSV export to a daily morning report</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1170,8 +1378,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">Open PowerShell and paste your first command</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">GA4 CSV export to a daily morning report</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1286,12 +1494,12 @@ assumeTrue(dir != null &amp;&amp; dir.isDirectory)</code></pre></li>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1414,8 +1622,8 @@ AppOpen: cold: entitlement answered in 4139 ms</code></pre></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-shorts/">TikTok, Reels and Shorts plans with Claude Code</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-game-marketing/">17 days of a Claude Code harness: how to start</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1554,8 +1762,8 @@ print(len(ids))</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">Open PowerShell and paste your first command</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">GA4 CSV export to a daily morning report</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1674,12 +1882,12 @@ answers per open  = quiz_answer(mode!=chat) events / quiz_open events</code></pr
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1797,8 +2005,8 @@ adb reboot                       # clears the two log.tag values (an empty setpr
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">Open PowerShell and paste your first command</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">GA4 CSV export to a daily morning report</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1917,8 +2125,8 @@ adb reboot                       # clears the two log.tag values (an empty setpr
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-shorts/">TikTok, Reels and Shorts plans with Claude Code</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-game-marketing/">17 days of a Claude Code harness: how to start</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2017,12 +2225,12 @@ test('bidirectional cross-check against python cryptography', () async {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2170,8 +2378,8 @@ while True:
         <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2324,8 +2532,8 @@ Report: what you fixed, what remains uncertain.</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2458,12 +2666,12 @@ private val codePopulated = setOf("com.example.Response#requestId")
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2571,8 +2779,8 @@ private val codePopulated = setOf("com.example.Response#requestId")
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2681,8 +2889,8 @@ private val codePopulated = setOf("com.example.Response#requestId")
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2779,12 +2987,12 @@ private val codePopulated = setOf("com.example.Response#requestId")
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2894,12 +3102,12 @@ thinkingConfig: { thinkingBudget: 0 },</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3011,8 +3219,8 @@ adb shell "dumpsys window | grep mCurrentFocus"</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3148,8 +3356,8 @@ adb -s emulator-5554 logcat -d -b crash</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">Open PowerShell and paste your first command</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">GA4 CSV export to a daily morning report</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3272,8 +3480,8 @@ How to apply: when setting or changing this campaign, the user's instruction bea
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">Open PowerShell and paste your first command</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">GA4 CSV export to a daily morning report</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3381,12 +3589,12 @@ edge = if (next &lt; edge) next else edge - 1 // strictly decreasing</code></pre
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3519,12 +3727,12 @@ git log --diff-filter=A --format="%h %ad %s" --date=iso -- &lt;scoring file&gt;
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3630,8 +3838,8 @@ POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3755,8 +3963,8 @@ print("first", shows[:1], "gaps", [b - a for a, b in zip(inter, inter[1:])],
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-shorts/">TikTok, Reels and Shorts plans with Claude Code</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-game-marketing/">17 days of a Claude Code harness: how to start</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3881,8 +4089,8 @@ Severity is exactly one of Blocker, High, Medium, Low</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">Open PowerShell and paste your first command</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">GA4 CSV export to a daily morning report</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4002,12 +4210,12 @@ def diff(a_png, b_png, top=300, bottom=330):
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-cache-no-context/">A shared LLM cache could have frozen a prompt injection: the blind A/B that let us stop sending context</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4136,12 +4344,12 @@ def diff(a_png, b_png, top=300, bottom=330):
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4262,8 +4470,8 @@ expect(all.sort()).toEqual(files.sort());</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">Open PowerShell and paste your first command</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">GA4 CSV export to a daily morning report</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4557,12 +4765,12 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4644,12 +4852,12 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4738,12 +4946,12 @@ git grep -nE "addOn(Complete|Success|Failure|Canceled)Listener\((this|requireAct
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4860,8 +5068,8 @@ depth(board):                   # peel
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
         <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4996,8 +5204,8 @@ depth(board):                   # peel
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5110,12 +5318,12 @@ if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5221,8 +5429,8 @@ git diff --name-only $(git merge-base &lt;base&gt; &lt;branch&gt;) &lt;branch&gt
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">Open PowerShell and paste your first command</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">GA4 CSV export to a daily morning report</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5309,12 +5517,12 @@ unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$TEST_PUB[~/][0-9]*" | sort -u | wc
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5450,8 +5658,8 @@ lifecycleScope.launch {
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-shorts/">TikTok, Reels and Shorts plans with Claude Code</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-game-marketing/">17 days of a Claude Code harness: how to start</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5561,12 +5769,12 @@ lifecycleScope.launch {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5669,8 +5877,8 @@ three_star = cleared and time &lt;= par(base, scale, floor) and mistakes &lt;= a
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
         <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5786,8 +5994,8 @@ print(pages.most_common(), "FAQ questions:", questions)</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">A static site that several AI agent sessions edit: one --check gate before every commit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5904,8 +6112,8 @@ NOT_TEST = {"notExpression": {"orGroup": {"expressions": [
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-shorts/">TikTok, Reels and Shorts plans with Claude Code</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-game-marketing/">17 days of a Claude Code harness: how to start</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6006,12 +6214,12 @@ export function cacheKey(api, group, original, corrected, model) {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6141,8 +6349,8 @@ const gaps = await agent(CTX + CHECKLIST + final + dossier, { schema: CRIT })</c
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">Open PowerShell and paste your first command</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">GA4 CSV export to a daily morning report</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6253,12 +6461,12 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(":core
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a></li>
         <li><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li>
         <li><a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">We pressed BACK at seven moments before shipping one &#x27;Save as PDF&#x27; button</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">The first LLM feature in a spell-check app: cost, model evaluation and daily caps for &quot;Why is this wrong?&quot;</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6381,8 +6589,8 @@ git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --gre
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">Open PowerShell and paste your first command</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">GA4 CSV export to a daily morning report</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">A daily Google Ads budget check that only suggests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -6518,277 +6726,16 @@ adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/silent-skip-green-ci/">Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">The 95.2% realism score never came out of the runner, and the 3D view was a fixed drawing</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
     <pubDate>Mon, 26 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>We checked the market after 3 apps: median 1,166 – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/market-check-before-app/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/market-check-before-app/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/market-check-before-app-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX note · Retrospective</span>
-      <h1>We built three photo apps before checking the market: this year's new apps had a median of 1,166 installs</h1>
-      <p class="lead">A four-minute scrape of top Google Play search results showed that the 32 photo-compress apps released in 2026 had a median of 1,166 lifetime installs, and we recorded the next 11 planned apps as on hold.</p>
-      <p>On the morning of October 3, 2026, three of our Android photo apps were already built and uploaded to Play. <a href="https://sugarmount21.com/en/apps/image-compress/">Compress Image</a> was waiting on the production track; a flip-and-rotate app and an image format converter sat on the internal test track. The operator asked a blunt question that morning: there must be hundreds of AI-built photo apps by now, so had anyone looked at the market? Nobody had. We had the coding agent scrape Play search results, and the first report came back four minutes later. Of 71 compress-and-resize utilities in the top 30 results, 32 had been released in 2026, and their median lifetime installs were 1,166. Our own app was not in the top 30 for any of the nine queries.</p>
-      <p class="note">Sources: three market research documents in the SugarMount app repository (sugar-utils), written on 2026-10-03 and committed in 7b0e567; the daily ops check of 2026-10-23; git history; and the work session log. Install counts are the worldwide lifetime numbers Play exposes. Checked on October 24, 2026.</p>
-    </section>
-    <section aria-labelledby="new-apps-2026">
-      <h2 id="new-apps-2026">26 of the 32 compress apps released this year had fewer than 10,000 installs</h2>
-      <p>The compress category came first. Six Korean and three English queries, top 30 results each, gave 103 apps. Keeping only utilities whose titles mention compressing, file size or resizing left 71. Of those, 47 were released in 2025 or 2026, and 32 in 2026.</p>
-      <p>Those 32 topped out at 73,286 installs. None had reached 100,000, and 26 were under 10,000. One 2026 app that aimed at exactly our pitch, getting photos ready for upload forms, had 0. The top of the list belonged to apps released between 2013 and 2022; the leader had 43.06 million installs.</p>
-      <p>About ninety minutes later the agent ran the same scrape for the other two categories. Flip and rotate: 46 utilities, only 7 released in 2026, median 373. Format conversion: 71 utilities, 38 from 2026, median 136. In none of the three categories had a 2026 app passed 100,000.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/market-check-before-app-1-en.webp" width="1200" height="558" alt="Bar chart: median lifetime installs of apps released in 2026 were 1,166 for photo compress, 373 for flip and rotate, and 136 (upper median) for format convert." loading="lazy"><figcaption>In the three categories we had just shipped into, this year's apps that made the top of search had a median in the low thousands or less.</figcaption></figure>
-      <p>Twenty days later, in the October 23 ops check, the download badges on the public Play pages read 5+ for Compress Image, 1+ for the flip app and 0+ for the converter. Those are 20-day-old apps, so they cannot be lined up against lifetime counts that had up to ten months to build. We read them only as a slow start.</p>
-    </section>
-    <section aria-labelledby="why-skipped">
-      <h2 id="why-skipped">We skipped the check because building looked cheaper than checking</h2>
-      <p>The missing check had a chain of causes behind it.</p>
-      <p>The lineup was chosen by feature. The product spec revised on September 21 fixed a list of 14 apps and paired each candidate with a "reference app" from one established developer. The same section said, in its own words, that the order was not a download ranking or a revenue forecast.</p>
-      <p>The reference apps then created an illusion. The reference compress app had 3.89 million installs, and the top of the search results was apps from 2013 to 2022 with millions to tens of millions of installs. If you only look at survivors, "build the same thing, but cleaner" sounds like a plan. Nobody looked at what happened to the apps that arrived this year.</p>
-      <p>The biggest link was cost: building had become very cheap. The flip-and-rotate app went from its engine commit (7821dbd, September 24, 13:29) to the internal test track (bc0ea78, 20:51) in 7 hours 22 minutes, and the converter reached the internal track at 22:39 the same night (7b9fd55). Leaving out review and store listing work, an app took less than a day, so "ship it and read the numbers" sounded reasonable. The scrape took four minutes.</p>
-      <p>Underneath all three: the workflow had no gate that said "look at the market before you build". It had a release gate and on-device checks, both described in <a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a>, but nothing upstream of the code.</p>
-    </section>
-    <section aria-labelledby="wrong-guesses">
-      <h2 id="wrong-guesses">None of our three starting assumptions was supported by the data</h2>
-      <p>Assumption one: an app that fixes what users hate about the incumbents will get installs. In the newest reviews of the top six compress apps, 127 were rated 3 stars or lower. Keyword tagging put 39 of them under too many ads, 19 under errors, 17 under paid plans and subscriptions, and 12 under output that missed the target size. Our app has no subscription and never writes a file larger than the original. Yet 26 of this year's 32 entrants had not reached 10,000 installs. That figure does not split apps that fixed the complaints from apps that did not, so it cannot refute the assumption directly. It does not support it either. (The top complaint applied to us too: the agent reported that the app-open ad turned on in 1.0.3 on September 23, an operator decision, was the same type. The operator kept it.)</p>
-      <p>Assumption two came from the operator: merge the three apps into one photo toolbox and people will look for it. The agent searched Play for Korean phrases meaning "photo tool set", "photo utilities" and "image tools", plus "image toolbox" in English. The top results were the default photo app, gallery apps and big photo editors. What the data shows is that general apps own the category-name searches. Play hides search volume, so we do not know how many people search that way.</p>
-      <p>That afternoon the same question went to document viewers. One developer had three apps: a viewer for HWP files (the Korean word processor format that government offices use) at 436k installs, a PowerPoint viewer at 469k, and an all-in-one office app at 13k. Three apps from one developer, with HWP demand boosted by a policy change, cannot prove that single-purpose beats all-in-one; we treated it as a directional signal. Assumption three, that AI features would make a viewer stand out, was checked against reviews. Of 15,043 Korean reviews of document viewers, 0.36% asked for AI, summaries or translation. That says reviewers rarely ask for it, not that AI cannot set an app apart. Both signals pointed the same way, so the next app became a single-purpose HWP viewer, <a href="https://sugarmount21.com/en/apps/doc-viewer/">HWP Viewer SugarDoc</a>.</p>
-    </section>
-    <section aria-labelledby="ai-and-human">
-      <h2 id="ai-and-human">The agent followed the spec's order, and got the median wrong</h2>
-      <p>The coding agent executed the spec's order as written. While shipping the third app it never suggested looking at the market before the next one. When the operator asked, the agent admitted no market analysis had been done and pointed at the spec's "not a forecast" line.</p>
-      <p>The numbers had a small error too. Re-reading the scrape script for this note, we found the median computed as <code>s[len(s)//2]</code> on the sorted list <code>s</code>. With 32 values that returns the upper of the two middle values, 1,304. The true median, the mean of 1,028 and 1,304, is 1,166, and that is the number this note uses. The conclusion stands. The flip category has 7 values, so its 373 is exact. The converter category has 38, so its 136 is also an upper median; the value list was not kept, so we could not recompute it, and the true figure is 136 or lower.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20We%20built%20three%20photo%20apps%20before%20checking%20the%20market%3A%20this%20year%27s%20new%20apps%20had%20a%20median%20of%201%2C166%20installs">Email us</a></p></aside>
-    <section aria-labelledby="what-we-held">
-      <h2 id="what-we-held">We recorded 11 planned apps as on hold and changed category</h2>
-      <p>There were four options on the table.</p>
-      <ul>
-        <li>Keep building U04 to U14 as planned. If those categories look like the three photo ones, that repeats the same result eleven times. We have not scraped any of them yet, though. The hold was recorded in the backlog on October 4.</li>
-        <li>Buy installs with ads. Not until we have measured what one install is worth.</li>
-        <li>Unpublish the three apps. Keeping them up costs almost nothing, and the search terms people actually used only show up in Play Console after an app is public. They stay up for a 30-day measurement.</li>
-        <li>Move to a category where demand is shifting. From October 2026, Korean government mail systems block .hwp attachments, which pushes documents to the newer HWPX format. One viewer released in May 2026 had already reached 417,538 installs. This is the one we chose.</li>
-      </ul>
-      <p>There were other ways to check the market, too. Paid app-intelligence services show install trends and estimated keyword data, for a subscription fee. Keyword tools can only estimate Play search volume, because Play does not publish it. Skimming the top-chart pages by hand is free, but the chart tops do not show how this year's entrants are doing. The record does not say why a script was chosen. What it does show is that the agent was already working in the repository and the cost was a few minutes.</p>
-      <p>The HWP viewer was started on October 4, went public on October 10, and shipped with no ad SDK. The difference from the photo apps is that review data and a rendering spike came before the first line of app code. (The rendering spike is written up in <a href="https://sugarmount21.com/en/ax/hwp-viewer-rhwp-webview/">Building an Android HWP viewer: rhwp in a WebView, measured on 222 documents</a>.)</p>
-      <p>Before you build your next app, look at the median installs of this year's entrants in the same category.</p>
-    </section>
-    <section aria-labelledby="procedure">
-      <h2 id="procedure">The 15-minute check to run before building</h2>
-      <p>This is the order we ran on October 3, plus step 2 (writing the rule first), which we skipped that day. Collection used the Python library google-play-scraper, which reads Play's web pages; it is not an official Google API.</p>
-      <ol>
-        <li>Write 6 to 9 queries in task words, the way a user would type them. We used six Korean queries and three English ones, such as "compress image" and "image resize kb".</li>
-        <li>Write the decision rule before looking. For example: if this year's entrants have a median in the low thousands and none has passed 100,000, do not build a single-feature general utility.</li>
-        <li>Collect the top 30 app IDs per query. For each app read lifetime installs, release date, rating count, and whether it has ads or in-app purchases.</li>
-        <li>Keep only apps whose title names the same task. We excluded general photo editors, video apps and PDF apps with a deny list. 103 became 71.</li>
-        <li>Take the apps released this year and count them, plus their median installs (mean of the two middle values when the count is even), maximum, how many are under 10,000 and how many are over 100,000. Note the release years of the top 10.</li>
-        <li>Check whether your own app ID appears anywhere in the results.</li>
-        <li>Pull up to 200 of the newest reviews for each of the top six apps, keep 3 stars and lower, and tag them by keyword: ads, payment, errors.</li>
-        <li>Search once more with the category name ("photo utilities"). If you are considering an all-in-one app, look at that result first.</li>
-      </ol>
-      <p>Below is a cleaned-up version of the collection code from that day, arranged to follow steps 3 to 6. We have not run this cleaned-up version, only syntax-checked it, so adapt the queries and both regexes to your category. The median comes from <code>statistics.median</code>, the line that prevents the upper-median mistake described above.</p>
-      <pre><code>import re, statistics, time
-from google_play_scraper import search, app
-QUERIES = [("사진 용량 줄이기", "ko", "kr"), ("사진 KB 줄이기", "ko", "kr"), ("compress image", "en", "us")]
-KEEP = re.compile(r"압축|용량|크기|사이즈|compress|resiz|kb|size", re.I)
-DROP = re.compile(r"video|동영상|pdf|editor|편집", re.I)
-YEAR, MY_APP = 2026, "com.example.myapp"
-ids = set()
-for q, lang, country in QUERIES:
-    ids |= {r["appId"] for r in search(q, lang=lang, country=country, n_hits=30) if r.get("appId")}
-    time.sleep(1)
-rows = []
-for app_id in sorted(ids):
-    try:
-        d = app(app_id, lang="ko", country="kr")
-    except Exception:
-        continue
-    time.sleep(0.4)
-    name = f'{d.get("title") or ""} {app_id}'
-    if not KEEP.search(name) or DROP.search(name):
-        continue
-    m = re.search(r"\d{4}", d.get("released") or "")   # "Oct 3, 2026" or "2026. 10. 3."
-    rows.append((int(m.group()) if m else None, d.get("realInstalls") or 0))
-new = [n for y, n in rows if y == YEAR]
-print("same-task apps:", len(rows), "| released in", YEAR, ":", len(new))
-if new:
-    print("median", statistics.median(new), "| max", max(new),
-          "| under 10k", sum(n &lt; 10_000 for n in new), "| 100k+", sum(n &gt;= 100_000 for n in new))
-print("my app in results:", MY_APP in ids)</code></pre>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/market-check-before-app-2-en.webp" width="1200" height="1028" alt="Step diagram: 9 queries, 103 apps from the top 30 results, read details, filter to 71, 32 released in 2026 with median 1,166 installs, and 39 of 127 low-rated reviews about too many ads." loading="lazy"><figcaption>Six steps from nine queries to the numbers the decision rule needs.</figcaption></figure>
-      <p>The four minutes cover collection and the first report for one category (09:47 to 09:51 Korea time). Add choosing queries and a person reading the tables against the step 2 rule, and budget 15 minutes.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">Why the median is not a forecast, and what the data cannot see</h2>
-      <p>The sample itself leans one way. Only apps in the top 30 for the nine queries got in; this year's apps that never ranked were left out. The median for all same-task apps released this year is probably below 1,166. So 1,166 is the result for this year's apps that made the top of search, and cannot be read as what a well-made app should expect. Even among them, six passed 10,000, the largest at 73,286.</p>
-      <p>In a category where demand is moving, last year's distribution says little about next month. Document viewers were that case: right after the policy change, new apps were collecting hundreds of thousands of installs.</p>
-      <p>Installs are worldwide lifetime counts, and rankings come from a logged-out session, so a real user's screen may differ. Review topics were counted with keyword regexes, so one review can land in several topics, and only six apps' newest reviews were read. Apps with an empty release-date field drop out of the yearly count. The library depends on Play's page layout and breaks when that changes.</p>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">What we check next</h2>
-      <p>The 30-day measurement for Compress Image ends on November 2, 2026. Impressions, install conversion and the real search terms will decide whether the three photo apps get merged into one. As of October 24, 2026 that merge has not started.</p>
-      <p>None of the U04 to U14 categories (photo to PDF, video, audio and others) has been scraped yet. Whether the hold is right can only be judged after running the same check on them, and the operator has not formally confirmed the hold. The next scrape runs with the median fixed.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20We%20built%20three%20photo%20apps%20before%20checking%20the%20market%3A%20this%20year%27s%20new%20apps%20had%20a%20median%20of%201%2C166%20installs">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">Frequently asked questions</h2>
-      <div class="faq">
-        <details><summary>How many installs does a new Android utility app usually get?</summary><div><p>In the photo-compress category we scraped on October 3, 2026, the 32 apps released that year that made the top 30 search results had a median of 1,166 lifetime installs. It varies by category, so scrape your own before building.</p></div></details>
-        <details><summary>Can I see Google Play search volume for a keyword?</summary><div><p>No. Play does not publish search volume per query. After your app is public, Play Console shows only the search terms that brought users to your own listing.</p></div></details>
-        <details><summary>Does an all-in-one app beat single-feature apps on Play?</summary><div><p>Our data showed no sign that it does. A category search like "photo utilities" returned only general apps, and one developer's two single-format viewers had 436k and 469k installs against 13k for its all-in-one app. That is one developer, so we do not treat it as a rule.</p></div></details>
-      </div>
-    </section>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">How we shipped four Android apps in 20 days with an AI coding agent</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Sun, 25 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>One --check gate for a static site agents co-edit – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/static-site-check-gate/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/static-site-check-gate/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/static-site-check-gate-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · How-to</span>
-      <h1>A static site that several AI agent sessions edit: one --check gate before every commit</h1>
-      <p class="lead">Nobody edits generated files, and before every commit --check must report zero files a rebuild would change and zero gate errors. With those two rules, budget overruns and drifting dates that only appear once work is combined get caught before a commit.</p>
-      <p><code>python tools/build.py --check</code> failed on the night of October 19, 2026, right after a rebase onto another session's commit, with one line: <code>[BUDGET-FONT] index.html: font files this page needs 421 KB &gt; 400 KB</code>. The build before the rebase had no error on the home page, so the problem only showed up once the two pieces of work were combined. This site is built without a framework by six Python modules (3,616 lines) that import nothing outside the standard library, and the rule is that whoever commits, person or agent, passes that command first. This note follows four of the times it stopped a commit between October 5 and 22.</p>
-      <p class="note">Sources: this site's git history (bdbbe97, b82faac, 663f04e, 6b96643, 4f46df8 and others), the code in <code>tools/</code>, the review documents written against the redesign spec, work session logs and the AX notes publishing log. Line, test and file counts were redone at commit 1d5d432 on October 24, 2026.</p>
-    </section>
-    <section aria-labelledby="check-stops">
-      <h2 id="check-stops">Four times --check stopped a commit</h2>
-      <p><code>--check</code> rebuilds the whole site in memory and asks two questions: does any output differ by even one byte from the file on disk, and did the checker module <code>tools/checks.py</code> report an error? Either one means exit 1. In outline:</p>
-      <pre><code>outputs = build_all()              # pages, feeds, sitemap, CSS: in memory
-changed = [p for p, text in outputs.items()
-           if read_file(p) != text]
-report = checks.run(ROOT, outputs)  # 106 issue codes
-if "--check" in argv:
-    if changed or report.errors:
-        exit(1)                     # nothing is written
-else:
-    write_files(changed)</code></pre>
-      <p>On October 24 the build wrote 162 files, the checker had 106 issue codes (fixed names such as <code>SD-CRUMB-HOME</code>), and one run took 11.6 seconds on this PC.</p>
-      <p>The four stops: two files out of date right after the first build on October 5; 101 gate errors when the redesign was integrated on October 18; the home page needing 421 KB of fonts against a 400 KB cap after the October 19 rebase; and on October 22, a new note title that pushed two older notes to 482 KB and 473 KB against a 470 KB cap. On October 23 we added a check that halts the image tools on characters the font draws as empty.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/static-site-check-gate-1-en.webp" width="1200" height="894" alt="Step diagram: Oct 5, two files out of date right after a build; Oct 18, 101 gate errors at integration; Oct 19, the home page needs 421 KB of fonts after a rebase; Oct 22, a new title pushes two other notes to 482 KB and 473 KB; Oct 23, a blank-glyph check is added to the image tools." loading="lazy"><figcaption>All four were caught before a commit, and the home page overflow only showed up after a rebase onto another session's commit.</figcaption></figure>
-    </section>
-    <section aria-labelledby="ownership">
-      <h2 id="ownership">Humans and agents write only the body and the data files</h2>
-      <p>Every file has exactly one kind of writer. Condensed from the table in the repository's AGENTS.md:</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Writer</th><th>Files</th></tr></thead>
-        <tbody>
-          <tr><td>Content authors (people or agents)</td><td>The <code>&lt;title&gt;</code>, description and <code>&lt;main&gt;</code> of hand-written pages (minus build blocks), <code>data/apps.json</code>, <code>data/ax.json</code></td></tr>
-          <tr><td>One build-owner session</td><td><code>tools/*.py</code>, and it runs the integration build</td></tr>
-          <tr><td>The build only</td><td>Head, header, footer, breadcrumbs, JSON-LD, home and list pages, topic pages, sitemap, RSS, robots.txt, llms.txt, the dates file <code>data/content-dates.json</code>, two generated stylesheets</td></tr>
-        </tbody>
-      </table></div>
-      <p>Inside a hand-written page, every spot the build fills is wrapped in a marker such as <code>&lt;!-- build:meta --&gt;</code>. Each build empties and refills those blocks and leaves the rest of <code>&lt;main&gt;</code> byte for byte, with one exception: the tracking parameter on Play install links. Content authors never run the build. They run the read-only <code>python tools/checks.py --file &lt;path&gt;</code>.</p>
-      <p>The first plan did not have this split; a review added it. An agent wrote the October 18 redesign spec, and it told every work package both to finish with build and --check and to leave generated HTML alone. A second agent, assigned to attack the spec, pointed out the contradiction: the build rewrites the head and footer of every hand-written page, so one session building to verify its work would change some 60 files another session was editing. Since then the integration build runs once, in one place.</p>
-      <p>Rebase conflicts follow the same rule. On October 19 the conflicted files were ones the build rewrites: 404.html, the about page, app pages, rss.xml. We took the other session's version of those, kept our own AX note files, and rebuilt. Do not hand-edit or hand-merge generated files. Pick a side, rebuild, and commit only when <code>--check</code> reports zero.</p>
-      <p>The six build modules import only standard library pieces such as <code>hashlib</code>, <code>html.parser</code> and <code>xml.etree</code>, so there is no package to install. The four image tools (775 lines) are different: they need Pillow, and they sit outside <code>--check</code>.</p>
-    </section>
-    <section aria-labelledby="idempotency">
-      <h2 id="idempotency">Test idempotency with tomorrow's date, not with a second build</h2>
-      <p>On October 5 an agent wrote the first build script (725 lines when committed) and ran it. This is what came back:</p>
-      <pre><code>45 files, 45 changed
-out of date:
-  apps/sugarcard/index.html
-  sitemap.xml</code></pre>
-      <p>A second build changed two files, and the third run said up to date. The lines that moved were sitemap lastmod dates.</p>
-      <p>There were two layers of cause. The near one was ordering: the build read lastmod from <code>git status</code> and <code>git log</code> before writing any file, so writing files changed the git state and the next build saw different input. The deeper one was where the date came from at all, which was repository state and the wall clock instead of page content.</p>
-      <p>The review agent flagged only the near cause, and that day's fix only addressed it: a set of "files this build writes get today's date". Two builds on the same day then agreed. The dates still came from git, though. A build that converges after two runs looks idempotent, yet the same input built the next day moves the dates again.</p>
-      <p>Thirteen days later the redesign removed that design. The redesign spec, also written by an agent, had two loops of the same kind. A generated app page kept its "last updated" line inside the hashed body, so the date changed the hash and the hash changed the date. And the spec had the build write a generated block into <code>site.css</code> while the stylesheet version string was a hash of that same file; the reviewer wrote that <code>--check</code> would "fail once, forever". Both were fixed before any code was written.</p>
-      <p>On the CSS side, the generated stylesheets are now built in memory first and the version string is computed and substituted before anything is written. The date rules (content hash, the <code>SOURCE_DATE</code> variable) are in <a href="https://sugarmount21.com/en/ax/sitemap-lastmod-content-hash/">Every sitemap lastmod had the same date: deriving modified dates from a content hash</a>.</p>
-      <p>At the October 18 integration, sha256 hashes of 445 tracked and untracked files were taken after the first build, the second build and a <code>SOURCE_DATE</code> run, with zero differences. On October 24, in a scratch copy, a plain build, <code>SOURCE_DATE=2026-10-25</code> and <code>SOURCE_DATE=2026-12-31</code> all printed "162 files, 0 changed".</p>
-    </section>
-    <section aria-labelledby="gate-was-wrong">
-      <h2 id="gate-was-wrong">At the first integration, the gate was the one that was wrong</h2>
-      <p>The October 18 redesign ran as a workflow split across 36 agents and took about 2 hours 24 minutes. The first <code>--check</code> on the merged result found zero files to rewrite and 101 gate errors.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/static-site-check-gate-2-en.webp" width="1200" height="662" alt="Bar chart: of the 101 errors from the first --check after the Oct 18, 2026 integration, BUDGET-FONT 43, ANCHOR-DUP 24, DATA-APP 19, BUDGET-OG 14, LINK-BROKEN 1." loading="lazy"><figcaption>The largest group of errors came from how the gate counted, not from the pages.</figcaption></figure>
-      <p>Most of the 43 BUDGET-FONT errors were the checker's own mistake. English pages draw © in the system font through CSS, but the checker counted that character and concluded the pages needed extra font files. One cost was real: the breadcrumb separator <code>›</code> alone made every page with breadcrumbs download one more 25 KB font file. The fix aligned the checker's character counting with the CSS rules and moved the separator to the system font. The rest were 24 anchor texts pointing at two different URLs, 19 app-colour samples on the design demo page, 14 share images over 200 KB and one broken link.</p>
-      <p>When the gate changes, its tests change with it. That fix added six tests, and each of the eight new guards was removed in turn in a scratch copy to confirm a test failed. As of October 24 every one of the 106 issue codes appears by name in <code>test_checks.py</code>, out of 188 tests in total.</p>
-      <p>The integrating agent also made two gate calls on its own. Individual privacy policies and the design demo page have no font cap in the spec, so their overruns became warnings, and the cap on the generated font stylesheet went from 20 KB to 24 KB. The agent wrote "needs confirmation" for both in its report. The operator settled a different item from that same report that evening (listing the privacy officer under the business name). The comment on the 24 KB cap still says "the spec owner should confirm or lower it" on October 24.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20static%20site%20that%20several%20AI%20agent%20sessions%20edit%3A%20one%20--check%20gate%20before%20every%20commit">Email us</a></p></aside>
-    <section aria-labelledby="font-budget">
-      <h2 id="font-budget">Another note's title can break a page's font budget</h2>
-      <p>The site's Korean font is split into 92 files by Unicode range, and a page downloads only the files that cover its characters. Note pages are capped at 470 KB, home and list pages at 400 KB. One rare Hangul syllable can pull in a 17 to 40 KB file by itself, so two of the first three AX notes came out at 619 KB and 533 KB. We reworded them that evening and wrote a helper that shows which characters pull in which files.</p>
-      <p>The home page broke for another reason. It listed the three newest AX note titles, which change every day, and after the rebase merged another session's work it needed 421 KB. Instead of rewording titles, the home list became links to topic pages (663f04e); topic names are fixed text, so the cost stops moving. The October 22 change that dropped note titles from the hub's topic cards had the same reason and took the hub from 468 KB to 389 KB (6b96643).</p>
-      <p>Also on October 22, a single syllable, <code>쟀</code>, in a new note's title travelled through the related-notes lists into two older notes and pushed them to 482 KB and 473 KB. Checking the new file alone passes. Rewording the title brought the two pages to 450 KB and 441 KB.</p>
-    </section>
-    <section aria-labelledby="og-images">
-      <h2 id="og-images">Share images use real screens and never carry text</h2>
-      <p><code>tools/og.py</code> builds the share images for app pages and help articles from a real Play screenshot on a neutral background, with no text and no logo. Text cards are reserved for the home, hub, about, privacy and AX pages.</p>
-      <p><code>--check</code> does not rebuild and compare images. Running og.py in a scratch copy on October 24 changed 4 of the 155 files: two app cards committed on October 19 with a new app page without going through og.py (they carry a title and tagline), and the two home cards, committed before that app's icon existed. Two og.py runs in a row produce identical bytes, so the generator is deterministic and the files that differ from its output are the committed ones. The daily publishing routine does not commit unrelated image changes, so from October 20 to 24 it ran og.py and restored these four files five times.</p>
-      <p>The background to the October 23 blank-glyph check in the image tools is in <a href="https://sugarmount21.com/en/ax/hangul-blank-glyph-cmap/">Android showed some Hangul as blank gaps: NanumSquare's cmap claimed 11,172 syllables but drew only 2,479</a>.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">Not for browser editing, very large sites or repositories without CI</h2>
-      <p>Teams that write in a browser and expect a preview will not like it. Here authors edit the HTML body directly and run commands. We have no record of weighing it against a static site generator. But three of the four stops here (October 18, 19 and 22) came from checks over the whole output, so a generator would still need those checks and the date rules built separately.</p>
-      <p>Large sites pay more. <code>--check</code> rebuilds and compares everything on every run. 11.6 seconds for 162 files is fine, but there is no incremental build.</p>
-      <p>Nothing enforces the gate. The repository has no CI job, so it works only if someone runs the command before committing. The gate can also be wrong, as the 43 errors on October 18 showed, and it cannot stop a commit that raises its own caps.</p>
-    </section>
-    <section aria-labelledby="how-to">
-      <h2 id="how-to">Adding a --check gate to another site, in order</h2>
-      <ol>
-        <li>Put a table of who writes which files at the top of your agent instructions (AGENTS.md or similar), and mark generated files as hands-off.</li>
-        <li>Wrap every spot the build fills inside a hand-written page in <code>&lt;!-- build:NAME --&gt;</code> markers; the build empties and refills them each time.</li>
-        <li>Make <code>--check</code> render every output in memory, compare it with disk, run the checks on the same output, and exit 1 if either fails.</li>
-        <li>Derive dates and version strings from content hashes, and keep date lines and automatic lists out of the hash input.</li>
-        <li>Test idempotency three ways: two builds in a row, a build dated tomorrow, and a build dated in the past (dates must not go backwards).</li>
-        <li>Give every check a fixed code and a test that proves the code fires. Remove each guard in a scratch copy and confirm a test fails.</li>
-        <li>Content sessions run only the read-only per-file check; one session runs the integration build once.</li>
-        <li>When generated files conflict in a rebase, pick a side, rebuild and run <code>--check</code>.</li>
-        <li>Check budgets that mix in other pages' text (fonts, size) on the whole output, and keep daily-changing lists off shared pages.</li>
-        <li>Have a person review any commit that changes a cap.</li>
-      </ol>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">What we will check next</h2>
-      <p>Images are still outside the gate. The next check is a step in <code>--check</code> that compares og.py output with the committed files; before that, the text-bearing app card has to become either a listed og.py exception or generator output. The 24 KB stylesheet cap and the two warning-only pages have not had a human review yet. How several sessions shared this repository is described in <a href="https://sugarmount21.com/en/ax/parallel-agent-workstreams/">"Use hundreds of agents" in practice: 10 workstreams, 59 commits in a day, three running at once</a>.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20static%20site%20that%20several%20AI%20agent%20sessions%20edit%3A%20one%20--check%20gate%20before%20every%20commit">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">Frequently asked questions</h2>
-      <div class="faq">
-        <details><summary>Do you commit the generated HTML?</summary><div><p>Yes. GitHub Pages serves the repository's files as they are (with .nojekyll, Jekyll processing is off), so the build output is the deployment. <code>--check</code> confirms that the committed output equals what the current inputs produce.</p></div></details>
-        <details><summary>How do you test that a static site build is idempotent?</summary><div><p>Build twice in a row, then with tomorrow's date and with a past date, and expect zero changed files. Two same-day builds can agree while dates still move the next day, so make "today" overridable through an environment variable first.</p></div></details>
-        <details><summary>How do you resolve conflicts when several AI agent sessions edit the same site repository?</summary><div><p>Merge only source files such as page bodies and data; for generated files, pick one side and rebuild. Run <code>--check</code> on the rebuilt result and commit only when it passes. On this site, that step after a rebase is where the home page font overflow first appeared.</p></div></details>
-      </div>
-    </section>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Claude Code login and a first unattended question</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Run a first Claude Code harness job with the kit</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Sun, 25 Oct 2026 09:00:00 +0900</pubDate>
   </item>
 </channel>
 </rss>

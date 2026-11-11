@@ -8,6 +8,214 @@
   <atom:link href="https://sugarmount21.com/rss.xml" rel="self" type="application/rss+xml"/>
   <lastBuildDate>Thu, 12 Nov 2026 09:00:00 +0900</lastBuildDate>
   <item>
+    <title>Android 테마 색이 다이얼로그로 새는 자리 3곳 – SugarMount</title>
+    <link>https://sugarmount21.com/ax/android-theme-color-leak/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/ax/android-theme-color-leak/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/android-theme-color-leak-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX 노트 · 방법</span>
+      <h1>XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</h1>
+      <p class="lead">다이얼로그와 시트 버튼 글자는 앱바 색을 물려받았습니다. 그 창에만 테마를 덮고, 대비는 띄운 화면에서 측정합니다.</p>
+      <p>한글 띄어쓰기 앱의 삭제 확인 창에서 취소·확인 버튼 글자가 흰 바탕 위에 거의 흰색으로 그려졌습니다. 대비(명암비)는 1.02:1로, 보통 글자에 요구하는 4.5:1에 한참 못 미쳤습니다. 2026년 9월 16일 이걸 고칠 때 레이아웃 XML 어디에도 흰 글자는 없었고, 앱바를 밝게 칠하려고 정해 둔 테마 색이 버튼 글자색으로 흘러 들어가 있었습니다.</p>
+      <p>고친 뒤 열하루 만에 새로 만든 하단 시트 두 곳에서 같은 색이 다시 나왔고, 이번에는 릴리스 빌드를 올린 갤럭시 S21 실기기에서야 보였습니다. 첫 수정은 다이얼로그만 덮었고, 교정 시트의 테스트는 글자색이 정해 둔 색과 같은지만 확인했으며 미니창 테스트는 색을 보지 않았습니다. 앱바 색을 테마 기본 색으로 정해 둔 앱이라면 다이얼로그나 시트를 새로 만들 때마다 같은 자리로 샐 수 있습니다.</p>
+    </section>
+    <section aria-labelledby="three-leaks">
+      <h2 id="three-leaks">앱바 색이 버튼 글자로 간 자리는 세 곳이었습니다</h2>
+      <p>9월 16일 13시 25분, 운영자가 활동 내역 삭제 팝업의 버튼 글자가 라이트 모드에서 흰색이라 안 보인다고 알려 왔습니다. 에이전트(Claude)가 구글의 UI 라이브러리 Material Components 1.14.0의 스타일 정의를 따라가 보니, 버튼 글자색은 아래 순서로 테마 속성 하나에 닿았습니다.</p>
+      <pre><code>AlertDialog 버튼
+  → buttonBarButtonStyle
+  → Widget.MaterialComponents.Button.TextButton
+  → mtrl_text_btn_text_color_selector (활성 상태 색)
+  → ?attr/colorPrimary</code></pre>
+      <p><code>colorPrimary</code>는 테마가 정하는 기본 색 자리이고, 이 앱의 앱 테마(<code>AppTheme</code>)가 여기에 넣어 둔 값은 앱바 색(라이트 #fafdff, 다크 검정)입니다. 다크에서는 흰 다이얼로그 위 검은 글자가 21:1로 잘 보였기 때문에 라이트에서만 문제가 났습니다.</p>
+      <p>전역 <code>colorPrimary</code>를 바꾸면 앱바 색까지 바뀌어서 그 방법은 버렸습니다. 앱 액센트 파랑으로 덮는 안도 흰 바탕에서 3.80:1이라 기준에 못 미쳤습니다. 첫 수정(c3f4f87)은 다이얼로그 창에만 씌우는 테마 오버레이 <code>alertDialogTheme</code>을 라이트·다크 양쪽에 걸고, 그 안의 <code>colorPrimary</code> 하나만 더 진한 파랑으로 덮었습니다. 오버레이의 부모는 원래 쓰던 다이얼로그 테마 그대로입니다.</p>
+      <p>9월 27일에 들어온 두 화면은 다른 경로로 같은 색을 받았습니다. 색칠된 교정 어절을 누르면 뜨는 교정 시트와 텍스트 선택 메뉴의 미니창은 둘 다 화면 아래에서 올라오는 <code>BottomSheetDialog</code>인데, 내용 뷰를 액티비티 컨텍스트로 부풀렸습니다(inflate: 레이아웃 XML을 뷰 객체로 만드는 일). 그러면 뷰는 시트의 테마 오버레이를 거치지 않고 액티비티의 <code>AppTheme</code>에서 바로 <code>colorPrimary</code>를 읽습니다. "왜 틀렸나요?" 채움 버튼의 바탕과 "확인", "교정문 복사", "앱에서 열기"의 글자가 #fafdff가 되어, 흰 시트 위에서 1.00~1.02:1이었습니다.</p>
+      <p>다크 모드는 원인이 하나 더 있었습니다. 이 앱의 다크 <code>AppTheme</code>도 부모가 밝은 테마(<code>Theme.MaterialComponents.Light</code>)여서, 교정 시트는 다크에서도 흰 바탕으로 떴습니다. 그 위에 다크용으로 밝게 잡은 교정 글자색이 얹혀 3.2:1이 됐습니다. 미니창은 반대였습니다. 바탕은 어두운 #212121인데 결과 글자는 테마 기본 글자색인 검정을 받아, 계산하면 1.30:1이었습니다.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/android-theme-color-leak-1-ko.webp" width="1200" height="836" alt="단계 그림: 9월 16일 AlertDialog 버튼 1.02:1, 9월 27일 교정 시트 1.02:1과 다크 3.2:1, 같은 날 미니창 1.00:1과 다크 검정 글자(둘 다 9월 28일 발견), 아직 새지 않은 AppTheme.NoActionBar." loading="lazy"><figcaption>9월 16일 다이얼로그에서 막은 colorPrimary가 9월 27일에 만든 시트 두 곳에서 다시 1.00~1.02:1로 나왔고, 9월 28일 실기기에서 드러났습니다.</figcaption></figure>
+      <p>고친 방법은 시트 내용 뷰를 시트 자신의 컨텍스트(<code>dialog.context</code>)로 부풀리고, <code>AppTheme</code>에 시트 전용 오버레이(<code>bottomSheetDialogTheme</code>)를 걸어 시트 바탕과 버튼 색 토큰을 따로 정하는 것이었습니다. 9월 28일 교정 시트를 먼저 고치면서 오버레이를 걸었고(4c27ac7), 21분 뒤 미니창은 그 오버레이 아래에서 컨텍스트와 버튼 색만 바꿨습니다.</p>
+    </section>
+    <section aria-labelledby="runtime-test">
+      <h2 id="runtime-test">첫 테스트는 XML을 읽었고, 다시 쓴 테스트는 띄운 버튼을 읽습니다</h2>
+      <p>13시 54분 c3f4f87에 붙은 테스트는 리소스 XML을 글자로 읽어, 오버레이 줄이 있는지와 버튼 색 값이 흰 바탕 위 4.5:1을 넘는지를 봤습니다. 흰 글자는 실행 중에 테마가 속성을 풀 때 생기므로, XML 값을 읽는 검사에는 이 결함이 보이지 않습니다.</p>
+      <p>14시 10분 운영자가 전부 고친 게 맞는지, 배포해도 되는지 교차 검증하라고 했습니다. 그 요구를 받고서야 에이전트는 "XML에 그렇게 적혀 있다"와 "실제로 그 색이 나온다"는 다르다며 Robolectric(기기 없이 JVM에서 안드로이드 코드를 돌리는 테스트 도구) 테스트를 썼습니다(99e6bf4). <code>AppTheme</code>을 씌운 컨텍스트로 다이얼로그를 만들어 <code>show()</code>하고, 버튼이 실제로 그리는 글자색(<code>currentTextColor</code>)을 읽습니다. 라이트 설정에서 오버레이 한 줄을 지우고 돌리자 아래처럼 원래 증상이 숫자로 나왔습니다.</p>
+      <pre><code>확인 #fafdff on #ffffff = 1.02:1   FAIL
+취소 #fafdff on #ffffff = 1.02:1   FAIL
+다크 모드에서도 버튼이 읽힌다         pass</code></pre>
+      <p>9월 27일 교정 시트에도 Robolectric 테스트는 있었습니다. 다만 교정 글자의 <code>currentTextColor</code>가 정해 둔 빨강 하이라이트 색과 같은지만 비교했습니다. 색이 맞으면 통과하므로, 그 글자가 흰 시트 위에 있든 검은 시트 위에 있든 결과가 같습니다. 9월 28일 S21 실기기 점검 뒤 고친 테스트는 띄운 시트의 실제 바탕을 먼저 읽습니다.</p>
+      <pre><code>// 시트 바탕 뷰
+val sheet = dialog.findViewById&lt;View&gt;(com.google.android.material.R.id.design_bottom_sheet)
+// 시트 배경 도형의 채움색 = 실제 바탕색
+val bg = (sheet.background as MaterialShapeDrawable).fillColor!!.defaultColor
+check("교정(유형 색)", dialog.findViewById&lt;TextView&gt;(R.id.correction_corrected).currentTextColor, bg, 4.5)</code></pre>
+      <p>이 방식으로 시트의 글자와 버튼을 라이트·다크에서 모두 재고, 채움 버튼은 글자 대 버튼 바탕 4.5:1과 버튼 바탕 대 시트 3:1을 따로 봅니다. 테마 색 결함은 띄운 화면의 <code>currentTextColor</code>와 그 뒤에 깔린 실제 바탕으로 재십시오.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20XML%20%EC%96%B4%EB%94%94%EC%97%90%EB%8F%84%20%ED%9D%B0%EC%83%89%EC%9D%B4%20%EC%97%86%EB%8A%94%EB%8D%B0%20%EB%8B%A4%EC%9D%B4%EC%96%BC%EB%A1%9C%EA%B7%B8%20%EA%B8%80%EC%9E%90%EA%B0%80%20%EC%82%AC%EB%9D%BC%EC%A1%8C%EB%8B%A4%3A%20%ED%85%8C%EB%A7%88%20%EC%83%89%EC%9D%B4%20%EC%83%88%EB%8A%94%20%EC%9E%90%EB%A6%AC%203%EA%B3%B3">메일로 문의하기</a></p></aside>
+    <section aria-labelledby="lightness-only">
+      <h2 id="lightness-only">하이라이트는 색조를 두고 명도만 움직였습니다</h2>
+      <p>다이얼로그 제보 4분 전에 에이전트가 먼저 짚은 문제는 오류 유형을 색으로 구분하는 맞춤법 하이라이트였습니다. 빨강은 맞춤법, 청록은 띄어쓰기, 파랑은 통계 기반 교정, 주황은 표준어 의심, 보라는 네이버 검사 결과가 따로 보라로 표시하는 유형입니다. 다크 모드용 색 폴더(<code>values-night</code>)에 이 다섯 색이 하나도 없어서 다크에서도 라이트 값이 그대로 쓰였고, 다크 바탕 #212121 위 보라는 2.70:1이었습니다.</p>
+      <p>13시 21분, 더 테스트할 것이 없느냐는 운영자 물음에 에이전트는 이 보라를 꼽고, 고친다면 다크용 밝은 보라 한 줄이면 된다고 했습니다. 대비로는 충분한 색이지만, HSL로 풀면 색상각이 5도 가까이 돌고 채도가 100%까지 올라가 다른 보라가 되는 값입니다. 운영자가 제대로 고치라고 하자, 에이전트는 다크용 다섯 색을 새로 넣었지만 라이트에서는 주황 하나만 바꾸고 빨강·청록은 익숙한 색이라며 파랑과 함께 그대로 두었습니다.</p>
+      <p>13시 40분 4.5:1 기준으로 만든 테스트가 셋 다 걸렀고, 에이전트는 "테스트가 제 판단을 반박했습니다"라고 보고했습니다. 출력의 temp1은 파랑, temp2는 청록, temp4는 빨강입니다.</p>
+      <pre><code>light/temp1 #3982ff on #fafdff = 3.54:1
+light/temp2 #009a9a on #fafdff = 3.38:1
+light/temp4 #ee4b4b on #fafdff = 3.58:1</code></pre>
+      <p>라이트 보라와 다크 주황만 그대로 두고, 나머지 8칸(기준 아래 7칸과 4.67:1로 여유가 없던 다크 청록)은 색상각을 고정한 채 명도를 옮겼습니다. 라이트는 어둡게, 다크는 밝게 옮겼고, 다시 계산해 보면 색상각이 가장 많이 돈 파랑도 0.2도입니다. 처음에는 4.5:1에 딱 맞춘 값을 계산했다가, 다크는 여유를 두려고 5.0:1을 목표로 다시 잡았습니다.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/android-theme-color-leak-shot1-ko.webp" width="1100" height="682" alt="수정 전후 colors.xml 값으로 다시 계산한 대비 점 그래프로, 4.5:1 아래였던 하이라이트 일곱 칸과 다이얼로그 버튼(1.02:1)이 수정 뒤 4.71~5.83:1로 올라간 모습." loading="lazy"><figcaption>처음에 그대로 두었던 라이트 빨강·청록·파랑은 셋 다 4.5:1 아래였고, 색조를 둔 채 명도만 옮겨 모두 기준을 넘겼습니다. (출처: 한글 띄어쓰기 앱 저장소 c3f4f87 전후 colors.xml, 2026-11-11 재계산)</figcaption></figure>
+      <p>c3f4f87 본문은 이 결정을 "빨강은 빨강, 초록은 초록으로 남는다"고 적었습니다(이 초록이 위의 청록입니다). 의미가 붙은 색은 색조를 돌리지 마십시오. 명도만 움직이고, <code>values</code>와 <code>values-night</code> 양쪽에 값을 두십시오. 웹 쪽에서 같은 생각으로 다크 글자색을 명도 1%씩 올려 찾는 방식은 <a href="https://sugarmount21.com/ax/build-measures-contrast/">색 대비 4.5:1을 빌드 게이트로 재기</a>에 적었습니다.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">띄운 화면에서 대비를 재는 순서</h2>
+      <ol>
+        <li>안 보이는 글자의 색을 스타일 정의 끝까지 따라가, 끝에 닿은 테마 속성(<code>?attr/colorPrimary</code> 등)에 다른 용도의 색이 들어 있지 않은지 봅니다.</li>
+        <li>전역 테마 색은 두고 그 창에만 오버레이(<code>alertDialogTheme</code>, <code>bottomSheetDialogTheme</code>)를 겁니다. 내용 뷰는 <code>dialog.context</code>로 부풀립니다. 다이얼로그 쪽은 이렇게 걸었습니다.
+<pre><code>&lt;!-- AppTheme 안(values, values-night 양쪽) --&gt;
+&lt;item name="alertDialogTheme"&gt;@style/AlertDialogTheme&lt;/item&gt;
+&lt;style name="AlertDialogTheme" parent="ThemeOverlay.MaterialComponents.Dialog.Alert"&gt;
+    &lt;item name="colorPrimary"&gt;@color/dialog_button_text&lt;/item&gt; &lt;!-- #0063c6 --&gt;
+&lt;/style&gt;</code></pre></li>
+        <li>매니페스트에 적힌 테마마다 오버레이가 걸렸는지, <code>parent="Theme.…"</code>로 점 앞 테마와 끊기지 않았는지 봅니다.</li>
+        <li>의미 색은 HSL 색상각을 고정하고 명도만 옮겨, 라이트·다크 값을 따로 찾습니다.</li>
+        <li>Robolectric으로 화면을 <code>show()</code>한 뒤 <code>currentTextColor</code>와 실제 바탕색(시트는 <code>MaterialShapeDrawable</code>의 <code>fillColor</code>)의 대비를 라이트·다크에서 측정합니다.</li>
+        <li>수정을 한 줄 되돌려 테스트가 원래 숫자(이번에는 1.02:1)로 실패하는지 봅니다. 9월 16일에는 이런 되돌리기 6건을 넣어 모두 잡히는 것을 확인했습니다.</li>
+        <li>릴리스 APK를 실기기에 올려 새 화면을 라이트·다크로 한 번 엽니다.</li>
+      </ol>
+      <p>측정 테스트는 화면마다 따로 써야 해서, 테스트가 없는 새 화면은 9월 28일처럼 실기기에서 처음 드러납니다. 그날의 S21 점검은 <a href="https://sugarmount21.com/ax/agent-review-refutation/">에이전트 코드 리뷰, 반박을 버틴 20건만 고쳤다</a>에 있습니다. Robolectric은 실제 기기 렌더링이 아니고, 이 앱의 화면은 XML 뷰라 Jetpack Compose 화면에는 재 보지 않았습니다.</p>
+    </section>
+    <section aria-labelledby="not-reached">
+      <h2 id="not-reached">오버레이가 닿지 않는 두 곳: NoActionBar와 프레임워크 AlertDialog</h2>
+      <p>9월 16일 14시 19분, 다이얼로그 호출과 매니페스트 테마를 맞춰 보던 에이전트가 하나를 더 찾았습니다. <code>AppTheme.NoActionBar</code>는 이름만 보면 <code>AppTheme</code>의 자식이지만 정의에는 <code>parent="Theme.AppCompat.NoActionBar"</code>가 적혀 있습니다. Android 스타일은 <code>parent</code> 속성을 적으면 점 앞의 이름으로 상속하지 않으므로, 이 테마에는 두 오버레이가 하나도 걸려 있지 않습니다.</p>
+      <p>이 테마를 쓰는 화면은 앱 시작 화면 하나입니다. 거기 뜨는 버전·권한 팝업은 자체 레이아웃으로 만든 창이라 <code>colorPrimary</code> 경로를 타지 않고, 그래서 아직 샌 적이 없습니다. 앱 1.6.018 버전의 변경 기록(CHANGELOG)은 이 화면에 <code>AlertDialog</code>를 추가하면 수정이 적용되지 않는다고 적어 두었고, 11월 10일 원격 개발 브랜치에서도 parent는 그대로입니다.</p>
+      <p>9월 16일 점검표는 다이얼로그를 만드는 세 곳(활동 내역 삭제, 인사카드 화면, 구독 화면)이 모두 <code>AppTheme</code> 아래라 덮였다고 적었습니다. 그런데 androidx 다이얼로그는 제보가 온 활동 내역뿐이었고, 나머지 둘은 안드로이드 프레임워크 기본 클래스 <code>android.app.AlertDialog</code>였습니다. 인사카드 호출은 그 뒤 없어졌지만, 11월 10일 원격 개발 브랜치에는 구독 화면의 한 곳(구독을 둘 이상 가진 경우에만 뜨는 분기)이 아직 프레임워크 클래스입니다. 9월 16일의 측정 테스트가 띄우는 것은 androidx 다이얼로그라, 이 한 곳의 버튼 색은 아직 재 보지 않았습니다.</p>
+    </section>
+    <p class="note">기준일 2026년 11월 11일. <a href="https://sugarmount21.com/apps/sugarspeller/">한글 띄어쓰기</a> 앱 저장소의 git 기록과 1.6.018 변경 기록, 9월 16일 작업 세션 기록을 바탕으로 썼고, 대비는 WCAG 상대 휘도 식으로 다시 계산했습니다. 현재 상태는 11월 10일 원격 개발 브랜치 기준입니다.</p>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20XML%20%EC%96%B4%EB%94%94%EC%97%90%EB%8F%84%20%ED%9D%B0%EC%83%89%EC%9D%B4%20%EC%97%86%EB%8A%94%EB%8D%B0%20%EB%8B%A4%EC%9D%B4%EC%96%BC%EB%A1%9C%EA%B7%B8%20%EA%B8%80%EC%9E%90%EA%B0%80%20%EC%82%AC%EB%9D%BC%EC%A1%8C%EB%8B%A4%3A%20%ED%85%8C%EB%A7%88%20%EC%83%89%EC%9D%B4%20%EC%83%88%EB%8A%94%20%EC%9E%90%EB%A6%AC%203%EA%B3%B3">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/ax/quiz-reach-entry-point-push/">퀴즈 도달 2.6%에서 17.7%로: 진입 건수의 63%는 아침 알림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/r8-gson-field-names/">단위 테스트 203개가 놓친 릴리스 전용 빈 값: R8과 Gson 필드 이름</a></li>
+        <li><a href="https://sugarmount21.com/ax/pdf-save-back-seven-points/">&#x27;PDF로 저장&#x27; 하나를 내려고 BACK을 7가지 시점에 눌렀다</a></li>
+        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
+        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Thu, 12 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>출시 게이트가 출시물이 아닌 것을 검사했다 – SugarMount</title>
+    <link>https://sugarmount21.com/ax/gate-checked-wrong-artifact/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/ax/gate-checked-wrong-artifact/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/gate-checked-wrong-artifact-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX 노트 · 사고 기록</span>
+      <h1>출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</h1>
+      <p class="lead">평문 시그널링 AAB가 출시 게이트를 통과했고, 다른 앱의 광고 SDK 판정은 출시하려던 빌드가 쓰지 않는 의존성 목록(클래스패스)을 봤습니다.</p>
+      <p>개발용 설정으로 빌드해 "제출용은 아니다"라고 문서에 적어 둔 Android 앱 번들(AAB)이 출시 게이트에서 PASS를 받았습니다. 2026년 9월 13일 Flutter P2P 채팅 앱의 일입니다. 서버 주소는 localhost였고, 연결을 맺는 시그널링도 암호화하지 않은 평문이었습니다. 한 달 뒤 가족 일정 앱 AXFamily에서는 게이트의 광고 SDK 판정이 출시하려던 빌드와 다른 의존성 목록을 보고 있었습니다.</p>
+      <p>두 게이트 모두 AI 코딩 에이전트와 같이 만들었고, 둘 다 출시물 옆에서 따로 만든 입력을 판정했습니다. 게이트가 초록이면 출시물도 검증됐다고 믿고 있다면, 그 PASS가 무엇을 읽었는지부터 봐야 합니다.</p>
+    </section>
+    <section aria-labelledby="chat-plaintext">
+      <h2 id="chat-plaintext">평문 시그널링 AAB가 PASS를 받았습니다</h2>
+      <p>채팅 앱의 릴리스 워크플로는 빌드 전에 dart-define 파일(Flutter가 빌드 때 앱에 넣는 키=값 설정)을 이 한 줄로 검사했습니다.</p>
+      <pre><code>grep -Eq 'example\.invalid|CHANGE_ME' "$f"   # 있으면 실패</code></pre>
+      <p>운영 설정 파일은 자리표시용 호스트 때문에 걸렸습니다. 개발 설정 파일은 호스트가 localhost이고 TLS가 꺼져 있었지만, 두 문자열이 없으니 통과했습니다. 9월 13일 CI가 업로드 키로 서명한 43MB 검증 AAB가 바로 이 개발 설정으로 빌드됐고, 번들 검증 스크립트도 PASS를 냈습니다.</p>
+      <p>같은 날 쓴 배포 문서는 이 AAB를 "파이프라인 검증본이라 제출용은 아니다"라고 적으면서도 첫머리에 "코드 쪽 차단 요소는 없다"고 요약했습니다. 저장소 지침대로면 평문 <code>ws://</code> 시그널링은 앱 설정 말고는 막는 곳이 없어서, 같은 워크플로로 서명된 제출용 AAB가 평문 시그널링을 들고 나갈 수 있었습니다.</p>
+      <p>이틀 뒤의 교차 검증 문서는 계기를 이렇게 적고 시작합니다. "배포 가능 여부를 내가 쓴 문서로 판단하면 교차 검증이 아니라 자기 확인이다." 그래서 배포 문서의 주장을 근거로 쓰지 않고 저장소 상태를 다시 측정했고, 판정은 "아직 배포하면 안 된다"였습니다(막는 것은 운영 결정 3개였고, 그 전에 결함 3건이 나왔습니다).</p>
+      <p>그날 밤 커밋 184e5ee는 워크플로와 검증 스크립트 양쪽에 같은 규칙을 넣었습니다. TLS가 켜져 있어야 하고, 호스트가 비었거나 localhost이거나 사설·루프백·링크로컬 IP면 실패입니다. 파이프라인 예행연습은 기본값 false인 플래그 <code>allow_insecure_signaling</code>을 켜야만 경고를 찍고 지나갑니다. 규칙을 넣은 뒤 픽스처(일부러 만든 시험 입력) 6개를 손으로 돌려 결과를 문서에 남겼고, 다시 돌린 출력은 뒤에 있습니다.</p>
+      <p>같은 커밋은 서명 확인도 고쳤습니다. 서명 확인 도구 keytool이 오류를 표준 출력으로 내보내는 바람에 '서명 못 읽음' 분기가 한 번도 돌지 않았고, 스크립트는 이유 없이 끝나 뒤의 검사들을 건너뛰었습니다. 나쁜 빌드가 통과하지는 않았습니다. 지금은 출력에 인증서 소유자 줄(<code>Owner:</code>)이 있는지로 판정합니다. 같은 밤 CI의 암호 대조 테스트 skip은 <a href="https://sugarmount21.com/ax/silent-skip-green-ci/">조용히 skip되는 테스트가 CI를 초록으로 만든다</a>에 따로 썼습니다.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/gate-checked-wrong-artifact-1-ko.webp" width="1200" height="641" alt="비교 그림: 고치기 전 두 게이트가 본 입력(dart-define 없는 클래스패스, 플레이스홀더 문자열)과 출시물을 만든 입력." loading="lazy"><figcaption>고치기 전 두 게이트는 dart-define 없이 뽑은 클래스패스와 플레이스홀더 문자열만 봤습니다.</figcaption></figure>
+    </section>
+    <section aria-labelledby="axfamily-classpath">
+      <h2 id="axfamily-classpath">AXFamily 게이트는 다른 광고 SDK를 봤습니다</h2>
+      <p>AXFamily가 광고에 쓰는 google_mobile_ads 9.1.0 플러그인은 빌드 때 받은 dart-define을 보고 Android 광고 SDK를 고릅니다. build.gradle은 Gradle 속성 <code>dart-defines</code>(base64로 바꾼 <code>KEY=VALUE</code>를 콤마로 이은 값)를 풀어 이렇게 정합니다.</p>
+      <pre><code>def useNextGenSdk = dartEnvironmentVariables.USE_NEXT_GEN_SDK ? dartEnvironmentVariables.USE_NEXT_GEN_SDK : false</code></pre>
+      <p>값이 있으면 Next-Gen SDK(ads-mobile-sdk), 없으면 Legacy SDK(play-services-ads)가 붙습니다. <code>flutter build</code>는 dart-define을 이 속성으로 Gradle에 넘기지만, Gradle을 따로 부르면 속성이 없으니 언제나 Legacy입니다.</p>
+      <p>10월 9일 커밋 5427191이 들인 게이트는 네 단계였습니다. 빌드 폴더를 지우고, AAB를 새로 빌드하고, Gradle로 릴리스 의존성 목록을 뽑고, 판정합니다. 세 번째 단계에는 dart-define이 없었습니다. AAB를 어떤 값으로 빌드했든 판정 대상은 Legacy 목록이었고, 저장소에 커밋해 둔 기준 의존성 목록(스냅샷)도 같은 명령에서 나왔으니 비교는 일치할 수밖에 없었습니다.</p>
+      <p>dart-define 판정은 반대쪽으로 어긋나 있었습니다. 게이트는 허용 목록에 있는 키만 받았는데, 그 목록에 <code>USE_NEXT_GEN_SDK</code>가 없었습니다.</p>
+      <p>같은 날 Galaxy S21에서 무작위 입력 2,000번을 견딘 것은 Next-Gen 릴리스 빌드였습니다. 그런데 이 게이트를 통과할 수 있는 빌드는 그 검증이 다루지 않은 Legacy 빌드뿐이었고, 검증한 설정은 모르는 키라는 이유로 막히게 되어 있었습니다.</p>
+      <p>10월 10일 커밋 c38703b가 세 번째 단계에 AAB와 같은 값을 넘기게 했습니다. flutter build가 Gradle에 넘기는 것과 같은 형식으로 <code>-Pdart-defines</code>를 만들고, 값은 화면에 찍지 않습니다. 판정은 <code>USE_NEXT_GEN_SDK</code>를 받되 값이 정확히 'true'여야 합니다. 플러그인의 조건식은 build.gradle의 언어인 Groovy 규칙대로 비어 있지 않은 문자열을 모두 참으로 보기 때문에, 'false'를 줘도 Next-Gen이 붙습니다.</p>
+      <p>다시 뽑은 스냅샷은 아래처럼 바뀌었고, 테스트에는 실패해야 하는 경우 셋('false', 빈 문자열, 키 없음)이 들어갔습니다.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>스냅샷에서 바뀐 줄</th><th>고치기 전</th><th>고친 뒤</th></tr></thead>
+        <tbody>
+          <tr><td>줄 수</td><td>211</td><td>214(5줄 빠지고 8줄 추가)</td></tr>
+          <tr><td>광고 SDK</td><td>play-services-ads, play-services-ads-api</td><td>ads-mobile-sdk</td></tr>
+          <tr><td>딸린 라이브러리</td><td>측정·광고 서비스 3개</td><td>Cronet(Chrome 네트워크 스택) 6개, kotlinx-coroutines-guava</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+    <section aria-labelledby="cause-chain">
+      <h2 id="cause-chain">스냅샷도 같은 명령으로 만들었습니다</h2>
+      <p>AXFamily 쪽 원인은 세 겹입니다. 게이트는 의존성 목록을 출시물과 다른 명령으로 뽑았고, 플러그인이 dart-define으로 의존성을 고르니 결과가 달라졌습니다. 게이트를 만든 커밋에는 두 명령이 같은 입력을 받는지 대조한 흔적이 없습니다. 마지막 겹은 비교 기준인 스냅샷과 테스트 픽스처까지 같은 명령에서 나왔다는 점입니다. 수정 전 게이트를 끝까지 돌린 기록은 남아 있지 않습니다.</p>
+      <p>채팅 앱에서도 저장소에 이미 있던 개발 설정은 게이트를 거쳤지만, 고치기 전까지는 막혀야 할 입력으로 다뤄진 적이 없었습니다.</p>
+      <p>c38703b보다 여섯 시간 반 앞서 커밋 1fcc1e1이 AAB 안의 dex(컴파일된 앱 코드)와 libapp.so(Flutter의 Dart 코드가 컴파일돼 들어가는 파일)를 직접 열어 E2E 테스트 모드가 섞였는지 보는 단계를 넣었습니다. 출시물을 읽는 장치가 있었는데도 SDK 목록은 Gradle 보고서로 판정했습니다.</p>
+    </section>
+    <section aria-labelledby="wrong-assumption">
+      <h2 id="wrong-assumption">빠진 검사는 결정 기록에 있었습니다</h2>
+      <p>AXFamily의 10월 5일 결정 기록에 이미 이 조건이 있었습니다. Next-Gen은 opt-in이라 CI에 <code>USE_NEXT_GEN_SDK=true</code>를 고정하고, 릴리스 APK에 ads-mobile-sdk가 들어 있는지 검사한다는 내용입니다. 항목 상태는 '권고(가결 추정)', 곧 운영자가 반대하지 않은 권고입니다. 백로그 완료 기준도 같은 dart-define을 요구했습니다. 10월 9일 게이트에는 둘 다 없었고, 대신 Legacy 목록을 스냅샷으로 커밋했습니다.</p>
+      <p>두 게이트와 두 수정, 그리고 틀렸던 배포 문서 요약까지 모두 Claude 공동 작성 커밋에서 나왔습니다. 요약을 바로잡은 것은 사람이 아니라 교차 검증 문서였고, 기록에 남은 사람의 일은 결정 기록의 권고에 반대하지 않은 것까지입니다.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EC%B6%9C%EC%8B%9C%20%EA%B2%8C%EC%9D%B4%ED%8A%B8%EA%B0%80%20%EC%B6%9C%EC%8B%9C%EB%AC%BC%EC%9D%B4%20%EC%95%84%EB%8B%8C%20%EA%B2%83%EC%9D%84%20%EA%B2%80%EC%82%AC%ED%95%98%EA%B3%A0%20%EC%9E%88%EC%97%88%EB%8B%A4%3A%20%ED%8F%89%EB%AC%B8%20AAB%EC%99%80%20dart-define%20%ED%95%98%EB%82%98">메일로 문의하기</a></p></aside>
+    <section aria-labelledby="alternatives">
+      <h2 id="alternatives">금지 문자열 대신 필수 값을 요구했습니다</h2>
+      <p>자리표시 목록에 localhost만 더했다면 픽스처의 192.168.0.10과 172.20.1.5는 TLS를 켜도 통과합니다. 수정은 막을 주소를 늘어놓는 대신 출시물이 가져야 할 값(TLS 켜짐, 공개 호스트)을 요구했고, 예행연습 때문에 예외는 기본값 false 플래그로만 엽니다.</p>
+      <p>AXFamily에서는 <code>USE_NEXT_GEN_SDK</code>가 비어 있지만 않으면 받아 주는 방법도 있었습니다. 플러그인과 같은 규칙이지만, 'false'를 적은 설정이 Next-Gen 빌드를 만들어도 게이트는 아무 말을 하지 않습니다. 정확히 'true'만 받게 했습니다.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">기록 파일을 읽는 검사는 로컬에서 SKIP됩니다</h2>
+      <p>채팅 앱 검증 스크립트의 새 TLS 검사와 기존 dart-define 기록 검사는 AAB를 열지 않습니다. 워크플로가 설정에서 만들어 AAB 옆에 둔 기록 파일 <code>dart_defines.txt</code>를 읽습니다. 그 파일 없이 로컬에서 돌리면 두 검사는 SKIP이고, 다른 검사가 통과하면 결과는 PASS입니다. AAB와 기록 파일이 짝인지도 보지 않습니다.</p>
+      <p>아래는 11월 11일 새 TLS 검사만 떼어 픽스처 7개로 다시 돌린 출력입니다. 처음 여섯은 9월 15일 결과와 같고, 일곱째 픽스처에는 기록 파일이 없습니다. signal.example.com은 예약 도메인 자리표시자입니다.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/gate-checked-wrong-artifact-shot1-ko.webp" width="1155" height="855" alt="검사 6을 픽스처 7개로 돌린 터미널 출력: 공개 호스트와 예행연습 플래그는 fail=0, localhost·사설 IP·TLS 누락 4개는 fail=1, 기록 파일이 없으면 SKIP에 fail=0." loading="lazy"><figcaption>기록 파일이 없으면 검사 6은 SKIP을 찍고 실패 수는 0으로 남습니다. BOS_SIGNALING_TLS·HOST는 채팅 앱의 dart-define 키입니다(출처: 채팅 앱 저장소 184e5ee의 검사 6을 2026-11-11 다시 실행).</figcaption></figure>
+      <p>AAB를 스스로 새로 만드는 AXFamily 게이트는 같은 입력을 넘기기가 쉬웠습니다. 채팅 앱 워크플로의 호스트 검사는 IP 리터럴만 판정해서, 공개처럼 보이는 이름이 사설 IP로 풀려도 막지 못합니다.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">고친 게이트 입력에는 테스트가 없습니다</h2>
+      <p>채팅 앱의 픽스처는 손으로 돌려 결과만 문서에 남겼습니다. 184e5ee가 바꾼 파일은 워크플로와 검증 스크립트 둘뿐이고, 그 뒤로 고친 커밋도 없습니다. AXFamily도 게이트가 Gradle에 <code>-Pdart-defines</code>를 넘기는지는 어떤 테스트도 보지 않습니다.</p>
+      <p>그 인자가 빠지면 지금은 Next-Gen 스냅샷과 어긋나 막힙니다. 오류가 안내하는 스냅샷 재생성 스크립트의 사용법 주석에도 이 인자가 없어서, 주석대로 다시 만들면 고치기 전 구조로 돌아갑니다. 결정 기록이 요구한 출시물(기록에는 릴리스 APK) 안의 ads-mobile-sdk 확인도 아직 게이트에 없습니다.</p>
+    </section>
+    <section aria-labelledby="fixture-procedure">
+      <h2 id="fixture-procedure">게이트마다 통과하면 안 되는 입력 하나</h2>
+      <p>그래서 게이트 자체를 이 순서로 검사합니다. 다른 Android 앱 묶음에서 쓰는 업로드 전 3단계 검사는 <a href="https://sugarmount21.com/ax/release-gate/">AI가 만든 Android 앱, 출시 전에 무엇을 검사하나</a>에 따로 있습니다.</p>
+      <ol>
+        <li>단계마다 무엇을 읽는지 적습니다. 출시물 자체(AAB의 매니페스트, dex, 서명), 출시물을 만든 입력, 따로 만든 입력 중 하나입니다.</li>
+        <li>따로 만든 입력이면 출시물을 만든 명령과 같은 인자인지 대조합니다. Flutter라면 Gradle에도 <code>-Pdart-defines</code>로 같은 값을 넘겨야 합니다. AXFamily 게이트는 android 폴더에서 이렇게 합니다(잠금 처리와 출력 저장은 생략했습니다). <code>$DEFINES</code>는 <code>--dart-define-from-file</code>에 준 JSON 파일입니다.
+          <pre><code>DD="$(node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(Object.entries(d).map(([k,v])=&gt;Buffer.from(k+"="+v).toString("base64")).join(","))' "$DEFINES")"
+./gradlew --no-daemon -q :app:dependencies --configuration releaseRuntimeClasspath "-Pdart-defines=$DD"</code></pre></li>
+        <li>스냅샷과 비교하는 단계는 스냅샷을 만든 명령도 같은 인자인지 봅니다. 한 번은 출시물 쪽에서 SDK를 직접 확인합니다. 10월 9일 재검증은 R8이 남기는 이름 대응표 mapping.txt에서 Next-Gen 패키지가 111줄 나오는 것으로 확인했습니다.
+          <pre><code>grep -c 'com.google.android.libraries.ads.mobile.sdk' build/app/outputs/mapping/release/mapping.txt</code></pre>
+          <code>com.google.android.gms.ads</code>로 찾으면 Next-Gen 안의 호환 클래스(그 기록에서 37줄)도 걸리니 Legacy 판정에 쓰지 않습니다. 위 줄은 그 확인을 옮긴 예시로, 그대로 실행한 기록은 없습니다.</li>
+        <li>금지 문자열 목록 대신 출시물이 가져야 할 값(TLS 켜짐, 스위치 값 정확히 'true')을 요구합니다. 예외는 기본값 false인 플래그로만 열고, 켜면 경고가 찍히게 합니다.</li>
+        <li>게이트마다 통과하면 안 되는 픽스처를 하나 만듭니다. 저장소에 이미 있는 개발 설정, 스위치가 빠진 dart-define 파일, 서명 안 된 AAB 같은 것입니다. FAIL과 함께 이유가 찍히는지도 봅니다.</li>
+        <li>그 픽스처를 테스트로 커밋합니다. 게이트를 고친 커밋에는 그 게이트가 막았어야 할 입력을 함께 넣으십시오.</li>
+      </ol>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/gate-checked-wrong-artifact-2-ko.webp" width="1200" height="836" alt="절차 그림: 단계마다 읽는 입력 적기, 같은 인자인지 대조, 스냅샷과 출시물 쪽 확인, 필수 값 요구, 실패해야 하는 픽스처 만들기, 테스트로 커밋의 6단계." loading="lazy"><figcaption>게이트를 고친 커밋에 그 게이트가 막았어야 할 입력을 픽스처로 함께 넣습니다.</figcaption></figure>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EC%B6%9C%EC%8B%9C%20%EA%B2%8C%EC%9D%B4%ED%8A%B8%EA%B0%80%20%EC%B6%9C%EC%8B%9C%EB%AC%BC%EC%9D%B4%20%EC%95%84%EB%8B%8C%20%EA%B2%83%EC%9D%84%20%EA%B2%80%EC%82%AC%ED%95%98%EA%B3%A0%20%EC%9E%88%EC%97%88%EB%8B%A4%3A%20%ED%8F%89%EB%AC%B8%20AAB%EC%99%80%20dart-define%20%ED%95%98%EB%82%98">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+      <h2 id="faq">자주 묻는 질문</h2>
+      <div class="faq">
+        <details><summary>flutter build의 --dart-define이 Android 의존성도 바꾸나요?</summary><div><p>플러그인에 따라 달라집니다. google_mobile_ads 9.1.0은 Gradle 속성 dart-defines에서 USE_NEXT_GEN_SDK를 읽어 광고 SDK를 고르므로, Gradle을 따로 부를 때는 같은 값을 -Pdart-defines로 넘겨야 같은 의존성이 나옵니다.</p></div></details>
+        <details><summary>USE_NEXT_GEN_SDK=false로 주면 Legacy SDK가 들어가나요?</summary><div><p>9.1.0에서는 들어가지 않습니다. 플러그인이 비어 있지 않은 문자열을 참으로 보므로 'false'도 Next-Gen이 되고, Legacy를 쓰려면 키를 빼야 합니다.</p></div></details>
+      </div>
+    </section>
+    <p class="note">기준일 2026-11-11. 두 앱 저장소의 git 기록, 교차 검증 문서, 광고 SDK 재검증 기록, 결정 기록, 플러그인 소스를 다시 확인했습니다. 서버 주소·서명 키 정보·앱 패키지 이름은 적지 않았습니다.</p>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/ax/docviewer-malicious-file-set/">문서 뷰어 악성 파일 세트: ZIP 폭탄·CFB 루프·XSS를 생성기로 만들어 테스트에 묶기</a></li>
+        <li><a href="https://sugarmount21.com/ax/silent-skip-green-ci/">조용히 skip되는 테스트가 CI를 초록으로 만든다: 암호 대조 3건과 엿새 동안 고장 난 통합 테스트</a></li>
+        <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/hwp-hancom-resave-check/">고친 HWP 7개 한컴 호환성 테스트: 열기 7/7, 다른 이름으로 저장은 로그인 뒤 2/2</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Thu, 12 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
     <title>Claude Code 로그인과 첫 자동 질문 보내기 – SugarMount</title>
     <link>https://sugarmount21.com/ax/windows-harness-claude-code-login/</link>
     <guid isPermaLink="true">https://sugarmount21.com/ax/windows-harness-claude-code-login/</guid>
@@ -87,8 +295,8 @@
         <li><a href="https://sugarmount21.com/ax/windows-harness-powershell-basics/">PowerShell 처음 열기: 명령 붙여넣기와 경로</a></li>
         <li><a href="https://sugarmount21.com/ax/vertex-test-cost-hard-cap/">Vertex AI 테스트 비용 하드캡: 2,500원 중단선이 결제 2,956원을 놓친 뒤 바꾼 기본값</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-install/">Windows에 Git과 Claude Code 설치하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-ga4-report/">GA4 CSV로 매일 아침 보고서 받기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -194,8 +402,8 @@ Get-Content .\logs\hello.log -Tail 3</code></pre><figure><img src="https://sugar
         <li><a href="https://sugarmount21.com/ax/windows-harness-powershell-basics/">PowerShell 처음 열기: 명령 붙여넣기와 경로</a></li>
         <li><a href="https://sugarmount21.com/ax/vertex-test-cost-hard-cap/">Vertex AI 테스트 비용 하드캡: 2,500원 중단선이 결제 2,956원을 놓친 뒤 바꾼 기본값</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-install/">Windows에 Git과 Claude Code 설치하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-ga4-report/">GA4 CSV로 매일 아침 보고서 받기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -284,8 +492,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
         <li><a href="https://sugarmount21.com/ax/windows-harness-shorts/">틱톡·릴스·쇼츠 게임 영상 계획을 AI로 매일 받기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-game-marketing/">Claude Code 하네스 17일 운영과 시작 순서</a></li>
         <li><a href="https://sugarmount21.com/ax/gma-next-gen-callback-thread/">GMA Next-Gen 전면 광고 콜백은 백그라운드 스레드에서 왔다: 사진 앱이 단위 테스트 243개 통과 뒤 죽은 기록</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -379,8 +587,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
         <li><a href="https://sugarmount21.com/ax/windows-harness-shorts/">틱톡·릴스·쇼츠 게임 영상 계획을 AI로 매일 받기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-game-marketing/">Claude Code 하네스 17일 운영과 시작 순서</a></li>
         <li><a href="https://sugarmount21.com/ax/gma-next-gen-callback-thread/">GMA Next-Gen 전면 광고 콜백은 백그라운드 스레드에서 왔다: 사진 앱이 단위 테스트 243개 통과 뒤 죽은 기록</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -454,8 +662,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
         <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
         <li><a href="https://sugarmount21.com/ax/vertex-test-cost-hard-cap/">Vertex AI 테스트 비용 하드캡: 2,500원 중단선이 결제 2,956원을 놓친 뒤 바꾼 기본값</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-install/">Windows에 Git과 Claude Code 설치하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-ga4-report/">GA4 CSV로 매일 아침 보고서 받기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -536,8 +744,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
         <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-game-marketing/">Claude Code 하네스 17일 운영과 시작 순서</a></li>
         <li><a href="https://sugarmount21.com/ax/gma-next-gen-callback-thread/">GMA Next-Gen 전면 광고 콜백은 백그라운드 스레드에서 왔다: 사진 앱이 단위 테스트 243개 통과 뒤 죽은 기록</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -651,8 +859,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
         <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
         <li><a href="https://sugarmount21.com/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://sugarmount21.com/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -753,8 +961,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
         <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-powershell-basics/">PowerShell 처음 열기: 명령 붙여넣기와 경로</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-install/">Windows에 Git과 Claude Code 설치하기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-ga4-report/">GA4 CSV로 매일 아침 보고서 받기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -830,8 +1038,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
         <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-powershell-basics/">PowerShell 처음 열기: 명령 붙여넣기와 경로</a></li>
         <li><a href="https://sugarmount21.com/ax/vertex-test-cost-hard-cap/">Vertex AI 테스트 비용 하드캡: 2,500원 중단선이 결제 2,956원을 놓친 뒤 바꾼 기본값</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-ga4-report/">GA4 CSV로 매일 아침 보고서 받기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -916,8 +1124,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
         <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-powershell-basics/">PowerShell 처음 열기: 명령 붙여넣기와 경로</a></li>
         <li><a href="https://sugarmount21.com/ax/vertex-test-cost-hard-cap/">Vertex AI 테스트 비용 하드캡: 2,500원 중단선이 결제 2,956원을 놓친 뒤 바꾼 기본값</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-ga4-report/">GA4 CSV로 매일 아침 보고서 받기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -999,8 +1207,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
         <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-shorts/">틱톡·릴스·쇼츠 게임 영상 계획을 AI로 매일 받기</a></li>
         <li><a href="https://sugarmount21.com/ax/gma-next-gen-callback-thread/">GMA Next-Gen 전면 광고 콜백은 백그라운드 스레드에서 왔다: 사진 앱이 단위 테스트 243개 통과 뒤 죽은 기록</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1080,8 +1288,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
         <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-powershell-basics/">PowerShell 처음 열기: 명령 붙여넣기와 경로</a></li>
         <li><a href="https://sugarmount21.com/ax/vertex-test-cost-hard-cap/">Vertex AI 테스트 비용 하드캡: 2,500원 중단선이 결제 2,956원을 놓친 뒤 바꾼 기본값</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-ga4-report/">GA4 CSV로 매일 아침 보고서 받기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1165,8 +1373,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
         <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-powershell-basics/">PowerShell 처음 열기: 명령 붙여넣기와 경로</a></li>
         <li><a href="https://sugarmount21.com/ax/vertex-test-cost-hard-cap/">Vertex AI 테스트 비용 하드캡: 2,500원 중단선이 결제 2,956원을 놓친 뒤 바꾼 기본값</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-ga4-report/">GA4 CSV로 매일 아침 보고서 받기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1281,12 +1489,12 @@ assumeTrue(dir != null &amp;&amp; dir.isDirectory)</code></pre></li>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/silent-skip-green-ci/">조용히 skip되는 테스트가 CI를 초록으로 만든다: 암호 대조 3건과 엿새 동안 고장 난 통합 테스트</a></li>
         <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
         <li><a href="https://sugarmount21.com/ax/hwp-hancom-resave-check/">고친 HWP 7개 한컴 호환성 테스트: 열기 7/7, 다른 이름으로 저장은 로그인 뒤 2/2</a></li>
-        <li><a href="https://sugarmount21.com/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1409,8 +1617,8 @@ AppOpen: cold: entitlement answered in 4139 ms</code></pre></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-shorts/">틱톡·릴스·쇼츠 게임 영상 계획을 AI로 매일 받기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-game-marketing/">Claude Code 하네스 17일 운영과 시작 순서</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1549,8 +1757,8 @@ print(len(ids))</code></pre>
         <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-powershell-basics/">PowerShell 처음 열기: 명령 붙여넣기와 경로</a></li>
         <li><a href="https://sugarmount21.com/ax/vertex-test-cost-hard-cap/">Vertex AI 테스트 비용 하드캡: 2,500원 중단선이 결제 2,956원을 놓친 뒤 바꾼 기본값</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-ga4-report/">GA4 CSV로 매일 아침 보고서 받기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1669,12 +1877,12 @@ print(len(ids))</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
         <li><a href="https://sugarmount21.com/ax/r8-gson-field-names/">단위 테스트 203개가 놓친 릴리스 전용 빈 값: R8과 Gson 필드 이름</a></li>
         <li><a href="https://sugarmount21.com/ax/pdf-save-back-seven-points/">&#x27;PDF로 저장&#x27; 하나를 내려고 BACK을 7가지 시점에 눌렀다</a></li>
         <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1792,8 +2000,8 @@ adb reboot                       # log.tag 두 값 정리(서브에이전트 기
         <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-powershell-basics/">PowerShell 처음 열기: 명령 붙여넣기와 경로</a></li>
         <li><a href="https://sugarmount21.com/ax/vertex-test-cost-hard-cap/">Vertex AI 테스트 비용 하드캡: 2,500원 중단선이 결제 2,956원을 놓친 뒤 바꾼 기본값</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-ga4-report/">GA4 CSV로 매일 아침 보고서 받기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1912,8 +2120,8 @@ adb reboot                       # log.tag 두 값 정리(서브에이전트 기
         <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-shorts/">틱톡·릴스·쇼츠 게임 영상 계획을 AI로 매일 받기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-game-marketing/">Claude Code 하네스 17일 운영과 시작 순서</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2012,12 +2220,12 @@ test('python cryptography 와의 양방향 교차 검증', () async {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/docviewer-malicious-file-set/">문서 뷰어 악성 파일 세트: ZIP 폭탄·CFB 루프·XSS를 생성기로 만들어 테스트에 묶기</a></li>
         <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
         <li><a href="https://sugarmount21.com/ax/hwp-hancom-resave-check/">고친 HWP 7개 한컴 호환성 테스트: 열기 7/7, 다른 이름으로 저장은 로그인 뒤 2/2</a></li>
-        <li><a href="https://sugarmount21.com/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2165,8 +2373,8 @@ while True:
         <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
         <li><a href="https://sugarmount21.com/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://sugarmount21.com/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2319,8 +2527,8 @@ Report: what you fixed, what remains uncertain.</code></pre>
         <li><a href="https://sugarmount21.com/ax/gsc-sitemap-couldnt-fetch/">서치콘솔 사이트맵 &#x27;가져올 수 없음&#x27; 열흘: 새 도메인 속성에서는 몇 초 만에 처리</a></li>
         <li><a href="https://sugarmount21.com/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://sugarmount21.com/ax/static-site-check-gate/">여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2452,12 +2660,12 @@ private val codePopulated = setOf("com.example.Response#requestId")
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
         <li><a href="https://sugarmount21.com/ax/quiz-reach-entry-point-push/">퀴즈 도달 2.6%에서 17.7%로: 진입 건수의 63%는 아침 알림이었다</a></li>
         <li><a href="https://sugarmount21.com/ax/pdf-save-back-seven-points/">&#x27;PDF로 저장&#x27; 하나를 내려고 BACK을 7가지 시점에 눌렀다</a></li>
         <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2565,8 +2773,8 @@ private val codePopulated = setOf("com.example.Response#requestId")
         <li><a href="https://sugarmount21.com/ax/gsc-sitemap-couldnt-fetch/">서치콘솔 사이트맵 &#x27;가져올 수 없음&#x27; 열흘: 새 도메인 속성에서는 몇 초 만에 처리</a></li>
         <li><a href="https://sugarmount21.com/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://sugarmount21.com/ax/static-site-check-gate/">여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2675,8 +2883,8 @@ private val codePopulated = setOf("com.example.Response#requestId")
         <li><a href="https://sugarmount21.com/ax/market-check-before-app/">사진 앱 3개를 만든 뒤에야 시장 조사를 했다: 올해 나온 경쟁 앱 설치 중앙값 1,166</a></li>
         <li><a href="https://sugarmount21.com/ax/commit-messages-701/">커밋 701개로 본 AI 코딩 1년: &#x27;완성&#x27;에서 &#x27;원인·검증&#x27;으로</a></li>
         <li><a href="https://sugarmount21.com/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/retro/">회고와 숫자 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2773,12 +2981,12 @@ private val codePopulated = setOf("com.example.Response#requestId")
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
         <li><a href="https://sugarmount21.com/ax/quiz-reach-entry-point-push/">퀴즈 도달 2.6%에서 17.7%로: 진입 건수의 63%는 아침 알림이었다</a></li>
         <li><a href="https://sugarmount21.com/ax/r8-gson-field-names/">단위 테스트 203개가 놓친 릴리스 전용 빈 값: R8과 Gson 필드 이름</a></li>
         <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2888,12 +3096,12 @@ thinkingConfig: { thinkingBudget: 0 },</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
         <li><a href="https://sugarmount21.com/ax/quiz-reach-entry-point-push/">퀴즈 도달 2.6%에서 17.7%로: 진입 건수의 63%는 아침 알림이었다</a></li>
         <li><a href="https://sugarmount21.com/ax/r8-gson-field-names/">단위 테스트 203개가 놓친 릴리스 전용 빈 값: R8과 Gson 필드 이름</a></li>
         <li><a href="https://sugarmount21.com/ax/pdf-save-back-seven-points/">&#x27;PDF로 저장&#x27; 하나를 내려고 BACK을 7가지 시점에 눌렀다</a></li>
-        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3005,8 +3213,8 @@ adb shell "dumpsys window | grep mCurrentFocus"</code></pre>
         <li><a href="https://sugarmount21.com/ax/game-feel-frame-review/">모바일 게임 손맛 개선: 하트가 충돌보다 109ms 먼저 줄던 순서를 코드와 녹화 프레임으로 찾았다</a></li>
         <li><a href="https://sugarmount21.com/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
         <li><a href="https://sugarmount21.com/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3140,8 +3348,8 @@ adb -s emulator-5554 logcat -d -b crash</code></pre>
         <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-powershell-basics/">PowerShell 처음 열기: 명령 붙여넣기와 경로</a></li>
         <li><a href="https://sugarmount21.com/ax/vertex-test-cost-hard-cap/">Vertex AI 테스트 비용 하드캡: 2,500원 중단선이 결제 2,956원을 놓친 뒤 바꾼 기본값</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-ga4-report/">GA4 CSV로 매일 아침 보고서 받기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3264,8 +3472,8 @@ How to apply: 이 캠페인 설정·수정 때 사용자 지시가 runbook보다
         <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-powershell-basics/">PowerShell 처음 열기: 명령 붙여넣기와 경로</a></li>
         <li><a href="https://sugarmount21.com/ax/vertex-test-cost-hard-cap/">Vertex AI 테스트 비용 하드캡: 2,500원 중단선이 결제 2,956원을 놓친 뒤 바꾼 기본값</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-ga4-report/">GA4 CSV로 매일 아침 보고서 받기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3373,12 +3581,12 @@ edge = if (next &lt; edge) next else edge - 1 // strictly decreasing</code></pre
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
         <li><a href="https://sugarmount21.com/ax/quiz-reach-entry-point-push/">퀴즈 도달 2.6%에서 17.7%로: 진입 건수의 63%는 아침 알림이었다</a></li>
         <li><a href="https://sugarmount21.com/ax/r8-gson-field-names/">단위 테스트 203개가 놓친 릴리스 전용 빈 값: R8과 Gson 필드 이름</a></li>
         <li><a href="https://sugarmount21.com/ax/pdf-save-back-seven-points/">&#x27;PDF로 저장&#x27; 하나를 내려고 BACK을 7가지 시점에 눌렀다</a></li>
-        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3510,12 +3718,12 @@ git log --diff-filter=A --format="%h %ad %s" --date=iso -- &lt;채점 파일&gt;
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/docviewer-malicious-file-set/">문서 뷰어 악성 파일 세트: ZIP 폭탄·CFB 루프·XSS를 생성기로 만들어 테스트에 묶기</a></li>
         <li><a href="https://sugarmount21.com/ax/silent-skip-green-ci/">조용히 skip되는 테스트가 CI를 초록으로 만든다: 암호 대조 3건과 엿새 동안 고장 난 통합 테스트</a></li>
         <li><a href="https://sugarmount21.com/ax/hwp-hancom-resave-check/">고친 HWP 7개 한컴 호환성 테스트: 열기 7/7, 다른 이름으로 저장은 로그인 뒤 2/2</a></li>
-        <li><a href="https://sugarmount21.com/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3621,8 +3829,8 @@ POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect
         <li><a href="https://sugarmount21.com/ax/build-measures-contrast/">다크 hover 대비가 11앱 중 7앱에서 4.5:1 아래였고, 지금은 빌드가 143쌍을 계산한다</a></li>
         <li><a href="https://sugarmount21.com/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
         <li><a href="https://sugarmount21.com/ax/static-site-check-gate/">여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3746,8 +3954,8 @@ print("first", shows[:1], "gaps", [b - a for a, b in zip(inter, inter[1:])],
         <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-shorts/">틱톡·릴스·쇼츠 게임 영상 계획을 AI로 매일 받기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-game-marketing/">Claude Code 하네스 17일 운영과 시작 순서</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3872,8 +4080,8 @@ print("first", shows[:1], "gaps", [b - a for a, b in zip(inter, inter[1:])],
         <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-powershell-basics/">PowerShell 처음 열기: 명령 붙여넣기와 경로</a></li>
         <li><a href="https://sugarmount21.com/ax/vertex-test-cost-hard-cap/">Vertex AI 테스트 비용 하드캡: 2,500원 중단선이 결제 2,956원을 놓친 뒤 바꾼 기본값</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-ga4-report/">GA4 CSV로 매일 아침 보고서 받기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3992,12 +4200,12 @@ def diff(a_png, b_png, top=300, bottom=330):
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/docviewer-malicious-file-set/">문서 뷰어 악성 파일 세트: ZIP 폭탄·CFB 루프·XSS를 생성기로 만들어 테스트에 묶기</a></li>
         <li><a href="https://sugarmount21.com/ax/silent-skip-green-ci/">조용히 skip되는 테스트가 CI를 초록으로 만든다: 암호 대조 3건과 엿새 동안 고장 난 통합 테스트</a></li>
         <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
-        <li><a href="https://sugarmount21.com/ax/llm-cache-no-context/">LLM 공유 캐시에 프롬프트 인젝션이 굳을 수 있었다: 문맥을 보내지 않기로 한 블라인드 A/B</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4126,12 +4334,12 @@ def diff(a_png, b_png, top=300, bottom=330):
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
         <li><a href="https://sugarmount21.com/ax/quiz-reach-entry-point-push/">퀴즈 도달 2.6%에서 17.7%로: 진입 건수의 63%는 아침 알림이었다</a></li>
         <li><a href="https://sugarmount21.com/ax/r8-gson-field-names/">단위 테스트 203개가 놓친 릴리스 전용 빈 값: R8과 Gson 필드 이름</a></li>
         <li><a href="https://sugarmount21.com/ax/pdf-save-back-seven-points/">&#x27;PDF로 저장&#x27; 하나를 내려고 BACK을 7가지 시점에 눌렀다</a></li>
-        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4252,8 +4460,8 @@ expect(all.sort()).toEqual(files.sort());</code></pre>
         <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-powershell-basics/">PowerShell 처음 열기: 명령 붙여넣기와 경로</a></li>
         <li><a href="https://sugarmount21.com/ax/vertex-test-cost-hard-cap/">Vertex AI 테스트 비용 하드캡: 2,500원 중단선이 결제 2,956원을 놓친 뒤 바꾼 기본값</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-ga4-report/">GA4 CSV로 매일 아침 보고서 받기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4547,12 +4755,12 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
         <li><a href="https://sugarmount21.com/ax/quiz-reach-entry-point-push/">퀴즈 도달 2.6%에서 17.7%로: 진입 건수의 63%는 아침 알림이었다</a></li>
         <li><a href="https://sugarmount21.com/ax/r8-gson-field-names/">단위 테스트 203개가 놓친 릴리스 전용 빈 값: R8과 Gson 필드 이름</a></li>
         <li><a href="https://sugarmount21.com/ax/pdf-save-back-seven-points/">&#x27;PDF로 저장&#x27; 하나를 내려고 BACK을 7가지 시점에 눌렀다</a></li>
-        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4634,12 +4842,12 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
         <li><a href="https://sugarmount21.com/ax/quiz-reach-entry-point-push/">퀴즈 도달 2.6%에서 17.7%로: 진입 건수의 63%는 아침 알림이었다</a></li>
         <li><a href="https://sugarmount21.com/ax/r8-gson-field-names/">단위 테스트 203개가 놓친 릴리스 전용 빈 값: R8과 Gson 필드 이름</a></li>
         <li><a href="https://sugarmount21.com/ax/pdf-save-back-seven-points/">&#x27;PDF로 저장&#x27; 하나를 내려고 BACK을 7가지 시점에 눌렀다</a></li>
-        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4728,12 +4936,12 @@ git grep -nE "addOn(Complete|Success|Failure|Canceled)Listener\((this|requireAct
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
         <li><a href="https://sugarmount21.com/ax/quiz-reach-entry-point-push/">퀴즈 도달 2.6%에서 17.7%로: 진입 건수의 63%는 아침 알림이었다</a></li>
         <li><a href="https://sugarmount21.com/ax/r8-gson-field-names/">단위 테스트 203개가 놓친 릴리스 전용 빈 값: R8과 Gson 필드 이름</a></li>
         <li><a href="https://sugarmount21.com/ax/pdf-save-back-seven-points/">&#x27;PDF로 저장&#x27; 하나를 내려고 BACK을 7가지 시점에 눌렀다</a></li>
-        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4850,8 +5058,8 @@ depth(board):                   # peel
         <li><a href="https://sugarmount21.com/ax/game-feel-frame-review/">모바일 게임 손맛 개선: 하트가 충돌보다 109ms 먼저 줄던 순서를 코드와 녹화 프레임으로 찾았다</a></li>
         <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
         <li><a href="https://sugarmount21.com/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -4986,8 +5194,8 @@ depth(board):                   # peel
         <li><a href="https://sugarmount21.com/ax/market-check-before-app/">사진 앱 3개를 만든 뒤에야 시장 조사를 했다: 올해 나온 경쟁 앱 설치 중앙값 1,166</a></li>
         <li><a href="https://sugarmount21.com/ax/commit-messages-701/">커밋 701개로 본 AI 코딩 1년: &#x27;완성&#x27;에서 &#x27;원인·검증&#x27;으로</a></li>
         <li><a href="https://sugarmount21.com/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/retro/">회고와 숫자 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5100,12 +5308,12 @@ if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
         <li><a href="https://sugarmount21.com/ax/quiz-reach-entry-point-push/">퀴즈 도달 2.6%에서 17.7%로: 진입 건수의 63%는 아침 알림이었다</a></li>
         <li><a href="https://sugarmount21.com/ax/r8-gson-field-names/">단위 테스트 203개가 놓친 릴리스 전용 빈 값: R8과 Gson 필드 이름</a></li>
         <li><a href="https://sugarmount21.com/ax/pdf-save-back-seven-points/">&#x27;PDF로 저장&#x27; 하나를 내려고 BACK을 7가지 시점에 눌렀다</a></li>
-        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5211,8 +5419,8 @@ git diff --name-only $(git merge-base &lt;base&gt; &lt;branch&gt;) &lt;branch&gt
         <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-powershell-basics/">PowerShell 처음 열기: 명령 붙여넣기와 경로</a></li>
         <li><a href="https://sugarmount21.com/ax/vertex-test-cost-hard-cap/">Vertex AI 테스트 비용 하드캡: 2,500원 중단선이 결제 2,956원을 놓친 뒤 바꾼 기본값</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-ga4-report/">GA4 CSV로 매일 아침 보고서 받기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5299,12 +5507,12 @@ unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$TEST_PUB[~/][0-9]*" | sort -u | wc
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
         <li><a href="https://sugarmount21.com/ax/quiz-reach-entry-point-push/">퀴즈 도달 2.6%에서 17.7%로: 진입 건수의 63%는 아침 알림이었다</a></li>
         <li><a href="https://sugarmount21.com/ax/r8-gson-field-names/">단위 테스트 203개가 놓친 릴리스 전용 빈 값: R8과 Gson 필드 이름</a></li>
         <li><a href="https://sugarmount21.com/ax/pdf-save-back-seven-points/">&#x27;PDF로 저장&#x27; 하나를 내려고 BACK을 7가지 시점에 눌렀다</a></li>
-        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5439,8 +5647,8 @@ lifecycleScope.launch {
         <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-shorts/">틱톡·릴스·쇼츠 게임 영상 계획을 AI로 매일 받기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-game-marketing/">Claude Code 하네스 17일 운영과 시작 순서</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5550,12 +5758,12 @@ lifecycleScope.launch {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
         <li><a href="https://sugarmount21.com/ax/quiz-reach-entry-point-push/">퀴즈 도달 2.6%에서 17.7%로: 진입 건수의 63%는 아침 알림이었다</a></li>
         <li><a href="https://sugarmount21.com/ax/r8-gson-field-names/">단위 테스트 203개가 놓친 릴리스 전용 빈 값: R8과 Gson 필드 이름</a></li>
         <li><a href="https://sugarmount21.com/ax/pdf-save-back-seven-points/">&#x27;PDF로 저장&#x27; 하나를 내려고 BACK을 7가지 시점에 눌렀다</a></li>
-        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5658,8 +5866,8 @@ three_star = cleared and time &lt;= par(base, scale, floor) and mistakes &lt;= a
         <li><a href="https://sugarmount21.com/ax/game-feel-frame-review/">모바일 게임 손맛 개선: 하트가 충돌보다 109ms 먼저 줄던 순서를 코드와 녹화 프레임으로 찾았다</a></li>
         <li><a href="https://sugarmount21.com/ax/result-card-tap-through/">막힌 화살표 연타와 잠금 없는 실패 카드: 결과 카드 600ms 잠금과 스트레스 테스트가 찾은 크래시 28회</a></li>
         <li><a href="https://sugarmount21.com/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5775,8 +5983,8 @@ print(pages.most_common(), "FAQ questions:", questions)</code></pre>
         <li><a href="https://sugarmount21.com/ax/build-measures-contrast/">다크 hover 대비가 11앱 중 7앱에서 4.5:1 아래였고, 지금은 빌드가 143쌍을 계산한다</a></li>
         <li><a href="https://sugarmount21.com/ax/gsc-sitemap-couldnt-fetch/">서치콘솔 사이트맵 &#x27;가져올 수 없음&#x27; 열흘: 새 도메인 속성에서는 몇 초 만에 처리</a></li>
         <li><a href="https://sugarmount21.com/ax/static-site-check-gate/">여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5893,8 +6101,8 @@ NOT_TEST = {"notExpression": {"orGroup": {"expressions": [
         <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-shorts/">틱톡·릴스·쇼츠 게임 영상 계획을 AI로 매일 받기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-game-marketing/">Claude Code 하네스 17일 운영과 시작 순서</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5995,12 +6203,12 @@ export function cacheKey(api, group, original, corrected, model) {
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/docviewer-malicious-file-set/">문서 뷰어 악성 파일 세트: ZIP 폭탄·CFB 루프·XSS를 생성기로 만들어 테스트에 묶기</a></li>
         <li><a href="https://sugarmount21.com/ax/silent-skip-green-ci/">조용히 skip되는 테스트가 CI를 초록으로 만든다: 암호 대조 3건과 엿새 동안 고장 난 통합 테스트</a></li>
         <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
-        <li><a href="https://sugarmount21.com/ax/hwp-hancom-resave-check/">고친 HWP 7개 한컴 호환성 테스트: 열기 7/7, 다른 이름으로 저장은 로그인 뒤 2/2</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -6130,8 +6338,8 @@ const gaps = await agent(CTX + CHECKLIST + final + dossier, { schema: CRIT })</c
         <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-powershell-basics/">PowerShell 처음 열기: 명령 붙여넣기와 경로</a></li>
         <li><a href="https://sugarmount21.com/ax/vertex-test-cost-hard-cap/">Vertex AI 테스트 비용 하드캡: 2,500원 중단선이 결제 2,956원을 놓친 뒤 바꾼 기본값</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-ga4-report/">GA4 CSV로 매일 아침 보고서 받기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -6242,12 +6450,12 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(":core
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
         <li><a href="https://sugarmount21.com/ax/quiz-reach-entry-point-push/">퀴즈 도달 2.6%에서 17.7%로: 진입 건수의 63%는 아침 알림이었다</a></li>
         <li><a href="https://sugarmount21.com/ax/r8-gson-field-names/">단위 테스트 203개가 놓친 릴리스 전용 빈 값: R8과 Gson 필드 이름</a></li>
         <li><a href="https://sugarmount21.com/ax/pdf-save-back-seven-points/">&#x27;PDF로 저장&#x27; 하나를 내려고 BACK을 7가지 시점에 눌렀다</a></li>
-        <li><a href="https://sugarmount21.com/ax/llm-explain-cost-limits/">맞춤법 앱에 처음 LLM을 붙였다: &#x27;왜 틀렸나요?&#x27;의 비용, 모델 평가, 한도 설계</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -6370,8 +6578,8 @@ git log --exclude=refs/stash --all --no-merges --since=$S --until=$U -i -E --gre
         <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-powershell-basics/">PowerShell 처음 열기: 명령 붙여넣기와 경로</a></li>
         <li><a href="https://sugarmount21.com/ax/vertex-test-cost-hard-cap/">Vertex AI 테스트 비용 하드캡: 2,500원 중단선이 결제 2,956원을 놓친 뒤 바꾼 기본값</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-ga4-report/">GA4 CSV로 매일 아침 보고서 받기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -6500,281 +6708,16 @@ adb logcat -d | grep 'token=' | grep -vc 'token=\*\*\*'</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
         <li><a href="https://sugarmount21.com/ax/docviewer-malicious-file-set/">문서 뷰어 악성 파일 세트: ZIP 폭탄·CFB 루프·XSS를 생성기로 만들어 테스트에 묶기</a></li>
         <li><a href="https://sugarmount21.com/ax/silent-skip-green-ci/">조용히 skip되는 테스트가 CI를 초록으로 만든다: 암호 대조 3건과 엿새 동안 고장 난 통합 테스트</a></li>
         <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">현실성 95.2%는 검증 러너에서 나오지 않았고, 3D 화면은 고정 시점 그림이었다</a></li>
-        <li><a href="https://sugarmount21.com/ax/hwp-hancom-resave-check/">고친 HWP 7개 한컴 호환성 테스트: 열기 7/7, 다른 이름으로 저장은 로그인 뒤 2/2</a></li>
+        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
         <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
     <pubDate>Mon, 26 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>사진 앱 3개 뒤 시장 조사: 설치 중앙값 1,166 – SugarMount</title>
-    <link>https://sugarmount21.com/ax/market-check-before-app/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/ax/market-check-before-app/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/market-check-before-app-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX 노트 · 회고</span>
-      <h1>사진 앱 3개를 만든 뒤에야 시장 조사를 했다: 올해 나온 경쟁 앱 설치 중앙값 1,166</h1>
-      <p class="lead">Play 검색 상위 결과를 4분 동안 수집해 보니 2026년 사진 압축 앱 32개의 설치 중앙값은 1,166이었고, 다음 앱 11개는 보류로 기록했습니다.</p>
-      <p>2026년 10월 3일 오전, 사진 앱 세 개는 이미 다 만들어 Play에 올려 둔 상태였습니다. <a href="https://sugarmount21.com/apps/image-compress/">사진 용량 줄이기</a>는 프로덕션 트랙에서 공개를 기다렸고, 사진 반전·회전과 이미지 형식 변환은 내부 테스트 트랙에 있었습니다. 그날 운영자가 물었습니다. AI로 만든 사진 앱이 이미 수백 개는 될 텐데 시장은 보기나 했느냐고요. 보지 않았습니다. 코딩 에이전트에게 Play 검색 결과를 수집하게 했고, 첫 보고까지 4분이 걸렸습니다. 검색 상위 30위에 든 압축 앱 71개 가운데 32개가 2026년에 나왔고, 그 32개의 누적 설치 중앙값은 1,166이었습니다. 우리 앱은 검색어 9개 어디의 상위 30위에도 없었습니다.</p>
-      <p class="note">근거는 SugarMount 앱 저장소(sugar-utils)의 시장 조사 문서 3개(2026-10-03 작성, 커밋 7b0e567), 운영 일일 점검(2026-10-23), git 기록, 작업 세션 기록입니다. 설치 수는 Play가 공개하는 전 세계 누적값입니다. 기준일은 2026년 10월 24일입니다.</p>
-    </section>
-    <section aria-labelledby="new-apps-2026">
-      <h2 id="new-apps-2026">올해 들어온 압축 앱 32개 중 26개가 설치 1만 미만이었습니다</h2>
-      <p>사진 압축 범주의 숫자가 가장 먼저 나왔습니다. 한국어 6개, 영어 3개 검색어로 상위 30위를 모으니 앱이 103개였고, 제목에 압축·용량·리사이즈 같은 단어가 있는 유틸만 남기자 71개였습니다. 그중 47개가 2025~2026년, 32개가 2026년에 나왔습니다.</p>
-      <p>2026년에 나온 32개의 누적 설치는 최대 73,286이었고, 10만을 넘긴 앱은 0개, 1만 미만이 26개였습니다. 우리와 같은 "업로드용 사진 만들기" 자리를 노린 올해 앱은 설치가 0이었습니다. 상위권은 2013~2022년에 나온 앱들이 차지했습니다. 맨 위 앱은 4,306만 설치였습니다.</p>
-      <p>한 시간 반 뒤 같은 방법으로 나머지 두 범주도 봤습니다. 사진 반전·회전은 검색 결과 유틸 46개 중 2026년 신규가 7개뿐이고, 설치 중앙값은 373입니다. 형식 변환은 71개 중 38개가 올해 나왔고 중앙값은 셋 중 가장 낮은 136입니다. 세 범주 모두 2026년 신규 앱 가운데 10만 설치를 넘긴 앱은 없었습니다.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/market-check-before-app-1-ko.webp" width="1200" height="558" alt="막대그래프: 2026년에 나온 앱의 누적 설치 중앙값은 사진 용량 줄이기 1,166, 사진 반전·회전 373, 이미지 형식 변환 136(위쪽 중앙값)입니다." loading="lazy"><figcaption>우리가 사진 앱을 낸 세 범주에서, 검색 상위에 든 올해 앱의 설치 중앙값은 천 단위 이하였습니다.</figcaption></figure>
-      <p>20일 뒤인 10월 23일 운영 점검에서, Play 공개 페이지의 다운로드 표시는 사진 용량 줄이기 5+, 반전·회전 1+, 형식 변환 0+였습니다. 공개 20일 된 앱의 숫자라, 최대 10개월 쌓인 다른 앱의 누적값과 나란히 비교할 수는 없습니다. 출발이 느리다는 신호까지만 읽습니다.</p>
-    </section>
-    <section aria-labelledby="why-skipped">
-      <h2 id="why-skipped">확인을 생략한 이유는 만드는 쪽이 더 싸 보였기 때문입니다</h2>
-      <p>시장 확인이 빠진 원인은 세 단계로 이어져 있었습니다.</p>
-      <p>첫째 단계는 앱 목록을 기능으로 정한 것입니다. 9월 21일에 고친 기획서(PRD)는 앱 14개를 정하면서, 후보마다 기존 개발사 한 곳의 앱을 "기준 앱"으로 붙였습니다. 같은 절에는 다운로드 순위나 수익 예측을 이 순서에 반영하지 않았다고 스스로 적어 두었습니다.</p>
-      <p>둘째 단계는 기준 앱이 만든 착시입니다. 압축 앱의 기준 앱은 389만 설치였고, 검색 상위권도 2013~2022년에 나온 수백만~수천만 설치 앱들이었습니다. 살아남은 앱만 보면 "같은 기능을 더 깔끔하게 만들면 몫이 있다"는 생각이 자연스럽게 듭니다. 올해 들어온 앱들이 어떻게 됐는지는 아무도 보지 않았습니다.</p>
-      <p>셋째 단계가 가장 컸는데, 만드는 비용이 너무 낮았습니다. 사진 반전·회전 앱은 엔진 커밋(7821dbd, 9월 24일 13:29)부터 내부 테스트 트랙 업로드(bc0ea78, 20:51)까지 7시간 22분이 걸렸고, 형식 변환 앱은 그날 밤 22:39에 내부 트랙에 올라갔습니다(7b9fd55). 심사와 스토어 등록을 빼면 하루 안에 앱 하나가 나오니 "일단 내고 숫자를 보자"가 합리적으로 보였습니다. 정작 수집은 4분이면 끝나는 일이었습니다.</p>
-      <p>근본 원인은 절차였습니다. 릴리스 게이트와 실기기 확인은 다 있었지만 "만들기 전에 시장 숫자를 본다"는 관문은 없었습니다. (그 게이트들 이야기는 <a href="https://sugarmount21.com/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a>에 있습니다.)</p>
-    </section>
-    <section aria-labelledby="wrong-guesses">
-      <h2 id="wrong-guesses">처음 가설 세 개는 데이터로 뒷받침되지 않았습니다</h2>
-      <p>첫 가설은 "기존 상위 앱의 불만을 막은 앱이면 설치가 난다"였습니다. 상위 6개 앱의 최신 리뷰에서 3점 이하 127건을 주제별로 세니 광고 과다가 39건, 오류 19건, 유료·구독 17건, 용량이 목표대로 안 줄어든다는 불만이 12건이었습니다. 우리 앱은 구독이 없고, 결과가 원본보다 커지지 않게 막혀 있습니다. 그런데 올해 들어온 32개 중 26개는 설치 1만에도 못 갔습니다. 이 숫자는 불만을 막은 앱과 막지 않은 앱을 나눠 세지 않았으므로 가설을 직접 반박하지는 못합니다. 불만을 막는 것만으로 설치가 난다는 근거도 데이터에는 없었습니다. (불만 1위인 광고는 우리 앱에도 있었습니다. 9월 23일 1.0.3에서 운영자 결정으로 켜 둔 앱 오프닝 광고를 에이전트가 같은 유형이라고 보고했고, 운영자는 유지했습니다.)</p>
-      <p>두 번째 가설은 운영자가 냈습니다. 세 앱을 하나의 통합 사진 유틸로 묶으면 사람들이 찾을 거라고 봤습니다. 에이전트가 바로 "사진 도구 모음", "사진 유틸", "이미지 도구"를 검색해 보니 상위는 기본 사진 앱, 갤러리, 대형 사진 편집기 같은 범용 앱이었습니다. 범주 이름 검색 결과는 범용 앱이 차지했다는 것까지가 데이터입니다. 검색량은 공개되지 않으니, 그렇게 검색하는 사람이 몇 명인지는 모릅니다.</p>
-      <p>같은 날 오후에 문서 뷰어 쪽도 같은 질문으로 봤습니다. 한 개발사가 낸 앱 세 개를 비교하니 한글 문서 뷰어 하나는 436k, PPT 뷰어 하나는 469k 설치였고, 통합 오피스 앱은 13k였습니다. 개발사 한 곳의 앱 세 개이고 한글 뷰어 수요는 정책 변화와 겹쳐 있어서, 이것으로 "통합보다 단일이 낫다"를 증명하지는 못합니다. 방향 신호로만 봤습니다. 세 번째 가설 "AI 기능을 붙이면 다르게 보인다"는 리뷰로 따져 봤습니다. 한국어 문서 뷰어 리뷰 15,043건 가운데 AI·요약·번역을 요청한 리뷰는 0.36%였습니다. 리뷰에서 요청이 드물다는 뜻이지, AI 기능이 차별점이 될 수 없다는 증거는 아닙니다. 두 신호가 같은 쪽을 가리켜서 다음 앱은 <a href="https://sugarmount21.com/apps/doc-viewer/">한글뷰어 슈가독</a> 하나로 좁혔습니다.</p>
-    </section>
-    <section aria-labelledby="ai-and-human">
-      <h2 id="ai-and-human">에이전트는 기획서 순서를 따랐고, 중앙값 식도 틀렸습니다</h2>
-      <p>코딩 에이전트는 기획서의 순서를 그대로 실행했습니다. 세 번째 앱을 올리는 동안 "다음 앱을 만들기 전에 시장을 보자"고 먼저 말한 적이 없습니다. 운영자가 물었을 때 에이전트는 동향 분석을 하지 않았다고 인정했고, 기획서의 "예측이 아니다" 문구를 근거로 들었습니다.</p>
-      <p>숫자에도 작은 오류가 있었습니다. 이 글을 쓰며 수집 스크립트를 다시 읽어 보니 정렬한 목록 <code>s</code>에서 중앙값을 <code>s[len(s)//2]</code>로 구했더군요. 값이 32개일 때 이 식은 가운데 두 값 중 큰 쪽(1,304)을 줍니다. 가운데 두 값 1,028과 1,304의 평균인 진짜 중앙값은 1,166입니다. 결론은 같지만 보고서에 남은 1,304는 위쪽 중앙값이라, 이 글은 1,166을 씁니다. 반전·회전은 값이 7개(홀수)라 373이 정확합니다. 형식 변환은 38개(짝수)라 136도 위쪽 중앙값인데, 값 목록이 기록에 남지 않아 다시 계산하지 못했습니다. 진짜 중앙값은 136 이하입니다.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EC%82%AC%EC%A7%84%20%EC%95%B1%203%EA%B0%9C%EB%A5%BC%20%EB%A7%8C%EB%93%A0%20%EB%92%A4%EC%97%90%EC%95%BC%20%EC%8B%9C%EC%9E%A5%20%EC%A1%B0%EC%82%AC%EB%A5%BC%20%ED%96%88%EB%8B%A4%3A%20%EC%98%AC%ED%95%B4%20%EB%82%98%EC%98%A8%20%EA%B2%BD%EC%9F%81%20%EC%95%B1%20%EC%84%A4%EC%B9%98%20%EC%A4%91%EC%95%99%EA%B0%92%201%2C166">메일로 문의하기</a></p></aside>
-    <section aria-labelledby="what-we-held">
-      <h2 id="what-we-held">계획한 앱 11개를 보류로 기록하고 범주를 바꿨습니다</h2>
-      <p>선택지는 네 가지였습니다.</p>
-      <ul>
-        <li>U04~U14 11개를 계획대로 계속 만들기: 사진 세 범주와 같은 분포라면 같은 결과를 11번 반복합니다. 다만 이 11개 범주는 아직 수집하지 않았습니다. 10월 4일 백로그에 보류로 기록했습니다.</li>
-        <li>광고로 설치를 사기: 설치 한 건이 돌려주는 값을 실측하기 전에는 하지 않기로 했습니다.</li>
-        <li>이미 만든 세 앱을 내리기: 공개해 두는 비용은 거의 없고, 사용자가 실제로 친 검색어는 공개한 뒤에만 Play 콘솔에서 보입니다. 그래서 그대로 두고 30일 동안 숫자를 봅니다.</li>
-        <li>수요가 바뀌는 범주로 옮기기: 공공기관 메일이 2026년 10월부터 .hwp 첨부를 막아 HWPX 문서가 늘어나는 시점이었습니다. 이 범주에서는 2026년 5월에 나온 앱 하나가 417,538 설치까지 갔습니다. 이것을 골랐습니다.</li>
-      </ul>
-      <p>확인 방법에도 다른 길이 있었습니다. 유료 앱 시장 분석 서비스는 설치 추이와 검색어 추정치를 보여 주지만 구독 비용이 듭니다. Play가 검색량을 공개하지 않으니 키워드 도구가 주는 Play 검색량은 어디까지나 추정치입니다. 인기 차트 페이지를 손으로 살펴보면 돈은 안 들지만, 차트 상위만 봐서는 올해 들어온 앱들의 분포가 나오지 않습니다. 스크립트를 고른 이유가 따로 기록돼 있지는 않습니다. 에이전트가 이미 그 저장소에서 일하고 있었고, 비용이 몇 분이었다는 것이 실제 조건이었습니다.</p>
-      <p>한글뷰어는 10월 4일 착수해 10월 10일에 공개했고, 광고 SDK 없이 냈습니다. 착수 전에 리뷰 데이터와 렌더링 실험을 먼저 했다는 점이 사진 앱 때와 다릅니다. (렌더링 실험은 <a href="https://sugarmount21.com/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a>에 적었습니다.)</p>
-      <p>새 앱을 만들기 전에 올해 들어온 같은 범주 앱의 설치 중앙값부터 보십시오.</p>
-    </section>
-    <section aria-labelledby="procedure">
-      <h2 id="procedure">만들기 전에 돌리는 15분 절차</h2>
-      <p>10월 3일에 돌린 순서에, 그날 빠졌던 2번(판정 규칙 먼저 적기)을 더했습니다. 수집은 Python 라이브러리 google-play-scraper로 했습니다. Play 공식 API가 아니라 Play 웹 페이지를 읽는 비공식 라이브러리입니다.</p>
-      <ol>
-        <li>사용자가 칠 검색어를 할 일 단어로 6~9개 적습니다. 우리는 "사진 용량 줄이기", "사진 KB 줄이기", "compress image" 등 한국어 6개, 영어 3개를 썼습니다.</li>
-        <li>판정 규칙을 숫자를 보기 전에 적어 둡니다. 예: 올해 신규 앱의 설치 중앙값이 천 단위이고 10만을 넘긴 앱이 0개면, 범용 기능 하나짜리 앱은 만들지 않는다.</li>
-        <li>검색어마다 상위 30위의 앱 ID를 모으고, 앱마다 누적 설치, 출시일, 평점 수, 광고·인앱 결제 여부를 읽습니다.</li>
-        <li>제목 단어로 같은 일을 하는 앱만 남깁니다. 우리는 범용 사진 편집기, 동영상, PDF 앱을 제외 목록으로 걸러 냈습니다. 103개가 71개가 됐습니다.</li>
-        <li>출시 연도가 올해인 앱만 골라 개수, 설치 중앙값(값이 짝수 개면 가운데 두 값의 평균), 최대, 1만 미만 개수, 10만 이상 개수를 셉니다. 상위 10개 앱의 출시 연도도 봅니다.</li>
-        <li>내 앱 ID가 결과 목록에 있는지 확인합니다.</li>
-        <li>상위 6개 앱의 최신 리뷰를 앱마다 최대 200건 받아 3점 이하만 남기고, 광고·결제·오류 같은 주제 단어로 셉니다.</li>
-        <li>범주 이름("사진 유틸" 같은 것)으로도 한 번 검색합니다. 통합 앱을 생각하고 있다면 이 결과를 먼저 보십시오.</li>
-      </ol>
-      <p>아래는 그날 돌린 수집 코드를 3~6단계에 맞춰 정리한 판입니다. 이 정리판 자체는 실행해 보지 않았고 문법 검사만 거쳤으니, 검색어와 두 정규식은 자기 범주에 맞게 고쳐 쓰십시오. 중앙값은 <code>statistics.median</code>으로 구합니다. 앞에서 말한 위쪽 중앙값 오류를 막는 줄입니다.</p>
-      <pre><code>import re, statistics, time
-from google_play_scraper import search, app
-QUERIES = [("사진 용량 줄이기", "ko", "kr"), ("사진 KB 줄이기", "ko", "kr"), ("compress image", "en", "us")]
-KEEP = re.compile(r"압축|용량|크기|사이즈|compress|resiz|kb|size", re.I)
-DROP = re.compile(r"video|동영상|pdf|editor|편집", re.I)
-YEAR, MY_APP = 2026, "com.example.myapp"
-ids = set()
-for q, lang, country in QUERIES:
-    ids |= {r["appId"] for r in search(q, lang=lang, country=country, n_hits=30) if r.get("appId")}
-    time.sleep(1)
-rows = []
-for app_id in sorted(ids):
-    try:
-        d = app(app_id, lang="ko", country="kr")
-    except Exception:
-        continue
-    time.sleep(0.4)
-    name = f'{d.get("title") or ""} {app_id}'
-    if not KEEP.search(name) or DROP.search(name):
-        continue
-    m = re.search(r"\d{4}", d.get("released") or "")   # "Oct 3, 2026" or "2026. 10. 3."
-    rows.append((int(m.group()) if m else None, d.get("realInstalls") or 0))
-new = [n for y, n in rows if y == YEAR]
-print("same-task apps:", len(rows), "| released in", YEAR, ":", len(new))
-if new:
-    print("median", statistics.median(new), "| max", max(new),
-          "| under 10k", sum(n &lt; 10_000 for n in new), "| 100k+", sum(n &gt;= 100_000 for n in new))
-print("my app in results:", MY_APP in ids)</code></pre>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/market-check-before-app-2-ko.webp" width="1200" height="924" alt="단계 그림: 검색어 9개, 상위 30위에서 앱 103개, 앱 상세 읽기, 범주 거르기로 71개, 2026년 신규 32개와 설치 중앙값 1,166, 저평점 리뷰 127건 중 광고 과다 39건." loading="lazy"><figcaption>검색어 9개에서 시작해 판정에 쓸 숫자까지 가는 여섯 단계입니다.</figcaption></figure>
-      <p>4분은 한 범주의 수집과 첫 보고에 걸린 시간(09:47~09:51)입니다. 검색어를 고르고, 사람이 결과 표를 판정 규칙과 맞춰 보는 시간까지 넣어 15분을 잡습니다.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">중앙값이 기대치가 아닌 이유와 데이터의 빈칸</h2>
-      <p>표본부터 한쪽으로 기울어 있습니다. 검색어 9개의 상위 30위에 든 앱만 표본에 들어갔고, 순위에 오르지 못한 올해 앱은 빠졌습니다. 올해 나온 같은 종류 앱 전체의 중앙값은 1,166보다 낮을 가능성이 높습니다. 1,166은 검색 상위에 든 올해 앱의 결과라 "잘 만든 앱의 기대치"로 읽을 수 없습니다. 그 안에서도 1만을 넘긴 앱이 6개 있었습니다(최대 73,286).</p>
-      <p>수요가 갑자기 바뀌는 범주에서는 지난 분포가 앞날을 말해 주지 않습니다. 문서 뷰어가 그런 예였습니다. 정책 변경 직후라 신규 앱이 수십만 설치를 얻고 있었습니다.</p>
-      <p>설치 수는 전 세계 누적이고, 검색 순위는 로그인하지 않은 결과라 실제 사용자 화면과 다를 수 있습니다. 리뷰 주제는 단어 정규식으로 세었기 때문에 한 리뷰가 여러 주제에 들어갈 수 있고, 앱 6개의 최신 리뷰만 봤습니다. 출시일 필드가 빈 앱은 연도 집계에서 빠집니다. 라이브러리가 웹 페이지 형식에 기대므로, Play가 페이지를 바꾸면 수집이 깨집니다.</p>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">다음에 확인할 것</h2>
-      <p>사진 용량 줄이기의 30일 측정이 11월 2일에 끝납니다(측정 예정, 2026-11-02). 그때 노출, 설치 전환율, 실제 유입 검색어를 보고 세 앱을 하나로 합칠지 정합니다. 2026년 10월 24일 기준으로 통합 작업은 시작하지 않았습니다.</p>
-      <p>보류로 기록한 U04~U14 범주(사진 PDF, 동영상, 오디오 등)는 아직 하나도 수집하지 않았습니다. 보류가 맞는지는 같은 절차로 그 범주들을 수집해 봐야 판단할 수 있고, 운영자도 보류를 명시적으로 확정하지 않았습니다. 다음 수집은 중앙값을 고친 스크립트로 돌립니다.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EC%82%AC%EC%A7%84%20%EC%95%B1%203%EA%B0%9C%EB%A5%BC%20%EB%A7%8C%EB%93%A0%20%EB%92%A4%EC%97%90%EC%95%BC%20%EC%8B%9C%EC%9E%A5%20%EC%A1%B0%EC%82%AC%EB%A5%BC%20%ED%96%88%EB%8B%A4%3A%20%EC%98%AC%ED%95%B4%20%EB%82%98%EC%98%A8%20%EA%B2%BD%EC%9F%81%20%EC%95%B1%20%EC%84%A4%EC%B9%98%20%EC%A4%91%EC%95%99%EA%B0%92%201%2C166">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">자주 묻는 질문</h2>
-      <div class="faq">
-        <details><summary>새로 나온 안드로이드 유틸 앱은 보통 몇 설치가 나오나요?</summary><div><p>2026년 10월 3일 우리가 수집한 사진 압축 범주에서는, 검색 상위 30위에 든 그해 앱 32개의 누적 설치 중앙값이 1,166이었습니다. 범주마다 다르니 만들기 전에 직접 수집해 보는 편이 정확합니다.</p></div></details>
-        <details><summary>Play 검색량을 알 수 있나요?</summary><div><p>알 수 없습니다. Play는 검색어별 검색량을 공개하지 않습니다. 앱을 공개한 뒤 Play 콘솔의 스토어 실적에서 내 앱으로 들어온 검색어만 볼 수 있습니다.</p></div></details>
-        <details><summary>기능을 여러 개 합친 통합 앱이 단일 기능 앱보다 유리한가요?</summary><div><p>우리 데이터에는 통합 앱이 유리하다는 신호가 없었습니다. "사진 유틸" 같은 범주 이름 검색에는 범용 앱만 나왔고, 한 개발사의 단일 포맷 뷰어 두 개는 436k·469k, 통합 앱은 13k 설치였습니다. 개발사 한 곳의 사례라 일반 법칙으로 보지는 않습니다.</p></div></details>
-      </div>
-    </section>
-    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">다른 AX 노트</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/ax/greeting-card-removal/">AI로 붙인 기능을 AI로 걷어냈다: 인사카드 10,001줄과 형제 앱</a></li>
-        <li><a href="https://sugarmount21.com/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
-        <li><a href="https://sugarmount21.com/ax/commit-messages-701/">커밋 701개로 본 AI 코딩 1년: &#x27;완성&#x27;에서 &#x27;원인·검증&#x27;으로</a></li>
-        <li><a href="https://sugarmount21.com/ax/20-days-4-apps/">AI 코딩 에이전트로 20일 만에 Android 앱 4개를 출시한 방법</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/ax/topic/retro/">회고와 숫자 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
-    </section>]]></description>
-    <pubDate>Sun, 25 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>GitHub Pages 커밋 전 --check 게이트 – SugarMount</title>
-    <link>https://sugarmount21.com/ax/static-site-check-gate/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/ax/static-site-check-gate/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/static-site-check-gate-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX 노트 · 방법</span>
-      <h1>여러 에이전트 세션이 고치는 정적 사이트: 커밋 전 --check 게이트 하나</h1>
-      <p class="lead">생성 파일은 손대지 않고 커밋 전 --check로 재빌드 변경 0개, 게이트 오류 0건을 보면 작업을 합친 뒤 생기는 예산 초과와 날짜 흔들림을 미리 잡습니다.</p>
-      <p><code>python tools/build.py --check</code>가 멈춘 것은 2026년 10월 19일 밤, 다른 세션의 커밋 위로 rebase한 직후였습니다. 오류는 한 줄이었습니다. <code>[BUDGET-FONT] index.html: font files this page needs 421 KB &gt; 400 KB</code>. rebase 전 빌드에서 홈에는 오류가 없었고, 두 작업을 합친 뒤에야 드러났습니다. 이 사이트는 프레임워크 없이 Python 표준 라이브러리만 쓰는 빌드 모듈 6개(3,616줄)로 만들고, 사람이든 에이전트든 커밋 전에 이 명령을 통과시키는 것이 규칙입니다. 10월 5일부터 22일까지 이 명령이 멈춘 일 가운데 네 번을 봅니다.</p>
-      <p class="note">근거는 이 사이트 저장소의 git 기록과 <code>tools/</code> 코드, 개편 명세 리뷰 문서, 작업 세션 기록, AX 노트 발행 기록입니다. 줄 수·테스트 수·파일 수는 2026년 10월 24일 커밋 1d5d432에서 다시 확인했습니다.</p>
-    </section>
-    <section aria-labelledby="check-stops">
-      <h2 id="check-stops">--check가 커밋 전에 멈춘 네 번</h2>
-      <p><code>--check</code>는 메모리에서 사이트 전체를 다시 만든 뒤 두 가지를 봅니다. 디스크에 있는 파일과 한 바이트라도 다른 출력이 있는지, 그리고 검사 모듈 <code>tools/checks.py</code>가 오류를 냈는지입니다. 하나라도 걸리면 exit 1입니다. 핵심만 줄이면 아래와 같습니다.</p>
-      <pre><code>outputs = build_all()              # pages, feeds, sitemap, CSS: in memory
-changed = [p for p, text in outputs.items()
-           if read_file(p) != text]
-report = checks.run(ROOT, outputs)  # 106 issue codes
-if "--check" in argv:
-    if changed or report.errors:
-        exit(1)                     # nothing is written
-else:
-    write_files(changed)</code></pre>
-      <p>10월 24일 기준 출력 파일은 162개, 검사 코드(<code>SD-CRUMB-HOME</code> 같은 고정 이름)는 106개이고, 이 PC에서 한 번 도는 데 11.6초가 걸렸습니다.</p>
-      <p>멈춘 네 번은 10월 5일 첫 빌드 직후 out of date 2개, 10월 18일 통합 빌드의 게이트 오류 101건, 10월 19일 rebase 뒤 홈 글꼴 421KB(상한 400KB), 10월 22일 새 글 제목 때문에 다른 글 2편이 482KB와 473KB(상한 470KB)였습니다. 10월 23일에는 그림 도구가 글꼴이 빈칸으로 그리는 글자에서 멈추도록 검사를 더했습니다.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/static-site-check-gate-1-ko.webp" width="1200" height="826" alt="단계 그림: 10월 5일 빌드 직후 out of date 2개, 10월 18일 통합 빌드 게이트 오류 101건, 10월 19일 rebase 뒤 홈 글꼴 421KB, 10월 22일 새 제목 때문에 다른 글 2편이 482KB와 473KB, 10월 23일 그림 도구에 BLANK GLYPH 검사 추가." loading="lazy"><figcaption>네 번 모두 커밋 전에 걸렸고, 홈 초과는 다른 세션의 커밋 위로 rebase한 뒤에야 보였습니다.</figcaption></figure>
-    </section>
-    <section aria-labelledby="ownership">
-      <h2 id="ownership">손으로 쓰는 곳은 본문과 데이터 파일뿐입니다</h2>
-      <p>파일마다 쓰는 쪽은 하나뿐입니다. 저장소의 AGENTS.md에 있는 표를 줄이면 이렇습니다.</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>누가 쓰나</th><th>무엇을</th></tr></thead>
-        <tbody>
-          <tr><td>글 쓰는 사람·에이전트</td><td>손 페이지의 <code>&lt;title&gt;</code>, description, <code>&lt;main&gt;</code>(빌드 블록 제외), <code>data/apps.json</code>, <code>data/ax.json</code></td></tr>
-          <tr><td>빌드 담당 세션 하나</td><td><code>tools/*.py</code>, 통합 빌드 실행</td></tr>
-          <tr><td>빌드만</td><td>head·헤더·푸터·이동 경로·JSON-LD, 홈·목록·주제 페이지, sitemap·RSS·robots·llms.txt, 날짜 파일, 생성 CSS</td></tr>
-        </tbody>
-      </table></div>
-      <p>손 페이지 안에서도 빌드가 채우는 자리는 <code>&lt;!-- build:meta --&gt;</code> 같은 표시로 구분합니다. 빌드는 매번 이 블록을 비우고 다시 넣으며, 그 밖의 <code>&lt;main&gt;</code>은 바이트 그대로 둡니다(앱 설치 링크의 추적 값 하나만 예외). 글을 쓰는 쪽은 빌드를 돌리지 않고 읽기 전용 검사 <code>python tools/checks.py --file &lt;파일&gt;</code>만 씁니다.</p>
-      <p>이 규칙은 처음부터 있지 않았습니다. 10월 18일 개편 명세는 에이전트가 썼고, 작업 묶음마다 "끝에 build와 --check를 돌려라"와 "생성 HTML은 건드리지 마라"를 함께 요구했습니다. 명세를 공격하는 역할을 맡은 리뷰 에이전트가 이 둘이 모순이라고 지적했습니다. 빌드는 모든 손 페이지의 머리와 꼬리를 다시 쓰므로, 한 세션이 검증하려고 빌드를 돌리면 다른 세션이 고치는 파일 60여 개가 달라집니다. 그 뒤로 통합 빌드는 한 번, 한 곳에서만 돌립니다.</p>
-      <p>rebase 충돌도 같은 원칙으로 해결합니다. 10월 19일 충돌 난 파일은 404.html, 소개·앱 페이지, rss.xml처럼 빌드가 다시 쓰는 파일이었고, 이 파일들은 다른 세션 쪽을 받고 AX 글만 내 쪽을 고른 뒤 다시 빌드했습니다. 생성 파일은 손으로 고치지도 병합하지도 마십시오. 한쪽을 고르고 다시 빌드한 뒤 <code>--check</code>가 0을 낼 때만 커밋하십시오.</p>
-      <p>빌드 모듈 6개는 <code>hashlib</code>, <code>html.parser</code>, <code>xml.etree</code> 같은 표준 라이브러리만 씁니다. 설치할 패키지가 없습니다. 그림 도구 4개(775줄)는 Pillow가 필요하고 <code>--check</code> 밖에 있습니다.</p>
-    </section>
-    <section aria-labelledby="idempotency">
-      <h2 id="idempotency">멱등성은 내일 날짜로 한 번 더 빌드해 확인합니다</h2>
-      <p>10월 5일 에이전트가 첫 빌드 스크립트(커밋 시점 725줄)를 쓰고 바로 돌렸을 때 결과는 이랬습니다.</p>
-      <pre><code>45 files, 45 changed
-out of date:
-  apps/sugarcard/index.html
-  sitemap.xml</code></pre>
-      <p>한 번 더 빌드하자 2개가 바뀌었고, 그다음에는 up to date였습니다. 달라진 줄은 sitemap의 lastmod 날짜였습니다.</p>
-      <p>원인은 두 단계였습니다. 가까운 원인은 계산 순서입니다. 빌드가 lastmod를 <code>git status</code>와 <code>git log</code>에서 읽었는데, 파일을 쓰기 전에 읽었습니다. 빌드가 파일을 쓰면 git 상태가 바뀌고, 다음 빌드는 다른 입력을 봅니다. 그 밑의 원인은 날짜를 저장소 상태와 벽시계에서 가져왔다는 점입니다. 본문이 그대로여도 날짜는 움직였습니다.</p>
-      <p>리뷰 에이전트가 짚은 것과 그날 고친 것은 가까운 원인뿐이었습니다. "이번 빌드가 쓰는 파일은 오늘 날짜"라는 집합을 하나 더하자 같은 날 두 번 빌드는 통과했지만, 날짜를 git에서 읽는 구조는 남았습니다. 두 번 돌려 수렴하면 멱등처럼 보이지만, 같은 입력으로 다음 날 빌드하면 날짜가 또 움직입니다.</p>
-      <p>13일 뒤 개편에서 이 구조를 걷어냈는데, 개편 명세(역시 에이전트 작성)에도 같은 종류의 순환이 둘 있었습니다. 앱 페이지의 "최종 업데이트" 줄이 해시 대상 안에 있어 날짜가 해시를, 해시가 다시 날짜를 바꿨고, 빌드가 <code>site.css</code>에 생성 블록을 쓰는데 CSS 버전 값은 그 파일의 해시였습니다. 리뷰 에이전트는 두 번째 것이 "<code>--check</code>가 영원히 한 번씩 실패한다"고 적었습니다. 둘 다 구현 전에 고쳤습니다.</p>
-      <p>CSS 쪽은 생성 CSS를 별도 파일로 메모리에서 먼저 만들고, 버전 값을 계산해 넣은 뒤에 디스크에 쓰게 했습니다. 날짜 쪽 규칙(본문 해시, <code>SOURCE_DATE</code> 환경 변수)은 <a href="https://sugarmount21.com/ax/sitemap-lastmod-content-hash/">사이트맵 lastmod가 전부 같은 날짜였다: 본문 해시로 수정일 정하기</a>에 적었습니다.</p>
-      <p>10월 18일 통합 때는 파일 445개의 sha256을 빌드 1회차, 2회차, <code>SOURCE_DATE</code> 실행 뒤에 떠서 비교했고 차이는 0이었습니다. 10월 24일 스크래치 사본에서 다시 돌린 결과입니다.</p>
-      <pre><code>$ SOURCE_DATE=2026-10-25 python tools/build.py
-162 files, 0 changed
-$ SOURCE_DATE=2026-12-31 python tools/build.py
-162 files, 0 changed</code></pre>
-    </section>
-    <section aria-labelledby="gate-was-wrong">
-      <h2 id="gate-was-wrong">첫 통합에서 틀린 쪽은 게이트였습니다</h2>
-      <p>10월 18일 개편은 에이전트 36명이 나눠 맡은 워크플로였고, 2시간 24분 걸렸습니다. 작업 묶음을 합친 첫 <code>--check</code>는 다시 쓸 파일 0개, 게이트 오류 101건으로 실패했습니다.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/static-site-check-gate-2-ko.webp" width="1200" height="662" alt="막대그림: 2026년 10월 18일 통합 빌드의 첫 --check 오류 101건 중 BUDGET-FONT 43건, ANCHOR-DUP 24건, DATA-APP 19건, BUDGET-OG 14건, LINK-BROKEN 1건." loading="lazy"><figcaption>가장 많은 오류는 게이트의 집계 방식에서 나왔습니다.</figcaption></figure>
-      <p>가장 많은 BUDGET-FONT 43건은 대부분 검사 코드가 틀린 경우였습니다. 영어 페이지의 ©는 CSS에서 시스템 글꼴로 그리는데, 검사 코드는 이 글자까지 세어 글꼴 조각이 더 필요하다고 계산했습니다. 진짜 낭비도 하나 있었습니다. 이동 경로의 구분 기호 <code>›</code> 한 글자 때문에 이동 경로가 있는 페이지마다 25KB 조각 하나를 더 받고 있었습니다. 검사 코드의 글자 집계를 CSS 규칙과 맞추고, 구분 기호는 시스템 글꼴로 돌렸습니다. 나머지는 같은 문구로 두 주소를 가리킨 링크, 디자인 예시의 앱 색 표시, 200KB를 넘은 공유 이미지, 깨진 링크였습니다.</p>
-      <p>게이트를 고칠 때는 테스트를 같이 고칩니다. 이때 테스트 6개를 더했고, 새로 넣은 가드 8개를 하나씩 지운 사본에서 테스트가 모두 실패하는 것을 확인했습니다. 10월 24일 기준 검사 코드 106개는 하나도 빠짐없이 <code>test_checks.py</code>에 이름이 나오고, 테스트는 전부 188개입니다.</p>
-      <p>통합 에이전트는 게이트 두 곳을 스스로 정했습니다. 명세에 상한이 없는 개별 방침과 디자인 예시 페이지는 글꼴 초과를 경고로만 냈고, 생성 글꼴 CSS 상한은 20KB에서 24KB로 올렸습니다. 둘 다 "확인이 필요하다"고 보고서에 적었습니다. 운영자는 같은 보고서의 다른 결정 항목(방침의 책임자 표기를 사업자 이름으로)을 그날 저녁 정했습니다. 24KB 쪽 코드 주석은 10월 24일에도 "확인하거나 낮춰야 한다"는 문장 그대로입니다.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EC%97%AC%EB%9F%AC%20%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EC%84%B8%EC%85%98%EC%9D%B4%20%EA%B3%A0%EC%B9%98%EB%8A%94%20%EC%A0%95%EC%A0%81%20%EC%82%AC%EC%9D%B4%ED%8A%B8%3A%20%EC%BB%A4%EB%B0%8B%20%EC%A0%84%20--check%20%EA%B2%8C%EC%9D%B4%ED%8A%B8%20%ED%95%98%EB%82%98">메일로 문의하기</a></p></aside>
-    <section aria-labelledby="font-budget">
-      <h2 id="font-budget">글꼴 예산은 다른 글의 제목으로도 깨집니다</h2>
-      <p>이 사이트의 한글 글꼴은 92개 조각으로 나뉘어 있고, 페이지는 자기 글자가 들어 있는 조각만 받습니다. 상한은 글 페이지 470KB, 홈과 목록 페이지 400KB입니다. 드문 음절 하나가 17~40KB 조각 하나를 더 부르기 때문에, 첫날 AX 노트 세 편 중 두 편이 619KB와 533KB였습니다. 그날 드문 음절이 든 단어를 흔한 말로 고쳤습니다.</p>
-      <p>홈에는 최신 AX 노트 제목 3개가 들어갔고, 그 제목은 매일 달라집니다. rebase로 다른 세션의 변경과 합쳐지자 421KB가 됐습니다. 제목을 고치는 대신 홈 목록을 주제 페이지 링크로 바꿨습니다(663f04e). 주제 이름은 고정 문구라 비용이 움직이지 않습니다. 10월 22일 허브의 주제 카드에서 글 제목을 없앤 것도 같은 이유였고, 허브는 468KB에서 389KB로 줄었습니다(6b96643).</p>
-      <p>10월 22일에는 새 글 제목에 든 <code>쟀</code> 한 글자가 관련 글 목록을 타고 다른 글 두 편에 들어가, 그 두 편이 482KB와 473KB가 됐습니다. 새 글 파일 하나만 검사하면 통과합니다. 제목을 "측정했나"로 바꾸자 450KB와 441KB로 내려갔습니다.</p>
-    </section>
-    <section aria-labelledby="og-images">
-      <h2 id="og-images">공유 이미지는 실제 화면만 쓰고 글자를 넣지 않습니다</h2>
-      <p><code>tools/og.py</code>는 앱·도움말 글의 공유 이미지를 실제 Play 스크린샷과 중립 배경만으로 만들고, 글자와 로고를 넣지 않습니다. 글자 카드는 홈·허브·소개·방침·AX 노트에만 씁니다.</p>
-      <p>이미지는 <code>--check</code>가 다시 만들어 비교하는 대상이 아닙니다. 10월 24일 스크래치 사본에서 og.py를 돌리자 155개 중 4개가 커밋본과 달랐습니다. 10월 19일 새 앱 페이지와 함께 og.py를 거치지 않고 커밋된 앱 카드 2장(제목과 문구가 들어 있음)과, 그 앱 아이콘이 들어가기 전의 홈 카드 2장이었습니다. og.py는 두 번 돌려도 바이트가 같았으니, 생성기 출력과 다른 쪽은 커밋본입니다. 발행 절차는 관련 없는 이미지 변경을 커밋하지 않으므로, 10월 20일부터 24일까지 다섯 번 og.py를 돌린 뒤 이 4개를 커밋본으로 되돌렸습니다.</p>
-      <p>10월 23일 그림 도구에 넣은 빈 글자 검사의 경위는 <a href="https://sugarmount21.com/ax/hangul-blank-glyph-cmap/">안드로이드에서 한글 일부 글자만 빈칸: 나눔스퀘어 cmap 11,172자 중 8,693자가 빈 글자였다</a>에 있습니다.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">브라우저 편집, 많은 페이지, CI 없는 저장소에는 맞지 않습니다</h2>
-      <p>글을 브라우저에서 쓰고 미리 보는 팀에는 맞지 않습니다. 여기서는 작성자가 HTML의 본문을 직접 고치고 명령을 실행합니다. 정적 사이트 생성기와 견줘 고른 기록은 없습니다. 다만 이 글의 네 번 중 세 번(10월 18일, 19일, 22일)은 전체 출력에 대한 검사에서 나왔으니, 생성기를 써도 그 검사와 날짜 규칙은 따로 만들어야 합니다.</p>
-      <p>페이지가 아주 많으면 비용이 커집니다. <code>--check</code>는 매번 전부 다시 만들고 전부 비교합니다. 162개 파일에 11.6초는 괜찮지만 증분 빌드는 없습니다.</p>
-      <p>게이트는 강제되지 않습니다. 저장소에 CI 작업이 없어서, 커밋 전에 누군가 이 명령을 돌려야 작동합니다. 게이트가 틀릴 수 있다는 점도 남습니다. 10월 18일 오류 43건이 그랬고, 상한을 올리는 커밋은 게이트가 막지 못합니다.</p>
-    </section>
-    <section aria-labelledby="how-to">
-      <h2 id="how-to">다른 사이트에 --check 게이트를 들이는 순서</h2>
-      <ol>
-        <li>누가 어떤 파일을 쓰는지 AGENTS.md 같은 지침 파일 첫머리에 표로 적고, 생성 파일은 손대지 않는다고 못박습니다.</li>
-        <li>손 페이지 안에서 빌드가 채우는 자리는 <code>&lt;!-- build:NAME --&gt;</code> 블록으로 표시하고, 빌드는 매번 비우고 다시 넣습니다.</li>
-        <li><code>--check</code>는 모든 출력을 메모리에 만든 뒤 디스크와 비교하고, 같은 출력에 검사를 돌려 둘 중 하나라도 걸리면 exit 1을 냅니다.</li>
-        <li>날짜와 버전 값은 내용 해시로 정하고, 해시 입력에서 날짜 줄과 자동 목록을 제외합니다.</li>
-        <li>멱등성은 세 번 확인합니다: 연속 두 번 빌드, 내일 날짜 빌드, 과거 날짜 빌드(날짜가 뒤로 가지 않는지).</li>
-        <li>검사마다 고정 코드를 붙이고, 그 코드가 실제로 나는지 확인하는 테스트를 둡니다. 가드를 지운 사본에서 테스트가 실패하는지도 봅니다.</li>
-        <li>글 쓰는 세션은 파일 단위 읽기 전용 검사만 하고, 통합 빌드는 한 세션이 한 번 돌립니다.</li>
-        <li>rebase에서 생성 파일이 충돌하면 한쪽을 고른 뒤 다시 빌드하고 <code>--check</code>를 돌립니다.</li>
-        <li>다른 페이지의 글이 섞여 들어가는 예산(글꼴, 크기)은 전체 출력에서 검사하고, 매일 바뀌는 목록은 공통 페이지에 넣지 않습니다.</li>
-        <li>상한 숫자를 바꾸는 커밋은 사람이 따로 봅니다.</li>
-      </ol>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">다음에 확인할 것</h2>
-      <p>이미지는 아직 게이트 밖입니다. 다음 확인은 og.py 출력과 커밋본을 비교하는 단계를 <code>--check</code>에 넣는 것이고, 그 전에 글자가 든 앱 카드를 og.py의 예외로 둘지 생성기 출력으로 바꿀지 정해야 합니다. 글꼴 CSS 상한 24KB와 경고로만 내는 두 페이지는 아직 사람이 확인하지 않았습니다.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%EC%97%AC%EB%9F%AC%20%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%20%EC%84%B8%EC%85%98%EC%9D%B4%20%EA%B3%A0%EC%B9%98%EB%8A%94%20%EC%A0%95%EC%A0%81%20%EC%82%AC%EC%9D%B4%ED%8A%B8%3A%20%EC%BB%A4%EB%B0%8B%20%EC%A0%84%20--check%20%EA%B2%8C%EC%9D%B4%ED%8A%B8%20%ED%95%98%EB%82%98">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">자주 묻는 질문</h2>
-      <div class="faq">
-        <details><summary>빌드 결과 HTML도 git에 커밋하나요?</summary><div><p>커밋합니다. GitHub Pages가 저장소 파일을 그대로 내보내므로(.nojekyll로 Jekyll 처리도 끔) 빌드 결과가 곧 배포본입니다. <code>--check</code>는 커밋된 결과가 지금 입력으로 다시 만든 결과와 같은지 확인합니다.</p></div></details>
-        <details><summary>정적 사이트 빌드가 멱등인지 어떻게 확인하나요?</summary><div><p>연속 두 번, 내일 날짜, 과거 날짜로 빌드해 바뀌는 파일이 0개인지 봅니다. 같은 날 두 번은 통과해도 다음 날 날짜가 움직이는 결함이 있어서, 날짜를 환경 변수로 바꿀 수 있게 만들어 두는 것이 먼저입니다.</p></div></details>
-        <details><summary>여러 AI 에이전트 세션이 같은 사이트 저장소를 고칠 때 충돌은 어떻게 푸나요?</summary><div><p>본문과 데이터 같은 원본만 병합하고, 생성 파일은 한쪽을 고른 뒤 다시 빌드해 <code>--check</code>를 통과해야 커밋합니다. 이 사이트의 홈 글꼴 초과도 이 단계에서 처음 드러났습니다.</p></div></details>
-      </div>
-    </section>
-    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">다른 AX 노트</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/ax/privacy-policy-code-audit/">앱 개인정보처리방침 직접 작성: &#x27;수집하지 않음&#x27; 템플릿을 버리고 코드 감사로 다시 썼다</a></li>
-        <li><a href="https://sugarmount21.com/ax/build-measures-contrast/">다크 hover 대비가 11앱 중 7앱에서 4.5:1 아래였고, 지금은 빌드가 143쌍을 계산한다</a></li>
-        <li><a href="https://sugarmount21.com/ax/gsc-sitemap-couldnt-fetch/">서치콘솔 사이트맵 &#x27;가져올 수 없음&#x27; 열흘: 새 도메인 속성에서는 몇 초 만에 처리</a></li>
-        <li><a href="https://sugarmount21.com/ax/structured-data-after-faq-rich-results/">FAQ 리치 결과가 끝난 뒤의 구조화 데이터: GEO용으로 무엇을 남겼나</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
-        <li><a href="https://sugarmount21.com/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/ax/topic/web/">웹사이트와 검색 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
-    </section>]]></description>
-    <pubDate>Sun, 25 Oct 2026 09:00:00 +0900</pubDate>
   </item>
 </channel>
 </rss>
