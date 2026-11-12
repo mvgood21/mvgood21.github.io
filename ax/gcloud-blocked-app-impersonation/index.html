@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>gcloud &#x27;차단된 앱&#x27;, 서비스 계정 가장으로 우회 – SugarMount</title>
+  <meta name="description" content="gcloud 로그인에 YouTube·analytics 스코프를 더하자 &#x27;차단된 앱&#x27;이 세 번 나왔습니다. 키 파일 없이 서비스 계정 가장으로 GA4 토큰을 받은 절차와 메모리에 남긴 방식입니다.">
+  <meta name="robots" content="max-image-preview:large">
+  <link rel="canonical" href="https://sugarmount21.com/ax/gcloud-blocked-app-impersonation/">
+  <link rel="alternate" hreflang="ko" href="https://sugarmount21.com/ax/gcloud-blocked-app-impersonation/">
+  <link rel="alternate" hreflang="en" href="https://sugarmount21.com/en/ax/gcloud-blocked-app-impersonation/">
+  <link rel="alternate" hreflang="x-default" href="https://sugarmount21.com/ax/gcloud-blocked-app-impersonation/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="gcloud &#x27;차단된 앱&#x27;, 서비스 계정 가장으로 우회 – SugarMount">
+  <meta property="og:description" content="gcloud 로그인에 YouTube·analytics 스코프를 더하자 &#x27;차단된 앱&#x27;이 세 번 나왔습니다. 키 파일 없이 서비스 계정 가장으로 GA4 토큰을 받은 절차와 메모리에 남긴 방식입니다.">
+  <meta property="og:url" content="https://sugarmount21.com/ax/gcloud-blocked-app-impersonation/">
+  <meta property="og:image" content="https://sugarmount21.com/assets/og/ax-gcloud-blocked-app-impersonation-ko.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="https://sugarmount21.com/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/svg+xml" href="https://sugarmount21.com/assets/favicon.svg">
+  <link rel="apple-touch-icon" href="https://sugarmount21.com/assets/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://sugarmount21.com/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/site.css?v=e2770b30">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=e2770b30">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://sugarmount21.com/ax/gcloud-blocked-app-impersonation/#article","headline":"gcloud '차단된 앱', 서비스 계정 가장으로 우회","description":"gcloud 로그인에 YouTube·analytics 스코프를 더하자 '차단된 앱'이 세 번 나왔습니다. 키 파일 없이 서비스 계정 가장으로 GA4 토큰을 받은 절차와 메모리에 남긴 방식입니다.","url":"https://sugarmount21.com/ax/gcloud-blocked-app-impersonation/","mainEntityOfPage":"https://sugarmount21.com/ax/gcloud-blocked-app-impersonation/","inLanguage":"ko","articleSection":"에이전트와 일하는 법","datePublished":"2026-11-13T09:00:00+09:00","dateModified":"2026-11-13T09:00:00+09:00","image":["https://sugarmount21.com/assets/og/ax-gcloud-blocked-app-impersonation-ko.png","https://sugarmount21.com/assets/ax/cover/gcloud-blocked-app-impersonation-ko.webp","https://sugarmount21.com/assets/ax/gcloud-blocked-app-impersonation-shot1-ko.webp","https://sugarmount21.com/assets/ax/gcloud-blocked-app-impersonation-1-ko.webp"],"author":{"@id":"https://sugarmount21.com/#org"},"publisher":{"@id":"https://sugarmount21.com/#org"},"isPartOf":{"@id":"https://sugarmount21.com/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"\"This request contains scopes that cannot be requested together\"는 왜 나오나요?","acceptedAnswer":{"@type":"Answer","text":"한 로그인 요청에 함께 넣을 수 없는 스코프 조합이 있어서입니다. 10월 8일에는 drive.file과 youtube.upload가 그 조합이었습니다. drive.file을 빼고 YouTube 스코프만 요청하자 이 400은 사라졌지만, gcloud 기본 로그인으로는 YouTube 스코프가 다시 '차단된 앱'에 걸렸습니다."}},{"@type":"Question","name":"GA4 Data API를 서비스 계정으로 읽으려면 키 파일이 꼭 있어야 하나요?","acceptedAnswer":{"@type":"Answer","text":"없어도 됩니다. 내 계정에 토큰 생성자 역할을 주고, GA4 계정 액세스 관리에서 서비스 계정을 뷰어로 넣은 뒤 --impersonate-service-account로 토큰을 받으면 됩니다. 이 글의 서비스 계정은 키 파일 없이 10월 15일부터 GA4를 읽었습니다."}}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://sugarmount21.com/"},{"@type":"ListItem","position":2,"name":"AX 노트","item":"https://sugarmount21.com/ax/"},{"@type":"ListItem","position":3,"name":"에이전트와 일하는 법","item":"https://sugarmount21.com/ax/topic/workflow/"},{"@type":"ListItem","position":4,"name":"gcloud '차단된 앱', 서비스 계정 가장으로 우회"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=e2770b30">
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a class="nav-apps" href="/apps/">앱</a>
+        <a class="nav-ax" href="/ax/" aria-current="page">AX 노트</a>
+        <a class="nav-about" href="/about/">소개</a>
+        <a class="nav-privacy" href="/privacy/">개인정보처리방침</a>
+      </nav>
+      <a class="lang" href="/en/ax/gcloud-blocked-app-impersonation/" lang="en" hreflang="en">English</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>메뉴</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="전체 메뉴">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">닫기</button>
+      <p class="menu-title" id="m-photo">사진·영상</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>슈가앨범</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 용량 줄이기</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 반전·회전</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>이미지 변환 JPG·PNG·WebP</span></a></li></ul>
+      <p class="menu-title" id="m-document">문서·글</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글 띄어쓰기</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글뷰어 슈가독</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">생활</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>생생카드</span></a></li></ul>
+      <p class="menu-title" id="m-games">게임</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>화살표 매듭풀기</span></a></li><li><a class="app-tile" data-app="blocks" href="/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한판블록</span></a></li></ul>
+      <p><a href="/apps/">모든 앱 보기</a></p>
+      <ul class="menu-links"><li><a href="/ax/" aria-current="page">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-workflow">
+    <nav class="crumbs" aria-label="이동 경로"><ol><li><a href="/">SugarMount</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/ax/topic/workflow/">에이전트와 일하는 법</a></li><li><span aria-current="page">gcloud &#x27;차단된 앱&#x27;, 서비스 계정 가장으로 우회</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/gcloud-blocked-app-impersonation-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX 노트 · 짧은 노트</span>
+      <h1>gcloud '차단된 앱', 서비스 계정 가장으로 우회</h1>
+      <p class="lead">gcloud 기본 로그인 앱으로는 analytics 권한을 받을 수 없었으니(YouTube·스프레드시트도 같음), 서비스 계정을 가장해 토큰을 받으면 됩니다.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/about/">작성 SugarMount</a> <span aria-hidden="true">·</span> <span>에이전트와 일하는 법</span> <span aria-hidden="true">·</span> <span>읽는 시간 6분</span> <span aria-hidden="true">·</span> 최종 업데이트 <time datetime="2026-11-13">2026년 11월 13일</time></p><!-- /build:meta -->
+      <p>GA4(Google 애널리틱스 4)를 스크립트로 읽으려고 gcloud 로그인에 analytics 권한 범위(스코프)를 더하면 브라우저에 '차단된 앱' 화면이 나옵니다. SugarMount는 10월 8~15일에 이 화면을 세 번 봤고, 세 번 다 AI 코딩 에이전트가 낸 로그인 명령에서 시작했습니다.</p>
+      <p>15일에는 서비스 계정 가장(impersonation), 곧 내 계정이 서비스 계정 대신 짧게 쓰는 토큰을 받아 오는 방식으로 갔습니다. 차단 뒤 5분이 안 돼 GA4 속성 목록이 나왔고, 키 파일은 만들지 않았습니다.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>목차 (5)</summary><ol><li><a href="#three-walls">세 번 본 같은 화면</a></li><li><a href="#cause">막은 쪽은 gcloud 로그인 앱</a></li><li><a href="#how-to">키 파일 없이 가장 토큰 받기</a></li><li><a href="#memory">reference 메모 한 장</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">목차</p><ol><li><a href="#three-walls">세 번 본 같은 화면</a></li><li><a href="#cause">막은 쪽은 gcloud 로그인 앱</a></li><li><a href="#how-to">키 파일 없이 가장 토큰 받기</a></li><li><a href="#memory">reference 메모 한 장</a></li><li><a href="#faq">자주 묻는 질문</a></li></ol></nav></div><!-- /build:toc -->
+
+    <!-- build:ad-rail --><!-- /build:ad-rail -->
+
+    <!-- build:ad-1 --><!-- /build:ad-1 -->
+
+    <section aria-labelledby="three-walls">
+      <h2 id="three-walls">세 번 본 같은 화면</h2>
+      <p>10월 8일 밤, 에이전트가 낸 로그인 명령은 drive.file과 youtube.upload를 함께 요청해 400을 받았습니다. Drive 스코프를 빼고 YouTube 스코프를 따로 요청하자 '차단된 앱'이 나왔고, 에이전트는 업로드를 접고 Google Ads 화면에서 영상을 올리는 길로 바꿨습니다(<a href="/ax/game-ad-creatives-from-play-recordings/">구글 앱 캠페인 광고 소재를 플레이 녹화로 만들기</a>). 11일과 15일에는 analytics 스코프로 같은 화면을 만났습니다.</p>
+      <figure><img src="/assets/ax/gcloud-blocked-app-impersonation-shot1-ko.webp" width="1200" height="880" alt="세션 기록 일부: 10월 8일 400 오류와 차단된 앱, 10월 11일 차단된 앱, 10월 15일 analytics.readonly를 더한 명령과 차단된 앱, 가장 토큰 길이 1024" loading="lazy"><figcaption>세션 기록 원문(10월 8·11·15일) 일부. 서비스 계정 주소는 검은 상자로 가렸습니다.</figcaption></figure>
+    </section>
+
+    <section aria-labelledby="cause">
+      <h2 id="cause">막은 쪽은 gcloud 로그인 앱</h2>
+      <p>15일의 출발점은 403 ACCESS_TOKEN_SCOPE_INSUFFICIENT였고, ADC(스크립트가 빌려 쓰는 기본 자격 증명) 토큰에 analytics 스코프가 없다는 진단은 맞았습니다. 틀린 것은 스코프를 더하는 해결이었습니다. <code>gcloud auth application-default login</code>은 gcloud에 든 OAuth 로그인 앱으로 동의 화면을 엽니다. 직접 만든 데스크톱 클라이언트로 같은 스코프를 요청한 11일 스크립트는 통과했습니다.</p>
+      <p>메모리에 남은 8일의 교훈은 게임 출시 상태 메모 속 괄호 한 줄, "gcloud 클라이언트는 YouTube 스코프에 막힌다"가 전부였습니다. 15일 세션은 그 메모를 읽고 39초 뒤, 같은 모양의 로그인 명령에 analytics 스코프만 바꿔 넣어 냈습니다. 에이전트가 스코프만 더하면 된다며 gcloud 로그인 명령을 내밀면 실행하지 마십시오.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20gcloud%20%27%EC%B0%A8%EB%8B%A8%EB%90%9C%20%EC%95%B1%27%2C%20%EC%84%9C%EB%B9%84%EC%8A%A4%20%EA%B3%84%EC%A0%95%20%EA%B0%80%EC%9E%A5%EC%9C%BC%EB%A1%9C%20%EC%9A%B0%ED%9A%8C">메일로 문의하기</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">키 파일 없이 가장 토큰 받기</h2>
+      <figure class="ax-fig"><img src="/assets/ax/gcloud-blocked-app-impersonation-1-ko.webp" width="1200" height="606" alt="비교 그림: gcloud 로그인에 스코프를 더하면 차단, 서비스 계정 가장은 cloud-platform 스코프만으로 analytics 토큰" loading="lazy"><figcaption>막힌 것은 gcloud의 로그인 앱이었고, 서비스 계정 가장은 그 동의 화면을 거치지 않습니다.</figcaption></figure>
+      <ol class="steps"><li><p>GA4 연결 프로젝트에서 IAM Credentials API(토큰 발급 API)와 Analytics Data API를 켜고 서비스 계정을 만듭니다. 키는 만들지 않습니다.</p></li><li><p>내 계정에 그 서비스 계정의 토큰 생성자 역할(roles/iam.serviceAccountTokenCreator)을 줍니다.</p></li><li><p>GA4 관리의 계정 액세스 관리에서 서비스 계정 주소를 뷰어로 넣습니다.</p></li><li><p>받은 토큰을 GA4 Data API 요청 헤더에 Bearer 토큰으로 붙입니다.</p><pre><code>gcloud auth print-access-token --impersonate-service-account=&lt;서비스 계정 주소&gt; --scopes=https://www.googleapis.com/auth/analytics.readonly</code></pre></li></ol>
+      <p>내 로그인은 원래 있던 cloud-platform(Google Cloud용) 스코프로 IAM Credentials API를 부를 뿐이고, analytics 스코프는 서비스 계정 토큰에 붙습니다. Windows PC에서는 ADC 토큰으로 그 API를 부릅니다(10월 22일). 15일에는 1·2번 명령(역할 부여 포함)을 Claude Code 자동 모드의 권한 분류기(위험한 명령을 사람에게 넘기는 자동 검사)가 막아 운영자가 직접 돌렸고, 3번도 운영자가 했습니다.</p>
+      <p>11일 대시보드 서버는 운영자의 질문 뒤 자체 OAuth 클라이언트로 AdMob·GA4 읽기와 Gmail 발송 세 스코프만 받은 토큰을 씁니다(4254b7f). 이 길은 클라이언트 비밀 파일이 필요하고, 15일에는 그 파일을 찾는 명령이 분류기에 막혀 유출될 비밀값이 없는 가장을 골랐습니다.</p>
+    </section>
+
+    <section aria-labelledby="memory">
+      <h2 id="memory">reference 메모 한 장</h2>
+      <p>15일 저녁 에이전트는 게임 폴더 메모리에 GA4 접근 전용 reference 메모를 만들었습니다. 첫 줄은 동작하는 명령, Why·How to apply(왜·어떻게 쓰나) 칸이 뒤따릅니다.</p>
+      <p>이 메모는 그 폴더에서만 읽힙니다. 이틀 뒤 한글뷰어 세션의 서브에이전트는 GA4 Data API 403 앞에서 다시 ADC 로그인 명령을 남겼습니다(<a href="/ax/ga4-zero-report-reversed/">AI 에이전트가 보고한 'GA4 28일 0건', 표 보고서에는 43명이 있었다</a>). 25일에는 다른 프로젝트가 스프레드시트 스코프로 네 번째 '차단된 앱'을 봤습니다. Gmail 발송, AdMob 읽기, YouTube 업로드는 가장으로 시험하지 않았습니다.</p>
+    </section>
+
+    
+
+    <!-- build:ad-2 --><!-- /build:ad-2 --><!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20gcloud%20%27%EC%B0%A8%EB%8B%A8%EB%90%9C%20%EC%95%B1%27%2C%20%EC%84%9C%EB%B9%84%EC%8A%A4%20%EA%B3%84%EC%A0%95%20%EA%B0%80%EC%9E%A5%EC%9C%BC%EB%A1%9C%20%EC%9A%B0%ED%9A%8C">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <section aria-labelledby="faq">
+    <h2 id="faq">자주 묻는 질문</h2>
+    <div class="faq"><details><summary>"This request contains scopes that cannot be requested together"는 왜 나오나요?</summary><div><p>한 로그인 요청에 함께 넣을 수 없는 스코프 조합이 있어서입니다. 10월 8일에는 drive.file과 youtube.upload가 그 조합이었습니다. drive.file을 빼고 YouTube 스코프만 요청하자 이 400은 사라졌지만, gcloud 기본 로그인으로는 YouTube 스코프가 다시 '차단된 앱'에 걸렸습니다.</p></div></details><details><summary>GA4 Data API를 서비스 계정으로 읽으려면 키 파일이 꼭 있어야 하나요?</summary><div><p>없어도 됩니다. 내 계정에 토큰 생성자 역할을 주고, GA4 계정 액세스 관리에서 서비스 계정을 뷰어로 넣은 뒤 --impersonate-service-account로 토큰을 받으면 됩니다. 이 글의 서비스 계정은 키 파일 없이 10월 15일부터 GA4를 읽었습니다.</p></div></details></div>
+    </section>
+
+    <p class="note">2026-11-12 확인. Claude Code 세션 기록(10월 8·11·15·17·25일, UTC를 한국 시간으로 바꿈), 게임 폴더 메모리(reference 메모, 10월 15일), 개인 대시보드 서버 저장소 커밋 4254b7f(10월 11일), 게임 저장소 커밋 7a61407(10월 22일).</p>
+
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="/ax/windows-harness-claude-code-login/">Claude Code 로그인과 첫 자동 질문 보내기</a></li>
+        <li><a href="/ax/windows-harness-first-job/">Claude Code 하네스 키트로 첫 작업 돌리기</a></li>
+        <li><a href="/ax/windows-harness-powershell-basics/">PowerShell 처음 열기: 명령 붙여넣기와 경로</a></li>
+        <li><a href="/ax/vertex-test-cost-hard-cap/">Vertex AI 테스트 비용 하드캡: 2,500원 중단선이 결제 2,956원을 놓친 뒤 바꾼 기본값</a></li>
+        <li><a href="/ax/game-ad-creatives-from-play-recordings/">구글 앱 캠페인 광고 소재를 플레이 녹화로 만들기</a></li>
+        <li><a href="/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
+      </ul>
+      <p><a href="/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="/ax/">AX 노트 전체 보기</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>한 가지 일을 간단하게 하는 Android 앱</p>
+        <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">앱</p>
+        <ul><li><a href="/apps/sugaralbum/">슈가앨범</a></li><li><a href="/apps/image-compress/">사진 용량 줄이기</a></li><li><a href="/apps/image-flip/">사진 반전·회전</a></li><li><a href="/apps/image-convert/">이미지 변환 JPG·PNG·WebP</a></li><li><a href="/apps/sugarspeller/">한글 띄어쓰기</a></li><li><a href="/apps/sugarclip/">SugarClip</a></li><li><a href="/apps/doc-viewer/">한글뷰어 슈가독</a></li><li><a href="/apps/sugarcard/">생생카드</a></li><li><a href="/apps/arrow-knots/">화살표 매듭풀기</a></li><li><a href="/apps/blocks/">한판블록</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">사이트</p>
+        <ul><li><a href="/apps/">모든 앱</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li><li><a href="/sitemap/">사이트맵</a></li><li><a href="/rss.xml">RSS 피드</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play 개발자 페이지</a></div>
+    </div>
+  </footer>
+</body>
+</html>
