@@ -187,6 +187,33 @@ AX_T = {"ko": {"ax_topic_eyebrow": "AX 노트 · 주제", "ax_n": "글 {n}개", 
         "en": {"ax_topic_eyebrow": "AX notes · Topic", "ax_n": "{n} notes", "ax_topic_all": "All notes on {name}", "ax_topic_title": "{name} – AX notes", "ax_list_h": "Notes"}}
 AX_TOPICS = {tp["id"]: tp for tp in AXD["topics"]}
 AX_NOTE_TOPIC = AXD["notes"]
+# series (연재): data/ax.json "series": [{id, ko:{name, desc}, en:{name, desc}, slugs:[reading order]}] -> /ax/series/<id>/
+AX_SERIES = AXD.get("series", [])
+AX_SERIES_OF = {s: (sr, i) for sr in AX_SERIES for i, s in enumerate(sr["slugs"])}
+AX_BOARD_PAGE = 20    # rows per board page: the hub is page 1, /ax/page/<n>/ the rest (40 KB HTML budget per page)
+AX_RESERVED = {"topic", "series", "page"}  # path segments under /ax/ that are not notes
+AX_T["ko"].update({
+    "ax_series_eyebrow": "AX 노트 · 연재", "ax_series_title": "{name} – AX 노트 연재", "ax_series_h": "연재",
+    "ax_series_badge": "연재 {i}/{n}", "ax_series_n": "{n}편", "ax_series_start": "1편부터 읽기",
+    "ax_series_all": "연재 전체 보기", "ax_series_list": "{name} 전체 {n}편", "ax_prev": "이전 편", "ax_next": "다음 편",
+    "ax_last": "마지막 편입니다.", "ax_series_nav": "연재 목차", "ax_part": "{i}편",
+    "ax_board_h": "글 목록", "ax_board_n": "전체 {n}편", "ax_topics_h": "주제", "ax_pages": "쪽 이동",
+    "ax_page_title": "AX 노트 글 목록 {p}쪽", "ax_page_eyebrow": "AX 노트 · 글 목록",
+    "ax_page_lead": "AX 노트 전체 글을 최신순으로 {size}편씩 보여 주는 목록입니다. 지금 보는 쪽은 {p}쪽입니다.",
+    "ax_page_desc": "SugarMount AX 노트 전체 {n}편 가운데 {a}~{b}번째 글 목록입니다. 주제, 글 유형, 발행일, 연재 순서를 함께 보여 줍니다.",
+    "ax_prev_page": "← 새 글", "ax_next_page": "지난 글 →",
+})
+AX_T["en"].update({
+    "ax_series_eyebrow": "AX notes · Series", "ax_series_title": "{name} – AX notes series", "ax_series_h": "Series",
+    "ax_series_badge": "Series {i}/{n}", "ax_series_n": "{n} parts", "ax_series_start": "Start with part 1",
+    "ax_series_all": "Whole series", "ax_series_list": "{name}: all {n} parts", "ax_prev": "Previous", "ax_next": "Next",
+    "ax_last": "This is the last part.", "ax_series_nav": "Series contents", "ax_part": "Part {i}",
+    "ax_board_h": "All notes", "ax_board_n": "{n} notes", "ax_topics_h": "Topics", "ax_pages": "Pages",
+    "ax_page_title": "AX notes, page {p}", "ax_page_eyebrow": "AX notes · All notes",
+    "ax_page_lead": "Every AX note, newest first, {size} to a page. This is page {p} of the list, with each note's topic and date.",
+    "ax_page_desc": "Notes {a} to {b} of all {n} SugarMount AX notes, newest first, with each note's topic, note type, publication date and place in a series.",
+    "ax_prev_page": "← Newer", "ax_next_page": "Older →",
+})
 
 def css_version(generated):
     """One version for all three stylesheets: site.css (committed LF bytes; a Windows checkout with core.autocrlf
@@ -291,6 +318,11 @@ def generated_inputs():
                 out[f"{p}apps/{a['app_path']}/index.html"] = dates.data_input("app", T[lang], app_core(a), a[lang])
     for relp, (tp, lang) in ax_topic_pages().items():  # a topic page changes when its topic text or its notes change
         out[relp] = dates.data_input("ax-topic", tp[lang], [ax_slug(u) for x, a in ax_by_topic(lang) if x["id"] == tp["id"] for u, _, _ in a])
+    for relp, (sr, lang) in ax_series_pages().items():  # a series page changes when its text or its parts change
+        out[relp] = dates.data_input("ax-series", sr[lang], [ax_slug(u) for u, _ in ax_series_parts(sr, lang)])
+    for relp, (p, lang) in ax_board_page_paths().items():  # a board page changes when its rows change
+        rows = ax_articles(lang)[(p - 1) * AX_BOARD_PAGE: p * AX_BOARD_PAGE]
+        out[relp] = dates.data_input("ax-page", {"p": p}, [ax_slug(u) for u, _, _ in rows])
     return out
 
 # ---------------------------------------------------------------- shared chrome (SDS 6.1, 6.2; IA 6.1, 6.2, 13)
@@ -978,7 +1010,7 @@ def ax_articles(lang):
     if os.path.isdir(base):
         for slug in os.listdir(base):
             f = os.path.join(base, slug, "index.html")
-            if not os.path.isfile(f): continue
+            if slug in AX_RESERVED or not os.path.isfile(f): continue
             relp = os.path.relpath(f, ROOT).replace(os.sep, "/")
             s = read(relp)
             md = re.search(r'<meta name="description" content="([^"]*)"', s)
@@ -1062,6 +1094,188 @@ def build_ax_topic(tp, lang):
             {"@type": "ListItem", "position": i + 1, "url": SITE + u} for i, (u, _, _) in enumerate(arts)]},
     ]}, bc]
     h = head(lang, title, d["desc"], path, alt, og_image=f"/assets/og/ax-{lang}.png", lds=lds)
+    return page(lang, h, ' class="page-hub"', header(lang, "ax", alt or url(other(lang), "/ax/")), main, footer(lang))
+
+# ---------------------------------------------------------------- AX board and series (2026-11-13 hub redesign)
+SEP = ' <span aria-hidden="true">·</span> '
+
+def ax_series_url(sr, lang): return url(lang, f"/ax/series/{sr['id']}/")
+def ax_page_url(p, lang): return url(lang, "/ax/") if p == 1 else url(lang, f"/ax/page/{p}/")
+
+def ax_series_parts(sr, lang):
+    """[(url, h1)] of a series' notes that exist in this language, in reading order."""
+    by = {ax_slug(u): (u, n) for u, n, _ in ax_articles(lang)}
+    return [by[s] for s in sr["slugs"] if s in by]
+
+def ax_series_pos(slug, lang):
+    """(series, index, parts) when the note is in a series in this language, else None."""
+    hit = AX_SERIES_OF.get(slug)
+    if not hit: return None
+    parts = ax_series_parts(hit[0], lang)
+    idx = next((i for i, (u, _) in enumerate(parts) if ax_slug(u) == slug), None)
+    return (hit[0], idx, parts) if idx is not None else None
+
+def ax_row(u, n, d, lang, desc=True):
+    """Board row (2 lines): title / topic · type · date · series badge, then a one-line summary."""
+    tp = ax_topic_of(u)
+    pub = published(relpath_of(u))
+    bits = []
+    if tp: bits.append(f'<a class="ax-tag" href="{ax_topic_url(tp, lang)}">{esc(tp[lang]["name"])}</a>')
+    ty = ax_type(u)
+    if ty: bits.append(f"<span>{esc(ty)}</span>")
+    bits.append(f'<time datetime="{pub}">{fmt_date(lang, pub)}</time>')
+    pos = ax_series_pos(ax_slug(u), lang)
+    if pos:
+        sr, i, parts = pos
+        bits.append(f'<span class="ax-tag ax-tag-series" title="{esc(sr[lang]["name"])}">'
+                    f'{esc(AX_T[lang]["ax_series_badge"].format(i=i + 1, n=len(parts)))}</span>')
+    sub = f'<p class="ax-row-desc">{esc(clip_sentences(d, 90 if lang == "ko" else 150))}</p>' if desc and d else ""
+    return f'\n        <li><a class="ax-row-title" href="{u}">{esc(n)}</a><p class="ax-row-meta">{SEP.join(bits)}</p>{sub}</li>'
+
+def ax_board_pages(lang):
+    arts = ax_articles(lang)
+    return max(1, math.ceil(len(arts) / AX_BOARD_PAGE))
+
+def ax_pager(p, lang):
+    n = ax_board_pages(lang)
+    if n == 1: return ""
+    t = AX_T[lang]
+    links = []
+    if p > 1: links.append(f'<a href="{ax_page_url(p - 1, lang)}" rel="prev">{t["ax_prev_page"]}</a>')
+    for k in range(1, n + 1):
+        links.append(f'<a aria-current="page" href="{ax_page_url(k, lang)}">{k}</a>' if k == p
+                     else f'<a href="{ax_page_url(k, lang)}">{k}</a>')
+    if p < n: links.append(f'<a href="{ax_page_url(p + 1, lang)}" rel="next">{t["ax_next_page"]}</a>')
+    return f'\n      <nav class="ax-pager" aria-label="{t["ax_pages"]}">{"".join(links)}</nav>'
+
+def ax_board(p, lang):
+    """Board page p (1 = the hub): AX_BOARD_PAGE rows, newest first, then the pager."""
+    arts = ax_articles(lang)
+    rows = arts[(p - 1) * AX_BOARD_PAGE: p * AX_BOARD_PAGE]
+    return f'\n      <ul class="ax-board">{"".join(ax_row(u, n, d, lang) for u, n, d in rows)}\n      </ul>{ax_pager(p, lang)}\n      ', rows
+
+def ax_series_cards(lang):
+    t = AX_T[lang]
+    out = []
+    for sr in AX_SERIES:
+        parts = ax_series_parts(sr, lang)
+        if not parts: continue
+        last = max(published(relpath_of(u)) for u, _ in parts)
+        out.append(f'\n        <li class="ax-series-card"><a class="ax-row-title" href="{ax_series_url(sr, lang)}">{esc(sr[lang]["name"])}</a>'
+                   f'<p class="ax-row-desc">{esc(sr[lang]["desc"])}</p>'
+                   f'<p class="ax-row-meta"><span>{t["ax_series_n"].format(n=len(parts))}</span>{SEP}'
+                   f'<time datetime="{last}">{fmt_date(lang, last)}</time></p></li>')
+    return f'\n      <ul class="ax-series-grid">{"".join(out)}\n      </ul>\n      ' if out else ""
+
+def ax_topic_chips(lang, current=None):
+    cur = ' aria-current="page"'
+    lis = "".join(f'<li><a href="{ax_topic_url(tp, lang)}"{cur if tp["id"] == current else ""}>'
+                  f'{esc(tp[lang]["name"])} <span class="n">{len(a)}</span></a></li>' for tp, a in ax_by_topic(lang))
+    return f'\n      <ul class="chips ax-chips">{lis}</ul>\n      '
+
+def ax_series_top(slug, lang):
+    """Line under the meta of a series note: 'series name i/n', linking the series page (prev/next sit in the end box)."""
+    pos = ax_series_pos(slug, lang)
+    if not pos: return ""
+    sr, i, parts = pos
+    t = AX_T[lang]
+    bits = [f'<a href="{ax_series_url(sr, lang)}">{esc(sr[lang]["name"])}</a> {i + 1}/{len(parts)}']
+    return '<p class="note ax-series-line">' + bits[0] + "</p>"
+
+def ax_series_nav(slug, lang):
+    """Box at the end of a series note: the series page, then the previous and next parts (the full list is the series
+    page; the current title is not repeated: every byte counts against the 40 KB page budget)."""
+    pos = ax_series_pos(slug, lang)
+    if not pos: return ""
+    sr, i, parts = pos
+    t = AX_T[lang]
+    near = [k for k in (i - 1, i + 1) if 0 <= k < len(parts)]
+    lis = "".join(f'<li value="{k + 1}"><a href="{parts[k][0]}">{esc(parts[k][1])}</a></li>' for k in near)
+    nxt = "" if i < len(parts) - 1 else f'<p>{t["ax_last"]}</p>'
+    return (f'\n    <nav class="box ax-series-box" aria-label="{t["ax_series_nav"]}"><p><strong>'
+            f'<a href="{ax_series_url(sr, lang)}">{esc(t["ax_series_list"].format(name=sr[lang]["name"], n=len(parts)))}</a>'
+            f'</strong></p><ol>{lis}</ol>{nxt}</nav>\n    ')
+
+def ax_series_pages():
+    return {("en/" if lang == "en" else "") + f"ax/series/{sr['id']}/index.html": (sr, lang)
+            for lang in ("ko", "en") for sr in AX_SERIES if ax_series_parts(sr, lang)}
+
+def ax_board_page_paths():
+    return {("en/" if lang == "en" else "") + f"ax/page/{p}/index.html": (p, lang)
+            for lang in ("ko", "en") for p in range(2, ax_board_pages(lang) + 1)}
+
+def ax_css(h):
+    return h.replace("</head>", f'  <link rel="stylesheet" href="/assets/ax.css?v={CSSV}">\n</head>')
+
+def build_ax_series(sr, lang):
+    t, at = T[lang], AX_T[lang]
+    d = sr[lang]
+    parts = ax_series_parts(sr, lang)
+    path = ax_series_url(sr, lang)
+    alt = ax_series_url(sr, other(lang)) if ax_series_parts(sr, other(lang)) else None
+    nav, bc = crumbs(lang, [(t["ax"], url(lang, "/ax/")), (at["ax_series_h"], url(lang, "/ax/") + "#series"), (d["name"], None)])
+    descs = {u: dd for u, _, dd in ax_articles(lang)}
+    rows = "".join(
+        f'\n        <li><span class="ax-part">{at["ax_part"].format(i=i + 1)}</span><a class="ax-row-title" href="{u}">{esc(n)}</a>'
+        f'<p class="ax-row-meta"><time datetime="{published(relpath_of(u))}">{fmt_date(lang, published(relpath_of(u)))}</time></p>'
+        f'<p class="ax-row-desc">{esc(clip_sentences(descs.get(u, ""), 90 if lang == "ko" else 150))}</p></li>'
+        for i, (u, n) in enumerate(parts))
+    main = f'''    {nav}
+    <header class="hero">
+      <span class="eyebrow">{at["ax_series_eyebrow"]}</span>
+      <h1>{esc(d["name"])}</h1>
+      <p class="lead">{esc(d["desc"])}</p>
+      <p class="meta">{at["ax_series_n"].format(n=len(parts))}</p>
+    </header>
+
+    <section aria-labelledby="parts-h">
+      <h2 id="parts-h">{at["ax_series_nav"]}</h2>
+      <ol class="ax-board ax-series-list">{rows}
+      </ol>
+      <p><a href="{url(lang, "/ax/")}">{t["ax_more"]}</a></p>
+    </section>'''
+    title = fit_title(at["ax_series_title"].format(name=d["name"]), lang)
+    relp = relpath_of(path)
+    lds = [{"@context": "https://schema.org", "@graph": [
+        {"@type": "CollectionPage", "@id": SITE + path, "url": SITE + path, "name": title, "description": d["desc"], "inLanguage": lang,
+         "isPartOf": SITE_REF, "publisher": ORG_REF, "mainEntity": {"@id": SITE + path + "#list"},
+         "dateModified": dates.iso_datetime(modified(relp))},
+        {"@type": "ItemList", "@id": SITE + path + "#list", "itemListOrder": "https://schema.org/ItemListOrderAscending",
+         "itemListElement": [{"@type": "ListItem", "position": i + 1, "url": SITE + u} for i, (u, _) in enumerate(parts)]},
+    ]}, bc]
+    h = ax_css(head(lang, title, d["desc"], path, alt, og_image=f"/assets/og/ax-{lang}.png", lds=lds))
+    return page(lang, h, ' class="page-hub"', header(lang, "ax", alt or url(other(lang), "/ax/")), main, footer(lang))
+
+def build_ax_page(p, lang):
+    t, at = T[lang], AX_T[lang]
+    total = len(ax_articles(lang))
+    board, rows = ax_board(p, lang)
+    path = ax_page_url(p, lang)
+    alt = ax_page_url(p, other(lang)) if p <= ax_board_pages(other(lang)) else None
+    nav, bc = crumbs(lang, [(t["ax"], url(lang, "/ax/")), (at["ax_page_title"].format(p=p), None)])
+    a, b = (p - 1) * AX_BOARD_PAGE + 1, (p - 1) * AX_BOARD_PAGE + len(rows)
+    desc = at["ax_page_desc"].format(n=total, a=a, b=b)
+    main = f'''    {nav}
+    <header class="hero">
+      <span class="eyebrow">{at["ax_page_eyebrow"]}</span>
+      <h1>{at["ax_page_title"].format(p=p)}</h1>
+      <p class="lead">{at["ax_page_lead"].format(size=AX_BOARD_PAGE, p=p)}</p>
+      <p class="meta">{at["ax_board_n"].format(n=total)}</p>
+    </header>
+
+    <section aria-labelledby="board-h">
+      <h2 id="board-h">{at["ax_board_h"]}</h2>{board}
+    </section>'''
+    title = fit_title(at["ax_page_title"].format(p=p), lang)
+    relp = relpath_of(path)
+    lds = [{"@context": "https://schema.org", "@graph": [
+        {"@type": "CollectionPage", "@id": SITE + path, "url": SITE + path, "name": title, "description": desc, "inLanguage": lang,
+         "isPartOf": SITE_REF, "publisher": ORG_REF, "mainEntity": {"@id": SITE + path + "#list"},
+         "dateModified": dates.iso_datetime(modified(relp))},
+        {"@type": "ItemList", "@id": SITE + path + "#list", "itemListElement": [
+            {"@type": "ListItem", "position": a + i, "url": SITE + u} for i, (u, _, _) in enumerate(rows)]},
+    ]}, bc]
+    h = ax_css(head(lang, title, desc, path, alt, og_image=f"/assets/og/ax-{lang}.png", lds=lds))
     return page(lang, h, ' class="page-hub"', header(lang, "ax", alt or url(other(lang), "/ax/")), main, footer(lang))
 
 BLOCK_RE = lambda name: re.compile(r"<!-- build:" + name + r" -->.*?<!-- /build:" + name + r" -->", re.S)
@@ -1249,27 +1463,24 @@ def wrap_hand(relpath):
     elif parts[0] == "ax" and len(parts) == 1:
         current = "ax"; og = f"/assets/og/ax-{lang}.png"
         items = [(t["ax"], None)]
-        arts = ax_articles(lang)
-        # the hub's lists are ours: the latest notes and one card per topic, rebuilt from ax/<slug>/ + data/ax.json on every build
-        latest = "".join(
-            f'\n        <li class="card"><h3><a href="{u}">{esc(n)}</a></h3><p class="sub">{esc(d)}</p>'
-            f'<p class="meta">{esc(ax_label(u, lang))}</p></li>' for u, n, d in arts[:AX_HUB_LATEST])
-        main = set_block(main, "ax-list", f'\n      <ul class="card-list">{latest}\n      </ul>\n      ')
+        # the hub is board page 1: series cards, the newest AX_BOARD_PAGE notes as a 2-line board, topic chips, search,
+        # all rebuilt from ax/<slug>/ + data/ax.json on every build (2026-11-13 redesign; the hand file holds only text)
+        board, rows = ax_board(1, lang)
+        main = set_block(main, "ax-list", board)
+        if BLOCK_RE("ax-series").search(main):
+            main = set_block(main, "ax-series", ax_series_cards(lang))
         if BLOCK_RE("ax-search").search(main):
             main = set_block(main, "ax-search", ax_extras.search_block(lang, url(lang, "/ax/search.json")))
-        # topic cards carry no note titles: every title on the hub costs font subsets (470 KB budget)
-        tcards = "".join(
-            f'\n        <li class="card"><h3><a href="{ax_topic_url(tp, lang)}">{esc(tp[lang]["name"])}</a></h3>'
-            f'<p class="sub">{esc(tp[lang]["desc"])}</p><p class="meta">{AX_T[lang]["ax_n"].format(n=len(a))}</p></li>'
-            for tp, a in ax_by_topic(lang))
         if BLOCK_RE("ax-topics").search(main):
-            main = set_block(main, "ax-topics", f'\n      <ul class="card-list">{tcards}\n      </ul>\n      ')
+            main = set_block(main, "ax-topics", ax_topic_chips(lang))
+        if BLOCK_RE("ax-count").search(main):
+            main = set_block(main, "ax-count", esc(AX_T[lang]["ax_board_n"].format(n=len(ax_articles(lang)))))
         lds.append({"@context": "https://schema.org", "@type": "CollectionPage", "@id": SITE + path, "name": title, "description": desc,
                     "url": SITE + path, "inLanguage": lang, "isPartOf": SITE_REF, "publisher": ORG_REF, "dateModified": page_dm,
-                    "hasPart": [{"@id": SITE + u + "#article"} for u, _, _ in arts],
                     "mainEntity": {"@type": "ItemList", "@id": SITE + path + "#list", "itemListElement": [
-                        {"@type": "ListItem", "position": i + 1, "url": SITE + u} for i, (u, _, _) in enumerate(arts)]}})
+                        {"@type": "ListItem", "position": i + 1, "url": SITE + u} for i, (u, _, _) in enumerate(rows)]}})
         main = set_block(main, "extra", "\n    " + updated_p(lang, relpath) + "\n    ")
+        main_cls = "ax-hub"
     elif parts[0] == "ax" and len(parts) == 2:
         current = "ax"; og_type = "article"
         og = f"/assets/og/ax-{parts[1]}-{lang}.png"
@@ -1285,6 +1496,12 @@ def wrap_hand(relpath):
                         + ax_extras.figures(main))]) else {}),
                     "author": ORG_REF, "publisher": ORG_REF, "isPartOf": SITE_REF})
         main = set_block(main, "meta", meta_line(lang, relpath, main, tp[lang]["name"] if tp else t["ax"]), after_lead(main))
+        # series: a line under the meta and the contents box at the end, unless the body already has ax_md's own (windows-harness)
+        own_series = re.search(r'<nav class="box" aria-label="(?:연재 목차|Series contents)"', dates.strip_build_blocks(main))
+        if not own_series and ax_series_pos(parts[1], lang):
+            main = set_block(main, "series", ax_series_top(parts[1], lang), BLOCK_RE("meta").search(main).end())
+            faq0 = re.search(r'\n\s*<section aria-labelledby="faq">', main)
+            main = set_block(main, "series-nav", ax_series_nav(parts[1], lang), faq0.start() if faq0 else None)
         # inquiry boxes: one before the middle body h2, one before the FAQ (ax_extras)
         mid = ax_extras.middle_h2(main)
         main = set_block(main, "cta-mid", ax_extras.cta_mid(lang, EMAIL, headline), mid)
@@ -1310,8 +1527,13 @@ def wrap_hand(relpath):
         main = set_block(main, "ad-rail", ax_extras.ad_unit(ADS, "rail_left", lang), BLOCK_RE("toc").search(main).end())
         # related: newest notes of the same topic first, then the newest of other topics, AX_RELATED in all
         allx = [(u, n) for u, n, _ in ax_articles(lang) if u != path]
-        same = [x for x in allx if tp and ax_topic_of(x[0]) is tp][:AX_RELATED - 2]
-        others = same + [x for x in allx if x not in same][:AX_RELATED - len(same)]
+        # a series note already links its neighbours and the series page: half the related list (40 KB budget)
+        my_sr = ax_series_pos(parts[1], lang)
+        n_rel = 2 if my_sr else AX_RELATED
+        if my_sr:  # same-series notes are in the series box already
+            allx = [x for x in allx if (AX_SERIES_OF.get(ax_slug(x[0])) or (None,))[0] is not my_sr[0]]
+        same = [x for x in allx if tp and ax_topic_of(x[0]) is tp][:n_rel - 2]
+        others = same + [x for x in allx if x not in same][:n_rel - len(same)]
         extra = ""
         if others:
             lis = "".join(f'\n        <li><a href="{u}">{esc(n)}</a></li>' for u, n in others)
@@ -1344,6 +1566,8 @@ def wrap_hand(relpath):
         base = privacy_url(a, lang)
         return page(lang, h, ' class="page-read"', legal_chrome.header(t, a, lang, base, other_href, BRAND_MARK), main,
                     legal_chrome.footer(t, a, lang, base, EMAIL, here_href=path), app=app_scope)
+    if main_cls == "ax-hub":
+        h = ax_css(h); main_cls = ""
     if main_cls.startswith("ax-note"):
         h = h.replace("</head>", f'  <link rel="stylesheet" href="/assets/ax.css?v={CSSV}">\n'
                                  + (f"  {ax_extras.ads_head(ADS)}\n" if ADS["on"] else "") + "</head>")
@@ -1465,7 +1689,7 @@ def sitemap_rank(relpath):
     parts = bare_of(relpath)[:-len("index.html")].strip("/").split("/")
     if parts == [""]: return "1.0", "daily"
     if parts in (["apps"], ["ax"]): return "0.9", "daily"
-    if parts[0] == "ax": return ("0.6", "weekly") if parts[1] == "topic" else ("0.8", "monthly")
+    if parts[0] == "ax": return ("0.6", "weekly") if parts[1] in AX_RESERVED else ("0.8", "monthly")
     if parts[0] == "apps": return ("0.8", "weekly") if len(parts) == 2 else ("0.7", "monthly")
     if parts[0] == "privacy": return "0.3", "yearly"
     return "0.5", "monthly"
@@ -1752,7 +1976,13 @@ def validate():
             if AX_NOTE_TOPIC.get(slug) not in AX_TOPICS:
                 errors.append(f"{lang}ax/{slug}/: add \"{slug}\": \"<topic id>\" to notes in data/ax.json")
     for slug in AX_NOTE_TOPIC:
-        if slug == "topic": errors.append("data/ax.json: the note slug 'topic' is reserved for topic pages")
+        if slug in AX_RESERVED: errors.append(f"data/ax.json: the note slug '{slug}' is reserved (topic, series and board pages)")
+    seen = {}
+    for sr in AX_SERIES:
+        for slug in sr["slugs"]:
+            if slug not in AX_NOTE_TOPIC: errors.append(f"data/ax.json: series {sr['id']} names {slug}, which is not a note")
+            if slug in seen: errors.append(f"data/ax.json: {slug} is in two series ({seen[slug]}, {sr['id']})")
+            seen[slug] = sr["id"]
         if not os.path.isfile(rel(f"ax/{slug}/index.html")): errors.append(f"data/ax.json: note {slug} has no ax/{slug}/index.html")
     known = {a.get("privacy_path") for a in APPS} | {a.get("app_path") for a in APPS}
     for p in all_pages():
@@ -1783,9 +2013,13 @@ def main():
                 generated.add(gp); outputs[gp] = build_app(a, lang)
     for gp, (tp, lang) in ax_topic_pages().items():
         generated.add(gp); outputs[gp] = build_ax_topic(tp, lang)
+    for gp, (sr, lang) in ax_series_pages().items():
+        generated.add(gp); outputs[gp] = build_ax_series(sr, lang)
+    for gp, (pn, lang) in ax_board_page_paths().items():
+        generated.add(gp); outputs[gp] = build_ax_page(pn, lang)
     outputs["404.html"] = build_404()
     generated |= {"sitemap/index.html", "en/sitemap/index.html"}  # built last, below
-    stale = [p for p in all_pages() if bare_of(p).startswith("ax/topic/") and p not in generated]  # topic left without notes
+    stale = [p for p in all_pages() if bare_of(p).startswith(("ax/topic/", "ax/series/", "ax/page/")) and p not in generated]  # topic left without notes
     for p in all_pages():
         if p not in generated and p not in stale:
             outputs[p] = wrap_hand(p)

@@ -194,7 +194,7 @@ def page_kind(relpath):
     if not parts: return "home"
     head, n = parts[0], len(parts)
     if head == "apps": return {1: "hub", 2: "app", 3: "article"}.get(n, "other")
-    if head == "ax": return "ax-topic" if n == 3 and parts[1] == "topic" else {1: "ax-hub", 2: "ax-note"}.get(n, "other")
+    if head == "ax": return "ax-topic" if n == 3 and parts[1] in ("topic", "series", "page") else {1: "ax-hub", 2: "ax-note"}.get(n, "other")
     if head == "about" and n == 1: return "about"
     if head == "privacy": return "privacy-list" if n == 1 else "policy"
     if head == "design" and n == 1: return "design"
