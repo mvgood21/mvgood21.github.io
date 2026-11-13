@@ -30,13 +30,13 @@
   <link rel="manifest" href="/site.webmanifest">
   <link rel="alternate" type="application/rss+xml" title="SugarMount" href="https://sugarmount21.com/rss.xml">
   <meta name="google-adsense-account" content="ca-pub-8023868702717237">
-  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=ed5cdd65">
-  <link rel="stylesheet" href="/assets/site.css?v=ed5cdd65">
-  <link rel="stylesheet" href="/assets/sds-apps.css?v=ed5cdd65">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=5d7227df">
+  <link rel="stylesheet" href="/assets/site.css?v=5d7227df">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=5d7227df">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://sugarmount21.com/ax/androidx-pdf-isolated-process/#article","headline":"androidx.pdf beta01: 격리 프로세스에서 Application.onCreate가 한 번 더 돌아 PDF가 조용히 안 열렸다","description":"androidx.pdf beta01의 격리 프로세스에서도 Application.onCreate가 돕니다. 가드가 없으면 오류 콜백 없이 PDF가 안 열렸고, 첫 줄 가드와 테스트로 막았습니다.","url":"https://sugarmount21.com/ax/androidx-pdf-isolated-process/","mainEntityOfPage":"https://sugarmount21.com/ax/androidx-pdf-isolated-process/","inLanguage":"ko","articleSection":"Android 개발","datePublished":"2026-10-22T09:00:00+09:00","dateModified":"2026-11-13T09:00:00+09:00","image":["https://sugarmount21.com/assets/og/ax-androidx-pdf-isolated-process-ko.png","https://sugarmount21.com/assets/ax/cover/androidx-pdf-isolated-process-ko.webp","https://sugarmount21.com/assets/ax/androidx-pdf-isolated-process-2-ko.webp"],"author":{"@id":"https://sugarmount21.com/#org"},"publisher":{"@id":"https://sugarmount21.com/#org"},"isPartOf":{"@id":"https://sugarmount21.com/#website"}}</script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"androidx.pdf에서 PDF가 오류 없이 안 열리면 무엇부터 보나요?","acceptedAnswer":{"@type":"Answer","text":"격리 프로세스 이름( :androidx.pdf.service.PdfDocumentServiceImpl )으로 logcat을 걸러 FATAL EXCEPTION이 있는지 봅니다. Application.onCreate의 저장소 초기화가 그 프로세스만 죽이면 앱에는 콜백이 오지 않습니다."}},{"@type":"Question","name":"격리 프로세스에서 SharedPreferences를 쓰면 왜 IllegalStateException이 나나요?","acceptedAnswer":{"@type":"Answer","text":"격리 프로세스는 UserManager를 쓸 수 없어 SharedPreferences를 열지 못합니다. 실제 메시지는 \"SharedPreferences cannot be accessed if UserManager is not available. (e.g. from inside an isolated process)\"였습니다. Application.onCreate 첫 줄에서 Process.isIsolated()이면 바로 return하면 됩니다."}},{"@type":"Question","name":"androidx.pdf beta01에 R8 keep 규칙을 따로 넣어야 하나요?","acceptedAnswer":{"@type":"Answer","text":"이 앱에서는 넣지 않았습니다. 2026-10-05 S21에서 keep 규칙을 더하지 않은 R8 릴리스 빌드가 PDF 열기, 검색, 텍스트 선택까지 동작했습니다. AAR 4개에 consumer 규칙 파일이 없다는 것도 확인했습니다."}}]}</script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://sugarmount21.com/"},{"@type":"ListItem","position":2,"name":"AX 노트","item":"https://sugarmount21.com/ax/"},{"@type":"ListItem","position":3,"name":"Android 개발","item":"https://sugarmount21.com/ax/topic/android/"},{"@type":"ListItem","position":4,"name":"androidx.pdf beta01: 격리 프로세스에서 Application.onCreate가 한 번 더 돌아 PDF가 조용히 안 열렸다"}]}</script>
-  <link rel="stylesheet" href="/assets/ax.css?v=ed5cdd65">
+  <link rel="stylesheet" href="/assets/ax.css?v=5d7227df">
 </head>
 <body class="page-read">
   <a class="skip" href="#main">본문으로 건너뛰기</a>
@@ -144,7 +144,7 @@
       <p>가드는 프로세스가 <code>onCreate</code>에서 죽는 경로 하나만 막습니다. 격리 서비스는 다른 이유로도 죽습니다. 그래서 리더 쪽 <code>ReaderController</code>가 openDocument에 8초 타임아웃(<code>PDF_OPEN_TIMEOUT_MS = 8_000L</code>, 화면에 보인 시간만 셈)을 걸고, 시간이 지나면 오류 화면(E-코드)으로 끝냅니다. 출시 전 점검에서 openDocument 도중 <code>am crash</code>로 서비스를 죽였더니(3회 × 2기기) 결과는 E14(다시 시도)이거나 서비스에 다시 붙어 첫 쪽을 그리는 것이었고, 모두 0.5~2.4초 안에 끝났습니다.</p>
       <p>더 아픈 경로는 문서가 열린 뒤였습니다. 서비스가 죽으면 androidx.pdf의 PdfView가 Material 오류 Snackbar를 띄웁니다. 그 레이아웃의 <code>ThemeOverlay.AppCompat.Dark</code>가 플랫폼 테마에 없는 <code>?attr/colorAccent</code> 등을 읽다가 InflateException을 냈고, 이번에는 앱 프로세스가 죽었습니다. 리더 테마에 AppCompat 색 속성 7개를 넣어 고쳤고, 부모 테마는 플랫폼 테마 그대로 뒀습니다. 고친 뒤 S21에서 9회 돌려 앱 크래시는 0이었습니다.</p>
       <p>R8 keep 규칙은 하나도 더하지 않았는데 릴리스에서 동작했습니다. APK는 1,263,741바이트에서 2,640,995바이트로, 1,377,254바이트 늘었습니다(dex +666,472, arsc +532,888, res +134,546). 같은 앱의 HWP 엔진 측정은 <a href="/ax/hwp-viewer-rhwp-webview/">안드로이드 한글 뷰어 만들기: rhwp + WebView를 문서 222개로 실측한 기록</a>에 있습니다.</p>
-      <figure class="ax-fig"><img src="/assets/ax/androidx-pdf-isolated-process-2-ko.webp" width="1200" height="530" alt="막대그래프: APK 증가분 1,377,254바이트 중 dex 666,472, arsc 532,888, res 134,546바이트입니다." loading="lazy"><figcaption>keep 규칙을 하나도 더하지 않은 릴리스 빌드에서 APK는 1,377,254바이트 늘었습니다.</figcaption></figure>
+      <figure class="ax-fig"><img src="/assets/ax/androidx-pdf-isolated-process-2-ko.webp" width="1200" height="524" alt="막대그래프: APK 증가분 1,377,254바이트 중 dex 666,472, arsc 532,888, res 134,546바이트입니다." loading="lazy"><figcaption>keep 규칙을 하나도 더하지 않은 릴리스 빌드에서 APK는 1,377,254바이트 늘었습니다.</figcaption></figure>
     </section>
 
     <section aria-labelledby="checklist">
