@@ -33,7 +33,7 @@
   <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=ed5cdd65">
   <link rel="stylesheet" href="/assets/site.css?v=ed5cdd65">
   <link rel="stylesheet" href="/assets/sds-apps.css?v=ed5cdd65">
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://sugarmount21.com/en/ax/release-gate/#article","headline":"What to check before shipping an AI-built Android app: the release gate and an R8 crash","description":"Our Android app ran fine in debug but crashed at launch in release after R8 removed a constructor. Now every upload passes three pre-release checks.","url":"https://sugarmount21.com/en/ax/release-gate/","mainEntityOfPage":"https://sugarmount21.com/en/ax/release-gate/","inLanguage":"en","articleSection":"Testing and release","datePublished":"2026-10-18T09:00:00+09:00","dateModified":"2026-10-25T09:00:00+09:00","image":["https://sugarmount21.com/assets/og/ax-release-gate-en.png","https://sugarmount21.com/assets/ax/cover/release-gate-en.webp","https://sugarmount21.com/assets/ax/release-gate-1-en.webp"],"author":{"@id":"https://sugarmount21.com/#org"},"publisher":{"@id":"https://sugarmount21.com/#org"},"isPartOf":{"@id":"https://sugarmount21.com/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://sugarmount21.com/en/ax/release-gate/#article","headline":"What to check before shipping an AI-built Android app: the release gate and an R8 crash","description":"Our Android app ran fine in debug but crashed at launch in release after R8 removed a constructor. Now every upload passes three pre-release checks.","url":"https://sugarmount21.com/en/ax/release-gate/","mainEntityOfPage":"https://sugarmount21.com/en/ax/release-gate/","inLanguage":"en","articleSection":"Testing and release","datePublished":"2026-10-18T09:00:00+09:00","dateModified":"2026-11-13T09:00:00+09:00","image":["https://sugarmount21.com/assets/og/ax-release-gate-en.png","https://sugarmount21.com/assets/ax/cover/release-gate-en.webp","https://sugarmount21.com/assets/ax/release-gate-1-en.webp"],"author":{"@id":"https://sugarmount21.com/#org"},"publisher":{"@id":"https://sugarmount21.com/#org"},"isPartOf":{"@id":"https://sugarmount21.com/#website"}}</script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Can you catch R8 problems in advance?","acceptedAnswer":{"@type":"Answer","text":"The surest way is to actually launch a build shrunk with the release settings on a device. Debug builds and unit tests never go through shrinking, so they cannot catch a missing keep rule."}},{"@type":"Question","name":"Is an emulator enough?","acceptedAnswer":{"@type":"Answer","text":"It was not. State loss after process death, and \"keep original name\" failing because of the file names the photo picker hands over, showed up only in on-device tests. Use the emulator for quick checks and a real device before release."}},{"@type":"Question","name":"Are the gate scripts public?","acceptedAnswer":{"@type":"Answer","text":"The repository is private. The table above lists every check shared by all apps, so you can build the same thing in the same order. The HWP viewer adds checks that compare its document engine files and fonts against pinned sources."}}]}</script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://sugarmount21.com/en/"},{"@type":"ListItem","position":2,"name":"AX notes","item":"https://sugarmount21.com/en/ax/"},{"@type":"ListItem","position":3,"name":"Testing and release","item":"https://sugarmount21.com/en/ax/topic/quality/"},{"@type":"ListItem","position":4,"name":"What to check before shipping an AI-built Android app: the release gate and an R8 crash"}]}</script>
   <link rel="stylesheet" href="/assets/ax.css?v=ed5cdd65">
@@ -79,11 +79,11 @@
       <h1>What to check before shipping an AI-built Android app: the release gate and an R8 crash</h1>
       <p class="lead">An Android app built with an AI coding agent can run fine as a debug build and still crash the moment its release build starts. So every upload first passes a release gate, a release-build launch check and on-device tests.</p>
 
-    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Testing and release</span> <span aria-hidden="true">·</span> <span>5 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-10-25">October 25, 2026</time></p><!-- /build:meta -->
+    <!-- build:meta --><p class="meta"><a href="/en/about/">By SugarMount</a> <span aria-hidden="true">·</span> <span>Testing and release</span> <span aria-hidden="true">·</span> <span>5 min read</span> <span aria-hidden="true">·</span> Last updated <time datetime="2026-11-13">November 13, 2026</time></p><!-- /build:meta -->
 
     <!-- build:series --><p class="note ax-series-line"><a href="/en/ax/series/r8-release-only/">Release-only bugs from R8</a> 1/4</p><!-- /build:series -->
-      <p>On September 23, 2026, the code shrinker R8 removed a single constructor from SugarMount's first app, <a href="/en/apps/image-compress/">Compress Image</a>, and every release build crashed at launch. Since then each upload goes through three steps: a release gate, a launch check of the minified release build, and on-device end-to-end tests.</p>
-      <p class="note">Scripts and numbers come from the code, changelog and on-device QA reports of SugarMount's app repository (sugar-utils), as of October 18, 2026.</p>
+      <p>An Android app can run fine as a debug build and still crash at launch once R8, the code shrinker, has processed the release build. That happened to SugarMount's first app, <a href="/en/apps/image-compress/">Compress Image</a>, on September 23, 2026: R8 removed a single constructor, every release build died at startup, and no release build had ever been launched on a device before.</p>
+      <p>Since then each upload goes through three steps: a release gate, a launch check of the minified release build, and on-device end-to-end tests. Below is what each step catches, and a list of checks you can rebuild yourself in the same order.</p>
     </section>
 
     <!-- build:ad-1 --><!-- /build:ad-1 -->
@@ -101,12 +101,13 @@
         <li><strong>Found</strong>: By installing and launching the release APK on a real device (Galaxy S23). Until then no release build had been run on a device.</li>
         <li><strong>Fix</strong>: One line in the shared ads module's consumer rules. Room 2.3 and later ship this rule themselves.</li>
       </ul>
+      <figure class="ax-fig"><img src="/assets/apps/sugarcompress/shot1-en.webp" width="360" height="640" alt="Compress Image home screen with size presets." loading="lazy"><figcaption>The Compress Image home screen (Play Store screenshot). The September 23 release build died during app startup, before this screen appeared.</figcaption></figure>
       <div class="table-wrap"><table><tbody><tr><td><code>-keep class * extends androidx.room.RoomDatabase { &lt;init&gt;(); }</code></td></tr></tbody></table></div>
     </section>
 
     <section aria-labelledby="release-gate">
       <h2 id="release-gate">Step 1: what does the release gate stop?</h2>
-      <p><code>release_gate.sh &lt;app&gt;</code> checks the following in order and builds no AAB if any of them fails.</p>
+      <p>One gate script, given the app name, checks the following in order and builds no AAB if any of them fails.</p>
       <div class="table-wrap">
         <table>
           <thead><tr><th scope="col">Check</th><th scope="col">Mistake it stops</th></tr></thead>
@@ -129,10 +130,11 @@
     <!-- /build:cta-mid -->
     <section aria-labelledby="launch-check">
       <h2 id="launch-check">Step 2: launch the minified release build twice</h2>
-      <p><code>release_launch.sh &lt;app&gt; &lt;device&gt;</code> installs the R8-shrunk release APK, force-stops the app and cold-starts it twice. After each launch it counts <strong>only this package's lines</strong> in the crash log since that moment, and checks that the process is alive.</p>
+      <p>The launch-check script installs the R8-shrunk release APK, force-stops the app and cold-starts it twice. After each launch it counts <strong>only this package's lines</strong> in the crash log since that moment, and checks that the process is alive.</p>
       <ul>
         <li>It never clears logcat, so it works on a phone other people use too; other apps' crashes are not counted.</li>
         <li>If reading logcat fails, the check fails. It never turns into "no crash".</li>
+        <li>To build your own, cold-start with <code>adb shell am start -W</code>, count this package's crash lines in <code>adb logcat -d -T '&lt;launch time&gt;'</code>, and check the process with <code>adb shell pidof &lt;package&gt;</code>.</li>
         <li>The rule to run it before every upload is also written in the agent instruction file (<a href="/en/ax/agents-md/">the AGENTS.md note</a>).</li>
       </ul>
     </section>
@@ -152,7 +154,7 @@
       </div>
       <p>No crashes and no damaged originals; the minified release builds of all three launched cleanly both times. But there were nine major defects with five distinct causes. The biggest, shared by all three apps: if the system killed the app mid-job, the progress screen froze at 0 / 0. Neither the emulator nor the unit tests had shown it.</p>
       <p>These tests ran after the apps had been submitted for production review, which was the wrong order. Now end-to-end tests come before submission; after the fixes, 410 unit tests, lint and all three release gates passed again before release.</p>
-      <figure class="ax-fig"><img src="/assets/ax/release-gate-1-en.webp" width="1200" height="770" alt="Three-step diagram: release gate, two launches of the minified release build, and on-device E2E on a Galaxy S21 that found nine major defects." loading="lazy"><figcaption>The three checks every upload goes through; the last one, on a real device, found nine major defects.</figcaption></figure>
+      <figure class="ax-fig"><img src="/assets/ax/release-gate-1-en.webp" width="1200" height="530" alt="Bar chart: failed scenarios in on-device E2E on a Galaxy S21 on October 4, 2026: Compress Image 2, Flip &amp; Rotate Image 4, Convert Image 3." loading="lazy"><figcaption>All three minified builds launched cleanly, yet every app failed scenarios on a real device.</figcaption></figure>
     </section>
 
     <section aria-labelledby="checks-by-ai">
@@ -182,6 +184,8 @@
         <details><summary>Are the gate scripts public?</summary><div><p>The repository is private. The table above lists every check shared by all apps, so you can build the same thing in the same order. The HWP viewer adds checks that compare its document engine files and fonts against pinned sources.</p></div></details>
       </div>
     </section>
+
+    <p class="note">Sources: the code, changelog and on-device QA reports in SugarMount's app repository (as of October 18, 2026).</p>
 
     <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
 
