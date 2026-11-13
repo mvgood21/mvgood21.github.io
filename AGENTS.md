@@ -30,6 +30,9 @@ Never edit generated files by hand; the next build overwrites them. Edit `data/a
 python tools/og.py                 # when an app is added or its screenshots/name change (all share images)
 python tools/build.py              # rebuild; prints how many files changed and a one-line gate summary
 python tools/build.py --check      # exit 1 if a rebuild would change anything OR a gate fails (run before committing)
+python tools/ax_figures.py && python tools/ax_cover.py && python tools/ax_figures.py --sync-html
+                                   # after a figure spec or the figure look changes: figures, covers, then the
+                                   # <img> width/height in ax/*/ and en/ax/*/ set to the new pixel sizes
 python tools/checks.py --file <path>   # read-only checks for content authors (title, description, <main>)
 python -m unittest discover -s tools/tests
 python tools/indexnow.py           # dry run: URLs whose modified date is today; --send only with owner approval
