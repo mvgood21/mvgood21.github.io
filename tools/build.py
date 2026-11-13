@@ -508,8 +508,8 @@ def head(lang, title, desc, path, alt_path, *, og_type="website", og_image=None,
     feed = "/en/rss.xml" if lang == "en" else "/rss.xml"
     lines += ['<meta name="twitter:card" content="summary_large_image">',
               '<meta name="color-scheme" content="light dark">',
-              '<meta name="theme-color" content="#F6F8FB" media="(prefers-color-scheme: light)">',
-              '<meta name="theme-color" content="#0F1622" media="(prefers-color-scheme: dark)">',
+              '<meta name="theme-color" content="#F7FAFE" media="(prefers-color-scheme: light)">',
+              '<meta name="theme-color" content="#0E1217" media="(prefers-color-scheme: dark)">',
               # Google Search favicon: square, a multiple of 48 px (favicon.ico has 48); svg for browsers (tools/og.py).
               # assets/favicon.png (96) is still drawn for old links but not linked: the HTML budget is tight on long notes.
               f'<link rel="icon" href="{SITE}/favicon.ico" sizes="48x48">',
@@ -652,6 +652,7 @@ def build_home(lang):
       <div>
         <h1 id="hero-heading">SugarMount</h1>
         <p class="lead">{t["home_lead"]}</p>
+        <p class="actions"><a class="button" href="{url(lang, "/apps/")}">{HOME_CTA[lang][0]}</a> <a class="button button--outline" href="{url(lang, "/ax/")}">{HOME_CTA[lang][1]}</a></p>
         <p class="count">{t["count"].format(n=len(APPS), live=len(live))}</p>
       </div>
       <div>
@@ -720,14 +721,15 @@ def build_apps_hub(lang):
                 arts_html = "\n              <ul class=\"related-links\">" + "".join(
                     f'\n                <li><a href="{u}">{esc(n)}</a></li>' for u, n in arts) + "\n              </ul>"
             links.append(f'<a href="{privacy_url(a, lang)}">{esc(t["policy_of"].format(name=d["name"]))}</a>')
-            if a.get("play"):
-                links.append(f'<a href="{esc(play_link(a, lang, "hub"))}" rel="noopener">{esc(t["play_of"].format(name=d["name"]))}</a>')
+            # Play: the same button as on the app page (a text link here read as a footnote)
+            play = (f'\n              <p class="actions"><a class="button button--s play-badge" href="{esc(play_link(a, lang, "hub"))}" '
+                    f'rel="noopener">{esc(t["play_of"].format(name=d["name"]))}</a></p>') if a.get("play") else ""
             rows.append(f'''          <li class="app-row" style="--sds-vt:app-{a["id"]}">
             {icon_img(a, 56)}
             <div>
               <h3 class="app-row-title"><a href="{primary_url(a, lang)}">{esc(d["name"])}</a></h3>
               {status_p(a, lang, d["brand"] if d["brand"] != d["name"] else "")}
-              <p class="tagline">{esc(d["tagline"])}</p>{arts_html}
+              <p class="tagline">{esc(d["tagline"])}</p>{arts_html}{play}
               <p class="links">{" · ".join(links)}</p>
             </div>
           </li>''')
@@ -1020,6 +1022,8 @@ def ax_articles(lang):
     return [(u, n, d) for _, _, u, n, d in out]
 
 AX_APP_H = {"ko": "이 앱의 AX 노트", "en": "AX notes on this app"}  # kept out of T so a new key does not re-date every generated page
+# home hero entry points (2026-11-13 rebrand): apps and AX notes; out of T for the same reason
+HOME_CTA = {"ko": ("앱 둘러보기", "AX 노트 읽기"), "en": ("Browse apps", "Read AX notes")}
 
 def ax_notes_for_app(a, lang, limit=3):
     """Newest AX notes whose hand-written body links this app's page (build blocks and site menus ignored)."""
@@ -1793,7 +1797,7 @@ def build_manifest():
     display "browser": this is a website, not an installable app (the apps live on Google Play)."""
     return json.dumps({
         "name": "SugarMount", "short_name": "SugarMount", "lang": "ko", "start_url": "/", "scope": "/",
-        "display": "browser", "background_color": "#F6F8FB", "theme_color": "#F6F8FB",
+        "display": "browser", "background_color": "#F7FAFE", "theme_color": "#F7FAFE",
         "icons": [{"src": "/assets/icon-192.png", "sizes": "192x192", "type": "image/png"},
                   {"src": "/assets/logo.png", "sizes": "512x512", "type": "image/png"},
                   {"src": "/assets/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},

@@ -1,7 +1,7 @@
 """Cover art for AX notes (Pillow). Output: assets/ax/cover/<slug>-<lang>.webp, 1200x900.
 
-The cover sits at the top of a note, inside a band of the topic's colour (build.py: the note's .hero becomes the band;
-site.css .ax-note). It carries no text: the title, lead and date are HTML on the band, so they stay readable, indexable
+The cover sits in the note's hero, a band of the topic's tint (build.py: the note's .hero becomes the band;
+assets/ax.css .ax-note; on phones the art comes after the title). It carries no text: the title, lead and date are HTML on the band, so they stay readable, indexable
 and translatable. The art is the note's own figures (tools/ax_figures.py) laid out as two cards on the band colour,
 so every cover restates numbers that are already in the note and adds no claim of its own.
 
@@ -20,11 +20,9 @@ W, H = 1200, 900
 OUT_DIR = os.path.join(ROOT, "assets/ax/cover")
 MAX_BYTES = 160 * 1024
 
-# Band colours per topic; site.css .ax-note[data-topic=…] uses the same values (white text on each is ≥ 7:1).
-TOPIC_BG = {
-    "workflow": "#24305a", "quality": "#1d3f37", "android": "#21402c", "games": "#4b2647",
-    "store": "#4a3322", "web": "#1d3a4f", "retro": "#3b2f52",
-}
+# Transparent ground (2026-11-13 rebrand): the band colour comes from assets/ax.css .ax-t-<topic> (--cover), light or
+# dark with the reader's colour scheme, so the same file sits on both bands; only the figure cards and their soft
+# shadows are drawn.
 
 
 def hex2rgb(h): h = h.lstrip("#"); return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
@@ -66,7 +64,7 @@ def place(base, c, x, y, angle):
     pad = 60
     layer = Image.new("RGBA", (c.width + 2 * pad, c.height + 2 * pad), (0, 0, 0, 0))
     sh = Image.new("RGBA", layer.size, (0, 0, 0, 0))
-    ImageDraw.Draw(sh).rounded_rectangle((pad, pad + 18, pad + c.width, pad + c.height + 18), radius=26, fill=(0, 0, 0, 110))
+    ImageDraw.Draw(sh).rounded_rectangle((pad, pad + 18, pad + c.width, pad + c.height + 18), radius=26, fill=(26, 30, 36, 70))
     sh = sh.filter(ImageFilter.GaussianBlur(22))
     layer.alpha_composite(sh)
     layer.alpha_composite(c, (pad, pad))
@@ -80,12 +78,7 @@ def fit(c, max_w, max_h):
 
 
 def cover(slug, lang, topic):
-    bg = hex2rgb(TOPIC_BG.get(topic, "#24305a"))
-    base = Image.new("RGBA", (W, H), bg + (255,))
-    # a faint diagonal light so the band is not flat; stays well under the text contrast budget
-    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    ImageDraw.Draw(glow).ellipse((W * .35, -H * .35, W * 1.35, H * .75), fill=(255, 255, 255, 26))
-    base.alpha_composite(glow.filter(ImageFilter.GaussianBlur(120)))
+    base = Image.new("RGBA", (W, H), (0, 0, 0, 0))   # topic is kept for callers; the band colour is CSS
     figs = figure_files(slug, lang)
     if not figs:
         return None
@@ -94,7 +87,7 @@ def cover(slug, lang, topic):
         place(base, back, W * .60, H * .36, -5)
     front = fit(card(figs[0], 900), 940, 640 if len(figs) >= 2 else 720)
     place(base, front, W * .46 if len(figs) >= 2 else W * .5, H * .60 if len(figs) >= 2 else H * .5, 2.5 if len(figs) >= 2 else 0)
-    return base.convert("RGB")
+    return base
 
 
 def save(img, out):

@@ -34,12 +34,14 @@ import glyphcheck  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FONT_EB = os.path.join(ROOT, "tools/fonts/nanumsquareeb.ttf")
 FONT_R = os.path.join(ROOT, "tools/fonts/nanumsquarer.ttf")
-PAPER, FILL, INK, INK2, LINE = (246, 248, 251), (238, 241, 245), (20, 32, 51), (75, 86, 104), (220, 226, 234)
+PAPER, FILL, INK, INK2, LINE = (247, 250, 254), (238, 244, 252), (26, 30, 36), (86, 91, 98), (217, 223, 230)  # site.css ref-*
+BRAND, SUGAR = (14, 89, 186), (255, 184, 72)   # --sds-fg-accent (6.5:1 on PAPER), --sds-bg-sugar-solid
 W, H = 1200, 630
 DOMAIN = "sugarmount21.com"
 
-# Brand mark colours = site.css --sds-mark-* (light). build.py BRAND_MARK must use the same values.
-MARK_TOP, MARK_LEFT, MARK_RIGHT, MARK_EDGE = "#FFFFFF", "#142033", "#4B5668", "#142033"
+# Brand mark colours = site.css --sds-mark-* (light): Honey top (sugar on the summit), Summit Blue sides, deep-blue edge.
+# build.py BRAND_MARK must use the same values.
+MARK_TOP, MARK_LEFT, MARK_RIGHT, MARK_EDGE = "#FFB848", "#0E59BA", "#4387EB", "#013271"
 
 def hex2rgb(h): h = h.lstrip("#"); return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
 
@@ -213,7 +215,7 @@ def text_card(out, eyebrow, title, sub, art=None, text_w=None):
     lh = f_title.size + 18
     block = 48 + len(t_lines) * lh + (16 + len(s_lines) * 50 if s_lines else 0)
     y = max(64, (520 - block) // 2)
-    dr.text((80, y), eyebrow, font=f_eye, fill=INK2); y += 48
+    dr.text((80, y), eyebrow, font=f_eye, fill=BRAND); y += 48
     for line in t_lines: dr.text((80, y), line, font=f_title, fill=INK); y += lh
     y += 16
     for line in s_lines: dr.text((80, y), line, font=f_sub, fill=INK2); y += 50
