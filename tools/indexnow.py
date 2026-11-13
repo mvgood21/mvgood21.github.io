@@ -80,15 +80,13 @@ def read_key():
 
 
 def noindex_paths():
-    """NOINDEX_PATHS from tools/build.py without importing it (no build side effects)."""
+    """The noindex rule from tools/noindex.py (a set-like object; no build import, no build side effects)."""
     try:
-        src = open(os.path.join(TOOLS, "build.py"), encoding="utf-8").read()
-        m = re.search(r"^NOINDEX_PATHS\s*=\s*(\{[^}]*\}|\[[^\]]*\]|\([^)]*\))", src, re.M)
-        if m:
-            return set(ast.literal_eval(m.group(1)))
-    except (OSError, ValueError, SyntaxError):
-        pass
-    return set(NOINDEX_FALLBACK)
+        sys.path.insert(0, TOOLS)
+        import noindex
+        return noindex.NoIndex()
+    except (ImportError, OSError, ValueError):
+        return set(NOINDEX_FALLBACK)
 
 
 def load_dates():

@@ -21,6 +21,7 @@ from urllib.parse import unquote, urljoin, urlsplit
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dates  # noqa: E402
+import noindex  # noqa: E402
 from legal_chrome import STANDALONE_PATHS  # noqa: E402  (pages the build never wraps; not checked)
 
 ROOT = dates.ROOT
@@ -28,7 +29,7 @@ SITE = "https://sugarmount21.com"
 SITE_HOST = "sugarmount21.com"
 ORG_ID = SITE + "/#org"
 SITE_ID = SITE + "/#website"
-NOINDEX_PATHS = frozenset({"404.html", "design/index.html"})
+NOINDEX_PATHS = noindex.NoIndex()  # tools/noindex.py
 ACCENT_DEMO_PAGES = frozenset({"design/index.html"})  # SDS demo (noindex): data-app samples allowed inside <main>
 ADS_ORIGIN = "pagead2.googlesyndication.com"  # async AdSense loader, AX notes only (see the script check)
 ALLOWED_ORIGINS = frozenset()          # e.g. {"gc.zgo.at"} once the owner approves one analytics origin
@@ -688,7 +689,7 @@ def check_head(page, report, all_org_urls):
         if og_url: report.error("NOINDEX-OGURL", p, "NOINDEX page outputs og:url")
         return
     if "noindex" in robots:
-        report.error("INDEX-NOINDEX", p, f"noindex on a page that is not in NOINDEX_PATHS {sorted(NOINDEX_PATHS)}")
+        report.error("INDEX-NOINDEX", p, f"noindex on a page that is not noindex by {NOINDEX_PATHS!r}")
     want = SITE + url_of(p)
     if len(canon) != 1 or canon[0].get("href") != want:
         report.error("CANONICAL", p, f"want exactly one canonical {want}, got {[c.get('href') for c in canon]}")
@@ -1040,7 +1041,7 @@ def check_robots(site, report):
 def check_llms(site, report):
     text = site.read("llms.txt")
     if text is None: return
-    for rp in NOINDEX_PATHS:
+    for rp in sorted(set(NOINDEX_PATHS) | {p for p in site.html_pages() if p in NOINDEX_PATHS}):
         u = SITE + url_of(rp)
         if re.search(re.escape(u) + r"(?![\w/-])", text):
             report.error("LLMS-NOINDEX", "llms.txt", f"{u} is a NOINDEX page")
@@ -1087,6 +1088,8 @@ def check_assets(site, report):
 
 def run(root=ROOT, outputs=None):
     """Every gate over the whole site. outputs = {relpath: text} from an in-memory build override files on disk."""
+    global NOINDEX_PATHS
+    NOINDEX_PATHS = noindex.NoIndex(root)  # the checked site's own rule (data/noindex.json under root)
     site = Site(root, outputs)
     report = Report()
     pages = site.html_pages()

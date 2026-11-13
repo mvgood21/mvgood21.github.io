@@ -816,8 +816,19 @@ class Helpers(unittest.TestCase):
                           k("404.html"), k("design/index.html")],
                          ["home", "hub", "app", "article", "ax-hub", "ax-note", "about", "policy", "404", "design"])
 
-    def test_noindex_constant(self):
-        self.assertEqual(checks.NOINDEX_PATHS, {"404.html", "design/index.html"})
+    def test_noindex_rule(self):
+        import noindex
+        n = noindex.NoIndex(prefixes=("privacy/", "ax/topic/", "ax/page/"), ax_notes={"folded"})
+        for p in ["404.html", "design/index.html", "privacy/index.html", "en/privacy/x/index.html",
+                  "privacy/axfamily/delete/index.html", "ax/topic/quality/index.html", "en/ax/page/2/index.html",
+                  "ax/folded/index.html", "en/ax/folded/index.html"]:
+            self.assertIn(p, n)
+        for p in ["index.html", "ax/index.html", "en/ax/index.html", "ax/kept/index.html", "ax/series/x/index.html",
+                  "apps/x/index.html", "en/about/index.html", "ax/folded.html"]:
+            self.assertNotIn(p, n)
+        self.assertEqual(sorted(n), ["404.html", "ax/folded/index.html", "design/index.html", "en/ax/folded/index.html"])
+        bare = noindex.NoIndex(prefixes=(), ax_notes=())  # a site without data/noindex.json: fixed pages only
+        self.assertIn("404.html", bare); self.assertNotIn("privacy/index.html", bare)
 
 
 if __name__ == "__main__":

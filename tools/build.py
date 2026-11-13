@@ -28,6 +28,7 @@ import sds_apps  # noqa: E402  (generated CSS text: assets/sds-apps.css, assets/
 import checks  # noqa: E402  (site gates run by --check)
 import legal_chrome  # noqa: E402  (isolated header/footer for legal pages an app opens; standalone pages)
 import ax_extras  # noqa: E402  (AX hub search, note types, inquiry boxes, figures)
+import noindex  # noqa: E402  (which pages are noindex)
 from html.parser import HTMLParser  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -40,8 +41,8 @@ SITE_ID = SITE + "/#website"
 BRAND = "SugarMount"
 SUFFIX = " – SugarMount"
 # pages that are noindex: no canonical/og:url/hreflang, and left out of sitemap, RSS and llms.txt (IA spec 2).
-# Keep this a plain set literal: tools/indexnow.py reads it with ast.literal_eval.
-NOINDEX_PATHS = {"404.html", "design/index.html"}
+# The rule lives in tools/noindex.py (fixed pages, policies, AX lists, data/ax.json "noindex" notes).
+NOINDEX_PATHS = noindex.NoIndex()
 AX_HUB_LATEST = 6    # newest AX notes on the hub; the rest through search and topic pages (each title costs hub font budget)
 ADS = ax_extras.ads_config(ROOT)  # data/ads.json; empty client → no ad markup anywhere
 AX_RELATED = 6       # "더 읽기" links under an AX note
@@ -1845,10 +1846,7 @@ def build_llms(outputs):
         link = SITE + (app_url(a, "en") or privacy_url(a, "en"))
         name = d["name"] if d["name"] == k["name"] else f"{d['name']} / {k['name']}"
         lines.append(f"- [{name}]({link}): {d['tagline']} Package {a['package']}, {st}.")
-    lines += ["", "## Privacy policies", ""]
-    for a in APPS:
-        if a.get("privacy_path"):
-            lines.append(f"- [{a['en']['name']}]({SITE + privacy_url(a, 'en')}) · [한국어]({SITE + privacy_url(a, 'ko')})")
+    # no "Privacy policies" section: policies are noindex (tools/noindex.py)
     lines += ["", "## Facts", ""]
     for q, x in en["home_faq"]:
         lines.append(f"- {q} {x}")
@@ -1866,7 +1864,8 @@ def build_llms(outputs):
     if groups:
         lines += ["", "## AX notes", "", f"How SugarMount apps are built and shipped with an AI coding agent, with measured numbers. Index: {SITE}/en/ax/ · Korean: {SITE}/ax/"]
         for tp, arts in groups:
-            lines += ["", f"### [{tp['en']['name']}]({SITE}{ax_topic_url(tp, 'en')})", ""] + [f"- [{n}]({SITE}{u}): {d}" for u, n, d in arts]
+            arts = [x for x in arts if x[0].lstrip("/") + "index.html" not in NOINDEX_PATHS]  # topic pages, folded notes
+            if arts: lines += ["", f"### {tp['en']['name']}", ""] + [f"- [{n}]({SITE}{u}): {d}" for u, n, d in arts]
     lines += ["", "## Optional", "", f"- [Korean home (한국어)]({SITE}/): {ko['home_lead']}", f"- [Google Play developer page]({PLAY_DEV})", ""]
     return "\n".join(lines)
 
