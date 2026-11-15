@@ -5,7 +5,9 @@ Every page gets {"hash", "published", "modified"} in data/content-dates.json.
 
   hash input, hand-written page:  <main>…</main> without <nav class="crumbs"> and without every
                                   <!-- build:NAME -->…<!-- /build:NAME --> block, whitespace runs -> one space, trimmed
-                                  (tags are kept).                      -> hand_input(page_html)
+                                  (tags are kept; an <img> tag counts only by its alt text, so a redrawn figure,
+                                  a new size or a renamed file is not a content change: 2026-11-15 SEO audit,
+                                  lastmod must be "verifiably accurate").  -> hand_input(page_html)
   hash input, generated page:     the input data the page is rendered from (apps.json entry, T strings),
                                   never the rendered HTML and never dates or automatic lists.
                                                                         -> data_input(*parts)
@@ -38,6 +40,8 @@ _MAIN_RE = re.compile(r"<main\b[^>]*>(.*)</main>", re.S)  # greedy: the last </m
 _CRUMBS_RE = re.compile(r'<nav\s+class="crumbs"[^>]*>.*?</nav>', re.S)
 _BUILD_RE = re.compile(r"<!--\s*build:([\w-]+)\s*-->.*?<!--\s*/build:\1\s*-->", re.S)
 _WS_RE = re.compile(r"\s+")
+_IMG_RE = re.compile(r"<img\b[^>]*>", re.S)
+_ALT_RE = re.compile(r'\balt="([^"]*)"')
 
 
 def today():
@@ -79,6 +83,7 @@ def hand_input(page_html):
         inner = page_html
     inner = _CRUMBS_RE.sub("", inner)
     inner = strip_build_blocks(inner)
+    inner = _IMG_RE.sub(lambda m: '<img alt="%s">' % (_ALT_RE.search(m.group(0)) or [None, ""])[1], inner)
     return _WS_RE.sub(" ", inner).strip()
 
 

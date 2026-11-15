@@ -54,6 +54,12 @@ class HashInput(unittest.TestCase):
         self.assertNotEqual(self.h(PAGE), self.h(PAGE.replace("<p>본문</p>", "<p>본문을 고쳤다</p>")))
         self.assertNotEqual(self.h(PAGE), self.h(PAGE.replace('<h2 id="a">', '<h2 id="b">')))  # tags are kept
 
+    def test_image_file_and_size_do_not_change_hash(self):
+        a = PAGE.replace("<p>본문</p>", '<p>본문</p><figure><img src="/a-1-ko.webp" width="1200" height="500" alt="막대 그림"></figure>')
+        b = a.replace('src="/a-1-ko.webp" width="1200" height="500"', 'src="/a-2-ko.webp" width="1200" height="640" loading="lazy"')
+        self.assertEqual(self.h(a), self.h(b))
+        self.assertNotEqual(self.h(a), self.h(a.replace('alt="막대 그림"', 'alt="다른 그림"')))
+
     def test_data_input_is_order_independent(self):
         self.assertEqual(dates.content_hash(dates.data_input({"a": 1, "b": [1, 2]})),
                          dates.content_hash(dates.data_input({"b": [1, 2], "a": 1})))
