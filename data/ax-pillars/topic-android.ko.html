@@ -1,0 +1,72 @@
+<!-- title: 클로드 코드로 안드로이드 앱 개발: 출시까지 지킨 규칙 -->
+<!-- h1: 클로드 코드로 안드로이드 앱 개발: Play 출시까지 지킨 규칙과 숫자 -->
+<!-- lead: 클로드 코드로 20일에 앱 4개를 Play에 냈지만, 결과를 가른 것은 코드 속도가 아니라 출시용 빌드를 기기에서 확인하는 규칙이었습니다. -->
+<!-- desc: 클로드 코드로 만든 안드로이드 앱을 Google Play에 낸 기록입니다. 20일에 앱 4개, R8 출시 빌드 크래시, 신규 설치 몽키 테스트, 실기기 결함 9건과 출시 규칙 6가지를 정리했습니다. -->
+<section aria-label="요약">
+  <p>클로드 코드(Claude Code)로 안드로이드 앱을 만들면 혼자서도 Google Play 출시까지 갑니다. SugarMount는 2026년 9월 20일부터 20일 동안 앱 4개를 공개했고, 그 기간 커밋 59개 중 52개(88%)를 클로드 코드와 함께 썼습니다. 지금 Play에 있는 앱 10개 중 6개(사진 앱 3개, 한글뷰어, 게임 2개)가 클로드 코드와 함께 만든 앱입니다.</p>
+  <p>속도는 다음 앱을 스크립트로 찍어 내고, 출시 전 검사와 Play Console 작업을 스크립트로 바꾼 데서 나왔습니다. 발목은 늘 같은 자리에서 잡혔습니다. 디버그 빌드와 단위 테스트는 통과했는데, 코드를 줄인 출시용 빌드나 처음 설치한 기기에서 앱이 죽었습니다. 아래 규칙은 모두 그런 사고 뒤에 생겼습니다.</p>
+</section>
+<section aria-labelledby="android-rules">
+  <h2 id="android-rules">출시까지 지킨 규칙 6가지</h2>
+  <ol>
+    <li><strong>출시용 빌드를 기기에서 두 번 띄운 뒤에만 올립니다.</strong> 2026년 9월 23일, 코드 축소 도구 R8이 생성자 하나를 지워 첫 앱의 릴리스 빌드가 모두 시작 직후 죽었고, 디버그에서는 재현되지 않았습니다. 지금은 릴리스 게이트, 축소된 빌드 콜드 스타트 두 번, 실기기 E2E를 거쳐야 올립니다(<a href="/ax/release-gate/">AI가 만든 앱 출시 전 점검과 R8 크래시</a>).</li>
+    <li><strong>R8 결과는 리뷰가 아니라 산출물로 셉니다.</strong> 맞춤법 앱은 단위 테스트 203개가 모두 통과한 채 릴리스 빌드에서만 교정문이 빈 값이 될 상태였습니다(<a href="/ax/r8-gson-field-names/">R8 Gson SerializedName 릴리스 빈 값</a>). 퍼즐 게임은 조건 한 줄의 모양 때문에 출시 AAB에 테스트 광고 문자열 5개가 남았고, 리뷰 에이전트가 낸 19건에는 이 문제가 없었습니다(<a href="/ax/release-ad-id-grep/">R8이 남긴 테스트 광고 ID 5개</a>).</li>
+    <li><strong>앱 데이터를 지운 상태에서 몽키를 돌립니다.</strong> 에이전트가 "실행 시간 857ms, 크래시 없음"이라고 보고한 게임이 4분 뒤 튜토리얼 첫 탭에서 꺼졌습니다. 진동 권한이 빠져 있었고, 데이터를 지운 뒤 돌린 몽키가 800회 중 15번째 이벤트에서 잡았습니다(<a href="/ax/fresh-install-monkey-test/">VIBRATE 권한 크래시와 신규 설치 몽키 테스트</a>).</li>
+    <li><strong>Gradle 빌드는 작업 공간 하나에서 한 번에 하나만 돌립니다.</strong> 에이전트 수백 개를 써도 된다고 한 날에도 코드를 고치는 에이전트는 동시에 3개가 최대였습니다. 메모리 13GB 중 여유가 4GB였고 테스트폰은 2대였습니다(<a href="/ax/parallel-agent-workstreams/">AI 에이전트 병렬 개발: 동시 실행은 3개였다</a>).</li>
+    <li><strong>실기기 E2E는 심사 제출 전에 합니다.</strong> 세 사진 앱을 심사에 넣은 뒤 Galaxy S21·S20에서 E2E를 돌리자 에뮬레이터와 단위 테스트가 놓친 major 결함 9건이 나왔습니다(<a href="/ax/20-days-4-apps/">AI 에이전트로 20일에 Android 앱 4개 출시</a>).</li>
+    <li><strong>minSdk 기기에서 릴리스 빌드를 띄우기 전에는 검증을 마쳤다고 쓰지 않습니다.</strong> 공용 모듈의 java.time 한 줄이 게임 두 개를 Android 7에서 2주 동안 죽였습니다. 커밋에 남은 "몽키 3x1500, 치명 오류 0"은 Android 15 기기의 결과였습니다(<a href="/ax/android7-java-time-crash/">Android 7 실행 즉시 크래시와 java.time</a>).</li>
+  </ol>
+  <p>여섯 규칙 모두 에이전트의 "완료"를 받기 전에, 어느 기기에서 어떤 빌드로 무엇을 확인했는지 묻는 일입니다. R8 사고 네 편은 <a href="/ax/series/r8-release-only/">릴리스 빌드에서만 나는 결함(R8)</a> 연재로 묶었습니다.</p>
+</section>
+<section aria-labelledby="android-stuck">
+  <h2 id="android-stuck">어디서 막혔나</h2>
+  <ul>
+    <li>Play 단계적 출시: 20%로 내보내려던 맞춤법 앱 1.6.029가 스크립트의 인자 개수 조건 하나 때문에 전체 사용자 대상으로 커밋됐고, 35초 뒤 되돌리려는 요청은 HTTP 403으로 거부됐습니다(<a href="/ax/play-staged-rollout-completed/">Play 단계적 출시 20%가 100%로 나갔다</a>).</li>
+    <li>16KB 페이지 요건: NDK를 27·29로 올린 사진 영상 앱 빌드가 사진 전환에 파란 색조를 냈습니다. 다시 재 보니 NDK 25에서도 링커 플래그 한 줄이면 됐습니다.</li>
+    <li>광고 SDK: 단위 테스트 243개가 통과하고 4분 뒤, 백그라운드 스레드에서 온 전면 광고 콜백이 화면을 옮기다 사진 앱을 죽였습니다(<a href="/ax/gma-next-gen-callback-thread/">GMA Next-Gen 전면 광고 콜백 스레드 크래시</a>).</li>
+    <li>검사 도구: 화면을 기다리는 스크립트가 시간 초과에도 성공으로 끝나, 뒤의 검사가 엉뚱한 화면에서 돌았습니다. AdMob 앱 생성 API는 403을 돌려줘서 광고 단위는 콘솔에서 사람이 만듭니다.</li>
+  </ul>
+</section>
+<section aria-labelledby="android-split">
+  <h2 id="android-split">클로드 코드에 무엇을 맡기고 무엇을 남겼나요?</h2>
+  <p>에이전트는 Kotlin 코드와 단위 테스트, 빌드·출시·QA 스크립트, 스토어 설명 초안과 스크린샷, 기기 테스트 보고서를 맡았습니다. 사람은 광고 배치·가격 같은 결정, Play Console에서만 되는 작업, 실기기 연결과 최종 확인, 출시 결정을 맡았습니다. 틀리기 쉬운 규칙은 지침 파일의 문장으로 두지 않고 빌드를 막는 테스트로 만들었습니다.</p>
+</section>
+<section aria-labelledby="android-reading">
+  <h2 id="android-reading">읽는 순서</h2>
+  <p>처음이면 20일 기록과 출시 전 점검 글부터 읽고, 아래에서 겪는 문제에 맞는 묶음을 고르십시오.</p>
+  <h3>출시용 빌드에서만 나는 문제</h3>
+  <ul>
+    <li><a href="/ax/r8-gson-field-names/">R8 Gson 릴리스 빈 값</a>: 예외 없이 값만 비는 결함을 mapping.txt와 dexdump로 찾는 순서.</li>
+    <li><a href="/ax/release-ad-id-grep/">테스트 광고 ID와 dex 건수 검사</a>: 값을 출력하지 않고 출시물의 광고 ID를 세는 명령.</li>
+    <li><a href="/ax/r8-dex-optimization-keep-rule/">DEX 최적화와 keep 규칙</a>: 쓰지 않는 keep 규칙 하나를 지우자 축소율이 39%에서 85%로 오른 기록.</li>
+    <li><a href="/ax/android7-java-time-crash/">Android 7 크래시와 java.time</a>: 공용 모듈까지 보는 lint 게이트와 API 24 에뮬레이터.</li>
+    <li><a href="/ax/ndk-16kb-page-blue-tint/">16KB 페이지 NDK 대응과 파란 색조</a>: NDK를 올리기 전에 링커 플래그부터 재 보는 이유.</li>
+    <li><a href="/ax/android-assets-gz-suffix/">assets .gz가 안 열리는 이유</a>: 빌드가 이름 끝의 .gz를 떼어 기기에서 파일을 못 찾은 일.</li>
+  </ul>
+  <h3>수명 주기와 저장</h3>
+  <ul>
+    <li><a href="/ax/splash-listener-onstop/">스플래시 멈춤과 리스너</a>: onStop에서 지워지는 리스너로 생긴 멈춤.</li>
+    <li><a href="/ax/androidx-pdf-isolated-process/">androidx.pdf 격리 프로세스의 함정</a>: 격리 프로세스에서도 도는 Application.onCreate와 첫 줄 가드.</li>
+    <li><a href="/ax/pdf-save-back-seven-points/">PDF 저장 취소와 SAF 빈 파일</a>: 저장 중 BACK을 일곱 시점에 눌러 빈 파일이 남는지 확인한 방법.</li>
+  </ul>
+  <h3>화면과 글자</h3>
+  <ul>
+    <li><a href="/ax/compose-korean-line-break/">Compose 한글 줄바꿈</a>: 음절 사이에서 끊기는 한글을 공용 TextStyle 한 곳에서 고친 방법.</li>
+    <li><a href="/ax/hangul-blank-glyph-cmap/">한글 빈칸과 cmap 8,693자</a>: 폰트가 없는 글자를 가진 척할 때 생기는 빈칸.</li>
+    <li><a href="/ax/android-theme-color-leak/">테마 색이 다이얼로그로 새는 자리 3곳</a>: 버튼 글자가 안 보일 때 테마를 덮을 자리.</li>
+  </ul>
+  <h3>파일, 문서, 외부 연결</h3>
+  <ul>
+    <li><a href="/ax/hwp-viewer-rhwp-webview/">한글 뷰어 만들기: rhwp 실측</a>: 문서 222개 중 221개를 연 엔진을 고른 측정.</li>
+    <li><a href="/ax/hwpx-octet-stream-intent-filter/">HWPX MIME과 intent-filter</a>: 종류를 모르는 파일(octet-stream)로 오는 hwpx를 받는 법.</li>
+    <li><a href="/ax/jpeg-target-size-search/">JPEG 용량 맞추기</a>: 500 KB 같은 상한에 맞추는 품질 이분 탐색.</li>
+    <li><a href="/ax/market-uri-store-chooser/">market:// 스토어 선택 창 없애기</a>: 통신사 판매 폰에서 Play 패키지를 먼저 지정하는 법.</li>
+  </ul>
+  <h3>출시 뒤에 드러난 문제</h3>
+  <ul>
+    <li><a href="/ax/string-version-compare/">버전 문자열 비교 버그</a>: "6.7"을 "6.11"보다 크게 본 비교로 원격 설정이 일부 기기에 가지 않은 일.</li>
+    <li><a href="/ax/daum-speller-js-redirect-200-empty/">다음 맞춤법 전부 실패</a>: 실패를 세는 이벤트가 없어 아무도 몰랐던 기록.</li>
+    <li><a href="/ax/llm-explain-cost-limits/">앱에 Gemini 붙이기</a>: 59건 평가로 모델을 고르고 하루 3,000회에서 끊는 설계.</li>
+    <li><a href="/ax/quiz-reach-entry-point-push/">퀴즈 도달 2.6%에서 17.7%</a>: 입구를 늘리기보다 아침 알림이 도달을 바꾼 측정.</li>
+  </ul>
+</section>
