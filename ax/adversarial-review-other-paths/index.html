@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>클로드 코드 재리뷰: 닫은 결함이 HTTP로 남았다 – SugarMount</title>
+  <meta name="description" content="P2P 채팅 앱 출시 준비에서 클로드 코드가 고친 코드를 다시 리뷰하자, 첫 수정이 로비 영구 잠금을 새로 만들었고 WebSocket만 막은 같은 잠금이 HTTP로 남아 있었습니다.">
+  <meta name="robots" content="max-image-preview:large">
+  <link rel="canonical" href="https://sugarmount21.com/ax/adversarial-review-other-paths/">
+  <link rel="alternate" hreflang="ko" href="https://sugarmount21.com/ax/adversarial-review-other-paths/">
+  <link rel="alternate" hreflang="en" href="https://sugarmount21.com/en/ax/adversarial-review-other-paths/">
+  <link rel="alternate" hreflang="x-default" href="https://sugarmount21.com/ax/adversarial-review-other-paths/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="SugarMount">
+  <meta property="og:title" content="클로드 코드 재리뷰: 닫은 결함이 HTTP로 남았다 – SugarMount">
+  <meta property="og:description" content="P2P 채팅 앱 출시 준비에서 클로드 코드가 고친 코드를 다시 리뷰하자, 첫 수정이 로비 영구 잠금을 새로 만들었고 WebSocket만 막은 같은 잠금이 HTTP로 남아 있었습니다.">
+  <meta property="og:url" content="https://sugarmount21.com/ax/adversarial-review-other-paths/">
+  <meta property="og:image" content="https://sugarmount21.com/assets/og/ax-adversarial-review-other-paths-ko.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F7FAFE" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0E1217" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="https://sugarmount21.com/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/svg+xml" href="https://sugarmount21.com/assets/favicon.svg">
+  <link rel="apple-touch-icon" href="https://sugarmount21.com/assets/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="alternate" type="application/rss+xml" title="AX 노트 · SugarMount" href="https://sugarmount21.com/ax/rss.xml">
+  <meta name="google-adsense-account" content="ca-pub-8023868702717237">
+  <link rel="stylesheet" href="/assets/fonts/pretendard.css?v=c990dc2e">
+  <link rel="stylesheet" href="/assets/site.css?v=c990dc2e">
+  <link rel="stylesheet" href="/assets/sds-apps.css?v=c990dc2e">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","@id":"https://sugarmount21.com/ax/adversarial-review-other-paths/#article","headline":"클로드 코드 재리뷰: 닫은 결함이 HTTP로 남았다","description":"P2P 채팅 앱 출시 준비에서 클로드 코드가 고친 코드를 다시 리뷰하자, 첫 수정이 로비 영구 잠금을 새로 만들었고 WebSocket만 막은 같은 잠금이 HTTP로 남아 있었습니다.","url":"https://sugarmount21.com/ax/adversarial-review-other-paths/","mainEntityOfPage":"https://sugarmount21.com/ax/adversarial-review-other-paths/","inLanguage":"ko","articleSection":"검증과 출시","datePublished":"2026-11-16T09:00:00+09:00","dateModified":"2026-11-16T09:00:00+09:00","image":["https://sugarmount21.com/assets/og/ax-adversarial-review-other-paths-ko.png","https://sugarmount21.com/assets/ax/cover/adversarial-review-other-paths-ko.webp","https://sugarmount21.com/assets/ax/adversarial-review-other-paths-1-ko.webp","https://sugarmount21.com/assets/ax/adversarial-review-other-paths-shot1-ko.webp","https://sugarmount21.com/assets/ax/adversarial-review-other-paths-shot2-ko.webp"],"author":{"@type":"Person","@id":"https://sugarmount21.com/about/#stephen","name":"Stephen"},"publisher":{"@id":"https://sugarmount21.com/#org"},"isPartOf":{"@id":"https://sugarmount21.com/#website"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SugarMount","item":"https://sugarmount21.com/"},{"@type":"ListItem","position":2,"name":"AX 노트","item":"https://sugarmount21.com/ax/"},{"@type":"ListItem","position":3,"name":"검증과 출시","item":"https://sugarmount21.com/ax/topic/quality/"},{"@type":"ListItem","position":4,"name":"클로드 코드 재리뷰: 닫은 결함이 HTTP로 남았다"}]}</script>
+  <link rel="stylesheet" href="/assets/ax.css?v=c990dc2e">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8023868702717237" crossorigin="anonymous"></script>
+</head>
+<body class="page-read">
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span class="brand-name">SugarMount</span></a>
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a class="nav-apps" href="/apps/">앱</a>
+        <a class="nav-ax" href="/ax/" aria-current="page">AX 노트</a>
+        <a class="nav-about" href="/about/">소개</a>
+        <a class="nav-privacy" href="/privacy/">개인정보처리방침</a>
+      </nav>
+      <a class="lang" href="/en/ax/adversarial-review-other-paths/" lang="en" hreflang="en">English</a>
+      <button class="menu-button" type="button" popovertarget="site-menu"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg><span>메뉴</span></button>
+    </div>
+    <div class="menu" id="site-menu" popover>
+      <nav aria-label="전체 메뉴">
+      <button class="button button--quiet menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide">닫기</button>
+      <p class="menu-title" id="m-photo">사진·영상</p>
+      <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>슈가앨범</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 용량 줄이기</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>사진 반전·회전</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>이미지 변환 JPG·PNG·WebP</span></a></li></ul>
+      <p class="menu-title" id="m-document">문서·글</p>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글 띄어쓰기</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한글뷰어 슈가독</span></a></li></ul>
+      <p class="menu-title" id="m-everyday">생활</p>
+      <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>생생카드</span></a></li></ul>
+      <p class="menu-title" id="m-games">게임</p>
+      <ul class="app-tiles" aria-labelledby="m-games"><li><a class="app-tile" data-app="arrows" href="/apps/arrow-knots/"><img class="app-icon" src="/assets/apps/arrows/icon.webp" width="48" height="48" alt="" loading="lazy"><span>화살표 매듭풀기</span></a></li><li><a class="app-tile" data-app="blocks" href="/apps/blocks/"><img class="app-icon" src="/assets/apps/blocks/icon.webp" width="48" height="48" alt="" loading="lazy"><span>한판블록</span></a></li></ul>
+      <p><a href="/apps/">모든 앱 보기</a></p>
+      <ul class="menu-links"><li><a href="/ax/" aria-current="page">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li></ul>
+      </nav>
+    </div>
+  </header>
+  <script>(function(m){m&&m.addEventListener('focusout',function(e){if(!m.contains(e.relatedTarget)&&m.matches(':popover-open'))m.hidePopover()})})(document.getElementById('site-menu'))</script>
+
+  <main id="main" class="container ax-note ax-t-quality">
+    <nav class="crumbs" aria-label="이동 경로"><ol><li><a href="/">SugarMount</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/ax/topic/quality/">검증과 출시</a></li><li><span aria-current="page">클로드 코드 재리뷰: 닫은 결함이 HTTP로 남았다</span></li></ol></nav>
+    <section class="hero">
+
+    <!-- build:cover --><figure class="ax-cover-art"><img src="/assets/ax/cover/adversarial-review-other-paths-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure><!-- /build:cover -->
+      <span class="eyebrow">AX 노트 · 회고</span>
+      <h1>클로드 코드 재리뷰: 닫은 결함이 HTTP로 남았다</h1>
+      <p class="lead">클로드 코드가 고친 코드를 네 번 다시 리뷰했지만 Blocker와 High는 0건이 된 적이 없고, 3차에서는 닫힌 결함이 HTTP로 살아 있었습니다.</p>
+
+    <!-- build:meta --><p class="meta"><a href="/about/#stephen">작성 Stephen</a> <span aria-hidden="true">·</span> <span>검증과 출시</span> <span aria-hidden="true">·</span> <span>읽는 시간 10분</span> <span aria-hidden="true">·</span> 최종 업데이트 <time datetime="2026-11-16">2026년 11월 16일</time></p><!-- /build:meta -->
+      <p>클로드 코드(Claude Code) 에이전트가 고친 코드를 적대적 리뷰(이 코드를 공격한다면 어디가 뚫리는지 묻는 리뷰)에 다시 넣자, 두 번째 리뷰는 첫 수정이 새로 만든 결함을 찾았고 세 번째 리뷰는 "닫았다"고 기록된 같은 결함이 다른 접속 경로로 살아 있는 것을 찾았습니다. SugarMount의 P2P 채팅 앱(Flutter)을 2026년 9월 출시 준비하며 네 번 다시 리뷰한 기록입니다.</p>
+      <p>두 번째 결함은 두 수정이 만나는 자리에, 세 번째 결함은 수정이 닿지 않은 HTTP 경로와 사실이 아닌 보증을 적은 서버 문서에 있었습니다. 세 번째 결함이 나왔을 때 수정 보고서, 서버 문서, 서버 테스트는 모두 '닫힘'이라고 말하고 있었습니다.</p>
+    </section>
+
+    <!-- build:toc --><details class="toc-inline"><summary>목차 (5)</summary><ol><li><a href="#second-review">첫 수정 1시간 9분 만에 찾아 고친 로비 잠금</a></li><li><a href="#third-review">새 점유 규칙은 WebSocket에만 걸렸습니다</a></li><li><a href="#wrong-assumption">가드가 빨개지면 닫혔다고 본 가정</a></li><li><a href="#path-list">같은 결함의 다른 입구를 세는 여섯 축</a></li><li><a href="#when-to-stop">네 번 돌려도 0건이 되지 않았습니다</a></li></ol></details><div class="ax-side"><nav class="toc" aria-labelledby="toc-h"><p id="toc-h" class="toc-title">목차</p><ol><li><a href="#second-review">첫 수정 1시간 9분 만에 찾아 고친 로비 잠금</a></li><li><a href="#third-review">새 점유 규칙은 WebSocket에만 걸렸습니다</a></li><li><a href="#wrong-assumption">가드가 빨개지면 닫혔다고 본 가정</a></li><li><a href="#path-list">같은 결함의 다른 입구를 세는 여섯 축</a></li><li><a href="#when-to-stop">네 번 돌려도 0건이 되지 않았습니다</a></li></ol></nav></div><!-- /build:toc -->
+
+    <section aria-labelledby="second-review">
+      <h2 id="second-review">첫 수정 1시간 9분 만에 찾아 고친 로비 잠금</h2>
+      <p>1차 리뷰(9월 8일)는 출시 준비 변경분에서 42건을 찾아 발견마다 Blocker(출시를 막는 등급), High, Medium, Low 가운데 하나를 붙였고, Blocker 둘 다 신원 문제였습니다. 앱은 상대가 보내는 peer id(채팅 상대를 가리키는 식별자)를 그대로 믿었고, 시그널링 서버(같은 네트워크의 상대를 찾아 주는 로비 서버)는 남의 id로 들어오는 접속을 막지 않았습니다.</p>
+      <p>수정은 에이전트 다섯이 파일을 나눠 맡아 9월 9일 0시 36분 커밋 하나로 들어갔습니다. 이제 id는 공개키에서 계산되어 바뀌지 않고 서버는 id를 처음 잡은 쪽에 묶는데, 둘 다 1차 리뷰가 제안한 방향이었습니다.</p>
+      <p>2차 리뷰는 코드를 한 줄도 고치지 않고 보고서만 쓰는 별도 에이전트가 이 커밋 하나를 기준으로 읽은 것입니다. 두 수정을 겹치면, 바뀌지 않는 id를 누군가 먼저 잡는 순간 진짜 주인은 거부되고 앱은 그 거부를 치명 오류로 여겨 다시 접속하지 않으므로, 주인은 로비에 다시 나타나지 못합니다. 보고서는 이 로비 영구 잠금을, 수정 전에는 두 번째 join이 허용됐으니 새로 생긴 결함이라고 판정했습니다. 2차 수정 커밋 메시지도 이 결함을 "introduced by the previous round"라고 적었습니다.</p>
+      <figure class="ax-fig"><img src="/assets/ax/adversarial-review-other-paths-1-ko.webp" width="1200" height="920" alt="단계 그림: 1차 리뷰 42건, 1차 수정, 2차 리뷰가 찾은 새 결함 로비 영구 잠금, WebSocket만 바꾼 2차 수정, 3차 리뷰가 찾은 HTTP 경로의 같은 잠금, 3차 수정, 9월 11일 수정 묶음을 읽은 4차 리뷰 26건 중 24건이 그 묶음이 만든 결함" loading="lazy"><figcaption>리뷰를 다시 돌릴 때마다 직전 수정이 만들었거나 덮지 못한 결함이 나왔습니다.</figcaption></figure>
+      <p>같은 보고서의 첫 항목인 말풍선 위조도 수정 사이에서 떨어진 결함이었습니다. 동기화 경로를 맡은 에이전트는 메시지의 방과 발신자를 확인하는 검사를 넣었지만, 실시간 메시지 경로는 다른 에이전트의 파일이라 그 검사가 없었습니다. 연결된 상대가 내 화면에 "내가 보낸 말풍선"을 심을 수 있었고, 보고서는 이를 "두 에이전트의 경계에서 떨어진 항목"이라고 불렀습니다.</p>
+    </section>
+
+    <section aria-labelledby="third-review">
+      <h2 id="third-review">새 점유 규칙은 WebSocket에만 걸렸습니다</h2>
+      <p>서버 쪽 지적을 맡은 수정 에이전트(보고서 이름 R8)는 id 점유를 접속이 살아 있는 동안과 짧은 유예 시간으로 제한했습니다. 보고서에는 "영구 잠금이 불가능하다"고 적었고, 같은 뜻의 문장이 서버 README와 프로토콜 문서에도 들어갔으며, 서버 테스트도 통과한 상태였습니다.</p>
+      <p>3차 리뷰는 그날 새벽 3시 38분 커밋을 git archive로 풀어 고정된 사본에서 읽었습니다. 작업 트리에는 다른 에이전트들이 아직 커밋하지 않은 변경이 있었기 때문입니다. 이 리뷰가 "즉시 고쳐야 하는 것" 맨 위에 올린 문장은 아래와 같습니다. 리뷰 문서는 항목에 번호를 붙여, 2차 항목은 RR-, 3차 항목은 TR-로 시작합니다.</p>
+      <figure><img src="/assets/ax/adversarial-review-other-paths-shot1-ko.webp" width="1200" height="434" alt="3차 리뷰 문서 머리의 원문 줄 17, 19, 21, 23, 29~30, 82. R8이 닫았다고 기록한 RR-2/RR-3이 다른 경로로 살아 있다는 문장, 서버 문서에 사실이 아닌 보증이 있다는 문장, TR-1 Blocker 제목, 서버 문서의 보증이 거짓 서술이라는 문장, 판정표의 RR-2 줄 &#x27;부분 (WS 만 닫힘)&#x27;. 점유 방법을 적은 24~28행은 생략" loading="lazy"><figcaption>3차 리뷰 문서 원문(2026-09-09, 커밋 6c99027). R8은 서버 수정 에이전트, RR-2는 로비 영구 잠금, TR-1은 그 잠금의 HTTP 경로입니다.</figcaption></figure>
+      <p>서버에 들어오는 길은 WebSocket과, 그것이 안 될 때 쓰는 HTTP 두 갈래입니다. 점유를 풀어 주는 새 규칙은 WebSocket 접속에만 걸렸고, HTTP로 등록한 쪽은 다른 분기를 타서 만료가 일어나지 않았습니다. 소켓 없이 HTTP 요청만으로 id를 계속 붙잡을 수 있었고, 별도 리뷰 트랙의 실측에서 주인의 WebSocket 접속 10번이 모두 거부됐습니다.</p>
+      <p>같은 리뷰는 같은 모양을 세 곳에서 더 찾았습니다.</p>
+      <ul><li>서버는 id를 처음 잡은 쪽에 참가 비밀값(다시 들어올 때 주인임을 증명하는 값)을 줍니다. 앱 재시작 뒤 id를 되찾는 복구 경로가 기존 참가 비밀값을 그대로 돌려줘서, 좁은 조건을 한 번 통과하면 주소와 상관없이 그 id를 가질 수 있었습니다(TR-2).</li><li>웹 빌드는 기기끼리 직접 잇지 않고 서버를 거치는 릴레이 전송을 씁니다. 차단한 상대에게 우리 hello(접속 직후 공개키와 닉네임을 알리는 첫 메시지)를 먼저 보내지 않게 바꾼 핸드셰이크가 이 전송에는 적용되지 않았습니다. 릴레이 전송이 새 인터페이스를 구현하지 않아 조용히 예전 동작으로 돌아갔습니다.</li><li>메시지 시각이 시간대 표시 없이 오가서, 시간대가 다른 두 기기는 서로의 메시지 해시 검증에 모두 실패했습니다. 같은 PC의 에뮬레이터 두 대는 시간대가 같아 이 결함을 만들 수 없었습니다(TR-26).</li></ul>
+      <p>오전 10시 10분 3차 수정 커밋은 제목부터 "앞선 수정이 덮지 않은 경로를 닫는다"였습니다. HTTP 점유에도 참가 비밀값을 요구하고, 복구 경로는 비밀값을 새로 만들어 주도록 바꾸었습니다.</p>
+    </section>
+
+
+    <!-- build:cta-mid -->
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%ED%81%B4%EB%A1%9C%EB%93%9C%20%EC%BD%94%EB%93%9C%20%EC%9E%AC%EB%A6%AC%EB%B7%B0%3A%20%EB%8B%AB%EC%9D%80%20%EA%B2%B0%ED%95%A8%EC%9D%B4%20HTTP%EB%A1%9C%20%EB%82%A8%EC%95%98%EB%8B%A4">메일로 문의하기</a></p></aside>
+    <!-- /build:cta-mid -->
+    <section aria-labelledby="wrong-assumption">
+      <h2 id="wrong-assumption">가드가 빨개지면 닫혔다고 본 가정</h2>
+      <p>이 라운드의 수정 규칙은 "가드를 지우면 빨개지는 테스트로 고정한다"였습니다. 리뷰어들은 그 주장을 직접 확인했습니다. 2차 리뷰는 가드 제거 실험 3건을, 3차 리뷰는 8건을 다시 돌렸고, 모두 가드를 지우면 테스트가 실패했습니다. 한 건은 보고보다 실패가 하나 더 많았을 뿐 나머지는 실패 수와 이름까지 같았습니다. 그 상태에서 HTTP 잠금이 나왔습니다.</p>
+      <p>가드 제거 실험은 가드가 있는 경로만 시험합니다. HTTP 경로에는 지울 가드가 처음부터 없었고, 3차 리뷰의 테스트 공백 표는 HTTP 잠금이 "처음부터 덮이지 않았다"고 적었습니다. 재시작 복구 경로에서는 테스트가 오히려 결함을 정상으로 고정했습니다. 수정 에이전트가 쓴 서버 테스트 하나가 같은 비밀값을 다시 받는 동작을 단언하고 있어서, TR-2는 테스트로 잡힐 수 없었습니다.</p>
+      <p>가드 제거로 테스트를 검사하는 방법은 <a href="/ax/guard-removal-test/">테스트 3,066개가 초록인데 DB를 못 여는 코드가 숨어 있었다: 가드 지워 보기</a>에 적었습니다. 이 글의 결함들은 그 검사를 통과한 뒤에도 남아 있던 것입니다.</p>
+      <p>서버 수정 에이전트는 WebSocket 경로만 고친 채 보고서와 서버 문서에 "영구 점유 불가"라는 보증을 적었고, 그 보증을 받친 테스트는 고친 경로만 덮었습니다. 결함을 잡은 쪽도 에이전트였고, 그 리뷰어도 한 번은 틀린 가설을 세웠습니다. 3차 리뷰어는 "거부된 hello가 소켓을 계속 붙잡는다"고 의심했다가, 사본에 테스트를 써서 돌려 가설이 틀린 것을 보고 결함 없음으로 적었습니다. 보고서에 남은 이유는 "추측으로 보고하지 않기 위해 실행했다"입니다.</p>
+      <p>기록으로 확인되는 사람 손은 규칙 하나입니다. 지금 운영자의 공통 작업 지침에는 큰 수정 뒤 적대적 리뷰를 한 번 더 하고, 같은 결함의 다른 경로를 함께 찾고, 프로덕션 호출자 수를 grep으로 확인한다는 줄이 있습니다. 어느 리뷰를 누가 다시 돌리자고 했는지는 그때 세션 기록이 이 PC에 남아 있지 않아 확인하지 못했습니다.</p>
+      <p>수정 커밋을 리뷰할 때는 가드가 빨개지는지 묻기 전에, 그 가드가 같은 결함의 모든 입구에 걸려 있는지부터 세십시오.</p>
+    </section>
+
+    <section aria-labelledby="path-list">
+      <h2 id="path-list">같은 결함의 다른 입구를 세는 여섯 축</h2>
+      <p>3차 리뷰는 결론에서 덮이지 않은 경로가 반복해서 결함의 위치였다고 적고, 다음 라운드는 "이 가드가 프로덕션의 모든 전송/경로에 적용되는가"를 물어야 한다고 했습니다. 네 번의 리뷰에서 결함이 지나간 입구를 묶으면 여섯 축이 나옵니다.</p>
+      <div class="table-wrap"><table><thead><tr><th>축</th><th>이 앱에서 걸린 예</th><th>확인한 방법</th></tr></thead><tbody><tr><td>전송 경로</td><td>WebSocket만 고치고 HTTP는 열림(TR-1), 웹 릴레이에 새 핸드셰이크 미적용(TR-8)</td><td>인터페이스 구현체마다 가드 유무를 대조</td></tr><tr><td>데이터 경로</td><td>방·발신자 검사가 동기화에만 있고 실시간 메시지에는 없음(RR-1)</td><td>같은 데이터를 받는 함수끼리 검사를 비교</td></tr><tr><td>재발급·복구</td><td>재시작 복구가 기존 비밀값을 그대로 돌려줌(TR-2)</td><td>비밀값을 내주는 분기마다 새로 만드는지 확인</td></tr><tr><td>문서 보증</td><td>서버 문서의 "영구 점유 불가"(TR-1), 설계 문서의 "하한은 두지 않는다"(4차)</td><td>문서의 "never·항상·불가" 문장을 코드와 테스트에 대조</td></tr><tr><td>호출자</td><td>닉네임 마스킹 등록 호출 0곳(RR-5), 옛 대화 페이지 API 호출 0곳(TR-19)</td><td>새 API마다 프로덕션 코드의 호출자 수를 grep</td></tr><tr><td>실행 환경</td><td>시간대 없는 시각을 같은 시간대 에뮬레이터가 못 드러냄(TR-26)</td><td>테스트 환경이 만들 수 없는 조건을 따로 적음</td></tr></tbody></table></div>
+      <p>여섯 축은 이 앱의 모양에서 나왔습니다. 서버 접속은 WebSocket과 HTTP, 채팅 연결은 TCP와 웹 릴레이로 두 갈래씩이라 전송 축이 길었고, 전송이 하나뿐인 앱에는 이 목록을 써 본 적이 없습니다. 실행 환경 축은 표에 적어도 닫히지 않습니다. 3차 리뷰는 QA 항목에 두 기기의 시간대를 다르게 두는 경우를 넣으라고 권했습니다.</p>
+      <p>호출자 축은 이 앱에서만 나오지 않았습니다. 한 달 뒤 가족 일정 앱 AXFamily의 기기 E2E 수정 커밋(10월 10일)에도 받은 사진·PDF를 정리 화면으로 넘기는 호출자가 없었다는 줄이 있습니다. 그 앱의 통합 리뷰는 <a href="/ax/integration-review-defects/">브랜치마다 AI 리뷰를 통과해도 합친 코드에는 결함이 남습니다</a>에 있습니다.</p>
+      <ol class="steps"><li><p>수정 커밋마다 막은 결함을 한 문장으로 적습니다. 무엇이, 어느 입구로 들어와, 무엇을 하는지입니다.</p></li><li><p>여섯 축마다 그 결함이 들어올 입구를 적습니다. 해당이 없는 축은 "없음"이라고 적고 넘어갑니다.</p></li><li><p>입구마다 같은 가드가 걸려 있는지 grep으로 셉니다. 3차 리뷰가 센 것은 인터페이스 구현체 수, 한도 검사 함수의 호출 지점 수, 새 API의 프로덕션 호출자 수였습니다.</p><pre><code># 전송 클래스들이 함께 구현하는 인터페이스의 구현체 전부
+grep -rn "implements TransportService" lib/
+# 옛 대화를 페이지로 읽는 API의 프로덕션 호출자
+grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>수정 diff를 수정에 참여하지 않은 리뷰 에이전트에게 보고서 전용으로 넘기고, 직전 지적마다 닫힘·부분·미해결 판정표를 만들게 합니다.</p></li><li><p>수정 에이전트가 쓴 테스트 가운데 지금 동작을 정상으로 못 박는 것을 따로 읽습니다. 같은 값을 다시 받는다고 단언하는 테스트는 결함까지 함께 고정할 수 있습니다.</p></li><li><p>리뷰를 돌리기 전에 멈춤 조건을 정합니다. 이 앱의 마지막 리뷰 지시서는 새 검증 영역을 열지 않고, Blocker·High만 고치고, Medium 이하는 백로그로 넘긴다고 정했습니다.</p></li></ol>
+    </section>
+
+    <section aria-labelledby="when-to-stop">
+      <h2 id="when-to-stop">네 번 돌려도 0건이 되지 않았습니다</h2>
+      <p>차수별 발견 수는 네 번 모두 18건 아래로 내려가지 않았고, Blocker와 High를 합친 수도 한 번도 0이 되지 않았습니다. 2차 리뷰는 수정 커밋 하나(83개 파일)만 읽었고, 문서에 집계 줄이 없어 심각도가 붙은 항목만 세었습니다.</p>
+      <figure><img src="/assets/ax/adversarial-review-other-paths-shot2-ko.webp" width="1200" height="560" alt="적대적 리뷰 차수별 발견 수를 심각도별로 쌓은 막대 그래프. 1차 42건(Blocker 2, High 13), 2차 18건(High 4), 3차 27건(Blocker 1, High 8), 4차 26건(Blocker 1, High 9)" loading="lazy"><figcaption>리뷰 문서 4개에서 센 값(2026-09-08~09-11). 매 차수 Blocker나 High가 남았습니다.</figcaption></figure>
+      <p>4차 리뷰는 직전 수정 묶음을 읽고 26건 가운데 24건을 그 묶음이 만든 결함으로 판정했습니다. 지시서는 앞선 리뷰마다 직전 수정이 만든 결함이 나왔다는 기록을 들어 멈출 자리를 미리 정해 두었습니다. 0건을 기다리는 대신 이 규칙으로 멈추었고, Medium 이하 16건은 백로그 후보로 표시됐습니다.</p>
+      <p>수정 보고서의 "닫힘"과 가드 제거 실험의 일치는 이번에 둘 다 닫힘의 근거가 되지 못했습니다. 수정 에이전트는 자기 수정을 가드 제거 실험으로 확인했지만, 자기 수정을 적대적 리뷰로 다시 보게 한 기록은 없어 비교 자료가 없습니다.</p>
+      <p>2차 리뷰의 로비 잠금과 말풍선 위조는 코드 판독으로만 확인한 결과이고, 두 클라이언트로 재현하는 일은 다음 라운드로 넘어갔습니다. 웹 릴레이 결함은 웹 빌드를 띄워 확인한 적이 없습니다. 결함 보고가 틀린 경우도 있었습니다. 4차 지시서는 이 라운드에 결함으로 보고됐다가 철회된 것을 5건으로 적었습니다(대비·스플래시·시뮬레이션 착시 등).</p>
+      <p>아직 확인하지 않은 것은 두 가지입니다. 4차 리뷰가 백로그 후보로 돌린 16건 가운데 다른 경로로 다시 살아난 것이 있는지, 그리고 9월 11일 뒤 이 앱의 수정 커밋에서 여섯 축을 실제로 적었는지입니다.</p>
+    </section>
+
+    <p class="note">2026-11-15 확인. P2P 채팅 앱 저장소 git 기록(커밋 df1dddc, 684ff8c, 5c44c96, 6c99027, 8f5a0a5, Claude Opus 5 공동 작성), 적대적 리뷰 문서 4개(2026-09-08~09-11)와 서버 수정 보고서, 4차 리뷰 지시서, 출시 준비 라운드 프로젝트 메모리, 가족 일정 앱 저장소 커밋 6a51d59(2026-10-10).</p>
+
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+
+    <!-- build:cta -->
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%ED%81%B4%EB%A1%9C%EB%93%9C%20%EC%BD%94%EB%93%9C%20%EC%9E%AC%EB%A6%AC%EB%B7%B0%3A%20%EB%8B%AB%EC%9D%80%20%EA%B2%B0%ED%95%A8%EC%9D%B4%20HTTP%EB%A1%9C%20%EB%82%A8%EC%95%98%EB%8B%A4">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <!-- /build:cta -->
+
+    <!-- build:extra -->
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="/ax/docviewer-malicious-file-set/">문서 뷰어 악성 파일 세트: ZIP 폭탄·CFB 루프·XSS를 생성기로 만들어 테스트에 묶기</a></li>
+        <li><a href="/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다: 평문 AAB와 dart-define 하나</a></li>
+        <li><a href="/ax/hwp-hancom-resave-check/">고친 HWP 7개 한컴 호환성 테스트: 열기 7/7, 다른 이름으로 저장은 로그인 뒤 2/2</a></li>
+        <li><a href="/ax/realism-score-not-3d/">AI 에이전트 완료 보고 검증: 95.2%가 러너에서 안 나온 이유</a></li>
+        <li><a href="/ax/ndk-16kb-page-blue-tint/">Android 16KB 페이지 대응, NDK를 올리기 전에 링커 플래그부터: NDK 27·29의 파란 색조</a></li>
+        <li><a href="/ax/privacy-policy-code-audit/">앱 개인정보처리방침 직접 작성: &#x27;수집하지 않음&#x27; 템플릿을 버리고 코드 감사로 다시 썼다</a></li>
+      </ul>
+      <p><a href="/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="/ax/">AX 노트 전체 보기</a></p>
+    </section>
+    <!-- /build:extra -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>
+        <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="l" d="M2.14 18 9.07 22 9.07 30 2.14 26Z"/><path class="r" d="M16 18 9.07 22 9.07 30 16 26Z"/><path class="t" d="M9.07 14 16 18 9.07 22 2.14 18Z"/><path class="e" d="M9.07 14 16 18 16 26 9.07 30 2.14 26 2.14 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M16 18 22.93 22 22.93 30 16 26Z"/><path class="r" d="M29.86 18 22.93 22 22.93 30 29.86 26Z"/><path class="t" d="M22.93 14 29.86 18 22.93 22 16 18Z"/><path class="e" d="M22.93 14 29.86 18 29.86 26 22.93 30 16 26 16 18Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/><path class="l" d="M9.07 6 16 10 16 18 9.07 14Z"/><path class="r" d="M22.93 6 16 10 16 18 22.93 14Z"/><path class="t" d="M16 2 22.93 6 16 10 9.07 6Z"/><path class="e" d="M16 2 22.93 6 22.93 14 16 18 9.07 14 9.07 6Z" fill="none" stroke-width="1.1" stroke-linejoin="round"/></svg><span>SugarMount</span></a>
+        <p>한 가지 일을 간단하게 하는 Android 앱</p>
+        <p>이메일: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a></p>
+      </div>
+      <nav aria-labelledby="f-apps">
+        <p class="footer-title" id="f-apps">앱</p>
+        <ul><li><a href="/apps/sugaralbum/">슈가앨범</a></li><li><a href="/apps/image-compress/">사진 용량 줄이기</a></li><li><a href="/apps/image-flip/">사진 반전·회전</a></li><li><a href="/apps/image-convert/">이미지 변환 JPG·PNG·WebP</a></li><li><a href="/apps/sugarspeller/">한글 띄어쓰기</a></li><li><a href="/apps/sugarclip/">SugarClip</a></li><li><a href="/apps/doc-viewer/">한글뷰어 슈가독</a></li><li><a href="/apps/sugarcard/">생생카드</a></li><li><a href="/apps/arrow-knots/">화살표 매듭풀기</a></li><li><a href="/apps/blocks/">한판블록</a></li></ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <p class="footer-title" id="f-site">사이트</p>
+        <ul><li><a href="/apps/">모든 앱</a></li><li><a href="/ax/">AX 노트</a></li><li><a href="/about/">소개</a></li><li><a href="/privacy/">개인정보처리방침</a></li><li><a href="/privacy/site/">광고·쿠키</a></li><li><a href="/sitemap/">사이트맵</a></li><li><a href="/rss.xml">RSS 피드</a></li></ul>
+      </nav>
+      <div class="legal"><span><span class="sym">©</span> 2026 simpest · SugarMount</span><a href="https://play.google.com/store/apps/dev?id=7906745536709395451" rel="noopener">Google Play 개발자 페이지</a></div>
+    </div>
+  </footer>
+</body>
+</html>

@@ -6,7 +6,84 @@
   <description>Small Android apps that each do one thing simply, from shrinking photos and opening Korean HWP documents to checking Korean spelling and playing puzzle games.</description>
   <language>en</language>
   <atom:link href="https://sugarmount21.com/en/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Sun, 15 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Mon, 16 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Claude Code re-review: the bug survived via HTTP – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/adversarial-review-other-paths/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/adversarial-review-other-paths/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/adversarial-review-other-paths-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Retrospective</span>
+      <h1>Claude Code re-review: the bug survived via HTTP</h1>
+      <p class="lead">We re-reviewed Claude Code's fixes four times, and the blocker-plus-high count never reached zero. The second pass found a defect the first fix had created; the third found a defect marked closed still open over HTTP.</p>
+      <p>We sent code fixed by Claude Code agents back through an adversarial review (a review that asks where the code breaks if someone attacks it), and the second pass found a defect the first fix had created; the third found that a defect recorded as closed was still alive through a different connection path. This was SugarMount's P2P chat app (Flutter), during release prep in September 2026, and we ran that review four times.</p>
+      <p>The second review's defect was where two fixes met; the third's was on an HTTP path the fix never touched and in server docs that promised something untrue. When the third defect turned up, the fix report, the server docs and the server tests all said it was closed.</p>
+    </section>
+    <section aria-labelledby="second-review">
+      <h2 id="second-review">The lobby lock, found and fixed within 69 minutes of the first fix</h2>
+      <p>The first review (September 8) found 42 issues in the release-prep changes. Each finding carried a severity: Blocker (stops the release), High, Medium or Low, and both blockers were about identity. The app trusted whatever peer id (the identifier for a chat partner) the other side sent, and the signalling server (the lobby service that helps devices on a network find each other) let anyone join under someone else's id.</p>
+      <p>Five agents split the fix by file, and it landed as one commit at 00:36 on September 9. Ids are now computed from the public key and never change, and the server binds an id to its first claimer. Both were what the first review had proposed.</p>
+      <p>The second review was done by a separate agent that wrote a report and changed no code, reading that one commit. Put the two fixes together and a permanent id becomes a target: whoever claims it first shuts the real owner out, and the app treats that refusal as fatal and never reconnects, so the owner never shows up in the lobby again. The report noted that before the fix a second join had been allowed, so this lobby lock was a new defect. The round-two fix commit message calls the lock "introduced by the previous round".</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/adversarial-review-other-paths-1-en.webp" width="1200" height="972" alt="Step diagram: review 1 with 42 findings, first fix, review 2 finds a new permanent lobby lock, a fix that changed only the WebSocket path, review 3 finds the same lock over HTTP, third fix, review 4 reads the September 11 fix bundle and finds 26 issues, 24 introduced by that bundle" loading="lazy"><figcaption>Every rerun found defects the previous fix had introduced or left uncovered.</figcaption></figure>
+      <p>The report's first item, forged message bubbles, had fallen between fixes as well. The agent that owned the history sync path had added checks on a message's room and sender, but the live message path belonged to another agent's files and got none. A connected peer could plant a bubble on the other user's screen that looked like their own message. The report called it an item that "fell at the boundary between two agents".</p>
+    </section>
+    <section aria-labelledby="third-review">
+      <h2 id="third-review">The new claim-expiry rule only covered WebSocket</h2>
+      <p>The fix agent that took the server items (its report is named R8) limited a claim to the life of the connection plus a short grace period. Its report said a permanent lock was no longer possible, the server README and protocol doc said the same, and the server tests passed.</p>
+      <p>The third review read the 03:38 commit from a frozen copy made with git archive, because the working tree held other agents' uncommitted changes. This is what it put at the top of its "fix now" list. The review documents number their items: round two's start with RR-, round three's with TR-.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/adversarial-review-other-paths-shot1-en.webp" width="1200" height="434" alt="Lines 17, 19, 21, 23, 29 to 30 and 82 of the third review, in the original Korean: RR-2 and RR-3, recorded as closed by R8, are alive through another path; the server docs carry an untrue guarantee; the TR-1 blocker heading; that guarantee judged false; and the verdict row for RR-2, partial, WebSocket only. Lines 24 to 28, on how the id was held, are left out" loading="lazy"><figcaption>The third review document as written (2026-09-09, commit 6c99027). R8 is the server fix agent, RR-2 the lobby lock, TR-1 the same lock over HTTP.</figcaption></figure>
+      <p>Clients reach the server over WebSocket, or over HTTP when WebSocket fails. The rule that lets a claim expire only applied to WebSocket connections. A peer registered over HTTP went down a different branch where the claim never expired, so HTTP requests alone, with no socket open, could keep an id held. A separate review track measured it: all 10 of the owner's WebSocket joins were refused.</p>
+      <p>It found the same shape in three more places:</p>
+      <ul><li>The server gives an id's first claimer a join secret (the value that proves ownership when it comes back). The path that lets an app recover its id after a restart handed back the existing join secret, so passing a narrow check once was enough to hold that id from any address (TR-2).</li><li>The web build does not connect devices directly; it uses a relay transport through the server. The handshake change that stops us sending our hello (the first message after connecting, carrying the public key and nickname) to a blocked peer first never reached that transport. The relay transport did not implement the new interface, so it quietly kept the old behaviour.</li><li>Message timestamps travelled without a time zone, so two devices in different zones failed every hash check on each other's messages. Our two emulators ran on one PC in one zone and could not produce this (TR-26).</li></ul>
+      <p>The third fix commit, at 10:10, is titled "close the paths the earlier fixes did not cover". HTTP claims now need the join secret, and the recovery path issues a fresh secret.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20re-review%3A%20the%20bug%20survived%20via%20HTTP">Email us</a></p></aside>
+    <section aria-labelledby="wrong-assumption">
+      <h2 id="wrong-assumption">We had treated a red guard as proof</h2>
+      <p>The rule for this round was that every fix gets a test that fails when its guard is removed. The reviewers checked that claim themselves: round two reran 3 of the fix reports' guard-removal experiments and round three reran 8; every one went red when its guard was removed, and all but one (which failed one test more than reported) matched the reported counts and names. The HTTP lock was there anyway.</p>
+      <p>Removing a guard only tests the paths that have the guard. The HTTP path never had one to remove, and the third review's test-gap table says the HTTP lock "was never covered in the first place". On the restart path the tests protected the defect: a server test written by the fix agent asserted that a restarted app gets the same secret back, so TR-2 could not show up as a test failure.</p>
+      <p>Checking tests by deleting guards is covered in <a href="https://sugarmount21.com/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database</a>. The defects in this note are the ones still there after that check passed.</p>
+      <p>The server fix agent changed only the WebSocket path, then wrote the no-permanent-lock guarantee into its report and the server docs, backed by tests that covered only the path it had changed. An agent caught the defect too, and that reviewer had its own wrong hypothesis: the third reviewer suspected that a rejected hello kept the socket occupied, wrote a test on its copy, found the hypothesis wrong and recorded no defect. Its report gives the reason as running it "so as not to report a guess".</p>
+      <p>The records show a person's hand in one place, the rules: the operator's shared working instructions now say that after a large fix you run one more adversarial review, look for other paths to the same defect, and grep the number of production callers. Who asked for each rerun we could not confirm, because the session logs from that week are not on this PC.</p>
+      <p>When you review a fix commit, count whether its guard covers every entrance to the same defect before you ask whether the guard turns red.</p>
+    </section>
+    <section aria-labelledby="path-list">
+      <h2 id="path-list">Six axes for finding the other entrances</h2>
+      <p>The third review concluded that uncovered paths had been where the defects were, again and again, and that the next round should ask whether each guard applies to every transport and path in production. Grouping the entrances the defects used across the four reviews gives six axes.</p>
+      <div class="table-wrap"><table><thead><tr><th>Axis</th><th>What it caught in this app</th><th>How it was checked</th></tr></thead><tbody><tr><td>Transport</td><td>WebSocket fixed, HTTP open (TR-1); web relay without the new handshake (TR-8)</td><td>Find every implementation of the interface and check each for the guard</td></tr><tr><td>Data path</td><td>Room and sender checks on sync but not on live messages (RR-1)</td><td>List every function that receives the same data and compare their checks</td></tr><tr><td>Reissue and recovery</td><td>Restart recovery returned the existing secret (TR-2)</td><td>At every branch that hands out a secret or state, ask whether it makes a new one or copies the old</td></tr><tr><td>Doc guarantees</td><td>"No id is held for good" in the server docs (TR-1); "no lower bound" in the design docs (round 4)</td><td>Match each "never", "always" or "cannot" sentence against code and tests</td></tr><tr><td>Callers</td><td>Nickname masking registered nowhere (RR-5); older-history page API with no callers (TR-19)</td><td>Grep production code for callers of every new API</td></tr><tr><td>Environment</td><td>Zone-less timestamps that same-zone emulators cannot expose (TR-26)</td><td>Write down conditions the test setup cannot create</td></tr></tbody></table></div>
+      <p>The six axes come from this app's shape. Server connections go over WebSocket or HTTP and chat links over TCP or a web relay, which made the transport axis long. We have not used the list on an app with a single transport. Writing the environment axis in a table does not close it; the third review asked for a QA case with the two devices set to different time zones.</p>
+      <p>The caller axis is not unique to this app. A month later, a device E2E fix commit in AXFamily, our family scheduling app (October 10), notes that nothing passed received photos and PDFs on to the organising screen. That app's merge review is in <a href="https://sugarmount21.com/en/ax/integration-review-defects/">Every branch passed its AI review, and the merged code still had 12 defects</a>.</p>
+      <ol class="steps"><li><p>For each fix commit, write the defect it blocks in one sentence: what comes in, through which entrance, and what it does.</p></li><li><p>For each of the six axes, list the entrances that defect could use. Write "none" for an axis that does not apply.</p></li><li><p>Grep each entrance for the same guard. The third review counted interface implementations, call sites of the limit check, and production callers of each new API. For this app:</p><pre><code># every class implementing the interface the transports share
+grep -rn "implements TransportService" lib/
+# production callers of the API that reads older history page by page
+grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>Give the fix diff to a review agent that took no part in the fix, report only, and have it mark each earlier finding closed, partial or open.</p></li><li><p>Read the fix agent's tests that lock in current behaviour as correct. A test asserting that the same value comes back can lock in the defect too.</p></li><li><p>Set the stop condition before you run the review. This app's last review brief set it as: open no new verification areas, fix only blockers and highs, move medium and below to the backlog.</p></li></ol>
+    </section>
+    <section aria-labelledby="when-to-stop">
+      <h2 id="when-to-stop">Four rounds, never zero</h2>
+      <p>No round found fewer than 18 issues (chart below), and the blocker-plus-high count never reached zero. Round two read a single fix commit (83 files), and its document has no tally line, so only findings tagged with a severity are counted.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/adversarial-review-other-paths-shot2-en.webp" width="1200" height="560" alt="Stacked bars of adversarial review findings per round by severity: round 1, 42 (2 blocker, 13 high); round 2, 18 (4 high); round 3, 27 (1 blocker, 8 high); round 4, 26 (1 blocker, 9 high)" loading="lazy"><figcaption>Counted from the four review documents (2026-09-08 to 09-11). Every round still had blockers or high-severity findings.</figcaption></figure>
+      <p>Round four read the latest fix bundle and judged 24 of its 26 findings to be defects that bundle had introduced. Its brief cited the record that every earlier review had found new defects made by the previous fix, and set the stopping point in advance. We stopped on that rule instead of waiting for zero, and the 16 findings rated medium or lower were marked as backlog candidates.</p>
+      <p>Neither the fix reports' "closed" nor matching guard-removal results held up as proof of closure this time. The fix agents checked their own fixes with guard-removal runs, but there is no record of any of them reviewing its own fix adversarially, so there is nothing to compare.</p>
+      <p>Round two confirmed the lobby lock and the forged bubble by reading code only; reproducing them with two real clients was left for a later round. Nobody launched the web build to see the relay defect either. Defect reports can be wrong too: the round-four brief counts 5 reported defects withdrawn during the round (contrast, splash screen, simulation artefacts).</p>
+      <p>Two things are still unchecked: whether any of the 16 findings round four marked as backlog candidates came back through another path, and whether fix commits in this app after September 11 actually wrote out the six axes.</p>
+    </section>
+    <p class="note">Checked 2026-11-15. Git history of the P2P chat app repository (commits df1dddc, 684ff8c, 5c44c96, 6c99027, 8f5a0a5, co-authored with Claude Opus 5), the four adversarial review documents (2026-09-08 to 09-11) and the server fix report, the round-four review brief, the project memory for the release-prep round, and commit 6a51d59 in the family scheduling app repository (2026-10-10).</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20re-review%3A%20the%20bug%20survived%20via%20HTTP">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Mon, 16 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>Daum spell check failed: OkHttp and a JS redirect – SugarMount</title>
     <link>https://sugarmount21.com/en/ax/daum-speller-js-redirect-200-empty/</link>
@@ -2198,7 +2275,7 @@ answers per open  = quiz_answer(mode!=chat) events / quiz_open events</code></pr
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/adversarial-review-other-paths/">Claude Code re-review: the bug survived via HTTP</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2525,7 +2602,7 @@ test('bidirectional cross-check against python cryptography', () async {
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/adversarial-review-other-paths/">Claude Code re-review: the bug survived via HTTP</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3634,7 +3711,7 @@ adb -s emulator-5554 logcat -d -b crash</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/integration-review-defects/">Every branch passed its AI review, and the merged code still had 12 defects</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/gcloud-blocked-app-impersonation/">gcloud &#x27;This app is blocked&#x27; for GA4: impersonate</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
@@ -6260,122 +6337,6 @@ print(pages.most_common(), "FAQ questions:", questions)</code></pre>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
     <pubDate>Wed, 28 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>GA4 installs: 11 of 19 were test devices – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/ga4-test-device-filter/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/ga4-test-device-filter/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/ga4-test-device-filter-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · Incident</span>
-      <h1>GA4 said 19 installs yesterday and 8 were real: filtering out test phones and Play pre-launch and review devices</h1>
-      <p class="lead">We now drop test phones and Play pre-launch and review devices with exclusion conditions on every report request. According to the official docs, the Firebase debug-mode setprop alone does not keep events out of GA4 reports.</p>
-    <p class="note ax-series-line"><a href="https://sugarmount21.com/en/ax/series/puzzle-game-marketing/">Ads and metrics for two puzzle games</a> 1/4</p>
-      <p>When an app gets a handful of installs a day, a few test devices can rewrite its GA4 numbers. Google Play runs every new build on pre-launch report and review devices, and a developer's own phones look like fresh installs each time an automated test wipes the app's data.</p>
-      <p>Of the 19 first opens GA4 counted for <a href="https://sugarmount21.com/en/apps/blocks/">Block Turn</a> on October 17, 2026, 11 came from such devices. An agent's morning report called the 19 "above the 7-day average of about 11"; split by device model, real installs were 8. This note covers how to spot those devices, the report filter that drops them, and the two ways devices still slipped through after the fix.</p>
-    </section>
-    <section aria-labelledby="split-by-model">
-      <h2 id="split-by-model">IN2025 came two per version; our S20 logged 0 seconds and 13 data wipes</h2>
-      <p>The split came out of a day-one drop-off review. We had shipped three Block Turn versions on October 17 (1.1.2, 1.1.3 and 1.1.4), and to count who was actually using them we pulled version, country, first-user medium and device model into one table.</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Device model</th><th>Country, medium</th><th>What it left during the new versions</th></tr></thead>
-        <tbody>
-          <tr><td>IN2025</td><td>(not set), (none)</td><td>2 per version, 6 first opens</td></tr>
-          <tr><td>SM-G981N (S20)</td><td>South Korea, (none)</td><td>1 per version, 0 s engaged, 13 app_clear_data</td></tr>
-          <tr><td>SM-G991N (S21)</td><td>South Korea, (none)</td><td>1 user, 0 s engaged, 5 app_clear_data</td></tr>
-          <tr><td>SM-G986N</td><td>South Korea, cpc</td><td>Finished the tutorial, solved 3 puzzles, 295 s</td></tr>
-          <tr><td>SM-S931N</td><td>South Korea, cpc</td><td>Opened the first puzzle and left</td></tr>
-        </tbody>
-      </table></div>
-      <p>IN2025, with no country, arrived two at a time with every version: Play running each uploaded build on its pre-launch report and review devices. The S20 and S21 are ours. They logged <code>app_clear_data</code> again and again with zero engagement. Only the last two rows, both from ads, were people (two users from the United States with no model, left out of the table, were only flagged as likely review devices).</p>
-      <p>Recounted per day from October 11 to 17 (from the drop-off review):</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Date</th><th>10/11</th><th>10/12</th><th>10/13</th><th>10/14</th><th>10/15</th><th>10/16</th><th>10/17</th></tr></thead>
-        <tbody>
-          <tr><td>Real</td><td>1</td><td>10</td><td>9</td><td>15</td><td>7</td><td>9</td><td>8</td></tr>
-          <tr><td>Test and review</td><td>6</td><td>1</td><td>0</td><td>1</td><td>0</td><td>0</td><td>11</td></tr>
-        </tbody>
-      </table></div>
-      <p>On October 11, the day Firebase went in, and on October 17, the day of three releases, test and review devices outnumbered real installs.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/ga4-test-device-filter-1-en.webp" width="1200" height="588" alt="Bar chart: on Oct 17, Block Turn&#x27;s report showed 19 first opens; 11 came from test and review devices, 8 were real installs, and the filtered 7-day average was about 8.4." loading="lazy"><figcaption>Filtered, October 17 had 8 real installs, close to the real 7-day average of 8.4.</figcaption></figure>
-    </section>
-    <section aria-labelledby="why-polluted">
-      <h2 id="why-polluted">The gate meant to keep test phones out of GA4 had a gap</h2>
-      <p>The app had a collection gate from the start. The October 11 code that added Firebase turns collection off in debug builds and test-ad builds, with one exception: it turns collection on when a marker file exists on the device. The comment says "so device harnesses don't fill the reports." Still, the app ran on the S20 and S21 with collection on, and every automated test run wiped its data with <code>pm clear</code>. The records do not settle which build or path turned collection on: a store update, a release build with real ad unit IDs, or the marker file. The S20 had logged two <code>app_update</code> events, and the release build pulled from the S21 on the night of October 18 was a test-ad build.</p>
-      <p>The app can do nothing about Play's pre-launch and review devices. They come with every upload, so the more often you ship, the more of these installs you get. Three uploads on October 17 produced six IN2025 first opens.</p>
-      <p>The report tool written on October 17 grouped by country and medium only, with no device dimension. The October 15 analysis has a data-pollution section listing 3 installs and 10 <code>app_clear_data</code> events from the S21 and 2 installs from emulators (<code>sdk_gphone</code>, which then stayed out of the October 18 filter), and its fifth to-do was to consider turning analytics off for release-build device tests or marking test devices as internal traffic in GA4. Nobody acted on that "consider" for three days, and in the meantime the morning report read 19 as real installs.</p>
-    </section>
-    <section aria-labelledby="report-filter">
-      <h2 id="report-filter">The report tool now filters by default; --include-test shows everything</h2>
-      <p>A commit at 17:06 on October 18 appends this condition to every GA4 request the report tool sends. Rows with no country go, and our own phone models go unless the user came from an ad (cpc), so a real S20 or S21 owner who clicked an ad still counts.</p>
-      <pre><code>TEST_MODELS = ["SM-G981N", "SM-G991N", "IN2025"]
-NOT_TEST = {"notExpression": {"orGroup": {"expressions": [
-    {"filter": {"fieldName": "country", "inListFilter": {"values": ["(not set)", ""]}}},
-    {"andGroup": {"expressions": [
-        {"filter": {"fieldName": "mobileDeviceModel", "inListFilter": {"values": TEST_MODELS}}},
-        {"notExpression": {"filter": {"fieldName": "firstUserMedium", "stringFilter": {"value": "cpc"}}}}]}}]}}}</code></pre>
-      <p>We ran the report from October 17 on with the filter and with <code>--include-test</code> side by side. Six non-ad rows with country (not set) disappeared, Korean non-ad installs went from 4 to 1, and the 5 Korean installs from ads stayed. Because the condition is applied at query time, it works on data GA4 already holds, which is how the October 11 to 17 numbers were recounted.</p>
-    </section>
-    <section aria-labelledby="debug-mode">
-      <h2 id="debug-mode">The commit said "DebugView only"; the official docs recommend a developer traffic filter as well</h2>
-      <p>The same commit added one line before <code>pm clear</code> in seven automated test scripts (E2E, reward checks, monkey runs):</p>
-      <pre><code>adb shell setprop debug.firebase.analytics.app &lt;package name&gt;</code></pre>
-      <p>The commit message says "so test runs go to DebugView only," and the script comments, the review document and the report to the operator all said test data would no longer mix into GA4 reports. The same sentence went into another note on this site, <a href="https://sugarmount21.com/en/ax/fresh-install-monkey-test/">The agent said it was tested. The game crashed on the first tutorial tap: a missing VIBRATE permission and the fresh-install monkey test</a>, and was corrected there on October 26, 2026.</p>
-      <p>Checked against the official docs while writing this note, that sentence does not hold. Firebase's DebugView page says the setting persists until you disable it with <code>.none.</code>, says these events are included in the daily BigQuery export by default, and recommends a developer traffic data filter to keep test traffic out of reports. The GA4 help page on that filter describes it as the thing that lets developers keep using DebugView while "their activity doesn't appear in your reports." Neither the repository nor the session logs show that filter being created, and we did not look at the GA4 property settings directly. We also did not measure whether events from setprop runs actually reached this property's reports; that conclusion rests on the docs.</p>
-      <p>The October 18 report says the setting was not verified on the real S20 and S21 because the agent's permission check blocked the command that changes device settings; that night it was recorded as working on an Android 7 emulator only, and whether events left the reports was not checked then either. Counting at HEAD on October 26, 12 scripts call <code>pm clear</code> and 5 of them still have no setprop. Four existed since October 4 and were missed when the first seven were edited; one was written on October 22.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20GA4%20said%2019%20installs%20yesterday%20and%208%20were%20real%3A%20filtering%20out%20test%20phones%20and%20Play%20pre-launch%20and%20review%20devices">Email us</a></p></aside>
-    <section aria-labelledby="second-leaks">
-      <h2 id="second-leaks">Five days later an emulator got through, and a week later arm64 devices</h2>
-      <p>On the morning of October 23, the agent corrected its own report from the day before: the "one Block Turn 1.1.5 user" was the emulator it had used for verification. Emulators report an empty <code>mobileDeviceModel</code> to GA4, so they passed the model list untouched. A commit at 08:14 dropped four x86 emulator names on the <code>deviceModel</code> dimension. Why that run reached GA4 at all is not recorded. The commit message also lists a debug build, 1.1.5-debug, among the versions GA4 showed, though debug builds should have had collection off.</p>
-      <p>At noon on October 25, a midpoint check put the first-puzzle (R001) solve rate of 1.1.6 at 6 of 12, or 50%. A commit at 16:14 corrected it. Four Play pre-launch and review devices in the United States (<code>sdk_gphone64_arm64</code>, <code>sdk_gphone16k_arm64</code>) were in the count, and the filter from October 23 only knew the x86 names. With the filter widened to every model starting with <code>sdk_gphone</code>, 8 real users remained and 6 solved it: 75%, close to the previous ad cohort's 77% (23 of 30). The same check found that all 6 GA4 users of 1.1.7 and 1.1.8 were Play pre-launch and review devices.</p>
-    </section>
-    <section aria-labelledby="alternatives">
-      <h2 id="alternatives">A GA4 data filter could not have fixed last week's numbers</h2>
-      <p>The October 15 document first proposed turning collection off or marking test devices as internal traffic in GA4; the October 18 report proposed marking debug devices or an internal traffic filter. GA4's help says data filters do not affect historical data. Correcting the October 11 to 17 numbers needed a report-side filter regardless. A report-side filter, in turn, only drops the models we know about and misses the next new test device. Our call is to use both: the report filter for past data and Play's pre-launch and review devices, debug mode plus a developer traffic filter for events from our own phones from now on.</p>
-      <p>Turning collection off in the build was already in place, and it did not stop the app from running with collection on on the S20 and S21.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">Real organic users on an S20, S21 or IN2025 are dropped too</h2>
-      <p>The filter also removes real people who install organically on an S20, S21 or IN2025. A few devices only swing the average while real installs are in single digits per day; at a few hundred installs a day, a handful of test phones would disappear in the noise.</p>
-    </section>
-    <section aria-labelledby="how-to">
-      <h2 id="how-to">Six checks: Data API dimensions, a test-script grep and a developer traffic filter</h2>
-      <ol>
-        <li>Pull <code>first_open</code> from the GA4 Data API by date, country, firstUserMedium, mobileDeviceModel, deviceModel and appVersion.</li>
-        <li>Flag rows with country (not set), a <code>deviceModel</code> starting with <code>sdk_gphone</code> or "Android SDK built for", your own phone models on non-ad installs, and devices with repeated <code>app_clear_data</code> and zero engagement. Be suspicious of any model that shows up in the same number for every new version on release day.</li>
-        <li>Make exclusion the default in your report tool, with a flag that shows everything, and compare the two outputs side by side once.</li>
-        <li>Find test scripts that call <code>pm clear</code> without <code>debug.firebase.analytics.app</code>: <code>grep -l "pm.*clear" tools/* | xargs grep -L debug.firebase.analytics.app</code>. Run it again whenever a script is added.</li>
-        <li>In GA4 admin, create a developer traffic data filter in the Testing state, confirm test-device events get labeled, then activate it. Data an active filter drops is gone for good, so do not skip the Testing state.</li>
-        <li>After every release, look at that version's users by device model before reading any funnel number.</li>
-      </ol>
-      <p>Whoever you report install counts to, do not call a number real installs until you have split it by device model once. A per-device event timeline built from the same GA4 data is in <a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a>; when you build the test-device list its steps mention, add the <code>sdk_gphone</code> prefix and the country (not set) condition from step 2.</p>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">What's left</h2>
-      <p>The next check is to add the developer traffic filter in the Testing state, run one automated test on the S20, and see whether those events are labeled. The five scripts without setprop need the same line. After that comes the question of why the October 22 emulator run had collection on.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20GA4%20said%2019%20installs%20yesterday%20and%208%20were%20real%3A%20filtering%20out%20test%20phones%20and%20Play%20pre-launch%20and%20review%20devices">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <nav class="box ax-series-box" aria-label="Series contents"><p><strong><a href="https://sugarmount21.com/en/ax/series/puzzle-game-marketing/">Ads and metrics for two puzzle games: all 4 parts</a></strong></p><ol><li value="2"><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li></ol></nav>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>How do I spot Play pre-launch report devices in GA4?</summary><div><p>In our data they had country (not set) and medium (none), and the same model appeared two at a time with each new version (IN2025). Devices with a <code>deviceModel</code> starting with <code>sdk_gphone</code>, such as <code>sdk_gphone64_arm64</code> and <code>sdk_gphone16k_arm64</code>, showed up in the United States.</p></div></details>
-        <details><summary>Does adb setprop debug.firebase.analytics.app keep events out of GA4 reports?</summary><div><p>Not according to the official docs. Firebase recommends a developer traffic data filter on the GA4 property to keep test traffic out of reports and BigQuery exports. The setting stays on until you clear it with <code>.none.</code></p></div></details>
-        <details><summary>Does a GA4 data filter clean up past data?</summary><div><p>No. Data filters apply only to data collected after they are turned on. For dates already collected, filter on the report side by adding device and country conditions to your Data API requests.</p></div></details>
-      </div>
-    </section>
-    <p class="note">Sources: the game repository's git history, report and test scripts, the October 18 day-one drop-off review, work logs from October 15, 18, 23 and 25, and the Firebase and GA4 help pages. Scripts recounted on 2026-10-26.</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Tue, 27 Oct 2026 09:00:00 +0900</pubDate>
   </item>
 </channel>
 </rss>
