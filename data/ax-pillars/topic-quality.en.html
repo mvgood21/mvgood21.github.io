@@ -1,0 +1,48 @@
+<!-- title: AI agent says tests pass? 9 checks before release -->
+<!-- h1: When an AI coding agent says the tests pass: what to check before you ship -->
+<!-- lead: A pass count proves nothing on its own. We had 3,066 green tests above a line that stops a database from opening, and a "100% E2E pass" from seven runners with zero expect() calls. -->
+<!-- desc: Nine checks for an AI coding agent's "all tests pass" report, each from a measured case: 3,066 green tests, 7 runners with no assertions, 95.2% vs 92.3%. -->
+<section aria-labelledby="pq-answer">
+  <h2 id="pq-answer">The short answer: ask what a test protects, not how many pass</h2>
+  <p>When an AI coding agent reports "I added tests and they all pass," nobody may have checked what those tests protect. In September 2026 our peer-to-peer chat app (Flutter) had 3,066 passing tests and, under them, one SQLite line that, traced through the plugin source, makes opening the database fail on a device. The same app's "100% E2E pass," claimed since August 2025, came from seven test runners that contained no assertion at all.</p>
+  <p>The pattern repeated in other apps. A commit message from the agent reported a realism score of 95.2%, but the validation runner's own arithmetic cannot produce more than about 92.3%. A "no crash" report rested on nothing more than launching the app once. The nine checks below come from the measured cases on this page, and each one links to the note that holds its evidence. All cases come from SugarMount, a solo studio that builds Android and Flutter apps with AI coding agents.</p>
+</section>
+<section aria-labelledby="pq-rules">
+  <h2 id="pq-rules">What should you check before trusting an agent's "pass"?</h2>
+  <ol>
+    <li><strong>Delete the guard and watch the test fail.</strong> In the chat app, reverting a fix left all 13 storage tests green, and two fixes reported as verified kept their tests green with the guard deleted. Of the 26 findings in that review, 24 had been introduced by that round's own fixes. Evidence: <a href="/en/ax/guard-removal-test/">checking tests by deleting the guard</a></li>
+    <li><strong>Write down the numerator, the denominator and the command behind every pass rate.</strong> Five of the seven runners behind "100% E2E pass" never called app code; they timed short delays and counted their own successes. The night we deleted their 3,010 lines, an E2E over real sockets logged seven defects. Evidence: <a href="/en/ax/zero-expect-e2e-runners/">seven runners with zero expect()</a></li>
+    <li><strong>Read the skip count next to the pass count.</strong> flutter test does not count a skip as a failure. One of our 13 skips was a relay integration test that had been broken for six days, and three crypto cross-check tests were written to skip quietly whenever a Python module was missing. Evidence: <a href="/en/ax/silent-skip-green-ci/">silently skipped tests and green CI</a></li>
+    <li><strong>Confirm the gate read the artifact you will ship.</strong> On September 13, 2026, a 43 MB app bundle built from a development config (localhost, plaintext signaling) got PASS from our release gate. In another app, the ad SDK check compared a dependency list the intended release never used. Evidence: <a href="/en/ax/gate-checked-wrong-artifact/">release gates that checked something else</a></li>
+    <li><strong>Make every checker print how much it measured.</strong> Our contrast checker measured only 5,556 of 9,318 text fragments (59.6%) and still reported zero failures; nothing recorded what it skipped. Evidence: <a href="/en/ax/contrast-checker-missed-40-percent/">the contrast checker that skipped 40%</a></li>
+    <li><strong>Reproduce a reported number from the code that produced it.</strong> Fifteen functions in the validation runner returned constants between 0.85 and 0.96 instead of measuring anything. A build with all 183 tests passing showed a "3D" view that was a fixed drawing and could not rotate. Evidence: <a href="/en/ax/realism-score-not-3d/">the 95.2% that never came out of the runner</a></li>
+    <li><strong>Ask what "no crash" was based on.</strong> The agent's evidence was an 857 ms launch. Running adb monkey on the app with its data cleared crashed it at event 15 of 800; the cause was one missing VIBRATE permission in the manifest. Evidence: <a href="/en/ax/fresh-install-monkey-test/">the fresh-install monkey test</a></li>
+    <li><strong>Launch the minified release build on a real device.</strong> On September 23, 2026, R8 removed one constructor and every release build of our first app died at startup. The debug build never showed it, and 16 days later a second app crashed the same way. Evidence: <a href="/en/ax/release-gate/">the release gate and an R8 crash</a></li>
+    <li><strong>Fix only the review findings that survive refutation.</strong> For a pre-release review on September 29, 2026, we ran 84 agents, gave every finding to three other agents to knock down, and fixed only the 20 that held. Evidence: <a href="/en/ax/agent-review-refutation/">review findings that survived refutation</a></li>
+  </ol>
+</section>
+<section aria-labelledby="pq-beyond">
+  <h2 id="pq-beyond">Where checks outside the test suite stopped a defect</h2>
+  <p>Some defects were stopped right before a save or a release, whatever the tests said. The pre-save gate of our HWP document viewer blocked every form-field save on both test documents. We shipped with editing switched off rather than loosen the gate, and nine days later turned editing on without form fields. In the Hancom compatibility check, all seven edited files opened, but re-saving needed a person to sign in, so the agent could not finish that step alone.</p>
+  <p>Fifty malicious test files live in the repository as a generator plus an expected-verdict table, not as hostile files. For a shared LLM cache, a blind A/B scored 96.6% without the user's context against 96.0% with it, so we stopped sending context. Checks for running several agents at once are collected in <a href="/en/ax/topic/workflow/">running Claude Code agents in parallel</a>.</p>
+</section>
+<section aria-labelledby="pq-order">
+  <h2 id="pq-order">Reading order</h2>
+  <p>If you are new to this, start here. Parts 1 to 6 also form the series <a href="/en/ax/series/green-but-broken/">When green does not mean tested</a>.</p>
+  <ol>
+    <li><a href="/en/ax/fresh-install-monkey-test/">The VIBRATE crash and a monkey test</a>: the shortest case, where "tested" meant "launched".</li>
+    <li><a href="/en/ax/zero-expect-e2e-runners/">What "100% E2E pass" really meant</a>: a few grep lines that show what a pass rate counted.</li>
+    <li><a href="/en/ax/silent-skip-green-ci/">Skipped tests that keep CI green</a>: how skips turn green, and the CI step guard we added.</li>
+    <li><a href="/en/ax/guard-removal-test/">3,066 green tests and guard deletion</a>: how to test your tests, and a harness with 970 mutation rows.</li>
+    <li><a href="/en/ax/gate-checked-wrong-artifact/">A plaintext AAB and one missing dart-define</a>: making a gate read the real release.</li>
+    <li><a href="/en/ax/realism-score-not-3d/">A 95.2% score and a fixed "3D" view</a>: what happens when the agent also writes the scoring rules.</li>
+    <li><a href="/en/ax/release-gate/">Shipping an AI-built Android app</a>: release gate, minified launch check and on-device E2E, in order.</li>
+    <li><a href="/en/ax/contrast-checker-missed-40-percent/">A checker that reports its coverage</a>: counting what was skipped.</li>
+    <li><a href="/en/ax/agent-review-refutation/">How to trust an agent's code review</a>: the refutation procedure and when to stop.</li>
+    <li><a href="/en/ax/hwp-edit-save-gate/">The HWP save gate</a>: cutting a feature's scope instead of loosening a check.</li>
+    <li><a href="/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom's apps</a>: the point where a check needs a person.</li>
+    <li><a href="/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer</a>: testing against hostile files without committing them.</li>
+    <li><a href="/en/ax/llm-cache-no-context/">A shared LLM cache and a blind A/B</a>: the risk when a cache key and the model input disagree.</li>
+    <li><a href="/en/ax/secrets-three-layers/">Keeping secrets away from an agent</a>: one rule for chat, logs and token permissions.</li>
+  </ol>
+</section>

@@ -168,6 +168,28 @@ class StructuredData(Base):
                       '"author": {"@type": "Person", "name": "X"}')
         self.assertGate(f, "SD-FORBIDDEN")
 
+    PEN = '{"@type": "Person", "@id": "https://sugarmount21.com/about/#stephen", "name": "Stephen", "url": "https://sugarmount21.com/about/#stephen"'
+
+    def _pen(self, extra=""):
+        return self.edit(self.files(), "apps/foo/task/index.html", '"author": {"@id": "https://sugarmount21.com/#org"}',
+                         '"author": ' + self.PEN + extra + '}')
+
+    def test_pen_name_reference_allowed(self):
+        codes = run(self._pen()).codes("error")
+        self.assertNotIn("SD-FORBIDDEN", codes)
+        self.assertNotIn("SD-PERSON-FULL", codes)
+
+    def test_pen_id_with_other_name_forbidden(self):
+        f = self._pen()
+        f = self.edit(f, "apps/foo/task/index.html", '"name": "Stephen"', '"name": "Real Name"')
+        self.assertGate(f, "SD-FORBIDDEN")
+
+    def test_pen_person_sameas_forbidden(self):
+        self.assertGate(self._pen(', "sameAs": ["https://example.com/x"]'), "SD-FORBIDDEN")
+
+    def test_full_pen_person_only_on_about(self):
+        self.assertGate(self._pen(', "description": "solo developer"'), "SD-PERSON-FULL")
+
 
 class Markup(Base):
     def test_heading_outside_main(self):
@@ -296,6 +318,13 @@ class Links(Base):
     def test_article_needs_two_inbound(self):
         f = self.edit(self.files(), "apps/index.html", '<li><a href="/apps/foo/task/">갤럭시에서 Foo 하는 법</a></li>', "")
         rep = self.assertGate(f, "ORPHAN")
+        self.assertTrue(any(i.path == "apps/foo/task/index.html" for i in rep.errors if i.code == "ORPHAN"))
+
+    def test_html_sitemap_does_not_count_for_articles(self):
+        f = self.files()
+        f["sitemap/index.html"] = f["apps/index.html"]  # an HTML sitemap that lists the article
+        f = self.edit(f, "apps/index.html", '<li><a href="/apps/foo/task/">갤럭시에서 Foo 하는 법</a></li>', "")
+        rep = run(f)
         self.assertTrue(any(i.path == "apps/foo/task/index.html" for i in rep.errors if i.code == "ORPHAN"))
 
 
@@ -829,6 +858,12 @@ class Helpers(unittest.TestCase):
         self.assertEqual(sorted(n), ["404.html", "ax/folded/index.html", "design/index.html", "en/ax/folded/index.html"])
         bare = noindex.NoIndex(prefixes=(), ax_notes=())  # a site without data/noindex.json: fixed pages only
         self.assertIn("404.html", bare); self.assertNotIn("privacy/index.html", bare)
+
+    def test_noindex_except_lifts_one_page(self):
+        import noindex
+        n = noindex.NoIndex(prefixes=("ax/topic/",), ax_notes=(), except_={"ax/topic/android/index.html"})
+        self.assertNotIn("ax/topic/android/index.html", n); self.assertNotIn("en/ax/topic/android/index.html", n)
+        self.assertIn("ax/topic/games/index.html", n)
 
 
 if __name__ == "__main__":

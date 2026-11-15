@@ -36,16 +36,22 @@ def note_topics():
 
 
 def figure_files(slug, lang):
-    """The note's figures in page order (the page lists them; fall back to files on disk)."""
+    """The note's figures in page order: its numbered charts (tools/ax_figures.py) if the page shows any, else the
+    real images in its body figures (app or site screenshots, 2026-11-15: notes whose text cards were removed kept
+    covers drawn from the removed cards); with no page, the numbered files on disk."""
     page = p("ax" if lang == "ko" else "en/ax", slug, "index.html")
-    srcs = re.findall(r'<img\b[^>]*\bsrc="/assets/ax/(%s-\d+-%s\.webp)"' % (re.escape(slug), lang),
-                      open(page, encoding="utf-8").read()) if os.path.exists(page) else []
-    if not srcs:
-        srcs = sorted(os.path.basename(f) for f in glob.glob(p("assets/ax", f"{slug}-[0-9]*-{lang}.webp")))
+    html = open(page, encoding="utf-8").read() if os.path.exists(page) else None
+    if html is None:
+        srcs = sorted("assets/ax/" + os.path.basename(f) for f in glob.glob(p("assets/ax", f"{slug}-[0-9]*-{lang}.webp")))
+    else:
+        srcs = ["assets/ax/" + s for s in re.findall(
+            r'<img\b[^>]*\bsrc="/assets/ax/(%s-\d+-%s\.webp)"' % (re.escape(slug), lang), html)]
+        if not srcs:
+            srcs = re.findall(r'<figure(?![^>]*ax-cover-art)[^>]*>\s*<img\b[^>]*\bsrc="/(assets/[^"]+\.webp)"', html)
     out = []
     for s in srcs:
         if s not in out: out.append(s)
-    return [p("assets/ax", s) for s in out]
+    return [p(s) for s in out]
 
 
 def card(src, width, radius=22):

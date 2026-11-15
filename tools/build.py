@@ -30,6 +30,8 @@ import legal_chrome  # noqa: E402  (isolated header/footer for legal pages an ap
 import ax_extras  # noqa: E402  (AX hub search, note types, inquiry boxes, figures)
 import app_shots  # noqa: E402  (store screenshots on an app page once their files exist)
 import noindex  # noqa: E402  (which pages are noindex)
+import ax_pillar  # noqa: E402  (hand-written guide text on AX topic and series pages)
+import ads  # noqa: E402  (AdSense on AX notes: modes, eligibility, placement, page budget)
 from html.parser import HTMLParser  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -45,7 +47,7 @@ SUFFIX = " – SugarMount"
 # The rule lives in tools/noindex.py (fixed pages, policies, AX lists, data/ax.json "noindex" notes).
 NOINDEX_PATHS = noindex.NoIndex()
 AX_HUB_LATEST = 6    # newest AX notes on the hub; the rest through search and topic pages (each title costs hub font budget)
-ADS = ax_extras.ads_config(ROOT)  # data/ads.json; empty client → no ad markup anywhere
+ADS = ads.config(ROOT)  # data/ads.json, mode off|review|on (tools/ads.py); empty client → no ad markup anywhere
 AX_RELATED = 6       # "더 읽기" links under an AX note
 RSS_MAX = 60         # newest items per feed (Naver reads the newest; a full-<main> feed grows by 3 notes a day)
 TITLE_LEN = {"ko": (30, 44), "en": (50, 65)}  # (topic, whole title), IA spec 3.1
@@ -382,7 +384,8 @@ def footer(lang):
                       for _, apps in grouped(lang, live_apps()) for a in apps)
     site_li = "".join(f'<li><a href="{h}">{esc(n)}</a></li>' for h, n in (
         (url(lang, "/apps/"), t["footer_all_apps"]), (url(lang, "/ax/"), t["ax_nav"]), (url(lang, "/about/"), t["about"]),
-        (url(lang, "/privacy/"), t["privacy"]), (url(lang, "/sitemap/"), SITEMAP_T[lang]["title"]),
+        (url(lang, "/privacy/"), t["privacy"]), (url(lang, "/privacy/site/"), ads.FOOTER[lang]),  # ads policy (G8)
+        (url(lang, "/sitemap/"), SITEMAP_T[lang]["title"]),
         ("/en/rss.xml" if lang == "en" else "/rss.xml", t["rss"])))
     return f'''<footer class="site-footer">
     <div class="container">
@@ -420,6 +423,19 @@ def crumbs(lang, items):
     return nav, ld
 
 ORG_REF = {"@id": ORG_ID}
+# AX notes are signed with the pen name Stephen (owner decision 2026-11-15). One Person @id; the full node sits only on
+# /about/ and /en/about/ (section #stephen). No real name, employer, job title or sameAs (re-identification rule).
+PEN_ID = SITE + "/about/#stephen"
+PEN_NAME = "Stephen"
+# kept out of T: T is hashed into every generated page's content date (generated_inputs), so a new key there would
+# move the "last updated" date of pages that did not change
+PEN_T = {"ko": {"byline": "작성 Stephen", "desc": "SugarMount 앱과 AX 노트를 쓰는 1인 개발자의 필명입니다."},
+         "en": {"byline": "By Stephen", "desc": "Pen name of the solo developer who makes the SugarMount apps and writes the AX notes."}}
+
+PEN_REF = {"@type": "Person", "@id": PEN_ID, "name": PEN_NAME}  # no url: keeps the 40 KB page budget; the byline links it
+
+def pen_full(lang):
+    return {**PEN_REF, "url": SITE + url(lang, "/about/") + "#stephen", "description": PEN_T[lang]["desc"], "worksFor": ORG_REF}
 SITE_REF = {"@id": SITE_ID}
 
 def org_full(lang):
@@ -508,7 +524,9 @@ def head(lang, title, desc, path, alt_path, *, og_type="website", og_image=None,
               f'<meta property="og:image:height" content="{h}">', f'<meta property="og:locale" content="{t["og_locale"]}">']
     if alt_path and not noindex:
         lines.append(f'<meta property="og:locale:alternate" content="{T[other(lang)]["og_locale"]}">')
-    feed = "/en/rss.xml" if lang == "en" else "/rss.xml"
+    ax_page = bare_of(path.lstrip("/") + "index.html").startswith("ax/")
+    feed = f"{prefix(lang)}{'/ax' if ax_page else ''}/rss.xml"
+    feed_title = f"{T[lang]['ax']} · SugarMount" if ax_page else "SugarMount"
     lines += ['<meta name="twitter:card" content="summary_large_image">',
               '<meta name="color-scheme" content="light dark">',
               '<meta name="theme-color" content="#F7FAFE" media="(prefers-color-scheme: light)">',
@@ -519,8 +537,8 @@ def head(lang, title, desc, path, alt_path, *, og_type="website", og_image=None,
               f'<link rel="icon" type="image/svg+xml" href="{SITE}/assets/favicon.svg">',
               f'<link rel="apple-touch-icon" href="{SITE}/assets/apple-touch-icon.png">',  # absolute, like rel=icon (Naver favicon)
               '<link rel="manifest" href="/site.webmanifest">',
-              f'<link rel="alternate" type="application/rss+xml" title="SugarMount" href="{SITE}{feed}">']
-    if (m := ax_extras.ads_meta(ADS)): lines.append(m)  # AdSense site ownership (data/ads.json client)
+              f'<link rel="alternate" type="application/rss+xml" title="{esc(feed_title)}" href="{SITE}{feed}">']
+    if (m := ads.meta(ADS)): lines.append(m)  # AdSense site ownership (data/ads.json client)
     lines += [f'<link rel="stylesheet" href="{c}?v={CSSV}">' for c in CSS_FILES]
     lines += [f'<script type="application/ld+json">{ld_json(x)}</script>' for x in lds]
     return "<head>\n" + "".join(f"  {x}\n" for x in lines) + "</head>"
@@ -1040,6 +1058,36 @@ def ax_notes_for_app(a, lang, limit=3):
         if len(out) == limit: break
     return out
 
+_AX_INLINKS = {}
+
+
+def ax_inlinks(lang):
+    """{note url: how many other notes link to it from their hand-written body} (build blocks stripped, so the
+    related lists this build writes do not feed back into the next build's choice)."""
+    if lang not in _AX_INLINKS:
+        prefix = "/en/ax/" if lang == "en" else "/ax/"
+        cnt = {}
+        for u, _, _ in ax_articles(lang):
+            body = dates.strip_build_blocks(read(u.lstrip("/") + "index.html"))
+            for v in set(re.findall(r'href="(%s[a-z0-9-]+/)"' % re.escape(prefix), body)):
+                if v != u: cnt[v] = cnt.get(v, 0) + 1
+        _AX_INLINKS[lang] = cnt
+    return _AX_INLINKS[lang]
+
+
+def ax_related(path, lang, tp, pool, n):
+    """Pick n related notes for the note at path (2026-11-15 SEO audit: "newest first" left older, well-ranking notes
+    linked only from noindex lists). Same topic first; inside each group the notes with the fewest in-body links come
+    first (0, 1-2, 3+), and ties are spread per page by a stable hash so every note does not point at the same few."""
+    inl = ax_inlinks(lang)
+    def key(x):
+        k = inl.get(x[0], 0)
+        return (0 if k == 0 else 1 if k <= 2 else 2, hashlib.sha1((path + x[0]).encode()).hexdigest())
+    same = sorted((x for x in pool if tp and ax_topic_of(x[0]) is tp), key=key)[:max(n - 2, 0)]
+    rest = sorted((x for x in pool if x not in same), key=key)
+    return same + rest[:n - len(same)], bool(same)
+
+
 def ax_slug(u): return u.rstrip("/").rsplit("/", 1)[-1]
 def ax_topic_of(u): return AX_TOPICS.get(AX_NOTE_TOPIC.get(ax_slug(u)))
 def ax_topic_url(tp, lang): return url(lang, f"/ax/topic/{tp['id']}/")
@@ -1066,9 +1114,16 @@ def ax_topic_pages():
     return {("en/" if lang == "en" else "") + f"ax/topic/{tp['id']}/index.html": (tp, lang)
             for lang in ("ko", "en") for tp, _ in ax_by_topic(lang)}
 
+def pillar_html(pl):
+    """The guide block above a topic or series list (tools/ax_pillar.py), or "" without one."""
+    return f'\n\n    <div class="ax-pillar">\n{pl["body"]}\n    </div>' if pl else ""
+
+
 def build_ax_topic(tp, lang):
     t = T[lang]
     d = tp[lang]
+    pl = ax_pillar.load("topic", tp["id"], lang)
+    h1, lead, desc = (pl["h1"], pl["lead"], pl["desc"]) if pl else (d["name"], d["desc"], d["desc"])
     arts = next(a for x, a in ax_by_topic(lang) if x["id"] == tp["id"])
     path = ax_topic_url(tp, lang)
     alt_p = ax_topic_url(tp, other(lang))
@@ -1080,10 +1135,10 @@ def build_ax_topic(tp, lang):
     main = f'''    {nav}
     <header class="hero">
       <span class="eyebrow">{AX_T[lang]["ax_topic_eyebrow"]}</span>
-      <h1>{esc(d["name"])}</h1>
-      <p class="lead">{esc(d["desc"])}</p>
+      <h1>{esc(h1)}</h1>
+      <p class="lead">{esc(lead)}</p>
       <p class="meta">{AX_T[lang]["ax_n"].format(n=len(arts))}</p>{chips_html}
-    </header>
+    </header>{pillar_html(pl)}
 
     <section aria-labelledby="notes-h">
       <h2 id="notes-h">{AX_T[lang]["ax_list_h"]}</h2>
@@ -1091,16 +1146,17 @@ def build_ax_topic(tp, lang):
       </ul>
       <p><a href="{url(lang, "/ax/")}">{t["ax_more"]}</a></p>
     </section>'''
-    title = fit_title(AX_T[lang]["ax_topic_title"].format(name=d["name"]), lang)
+    title = fit_title(pl["title"] if pl else AX_T[lang]["ax_topic_title"].format(name=d["name"]), lang)
     relp = relpath_of(path)
     lds = [{"@context": "https://schema.org", "@graph": [
-        {"@type": "CollectionPage", "@id": SITE + path, "url": SITE + path, "name": title, "description": d["desc"], "inLanguage": lang,
+        {"@type": "CollectionPage", "@id": SITE + path, "url": SITE + path, "name": title, "description": desc, "inLanguage": lang,
          "isPartOf": SITE_REF, "publisher": ORG_REF, "mainEntity": {"@id": SITE + path + "#list"},
          "dateModified": dates.iso_datetime(modified(relp))},
         {"@type": "ItemList", "@id": SITE + path + "#list", "itemListElement": [
             {"@type": "ListItem", "position": i + 1, "url": SITE + u} for i, (u, _, _) in enumerate(arts)]},
     ]}, bc]
-    h = head(lang, title, d["desc"], path, alt, og_image=f"/assets/og/ax-{lang}.png", lds=lds)
+    h = head(lang, title, desc, path, alt, og_image=f"/assets/og/ax-{lang}.png", lds=lds)
+    if pl: h = ax_css(h)
     return page(lang, h, ' class="page-hub"', header(lang, "ax", alt or url(other(lang), "/ax/")), main, footer(lang))
 
 # ---------------------------------------------------------------- AX board and series (2026-11-13 hub redesign)
@@ -1217,6 +1273,8 @@ def ax_css(h):
 def build_ax_series(sr, lang):
     t, at = T[lang], AX_T[lang]
     d = sr[lang]
+    pl = ax_pillar.load("series", sr["id"], lang)
+    h1, lead, desc = (pl["h1"], pl["lead"], pl["desc"]) if pl else (d["name"], d["desc"], d["desc"])
     parts = ax_series_parts(sr, lang)
     path = ax_series_url(sr, lang)
     alt = ax_series_url(sr, other(lang)) if ax_series_parts(sr, other(lang)) else None
@@ -1230,10 +1288,10 @@ def build_ax_series(sr, lang):
     main = f'''    {nav}
     <header class="hero">
       <span class="eyebrow">{at["ax_series_eyebrow"]}</span>
-      <h1>{esc(d["name"])}</h1>
-      <p class="lead">{esc(d["desc"])}</p>
+      <h1>{esc(h1)}</h1>
+      <p class="lead">{esc(lead)}</p>
       <p class="meta">{at["ax_series_n"].format(n=len(parts))}</p>
-    </header>
+    </header>{pillar_html(pl)}
 
     <section aria-labelledby="parts-h">
       <h2 id="parts-h">{at["ax_series_nav"]}</h2>
@@ -1241,16 +1299,16 @@ def build_ax_series(sr, lang):
       </ol>
       <p><a href="{url(lang, "/ax/")}">{t["ax_more"]}</a></p>
     </section>'''
-    title = fit_title(at["ax_series_title"].format(name=d["name"]), lang)
+    title = fit_title(pl["title"] if pl else at["ax_series_title"].format(name=d["name"]), lang)
     relp = relpath_of(path)
     lds = [{"@context": "https://schema.org", "@graph": [
-        {"@type": "CollectionPage", "@id": SITE + path, "url": SITE + path, "name": title, "description": d["desc"], "inLanguage": lang,
+        {"@type": "CollectionPage", "@id": SITE + path, "url": SITE + path, "name": title, "description": desc, "inLanguage": lang,
          "isPartOf": SITE_REF, "publisher": ORG_REF, "mainEntity": {"@id": SITE + path + "#list"},
          "dateModified": dates.iso_datetime(modified(relp))},
         {"@type": "ItemList", "@id": SITE + path + "#list", "itemListOrder": "https://schema.org/ItemListOrderAscending",
          "itemListElement": [{"@type": "ListItem", "position": i + 1, "url": SITE + u} for i, (u, _) in enumerate(parts)]},
     ]}, bc]
-    h = ax_css(head(lang, title, d["desc"], path, alt, og_image=f"/assets/og/ax-{lang}.png", lds=lds))
+    h = ax_css(head(lang, title, desc, path, alt, og_image=f"/assets/og/ax-{lang}.png", lds=lds))
     return page(lang, h, ' class="page-hub"', header(lang, "ax", alt or url(other(lang), "/ax/")), main, footer(lang))
 
 def build_ax_page(p, lang):
@@ -1320,11 +1378,12 @@ def reading_minutes(main, lang):
         return max(1, math.ceil(len(text.split()) / 230))
     return max(1, math.ceil(len(re.sub(r"\s", "", text)) / 500))
 
-def meta_line(lang, relpath, main, category=None):
+def meta_line(lang, relpath, main, category=None, pen=False):
     t = T[lang]
     d = modified(relpath)
     sep = ' <span aria-hidden="true">·</span> '
-    parts = [f'<a href="{url(lang, "/about/")}">{t["byline"]}</a>']
+    parts = [f'<a href="{url(lang, "/about/")}#stephen">{PEN_T[lang]["byline"]}</a>' if pen
+             else f'<a href="{url(lang, "/about/")}">{t["byline"]}</a>']
     if category: parts.append(f"<span>{esc(category)}</span>")
     parts.append(f'<span>{t["read_time"].format(n=reading_minutes(main, lang))}</span>')
     parts.append(f'{t["updated"]} <time datetime="{d}">{fmt_date(lang, d)}</time>')
@@ -1503,8 +1562,8 @@ def wrap_hand(relpath):
                     **({"image": imgs} if (imgs := [SITE + x for x in dict.fromkeys(
                         [x for x in (og, f"/assets/ax/cover/{parts[1]}-{lang}.webp") if exists(x.lstrip("/"))]
                         + ax_extras.figures(main))]) else {}),
-                    "author": ORG_REF, "publisher": ORG_REF, "isPartOf": SITE_REF})
-        main = set_block(main, "meta", meta_line(lang, relpath, main, tp[lang]["name"] if tp else t["ax"]), after_lead(main))
+                    "author": PEN_REF, "publisher": ORG_REF, "isPartOf": SITE_REF})
+        main = set_block(main, "meta", meta_line(lang, relpath, main, tp[lang]["name"] if tp else t["ax"], pen=True), after_lead(main))
         # series: a line under the meta and the contents box at the end, unless the body already has ax_md's own (windows-harness)
         own_series = re.search(r'<nav class="box" aria-label="(?:연재 목차|Series contents)"', dates.strip_build_blocks(main))
         if not own_series and ax_series_pos(parts[1], lang):
@@ -1524,25 +1583,22 @@ def wrap_hand(relpath):
             main = set_block(main, "cover", f'<figure class="ax-cover-art"><img src="{cover}" width="1200" height="900" alt=""'
                                             f' fetchpriority="high" decoding="async"></figure>', hero.end())
             main_cls = f"ax-note ax-t-{tp['id'] if tp else 'workflow'}"
-        # ads: one unit after the intro, one before the closing inquiry box, a left rail and one under the side TOC
-        main = set_block(main, "ad-1", ax_extras.ad_unit(ADS, "in_article", lang), after_hero(main))
-        cta_end = BLOCK_RE("cta").search(main)
-        main = set_block(main, "ad-2", ax_extras.ad_unit(ADS, "in_article", lang), cta_end.start() if cta_end else None)
+        # ads (tools/ads.py): mode "on" takes the ad blocks out here and ads.fit() places them on the finished page
+        # (R6 page budget); the other modes keep them empty where they are
+        main = ads.clear_blocks(main, ADS)
         toc = toc_inner(main, lang)
         if toc:
             inline, nav = toc.split("</details>", 1)
-            toc = f'{inline}</details><div class="ax-side">{nav}{ax_extras.ad_unit(ADS, "rail_right", lang)}</div>'
+            toc = f'{inline}</details><div class="ax-side">{nav}</div>'
         main = set_block(main, "toc", toc, after_hero(main))
-        main = set_block(main, "ad-rail", ax_extras.ad_unit(ADS, "rail_left", lang), BLOCK_RE("toc").search(main).end())
-        # related: newest notes of the same topic first, then the newest of other topics, AX_RELATED in all
+        # related: same topic first, least-linked notes first (ax_related), AX_RELATED in all
         allx = [(u, n) for u, n, _ in ax_articles(lang) if u != path]
         # a series note already links its neighbours and the series page: half the related list (40 KB budget)
         my_sr = ax_series_pos(parts[1], lang)
         n_rel = 2 if my_sr else AX_RELATED
         if my_sr:  # same-series notes are in the series box already
             allx = [x for x in allx if (AX_SERIES_OF.get(ax_slug(x[0])) or (None,))[0] is not my_sr[0]]
-        same = [x for x in allx if tp and ax_topic_of(x[0]) is tp][:n_rel - 2]
-        others = same + [x for x in allx if x not in same][:n_rel - len(same)]
+        others, same = ax_related(path, lang, tp, allx, n_rel)
         extra = ""
         if others:
             lis = "".join(f'\n        <li><a href="{u}">{esc(n)}</a></li>' for u, n in others)
@@ -1557,6 +1613,7 @@ def wrap_hand(relpath):
         lds.append({"@context": "https://schema.org", "@type": "ProfilePage", "@id": SITE + path, "url": SITE + path, "name": title,
                     "inLanguage": lang, "isPartOf": SITE_REF, "dateCreated": dates.iso_datetime(pub), "dateModified": page_dm,
                     "mainEntity": org_full(lang)})
+        lds.append({"@context": "https://schema.org", **pen_full(lang)})
         main = set_block(main, "toc", toc_inner(main, lang), after_hero(main))
     elif parts[0] == "design" and len(parts) == 1:
         main = set_block(main, "toc", toc_inner(main, lang), after_hero(main))
@@ -1578,13 +1635,15 @@ def wrap_hand(relpath):
     if main_cls == "ax-hub":
         h = ax_css(h); main_cls = ""
     if main_cls.startswith("ax-note"):
-        h = h.replace("</head>", f'  <link rel="stylesheet" href="/assets/ax.css?v={CSSV}">\n'
-                                 + (f"  {ax_extras.ads_head(ADS)}\n" if ADS["on"] else "") + "</head>")
+        h = h.replace("</head>", f'  <link rel="stylesheet" href="/assets/ax.css?v={CSSV}">\n</head>')
     # body class (site.css "layout"): hubs use the full width like home; app pages grid main themselves (app-layout);
     # everything else is a reading page (text column, side TOC when there is one)
     body = ' class="page-hub"' if parts == ["ax"] else "" if main_cls == "app-layout" else ' class="page-read"'
-    return page(lang, h, body, header(lang, current, other_href), nav + main, footer(lang), app=app_scope,
-                main_cls=main_cls)
+    out = page(lang, h, body, header(lang, current, other_href), nav + main, footer(lang), app=app_scope,
+               main_cls=main_cls)
+    if main_cls.startswith("ax-note") and ads.eligible(ADS, relpath, main, NOINDEX_PATHS, lang) is None:
+        out, _ = ads.fit(out, ADS, lang, checks.BUDGET["html"])  # review: loader tag; on: boxes and ads.js (R6)
+    return out
 
 def build_404():
     """noindex only: no canonical, og:url, hreflang, breadcrumbs or JSON-LD (IA spec 3.2(8)). Links: /, /apps/, /ax/, /privacy/, /en/."""
@@ -1759,24 +1818,39 @@ def feed_body(content, page_url):
     body = re.sub(r"\n\s*\n", "\n", body).strip()
     return body.replace("]]>", "]]]]><![CDATA[>")
 
-def build_rss(outputs, lang):
+AX_RSS_MAX = 30      # /ax/rss.xml: the AX notes channel alone (2026-11-15 SEO audit: the site feed is titled for the apps)
+
+
+def is_ax_note(relpath):
+    parts = bare_of(relpath)[:-len("index.html")].strip("/").split("/") if relpath.endswith("index.html") else [""]
+    return len(parts) == 2 and parts[0] == "ax" and parts[1] not in AX_RESERVED
+
+
+def build_rss(outputs, lang, ax=False):
     from email.utils import format_datetime
     import datetime
     items = []
     for relpath, content in outputs.items():
         if lang_of(relpath) != lang or relpath in NOINDEX_PATHS or not feed_kind(relpath): continue
+        if ax and not is_ax_note(relpath): continue
         mt = re.search(r"<title>(.*?)</title>", content, re.S)
         if not mt: continue
         pub, mod = page_dates(relpath)
         items.append((pub, mod, relpath, html.unescape(mt.group(1).strip()), content))
     items.sort(key=lambda x: x[2]); items.sort(key=lambda x: x[0], reverse=True)
-    items = items[:RSS_MAX]
+    items = items[:AX_RSS_MAX if ax else RSS_MAX]
     def rfc(day): return format_datetime(datetime.datetime.fromisoformat(day + "T09:00:00+09:00"))
     t = T[lang]
-    self_url = f"{SITE}{prefix(lang)}/rss.xml"
+    self_url = f"{SITE}{prefix(lang)}{'/ax' if ax else ''}/rss.xml"
+    if ax:
+        hub = outputs.get(prefix(lang).lstrip("/") + ("/" if lang == "en" else "") + "ax/index.html", "")
+        md = re.search(r'<meta name="description" content="([^"]*)"', hub)
+        ch_title, ch_link, ch_desc = f"{t['ax']} · SugarMount", f"{SITE}{url(lang, '/ax/')}", html.unescape(md.group(1)) if md else t["ax"]
+    else:
+        ch_title, ch_link, ch_desc = t["home_title"], f"{SITE}{url(lang, '/')}", t["home_lead"]
     out = ['<?xml version="1.0" encoding="UTF-8"?>', '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">', "<channel>",
-           f"  <title>{esc(t['home_title'])}</title>", f"  <link>{SITE}{url(lang, '/')}</link>",
-           f"  <description>{esc(t['home_lead'])}</description>", f"  <language>{lang}</language>",
+           f"  <title>{esc(ch_title)}</title>", f"  <link>{ch_link}</link>",
+           f"  <description>{esc(ch_desc)}</description>", f"  <language>{lang}</language>",
            f'  <atom:link href="{self_url}" rel="self" type="application/rss+xml"/>']
     if items: out.append(f"  <lastBuildDate>{rfc(max(x[1] for x in items))}</lastBuildDate>")
     for pub, _, relpath, title, content in items:
@@ -1872,7 +1946,7 @@ def build_llms(outputs):
         if arts: lines += ["", h, ""] + arts
     groups = ax_by_topic("en")
     if groups:
-        lines += ["", "## AX notes", "", f"How SugarMount apps are built and shipped with an AI coding agent, with measured numbers. Index: {SITE}/en/ax/ · Korean: {SITE}/ax/"]
+        lines += ["", "## AX notes", "", f"How SugarMount apps are built and shipped with an AI coding agent, with measured numbers. Written by Stephen (pen name of the SugarMount developer). Index: {SITE}/en/ax/ · Korean: {SITE}/ax/"]
         for tp, arts in groups:
             arts = [x for x in arts if x[0].lstrip("/") + "index.html" not in NOINDEX_PATHS]  # topic pages, folded notes
             if arts: lines += ["", f"### {tp['en']['name']}", ""] + [f"- [{n}]({SITE}{u}): {d}" for u, n, d in arts]
@@ -2059,9 +2133,11 @@ def main():
     outputs.update(build_sitemap(pages, outputs))
     outputs["rss.xml"] = build_rss(outputs, "ko")
     outputs["en/rss.xml"] = build_rss(outputs, "en")
+    outputs["ax/rss.xml"] = build_rss(outputs, "ko", ax=True)
+    outputs["en/ax/rss.xml"] = build_rss(outputs, "en", ax=True)
     outputs["robots.txt"] = build_robots()
     outputs["site.webmanifest"] = build_manifest()
-    if (adstxt := ax_extras.ads_txt(ADS)): outputs["ads.txt"] = adstxt
+    if (adstxt := ads.ads_txt(ADS)): outputs["ads.txt"] = adstxt
     key = indexnow_key()
     if key: outputs[key + ".txt"] = key
     for gone in STORE.unused():  # pages that no longer exist (or became NOINDEX) leave content-dates
