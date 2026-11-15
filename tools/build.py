@@ -421,6 +421,19 @@ def crumbs(lang, items):
     return nav, ld
 
 ORG_REF = {"@id": ORG_ID}
+# AX notes are signed with the pen name Stephen (owner decision 2026-11-15). One Person @id; the full node sits only on
+# /about/ and /en/about/ (section #stephen). No real name, employer, job title or sameAs (re-identification rule).
+PEN_ID = SITE + "/about/#stephen"
+PEN_NAME = "Stephen"
+# kept out of T: T is hashed into every generated page's content date (generated_inputs), so a new key there would
+# move the "last updated" date of pages that did not change
+PEN_T = {"ko": {"byline": "작성 Stephen", "desc": "SugarMount 앱과 AX 노트를 쓰는 1인 개발자의 필명입니다."},
+         "en": {"byline": "By Stephen", "desc": "Pen name of the solo developer who makes the SugarMount apps and writes the AX notes."}}
+
+PEN_REF = {"@type": "Person", "@id": PEN_ID, "name": PEN_NAME}  # no url: keeps the 40 KB page budget; the byline links it
+
+def pen_full(lang):
+    return {**PEN_REF, "url": SITE + url(lang, "/about/") + "#stephen", "description": PEN_T[lang]["desc"], "worksFor": ORG_REF}
 SITE_REF = {"@id": SITE_ID}
 
 def org_full(lang):
@@ -1363,11 +1376,12 @@ def reading_minutes(main, lang):
         return max(1, math.ceil(len(text.split()) / 230))
     return max(1, math.ceil(len(re.sub(r"\s", "", text)) / 500))
 
-def meta_line(lang, relpath, main, category=None):
+def meta_line(lang, relpath, main, category=None, pen=False):
     t = T[lang]
     d = modified(relpath)
     sep = ' <span aria-hidden="true">·</span> '
-    parts = [f'<a href="{url(lang, "/about/")}">{t["byline"]}</a>']
+    parts = [f'<a href="{url(lang, "/about/")}#stephen">{PEN_T[lang]["byline"]}</a>' if pen
+             else f'<a href="{url(lang, "/about/")}">{t["byline"]}</a>']
     if category: parts.append(f"<span>{esc(category)}</span>")
     parts.append(f'<span>{t["read_time"].format(n=reading_minutes(main, lang))}</span>')
     parts.append(f'{t["updated"]} <time datetime="{d}">{fmt_date(lang, d)}</time>')
@@ -1544,8 +1558,8 @@ def wrap_hand(relpath):
                     **({"image": imgs} if (imgs := [SITE + x for x in dict.fromkeys(
                         [x for x in (og, f"/assets/ax/cover/{parts[1]}-{lang}.webp") if exists(x.lstrip("/"))]
                         + ax_extras.figures(main))]) else {}),
-                    "author": ORG_REF, "publisher": ORG_REF, "isPartOf": SITE_REF})
-        main = set_block(main, "meta", meta_line(lang, relpath, main, tp[lang]["name"] if tp else t["ax"]), after_lead(main))
+                    "author": PEN_REF, "publisher": ORG_REF, "isPartOf": SITE_REF})
+        main = set_block(main, "meta", meta_line(lang, relpath, main, tp[lang]["name"] if tp else t["ax"], pen=True), after_lead(main))
         # series: a line under the meta and the contents box at the end, unless the body already has ax_md's own (windows-harness)
         own_series = re.search(r'<nav class="box" aria-label="(?:연재 목차|Series contents)"', dates.strip_build_blocks(main))
         if not own_series and ax_series_pos(parts[1], lang):
@@ -1595,6 +1609,7 @@ def wrap_hand(relpath):
         lds.append({"@context": "https://schema.org", "@type": "ProfilePage", "@id": SITE + path, "url": SITE + path, "name": title,
                     "inLanguage": lang, "isPartOf": SITE_REF, "dateCreated": dates.iso_datetime(pub), "dateModified": page_dm,
                     "mainEntity": org_full(lang)})
+        lds.append({"@context": "https://schema.org", **pen_full(lang)})
         main = set_block(main, "toc", toc_inner(main, lang), after_hero(main))
     elif parts[0] == "design" and len(parts) == 1:
         main = set_block(main, "toc", toc_inner(main, lang), after_hero(main))
@@ -1921,7 +1936,7 @@ def build_llms(outputs):
         if arts: lines += ["", h, ""] + arts
     groups = ax_by_topic("en")
     if groups:
-        lines += ["", "## AX notes", "", f"How SugarMount apps are built and shipped with an AI coding agent, with measured numbers. Index: {SITE}/en/ax/ · Korean: {SITE}/ax/"]
+        lines += ["", "## AX notes", "", f"How SugarMount apps are built and shipped with an AI coding agent, with measured numbers. Written by Stephen (pen name of the SugarMount developer). Index: {SITE}/en/ax/ · Korean: {SITE}/ax/"]
         for tp, arts in groups:
             arts = [x for x in arts if x[0].lstrip("/") + "index.html" not in NOINDEX_PATHS]  # topic pages, folded notes
             if arts: lines += ["", f"### {tp['en']['name']}", ""] + [f"- [{n}]({SITE}{u}): {d}" for u, n, d in arts]

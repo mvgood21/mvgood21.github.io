@@ -168,6 +168,28 @@ class StructuredData(Base):
                       '"author": {"@type": "Person", "name": "X"}')
         self.assertGate(f, "SD-FORBIDDEN")
 
+    PEN = '{"@type": "Person", "@id": "https://sugarmount21.com/about/#stephen", "name": "Stephen", "url": "https://sugarmount21.com/about/#stephen"'
+
+    def _pen(self, extra=""):
+        return self.edit(self.files(), "apps/foo/task/index.html", '"author": {"@id": "https://sugarmount21.com/#org"}',
+                         '"author": ' + self.PEN + extra + '}')
+
+    def test_pen_name_reference_allowed(self):
+        codes = run(self._pen()).codes("error")
+        self.assertNotIn("SD-FORBIDDEN", codes)
+        self.assertNotIn("SD-PERSON-FULL", codes)
+
+    def test_pen_id_with_other_name_forbidden(self):
+        f = self._pen()
+        f = self.edit(f, "apps/foo/task/index.html", '"name": "Stephen"', '"name": "Real Name"')
+        self.assertGate(f, "SD-FORBIDDEN")
+
+    def test_pen_person_sameas_forbidden(self):
+        self.assertGate(self._pen(', "sameAs": ["https://example.com/x"]'), "SD-FORBIDDEN")
+
+    def test_full_pen_person_only_on_about(self):
+        self.assertGate(self._pen(', "description": "solo developer"'), "SD-PERSON-FULL")
+
 
 class Markup(Base):
     def test_heading_outside_main(self):

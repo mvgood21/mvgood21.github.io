@@ -41,6 +41,10 @@ LINK_FILE_EXCEPTIONS = frozenset({"/sitemap.xml", "/rss.xml", "/en/rss.xml", "/a
 FEEDS = ("rss.xml", "en/rss.xml", "ax/rss.xml", "en/ax/rss.xml")
 ROBOTS_DISALLOW = ("/tools/", "/data/", "/AGENTS.md", "/404.html")
 ORG_FULL_PAGES = frozenset({"index.html", "about/index.html", "en/about/index.html"})
+PEN_ID, PEN_NAME = SITE + "/about/#stephen", "Stephen"  # AX notes author, pen name only (build.py pen_ref)
+PEN_FULL_PAGES = frozenset({"about/index.html", "en/about/index.html"})
+PEN_FORBIDDEN_KEYS = frozenset({"givenName", "familyName", "additionalName", "alternateName", "jobTitle", "alumniOf",
+                                "sameAs", "email", "telephone", "address", "birthDate", "image", "affiliation"})
 
 KB = 1024
 BUDGET = {
@@ -727,7 +731,13 @@ def check_jsonld(page, report, org_urls, dates_entries):
             if ts & {"HowTo", "AggregateRating", "Review", "SearchAction", "SpeakableSpecification"}:
                 report.error("SD-FORBIDDEN", p, f"@type {sorted(ts)} is not used on this site")
             if "Person" in ts:
-                report.error("SD-FORBIDDEN", p, "Person node (no real-name Person markup)")
+                # only the pen name Stephen (owner decision 2026-11-15); any other Person is real-name markup
+                if node.get("@id") != PEN_ID or node.get("name", PEN_NAME) != PEN_NAME:
+                    report.error("SD-FORBIDDEN", p, "Person node other than the pen name (@id …/about/#stephen, name Stephen)")
+                elif set(node) & PEN_FORBIDDEN_KEYS:
+                    report.error("SD-FORBIDDEN", p, f"pen-name Person carries {sorted(set(node) & PEN_FORBIDDEN_KEYS)} (re-identification)")
+                elif set(node) - {"@type", "@id", "name", "url", "@context"} and p not in PEN_FULL_PAGES:
+                    report.error("SD-PERSON-FULL", p, "full Person node outside /about/ (reference @id, name, url only)")
             if "BreadcrumbList" in ts:
                 items = node.get("itemListElement") or []
                 if len(items) < 2:
