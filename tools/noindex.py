@@ -1,7 +1,9 @@
 """Which pages carry <meta name=robots content=noindex>: one rule for build.py, checks.py and indexnow.py.
 
 Fixed pages (404, the /design/ demo) are always noindex. A site adds more in data/noindex.json:
-  {"prefixes": ["privacy/", ...], "ax_notes": ["<slug>", ...]}   (paths without the en/ prefix; both languages match)
+  {"prefixes": ["privacy/", ...], "except": ["ax/topic/<id>/index.html", ...], "ax_notes": ["<slug>", ...]}
+  (paths without the en/ prefix; both languages match). "except" lifts single pages out of a prefix rule: a topic
+  page with a hand-written pillar guide (tools/ax_pillar.py, 2026-11-15) is indexed.
 Owner decision 2026-11-13 (AdSense "replicated / low value content"): policies (one template per app), AX topic
 and board pages (lists of notes that are indexed themselves) and AX notes folded into a sibling are noindex.
 They stay reachable and linked. Noindex pages get no canonical, og:url, hreflang, breadcrumbs or JSON-LD, and stay
@@ -17,20 +19,21 @@ class NoIndex:
     """Set-like: `relpath in NOINDEX_PATHS`. Iterating yields the fixed pages and the listed notes (ko and en);
     prefix rules have no fixed members, so a caller that must cover every page tests each page for membership."""
 
-    def __init__(self, root=ROOT, prefixes=None, ax_notes=None):
+    def __init__(self, root=ROOT, prefixes=None, ax_notes=None, except_=None):
         cfg = {}
-        if prefixes is None or ax_notes is None:
+        if prefixes is None or ax_notes is None:  # explicit rules (tests) do not read the file
             try:
                 cfg = json.load(open(os.path.join(root, FILE), encoding="utf-8"))
             except (OSError, ValueError):
                 cfg = {}
         self.prefixes = tuple(cfg.get("prefixes", ()) if prefixes is None else prefixes)
         self.ax_notes = frozenset(cfg.get("ax_notes", ()) if ax_notes is None else ax_notes)
+        self.except_ = frozenset(cfg.get("except", ()) if except_ is None else except_)
 
     def __contains__(self, relpath):
         if relpath in BASE: return True
         bare = relpath[3:] if relpath.startswith("en/") else relpath
-        if self.prefixes and bare.startswith(self.prefixes): return True
+        if self.prefixes and bare.startswith(self.prefixes) and bare not in self.except_: return True
         parts = bare.split("/")
         return len(parts) == 3 and parts[0] == "ax" and parts[2] == "index.html" and parts[1] in self.ax_notes
 
@@ -39,4 +42,5 @@ class NoIndex:
         for s in sorted(self.ax_notes):
             yield f"ax/{s}/index.html"; yield f"en/ax/{s}/index.html"
 
-    def __repr__(self): return f"NoIndex(base={sorted(BASE)}, prefixes={list(self.prefixes)}, ax_notes={sorted(self.ax_notes)})"
+    def __repr__(self): return (f"NoIndex(base={sorted(BASE)}, prefixes={list(self.prefixes)}, except={sorted(self.except_)}, "
+                                f"ax_notes={sorted(self.ax_notes)})")

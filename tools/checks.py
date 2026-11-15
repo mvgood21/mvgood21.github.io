@@ -35,8 +35,8 @@ ADS_ORIGIN = "pagead2.googlesyndication.com"  # async AdSense loader, AX notes o
 ALLOWED_ORIGINS = frozenset()          # e.g. {"gc.zgo.at"} once the owner approves one analytics origin
 OWNERSHIP_FILES = ("google83e3e62aee87a145.html", "naverc6d2c9710a0b598bb0562751a0d005b7.html",
                    "naver336622988ccb96edbbdc3ad02fd2f6eb.html")
-LINK_FILE_EXCEPTIONS = frozenset({"/sitemap.xml", "/rss.xml", "/en/rss.xml", "/llms.txt", "/404.html"})
-FEEDS = ("rss.xml", "en/rss.xml")
+LINK_FILE_EXCEPTIONS = frozenset({"/sitemap.xml", "/rss.xml", "/en/rss.xml", "/ax/rss.xml", "/en/ax/rss.xml", "/llms.txt", "/404.html"})
+FEEDS = ("rss.xml", "en/rss.xml", "ax/rss.xml", "en/ax/rss.xml")
 ROBOTS_DISALLOW = ("/tools/", "/data/", "/AGENTS.md", "/404.html")
 ORG_FULL_PAGES = frozenset({"index.html", "about/index.html", "en/about/index.html"})
 
@@ -965,6 +965,7 @@ def check_sitemap(site, report, pages, dates_entries):
 
 def check_feeds(site, report, dates_entries):
     for feed in FEEDS:
+        if "/ax/" in "/" + feed and not site.exists(feed.replace("rss.xml", "index.html")): continue  # a site without AX notes
         text = site.read(feed)
         if text is None:
             report.error("RSS-MISSING", feed, "feed does not exist"); continue
@@ -1057,11 +1058,28 @@ def check_orphans(site, report, pages, listed):
             lk = resolve(a.get("href"), rp)
             if lk.internal and lk.relpath != rp:
                 inbound.setdefault(lk.relpath, set()).add(rp)
+    html_map = {"sitemap/index.html", "en/sitemap/index.html"}
     for rp in sorted(listed):
-        n = len(inbound.get(rp, set()) - {counterpart(rp)})  # the language switch on the twin page does not count
-        need = 2 if page_kind(rp) == "article" else 1
+        src = inbound.get(rp, set()) - {counterpart(rp)}  # the language switch on the twin page does not count
+        article = page_kind(rp) == "article"
+        if article: src -= html_map  # 2026-11-15 SEO audit: notes reachable only via the HTML sitemap were orphans
+        n = len(src)
+        need = 2 if article else 1
         if n < need:
             report.error("ORPHAN", rp, f"linked from {n} other page(s), want >= {need}")
+
+
+def check_pillars(site, report, pages):
+    """A page lifted out of a noindex prefix ("except" in data/noindex.json) must carry its hand-written pillar guide
+    (tools/ax_pillar.py): otherwise it is the list-only page the prefix rule keeps out of the index."""
+    for rp in pages:
+        bare = rp[3:] if rp.startswith("en/") else rp
+        if bare in NOINDEX_PATHS.except_:
+            text = (site.read(rp) or "").replace("\r\n", "\n")
+            body = re.search(r'<div class="ax-pillar">\n(.*?)\n    </div>', text, re.S)  # build.py pillar_html
+            plain_len = len(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", body.group(1))).strip()) if body else 0
+            if plain_len < 600:
+                report.error("PILLAR-MISSING", rp, f"indexed by noindex.json except, but its pillar text is {plain_len} chars (want >= 600)")
 
 
 def check_assets(site, report):
@@ -1115,6 +1133,7 @@ def run(root=ROOT, outputs=None):
     check_robots(site, report)
     check_llms(site, report)
     check_orphans(site, report, pages, listed)
+    check_pillars(site, report, pages)
     check_assets(site, report)
     return report
 

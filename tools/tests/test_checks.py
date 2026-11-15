@@ -298,6 +298,13 @@ class Links(Base):
         rep = self.assertGate(f, "ORPHAN")
         self.assertTrue(any(i.path == "apps/foo/task/index.html" for i in rep.errors if i.code == "ORPHAN"))
 
+    def test_html_sitemap_does_not_count_for_articles(self):
+        f = self.files()
+        f["sitemap/index.html"] = f["apps/index.html"]  # an HTML sitemap that lists the article
+        f = self.edit(f, "apps/index.html", '<li><a href="/apps/foo/task/">갤럭시에서 Foo 하는 법</a></li>', "")
+        rep = run(f)
+        self.assertTrue(any(i.path == "apps/foo/task/index.html" for i in rep.errors if i.code == "ORPHAN"))
+
 
 class HeadRules(Base):
     def test_noindex_needs_meta(self):
@@ -829,6 +836,12 @@ class Helpers(unittest.TestCase):
         self.assertEqual(sorted(n), ["404.html", "ax/folded/index.html", "design/index.html", "en/ax/folded/index.html"])
         bare = noindex.NoIndex(prefixes=(), ax_notes=())  # a site without data/noindex.json: fixed pages only
         self.assertIn("404.html", bare); self.assertNotIn("privacy/index.html", bare)
+
+    def test_noindex_except_lifts_one_page(self):
+        import noindex
+        n = noindex.NoIndex(prefixes=("ax/topic/",), ax_notes=(), except_={"ax/topic/android/index.html"})
+        self.assertNotIn("ax/topic/android/index.html", n); self.assertNotIn("en/ax/topic/android/index.html", n)
+        self.assertIn("ax/topic/games/index.html", n)
 
 
 if __name__ == "__main__":
