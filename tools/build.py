@@ -30,6 +30,7 @@ import legal_chrome  # noqa: E402  (isolated header/footer for legal pages an ap
 import ax_extras  # noqa: E402  (AX hub search, note types, inquiry boxes, figures)
 import noindex  # noqa: E402  (which pages are noindex)
 import ax_pillar  # noqa: E402  (hand-written guide text on AX topic and series pages)
+import ads  # noqa: E402  (AdSense on AX notes: modes, eligibility, placement, page budget)
 from html.parser import HTMLParser  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -45,7 +46,7 @@ SUFFIX = " – SugarMount"
 # The rule lives in tools/noindex.py (fixed pages, policies, AX lists, data/ax.json "noindex" notes).
 NOINDEX_PATHS = noindex.NoIndex()
 AX_HUB_LATEST = 6    # newest AX notes on the hub; the rest through search and topic pages (each title costs hub font budget)
-ADS = ax_extras.ads_config(ROOT)  # data/ads.json; empty client → no ad markup anywhere
+ADS = ads.config(ROOT)  # data/ads.json, mode off|review|on (tools/ads.py); empty client → no ad markup anywhere
 AX_RELATED = 6       # "더 읽기" links under an AX note
 RSS_MAX = 60         # newest items per feed (Naver reads the newest; a full-<main> feed grows by 3 notes a day)
 TITLE_LEN = {"ko": (30, 44), "en": (50, 65)}  # (topic, whole title), IA spec 3.1
@@ -381,7 +382,8 @@ def footer(lang):
                       for _, apps in grouped(lang, live_apps()) for a in apps)
     site_li = "".join(f'<li><a href="{h}">{esc(n)}</a></li>' for h, n in (
         (url(lang, "/apps/"), t["footer_all_apps"]), (url(lang, "/ax/"), t["ax_nav"]), (url(lang, "/about/"), t["about"]),
-        (url(lang, "/privacy/"), t["privacy"]), (url(lang, "/sitemap/"), SITEMAP_T[lang]["title"]),
+        (url(lang, "/privacy/"), t["privacy"]), (url(lang, "/privacy/site/"), ads.FOOTER[lang]),  # ads policy (G8)
+        (url(lang, "/sitemap/"), SITEMAP_T[lang]["title"]),
         ("/en/rss.xml" if lang == "en" else "/rss.xml", t["rss"])))
     return f'''<footer class="site-footer">
     <div class="container">
@@ -521,7 +523,7 @@ def head(lang, title, desc, path, alt_path, *, og_type="website", og_image=None,
               f'<link rel="apple-touch-icon" href="{SITE}/assets/apple-touch-icon.png">',  # absolute, like rel=icon (Naver favicon)
               '<link rel="manifest" href="/site.webmanifest">',
               f'<link rel="alternate" type="application/rss+xml" title="{esc(feed_title)}" href="{SITE}{feed}">']
-    if (m := ax_extras.ads_meta(ADS)): lines.append(m)  # AdSense site ownership (data/ads.json client)
+    if (m := ads.meta(ADS)): lines.append(m)  # AdSense site ownership (data/ads.json client)
     lines += [f'<link rel="stylesheet" href="{c}?v={CSSV}">' for c in CSS_FILES]
     lines += [f'<script type="application/ld+json">{ld_json(x)}</script>' for x in lds]
     return "<head>\n" + "".join(f"  {x}\n" for x in lines) + "</head>"
@@ -1563,16 +1565,14 @@ def wrap_hand(relpath):
             main = set_block(main, "cover", f'<figure class="ax-cover-art"><img src="{cover}" width="1200" height="900" alt=""'
                                             f' fetchpriority="high" decoding="async"></figure>', hero.end())
             main_cls = f"ax-note ax-t-{tp['id'] if tp else 'workflow'}"
-        # ads: one unit after the intro, one before the closing inquiry box, a left rail and one under the side TOC
-        main = set_block(main, "ad-1", ax_extras.ad_unit(ADS, "in_article", lang), after_hero(main))
-        cta_end = BLOCK_RE("cta").search(main)
-        main = set_block(main, "ad-2", ax_extras.ad_unit(ADS, "in_article", lang), cta_end.start() if cta_end else None)
+        # ads (tools/ads.py): mode "on" takes the ad blocks out here and ads.fit() places them on the finished page
+        # (R6 page budget); the other modes keep them empty where they are
+        main = ads.clear_blocks(main, ADS)
         toc = toc_inner(main, lang)
         if toc:
             inline, nav = toc.split("</details>", 1)
-            toc = f'{inline}</details><div class="ax-side">{nav}{ax_extras.ad_unit(ADS, "rail_right", lang)}</div>'
+            toc = f'{inline}</details><div class="ax-side">{nav}</div>'
         main = set_block(main, "toc", toc, after_hero(main))
-        main = set_block(main, "ad-rail", ax_extras.ad_unit(ADS, "rail_left", lang), BLOCK_RE("toc").search(main).end())
         # related: same topic first, least-linked notes first (ax_related), AX_RELATED in all
         allx = [(u, n) for u, n, _ in ax_articles(lang) if u != path]
         # a series note already links its neighbours and the series page: half the related list (40 KB budget)
@@ -1616,13 +1616,15 @@ def wrap_hand(relpath):
     if main_cls == "ax-hub":
         h = ax_css(h); main_cls = ""
     if main_cls.startswith("ax-note"):
-        h = h.replace("</head>", f'  <link rel="stylesheet" href="/assets/ax.css?v={CSSV}">\n'
-                                 + (f"  {ax_extras.ads_head(ADS)}\n" if ADS["on"] else "") + "</head>")
+        h = h.replace("</head>", f'  <link rel="stylesheet" href="/assets/ax.css?v={CSSV}">\n</head>')
     # body class (site.css "layout"): hubs use the full width like home; app pages grid main themselves (app-layout);
     # everything else is a reading page (text column, side TOC when there is one)
     body = ' class="page-hub"' if parts == ["ax"] else "" if main_cls == "app-layout" else ' class="page-read"'
-    return page(lang, h, body, header(lang, current, other_href), nav + main, footer(lang), app=app_scope,
-                main_cls=main_cls)
+    out = page(lang, h, body, header(lang, current, other_href), nav + main, footer(lang), app=app_scope,
+               main_cls=main_cls)
+    if main_cls.startswith("ax-note") and ads.eligible(ADS, relpath, main, NOINDEX_PATHS, lang) is None:
+        out, _ = ads.fit(out, ADS, lang, checks.BUDGET["html"])  # review: loader tag; on: boxes and ads.js (R6)
+    return out
 
 def build_404():
     """noindex only: no canonical, og:url, hreflang, breadcrumbs or JSON-LD (IA spec 3.2(8)). Links: /, /apps/, /ax/, /privacy/, /en/."""
@@ -2110,7 +2112,7 @@ def main():
     outputs["en/ax/rss.xml"] = build_rss(outputs, "en", ax=True)
     outputs["robots.txt"] = build_robots()
     outputs["site.webmanifest"] = build_manifest()
-    if (adstxt := ax_extras.ads_txt(ADS)): outputs["ads.txt"] = adstxt
+    if (adstxt := ads.ads_txt(ADS)): outputs["ads.txt"] = adstxt
     key = indexnow_key()
     if key: outputs[key + ".txt"] = key
     for gone in STORE.unused():  # pages that no longer exist (or became NOINDEX) leave content-dates

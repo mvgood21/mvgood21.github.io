@@ -22,6 +22,7 @@ from urllib.parse import unquote, urljoin, urlsplit
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dates  # noqa: E402
 import noindex  # noqa: E402
+import ads  # noqa: E402  (AdSense modes and eligibility, shared with build.py)
 from legal_chrome import STANDALONE_PATHS  # noqa: E402  (pages the build never wraps; not checked)
 
 ROOT = dates.ROOT
@@ -31,7 +32,8 @@ ORG_ID = SITE + "/#org"
 SITE_ID = SITE + "/#website"
 NOINDEX_PATHS = noindex.NoIndex()  # tools/noindex.py
 ACCENT_DEMO_PAGES = frozenset({"design/index.html"})  # SDS demo (noindex): data-app samples allowed inside <main>
-ADS_ORIGIN = "pagead2.googlesyndication.com"  # async AdSense loader, AX notes only (see the script check)
+ADS_ORIGIN = "pagead2.googlesyndication.com"  # async AdSense loader: review mode, eligible AX notes only (check_ads)
+ADS_CFG = ads.config(ROOT)  # data/ads.json of the checked site (run() reloads it for its root)
 ALLOWED_ORIGINS = frozenset()          # e.g. {"gc.zgo.at"} once the owner approves one analytics origin
 OWNERSHIP_FILES = ("google83e3e62aee87a145.html", "naverc6d2c9710a0b598bb0562751a0d005b7.html",
                    "naver336622988ccb96edbbdc3ad02fd2f6eb.html")
@@ -805,8 +807,9 @@ def check_page_budget(page, report, file_mode):
         if src:
             lk = resolve(src, p)
             if not lk.internal:
-                # the one approved exception: AdSense on AX notes (data/ads.json, owner decision 2026-10-22)
-                if not (lk.host == ADS_ORIGIN and re.match(r"(en/)?ax/[^/]+/index\.html$", p) and "async" in s.attrs):
+                # the one approved exception: the AdSense loader tag on AX notes in review mode (data/ads.json, owner
+                # decisions 2026-10-22 and 2026-11-15); in mode on assets/ads.js adds it after the first interaction
+                if not (lk.host == ADS_ORIGIN and ADS_CFG["mode"] == "review" and ads.note_slug(p) and "async" in s.attrs):
                     report.error("ORIGIN", p, f"external script {src}")
                 continue
             js += site.size(lk.relpath) or 0
@@ -1069,6 +1072,132 @@ def check_orphans(site, report, pages, listed):
             report.error("ORPHAN", rp, f"linked from {n} other page(s), want >= {need}")
 
 
+# ------------------------------------------------------------------ ads (tools/ads.py, owner decision 2026-11-15)
+AD_SCRIPT_RE = re.compile(r"adsbygoogle|/assets/ads\.js|kakaocdn\.net/kas/")
+AD_LABELS = ('content:"광고"', 'content:"Advertisements"')
+
+
+def ad_traces(page):
+    """(boxes, units, scripts): .ad boxes, <ins> ad units, and ad network or ads.js scripts anywhere on the page."""
+    boxes = [n for n in page.dom.iter() if "ad" in n.classes()]
+    units = [n for n in page.dom.iter() if {"adsbygoogle", "kakao_ad_area"} & set(n.classes())]
+    scripts = [s for s in page.dom.find_all("script")
+               if AD_SCRIPT_RE.search(s.get("src") or "") or "adsbygoogle" in "".join(c for c in s.children if isinstance(c, str))]
+    return boxes, units, scripts
+
+
+def _body_section(n):
+    """A note's own text section: not the hero, FAQ or related list (the boxes may sit only between two of these)."""
+    return (n is not None and n.tag == "section" and "hero" not in n.classes()
+            and n.get("aria-labelledby") not in ("faq", "ax-related-heading"))
+
+
+def _name(n):
+    if n is None: return "nothing"
+    return n.tag + "".join("." + c for c in n.classes()) + (f"[aria-labelledby={n.get('aria-labelledby')}]" if n.get("aria-labelledby") else "")
+
+
+def check_ads_page(page, report, cfg, noindex_paths):
+    """AD-OFF, AD-PLACEMENT and AD-BUDGET-DROP for one page (cfg = tools/ads.py config of the checked site)."""
+    p = page.relpath
+    boxes, units, scripts = ad_traces(page)
+    mode = "on" if cfg["preview"] else cfg["mode"]
+    traces = len(boxes) + len(units) + len(scripts)
+    if mode == "off":
+        if traces: report.error("AD-OFF", p, f"data/ads.json mode is off, but the page has {traces} ad trace(s)")
+        return
+    m = re.search(r"<main\b[^>]*>(.*)</main>", page.text, re.S)
+    why = ads.eligible(cfg, p, m.group(1) if m else "", noindex_paths, page.lang) if page.kind == "ax-note" else "R2"
+    if why:
+        if traces: report.error("AD-PLACEMENT", p, f"{traces} ad trace(s) on a page that may not carry ads ({why})")
+        return
+    js = [s for s in scripts if "/assets/ads.js" in (s.get("src") or "")]
+    loader = [s for s in scripts if s.get("src") == ads.loader_url(cfg) and "async" in s.attrs]
+    if units:
+        report.error("AD-PLACEMENT", p, "static <ins> ad unit: assets/ads.js adds units to visible boxes only")
+    if mode == "review":
+        if boxes or js: report.error("AD-PLACEMENT", p, "review mode carries the loader tag only (no boxes, no ads.js)")
+        if not loader: report.warn("AD-BUDGET-DROP", p, "eligible note without the AdSense loader tag (page budget)")
+        return
+    if len(scripts) != len(js) and not cfg["preview"]:
+        report.error("AD-PLACEMENT", p, "mode on loads the ad network only through /assets/ads.js")
+    if boxes and not cfg["preview"] and not (js and "defer" in js[0].attrs):
+        report.error("AD-PLACEMENT", p, "ad boxes without <script src=/assets/ads.js defer>")
+    if js and not boxes:
+        report.error("AD-PLACEMENT", p, "/assets/ads.js on a page without ad boxes")
+    kinds = {"ad-in": 2, "ad-side": 1, "ad-rail": 1}  # 4 at most, unknown boxes fail below
+    for k, most in kinds.items():
+        n = sum(1 for b in boxes if k in b.classes())
+        if n > most: report.error("AD-PLACEMENT", p, f"{n} .{k} boxes (at most {most})")
+    inline = []
+    for b in boxes:
+        c = b.classes()
+        if "ad-in" in c:
+            els = b.parent.element_children() if b.parent is not None else [b]
+            i = els.index(b)
+            prev, nxt = (els[i - 1] if i else None), (els[i + 1] if i + 1 < len(els) else None)
+            if b.parent is not page.main:
+                report.error("AD-PLACEMENT", p, "in-article ad box is not a direct child of <main>")
+            elif not (_body_section(prev) and _body_section(nxt) and nxt.find("h2")):
+                report.error("AD-PLACEMENT", p, f"in-article ad box between {_name(prev)} and {_name(nxt)}; "
+                                                "it may sit only between two body sections (not by the hero, TOC, "
+                                                "series box, inquiry box, FAQ or related list)")
+            else:
+                inline.append(i)
+        elif "ad-side" in c:
+            els = b.parent.element_children() if b.parent is not None else []
+            prev = els[els.index(b) - 1] if b in els and els.index(b) else None
+            if not (b.parent is not None and "ax-side" in b.parent.classes() and prev is not None and prev.tag == "nav"):
+                report.error("AD-PLACEMENT", p, "side ad box must follow the side TOC inside .ax-side")
+        elif "ad-rail" in c:
+            if b.parent is not page.main: report.error("AD-PLACEMENT", p, "rail ad box is not a direct child of <main>")
+        else:
+            report.error("AD-PLACEMENT", p, f"unknown ad box {_name(b)}")
+    if len(inline) == 2:
+        between = page.main.element_children()[inline[0] + 1:inline[1]]
+        n = sum((1 if e.tag == "p" else 0) + len(e.find_all("p")) for e in between)
+        if n < 2: report.error("AD-PLACEMENT", p, f"{n} <p> between the two in-article ad boxes (want >= 2)")
+    # R6 report: parts with a spot that the page does not carry were dropped for the page budget
+    if m:
+        want = {k for k, v in ads.spots(ads.unplace(m.group(1)), cfg, page.lang).items() if v is not None}
+        have = {"ad-1" if i == 0 else "ad-2" for i in range(len(inline))}
+        have |= {"side" for b in boxes if "ad-side" in b.classes()} | {"ad-rail" for b in boxes if "ad-rail" in b.classes()}
+        if want - have:
+            report.warn("AD-BUDGET-DROP", p, f"left out for the page budget: {', '.join(sorted(want - have))}")
+
+
+def check_ads(site, report, pages):
+    """Ads follow data/ads.json (tools/ads.py): AD-OFF (mode off = no ad trace on any page), AD-PLACEMENT (eligible
+    notes only; box count, neighbours and spacing; labels in assets/ax.css), AD-JS (assets/ads.js names the
+    configured client and slots), AD-BUDGET-DROP (warning: a part left out to keep the page within budget)."""
+    cfg = ADS_CFG
+    any_box = False
+    for rp in pages:
+        pg = site.page(rp)
+        if pg is None: continue
+        check_ads_page(pg, report, cfg, NOINDEX_PATHS)
+        any_box = any_box or bool(ad_traces(pg)[0])
+    if any_box: check_ad_labels(site.read("assets/ax.css") or "", report)
+    if cfg["mode"] == "on": check_ads_js(site.read(ads.JS), cfg, report)
+
+
+def check_ad_labels(css, report):
+    """The boxes carry no text: assets/ax.css draws the label, in AdSense's wording only."""
+    for lab in AD_LABELS:
+        if lab not in css.replace(" ", ""):
+            report.error("AD-PLACEMENT", "assets/ax.css", f"ad label {lab} missing (AdSense allows 광고 / Advertisements)")
+
+
+def check_ads_js(js, cfg, report):
+    """assets/ads.js carries the client and slot ids itself (no per-box attributes: page budget); they must equal
+    data/ads.json."""
+    if js is None:
+        report.error("AD-JS", ads.JS, "mode on needs assets/ads.js"); return
+    for k in ("client",) + tuple(f"slots.{s}" for s in ads.SLOT_KEYS):
+        v = cfg["client"] if k == "client" else cfg["slots"].get(k.split(".")[1], "")
+        if f'"{v}"' not in js: report.error("AD-JS", ads.JS, f"does not name {k} {v} from data/ads.json")
+
+
 def check_pillars(site, report, pages):
     """A page lifted out of a noindex prefix ("except" in data/noindex.json) must carry its hand-written pillar guide
     (tools/ax_pillar.py): otherwise it is the list-only page the prefix rule keeps out of the index."""
@@ -1106,8 +1235,9 @@ def check_assets(site, report):
 
 def run(root=ROOT, outputs=None):
     """Every gate over the whole site. outputs = {relpath: text} from an in-memory build override files on disk."""
-    global NOINDEX_PATHS
+    global NOINDEX_PATHS, ADS_CFG
     NOINDEX_PATHS = noindex.NoIndex(root)  # the checked site's own rule (data/noindex.json under root)
+    ADS_CFG = ads.config(root)
     site = Site(root, outputs)
     report = Report()
     pages = site.html_pages()
@@ -1134,6 +1264,7 @@ def run(root=ROOT, outputs=None):
     check_llms(site, report)
     check_orphans(site, report, pages, listed)
     check_pillars(site, report, pages)
+    check_ads(site, report, pages)
     check_assets(site, report)
     return report
 
