@@ -6,7 +6,229 @@
   <description>Notes from shipping Android apps on Google Play with an AI coding agent: release gates, R8 crashes, staged rollouts, agent permissions. Dated numbers from git.</description>
   <language>en</language>
   <atom:link href="https://sugarmount21.com/en/ax/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Mon, 16 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Tue, 17 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Claude Code real-device E2E: 31 fixes in 3 rounds – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/local-e2e-harness-three-rounds-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · How-to</span>
+      <h1>Claude Code real-device E2E: 31 fixes in 3 rounds</h1>
+      <p class="lead">We ran a Flutter app that Claude Code had built through three rounds of end-to-end tests on a real phone and an emulator. Unit tests passed at the end of every round, and we still fixed 31 defects.</p>
+      <p>The first button on the first screen did nothing. That was the start of a morning spent walking a Flutter family app through sign-up, invites, AI suggestions and account deletion on a Galaxy S21 and a PC emulator, with its unit tests passing. A Claude Code agent had committed the zero-cost test stack minutes earlier; three rounds later, 31 defects had been fixed.</p>
+      <p>Every unit test was green, which is when an agent reports it is done. The guard that kept the test build away from production was wrong at first: a test build documented as running "without the real cloud" sent requests to Google servers every time it ran, until October 13. Requests that the Firebase SDK opens on its own do not go through the local emulator connection.</p>
+    </section>
+    <section aria-labelledby="first-tap">
+      <h2 id="first-tap">07:53: the Start button did nothing on either device</h2>
+      <p>At 07:37 KST on October 10, 2026, Claude Code committed a local test stack for the family calendar app <a href="https://sugarmount21.com/en/apps/axfamily/">AXFamily</a> and went straight into device E2E (end-to-end testing: using the whole app in the order a person would). Device A was the operator's own Galaxy S21; device B was an Android emulator on the PC.</p>
+      <p>When Start did nothing, the agent dumped the view hierarchy, read the router, and wrote a failing test before touching the code. The router's navigation rule should have sent a user in onboarding to the age check, but that step listed the welcome screen as an allowed route, so the rule sent them nowhere.</p>
+      <p>Sign-up then failed on both devices. The app pointed at the local Firebase stack on 127.0.0.1, but FlutterFire, the Firebase plugin set for Flutter, rewrites that address to 10.0.2.2 by default. Both devices failed with 'Cleartext HTTP traffic to 10.0.2.2 not permitted', because the test build allowed plain HTTP only to 127.0.0.1 and localhost. And 10.0.2.2 reaches the host PC only from inside an emulator, so even with that allowed the S21 could not have reached it.</p>
+      <p>Creating a family failed next: every server function call broke because the fake API key was not in the format Firebase expects. Each fix meant rebuilding the release APK with R8 (Android's code shrinker for release builds) and reinstalling it. The first build took about five and a half minutes and later rebuilds mostly one to three.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/local-e2e-harness-three-rounds-1-en.webp" width="1200" height="504" alt="Bar chart: device E2E on 2026-10-10 fixed 12 defects in round 1, 13 in round 2 and 6 in round 3; none came from R8 shrinking." loading="lazy"><figcaption>Three rounds fixed 31 defects, and none of them was caused by R8.</figcaption></figure>
+    </section>
+    <section aria-labelledby="harness">
+      <h2 id="harness">The zero-cost stack swapped four services for fakes</h2>
+      <p>Commit 1fcc1e1 swapped four real services for local stand-ins:</p>
+      <div class="table-wrap"><table><thead><tr><th>Real service</th><th>Stand-in</th><th>Condition that keeps it out of production</th></tr></thead><tbody><tr><td>Firebase Auth, Firestore, Functions</td><td>Firebase Local Emulator Suite on the PC</td><td>Only projects whose ID starts with demo- (they have no real resources)</td></tr><tr><td>AI extraction model</td><td>A deterministic fake model</td><td>Only when the Functions emulator flag and a demo- project are both true</td></tr><tr><td>Photo storage server</td><td>A local photo server (a Worker) on the PC</td><td>Local config and a demo- project</td></tr><tr><td>App Check (app attestation)</td><td>An unsigned local token</td><td>Only the emulator accepts it; production functions take signed tokens only</td></tr></tbody></table></div>
+      <p>Firebase's own debug App Check provider was an option, but it has to exchange tokens with Google's servers, which a demo- project cannot do.</p>
+      <p>The other direction is guarded too. The release gate opens the production AAB and searches the compiled code (dex) and the Flutter code library (libapp.so) for test marker strings; any hit stops the release. A CI check confirms the guard statements are still in the source and that a copy with each guard deleted fails the check. The harness commit shipped 14 of these guard-removal cases. Why a gate should read the artifact itself is in <a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release</a>.</p>
+    </section>
+    <section aria-labelledby="rounds">
+      <h2 id="rounds">Unit tests were green after every round</h2>
+      <div class="table-wrap"><table><thead><tr><th>Round</th><th>Time (KST)</th><th>R8 APK builds</th></tr></thead><tbody><tr><td>1</td><td>07:44-09:48</td><td>9</td></tr><tr><td>2</td><td>09:48-11:01</td><td>2</td></tr><tr><td>3</td><td>11:01-12:25</td><td>4</td></tr></tbody></table></div>
+      <p>Each round ran Android's monkey tool for 3,000 random events on both devices with no crashes or ANRs (app-not-responding errors). The instructions asked the agent to look for R8 symptoms in the logs, classes or methods the shrinker had removed, and there were none. The case where R8 did kill a release build, in a different app, is in <a href="https://sugarmount21.com/en/ax/release-gate/">AI-built Android app release checklist: R8 and real devices</a>.</p>
+      <p>What showed up instead were flow and state defects. After B joined the family, A could not assign a task to B until A restarted the app, a defect you only see when two accounts take turns; after an AI suggestion was approved, the Today screen stayed on the first-run card because the app never heard about the server's write. The round 1 and round 3 commit messages say each of their 18 fixes came with a test that fails without the fix. When the harness was committed, all 1,118 Flutter tests passed with the round 1 defects still in the code.</p>
+      <p>One round 3 fix: on device B, AI organizing ended with a retryable error, yet the banner at the top of the Records tab kept saying a result was waiting. It had been left open in round 2; round 3 marked the pending record as failed and changed the text.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/local-e2e-harness-three-rounds-shot1-en.webp" width="1192" height="650" alt="Two AXFamily Records tab screenshots: before, the banner says &#x27;An AI result is waiting for you.&#x27; after a failed run; after the fix it says &#x27;AI organizing didn&#x27;t finish.&#x27; The first list item is marked Not organized." loading="lazy"><figcaption>Device B captures from the round 3 screen record (commit 218b34c); the right one is after fix commit 9c8bda6. With every unit test passing, the banner reported the opposite of what had happened.</figcaption></figure>
+      <p>We also counted whether any defect appeared only on the real phone. None of the fix records says "S21 only". One defect surfaced because of the emulator: it ran on GMT while the S21 used Seoul time, the same as the family, so a date picker whose "today" followed the device time zone looked wrong only on the emulator.</p>
+    </section>
+    <section aria-labelledby="network">
+      <h2 id="network">"Without the real cloud" was false until October 13</h2>
+      <p>The harness README opened by saying it runs the core flow on two devices without the real cloud. Round 1's report already contradicted it: a Google logging endpoint answered with HTTP 200 and Firebase Installations (the service that issues an ID per install) rejected requests with HTTP 400, so requests were leaving the device. The agent noted in its own report that the 400s started after it fixed the fake key's format.</p>
+      <p>At the end of round 3 each app process still logged 24 Installations warnings. That afternoon, commit 753cc37 switched off Firebase's automatic collection settings in the test build and the README said there were no Installations or FCM registration requests. Thirty-five minutes later a review fix, c2aeb59, noted that only one setting had actually changed and downgraded the line: until a device showed zero requests, "network zero" was not done.</p>
+      <p>The next day a QA run on the operator's other phone, a Galaxy S20, logged the Installations 400 again and settled that open item as false. The cause it named was a push token request.</p>
+      <p>The harness redirected only the server addresses the app calls itself; requests the SDKs open on their own were outside it. And the isolation gate read source statements and strings inside the artifact, so the harness commit's 21 isolation tests checked network config such as the cleartext host list, but none blocked or counted a running app's outbound connections.</p>
+      <p>On October 13, commit d90e21a blocked traffic at the transport layer instead of switching off more settings:</p>
+      <ul><li>An empty ContentProvider (an Android component created at app start, before Firebase) replaces Java's https handler with one that always refuses.</li><li>The test build's network security config (NSC) trusts zero certificates, so any other TLS connection fails at the handshake.</li><li>Dart's HttpClient may open only local plain-http connections.</li></ul>
+      <p>The same day a device script counted the off-device bytes of the app's UID (the user number Android gives each app): zero on both the S21 and the S20. Review then pointed out that a zero alone cannot be told apart from a broken counter that always returns zero, so a PASS now also requires the system UID, counted the same way, to be above zero.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/local-e2e-harness-three-rounds-shot2-en.webp" width="1180" height="566" alt="Terminal output of the isolation tests re-run on three snapshots: 21 tests at the harness commit, 38 at the network-block commit and 46 now, all passing, with 14, 23 and 30 guard-removal cases. Eight network-blocking cases are listed below." loading="lazy"><figcaption>Output lines from a 2026-11-16 re-run, redrawn verbatim. The eight Korean test names cover the trust-anchor, provider-order, https-handler and Dart allow-list guards. The harness commit's 21 tests never checked outbound blocking; those cases first appear in d90e21a.</figcaption></figure>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20real-device%20E2E%3A%2031%20fixes%20in%203%20rounds">Email us</a></p></aside>
+    <section aria-labelledby="no-emulator">
+      <h2 id="no-emulator">The day we stopped using the emulator</h2>
+      <p>At 14:32 on October 11 the operator asked why the agent kept starting the PC emulator when it had been told to test on the S20. The agent shut the emulator down and said it had itself told the store-screenshot agent to use it. Commit 9fcff82 that afternoon traced the root cause to an old decision in the plan, "Second test device: Play image emulator. Do not use the S20.", plus two lines in its table that echoed it.</p>
+      <p>The old decision is now struck through, with a new one beneath it: S21 is device A, S20 is device B. The install script exits, with no override, when the device serial starts with emulator- or the system properties say it is one, and a docs check fails if the three old sentences come back. The GMT device that caught the time zone defect went with it.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Building the same harness</h2>
+      <p>Accept an agent's "done" only when it comes with a round record of the release build run end to end on two devices. Here is how to get that record without paying for cloud time.</p>
+      <ol class="steps"><li><p>Build the test APK with production's release and R8 settings, and let one build constant (a dart-define) pull in the test code. Add a package suffix, debug-key-only signing and a ban on Play bundles (AABs).</p></li><li><p>Choose the fake backend and fake model only when "running in the emulator" and "demo- project" are both true; if only one is, refuse the call.</p></li><li><p>Turn off FlutterFire's host rewriting and connect with adb reverse, which forwards a PC port to 127.0.0.1 on the device. Allow cleartext only for 127.0.0.1 and localhost.</p><pre><code>firestore.useFirestoreEmulator('127.0.0.1', 8180, automaticHostMapping: false);
+adb -s &lt;device&gt; reverse tcp:8180 tcp:8180</code></pre></li><li><p>Have the release gate search the production AAB for test markers, and lock it with guard-removal cases that must fail.</p></li><li><p>Give the two devices different languages and time zones and run a 12-step scenario covering sign-up, invites, AI suggestions, photos and account deletion. For each defect: failing test, fix, rebuild the APK, recheck on the device.</p></li><li><p>Count off-device traffic on the device from <code>dumpsys netstats detail</code> by the app's UID. The increase must be zero, the blocker's install log must be present, and the system UID, counted the same way, must be above zero. That output also holds other apps and carrier identifiers, so filter on the device and pull out only the numbers.</p></li><li><p>Make the install script refuse devices you have decided not to use.</p></li></ol>
+    </section>
+    <section aria-labelledby="errors">
+      <h2 id="errors">Errors we hit</h2>
+      <div class="table-wrap"><table><thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead><tbody><tr><td>Sign-up fails with Cleartext HTTP traffic to 10.0.2.2 not permitted</td><td>FlutterFire's automatic host mapping</td><td>automaticHostMapping: false</td></tr><tr><td>Every server function call (callable) throws IllegalArgumentException (valid API key)</td><td>The fake key did not match the Installations format (39 characters starting with A)</td><td>A fake key in the right format</td></tr><tr><td>Firestore triggers die with default Firebase app does not exist</td><td>A check that skipped default app setup</td><td>Check for the default app (the bug was in production too)</td></tr></tbody></table></div>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">Purchases, push and Play Integrity went to a separate runbook</h2>
+      <p>Completed Play purchases, real push delivery, photo file deletion and App Check tokens backed by Play Integrity (Google's check that the app came from Play) are out of reach for this harness. Device tests with the real AI model and production backend got their own runbook on October 13 and install through Play's internal testing track. The same day the operator set the bar: the E2E has to pass clearly on the S20 and S21 before anything counts as done.</p>
+      <p>The Firebase emulator produced its own errors. Family deletion failed several times with CANCELLED; the agent put that down to the emulator but added retries anyway. Whether production Firestore does the same is something this harness cannot show.</p>
+      <p>With a personal phone as device A, the agent kept the share sheet and photo picker closed, because they show contacts and personal photos. Photo steps ran on device B, and round 3 recorded the invite-code hand-off as a partial pass caused by the harness.</p>
+      <p>The round 3 fix to the account deletion screen could not be reproduced on a device again and is covered only by unit and widget tests. A checklist step that sets one phone to a time zone different from the family's is what would catch the date picker class of defect again; this project's checklist has no such step today.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20real-device%20E2E%3A%2031%20fixes%20in%203%20rounds">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+    <h2 id="faq">FAQ</h2>
+    <div class="faq"><details><summary>Is passing on the emulator enough to ship?</summary><div><p>Not on this record. None of the 31 defects was marked as real-phone only, but a library default that assumes an emulator blocked both devices and pointed the real phone at an address it could never reach, and the time zone difference between the two devices exposed a defect.</p></div></details><details><summary>How do I connect a Flutter release build to the Firebase Local Emulator Suite?</summary><div><p>Apps targeting Android 9 or later block cleartext HTTP by default. Allow cleartext only for 127.0.0.1 in the test build's network security config, then connect with automaticHostMapping: false and adb reverse.</p></div></details></div>
+    </section>
+    <p class="note">Checked 2026-11-16. AXFamily repository git history (1fcc1e1, 6a51d59, 5b52ff5, 7d5dfa7, d3fde30, 74df690, 9c8bda6, 218b34c, 753cc37, c2aeb59, c966602, 9fcff82, d90e21a, dab90fe, eae1508; all co-authored with Claude Opus 5.5), per-round results of the device E2E workflow (2026-10-10 KST), QA records (2026-10-10 screens, 2026-10-11 S20 report), real-device E2E runbook (2026-10-13), Claude Code session logs (2026-10-10 to 10-13), isolation test re-run (2026-11-16, node 22).</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/adversarial-review-other-paths/">Claude Code re-review: the bug survived via HTTP</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Tue, 17 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Claude Code fix: Naver spelling highlights missing – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/naver-speller-highlight-missing/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/naver-speller-highlight-missing/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/naver-speller-highlight-missing-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>Claude Code fix: Naver spelling highlights missing</h1>
+      <p class="lead">The missing highlights were errors at the end of a sentence. A request tag the server folded into the correction and a strict length check each dropped them; after fixing both with Claude Code, all 31 errors in the saved responses get colour.</p>
+      <p>Type "이거 어떻해" (a common misspelling of "what do I do") into the <a href="https://sugarmount21.com/en/apps/sugarspeller/">SugarSpeller</a> app and it used to show no highlight at all. The chat-style screen went further and told the user there were no spelling errors. Naver, the Korean portal whose spell checker the app calls, was returning the right correction the whole time. Replaying the colouring logic from before the September 13, 2026 fix on saved server responses, only 17 of the 31 errors Naver flagged got colour.</p>
+      <p>Every one of the 14 misses was the last error in its sentence. The causes were a string appended to the request body and one comparison that filters out ranges reaching the end. If your app paints corrections from an external spelling or translation service, look at those two places first.</p>
+    </section>
+    <section aria-labelledby="scene">
+      <h2 id="scene">Short sentences came back with no colour at all</h2>
+      <p>The app has two screens: Chat, which shows results as message bubbles, and the older Classic screen with separate input and output boxes. At 18:14 KST on September 13, 2026, the operator asked Claude Code to investigate: highlighting did nothing in Chat and was unreliable in Classic, and Naver should be analysed first.</p>
+      <p>The agent's first suspect was the response parser. It fetched live Naver responses and ran them through the app's regular expression; every corrected word and error type came out correctly, so parsing was ruled out. Its second suspect was how Classic matches each response to its chunk (long input is split into chunks). Ten measured sentences produced zero mismatches.</p>
+      <p>At 18:27 the agent tested what it called its last hypothesis: a short sentence whose only error is at the end. The result came a minute later: of 10 short sentences, Naver found errors in 7, and all 7 got zero colour. The pair below is that case as it was later saved in the repository's test data.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/naver-speller-highlight-missing-shot1-en.webp" width="1200" height="544" alt="The fixture pair for &#x27;이거 어떻해&#x27;: in the old request the correction span contains the corrected word plus a message-ID-and-chunk tag; in the current request the span holds only the corrected word. The old code colours neither" loading="lazy"><figcaption>Verbatim server responses from the fixture in commit 9ed4dca. Even without the tag, the old comparison leaves the final error uncoloured.</figcaption></figure>
+    </section>
+    <section aria-labelledby="cause">
+      <h2 id="cause">A tag and an operator erased the same error</h2>
+      <p>To tell which chunk a response belonged to, the app appended a tag (in Chat, the message's unique ID and chunk number; in Classic, the chunk number and a hash of the sentence) to the text it sent. Naver read the tag as part of the last word and returned it inside the em element that marks the corrected span.</p>
+      <p>The app stripped the tag only from the corrected sentence it displays. The list of corrected words still held "어떡해-…-0", so indexOf, which looks up the word's position in the displayed sentence, returned -1 (not found), and an error the app can't locate gets no colour.</p>
+      <p>Chat counted the corrected words it managed to find on screen, and when that count was zero it said "no spelling errors". Classic used Naver's own error count field, <code>errata_count</code>, so it reported the right number and showed no colour.</p>
+      <p>The second defect had nothing to do with the tag. Colour was applied only when <code>buffer.length &gt; key + text.length</code>: the displayed sentence had to be longer than the word's start position (key) plus the word's length (text.length), meaning the range had to end before the last character. "이거 어떡해" is 6 characters and the corrected word ends at character 6, so 6 &gt; 6 is false and nothing was painted. A short sentence often has one error, at the end, which leaves the screen with no colour.</p>
+      <p>Because both defects remove the same error, fixing one barely helps.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/naver-speller-highlight-missing-1-en.webp" width="1200" height="620" alt="Highlighted errors out of 31: 17 before the fix, 18 with only the tag removed, 18 with only the comparison fixed, 31 with both fixed" loading="lazy"><figcaption>Either fix alone stopped at 18; with both, all 31 errors were highlighted.</figcaption></figure>
+      <p>Both defects predate any AI-co-authored commit in the repository. Appending an identifier to the request text (then a hash of the sentence) first appeared in December 2020, in the original screen that later became Classic (6baa0ae).</p>
+      <p>The comparison came in April 2021 with commit 3ad9ba4, titled as a fix for an IndexOutOfBoundsException in the colour-span call. A guard written to stop an out-of-range crash also blocked ranges that end exactly at the end.</p>
+      <p>In August 2025, when Chat was rebuilt with Claude Code, two commits (02cbb15 and 5f082f8) copied both habits into the new screen: the new request code appended the tag, and the new colouring loop used the same comparison.</p>
+    </section>
+    <section aria-labelledby="check">
+      <h2 id="check">Start with a short sentence whose only error is the last word</h2>
+      <ol class="steps"><li><p>Check a short sentence whose only error is the last word. If nothing is highlighted, look at the next two places.</p></li><li><p>In the request builder, look for an order number, hash or UUID appended to the text being checked. Move it into the HTTP client's request tag or the callback closure.</p></li><li><p>Find the range check right before colouring. If it reads <code>length &gt; end</code> or <code>end &lt; length</code>, it should be <code>end &lt;= length</code>. The grep below only finds the <code>length &gt; start + length</code> form this app had; check <code>length &gt; end</code>, <code>end &lt; length</code> and Java's <code>length()</code> separately.</p><pre><code>grep -rnE '(length|size) *&gt; *[a-z]+ *\+' app/src/main</code></pre></li><li><p>Save real responses as test data files. Assert that the error-count field equals the number of coloured ranges, that each range's substring equals the corrected word, and that ranges don't overlap.</p></li><li><p>Revert the fixed line for a moment and confirm the tests fail. If they still pass, they won't catch the bug when it comes back.</p></li></ol>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20fix%3A%20Naver%20spelling%20highlights%20missing">Email us</a></p></aside>
+    <section aria-labelledby="crosscheck">
+      <h2 id="crosscheck">The 26/26 check was never in the repository</h2>
+      <p>At 20:41 the agent committed e9cd771, fixing both defects and Chat's error count, and reported that a live cross-check on 18 sentences now coloured every error. The report also listed the number of passing unit tests.</p>
+      <p>At 22:13 the operator asked whether the Naver tests were all committed. The agent replied that only 10 pure-logic tests were in the commit; the live cross-check depended on response files in a scratch folder and had been deleted as a one-off.</p>
+      <p>Eleven minutes later commit 9ed4dca landed. It stores verbatim server responses in the repository as a fixture (fixed test data): 23 sentences sent without the tag, and the same sentences sent the old way with the tag attached. A mutation check, temporarily reverting the fix, showed 9 tests failing when end-of-string ranges are dropped again.</p>
+      <div class="table-wrap"><table><thead><tr><th>Number</th><th>What it counts</th><th>Record</th></tr></thead><tbody><tr><td>7 of 7 with no colour</td><td>first analysis, 7 of 10 short sentences that had errors</td><td>session log, 18:28</td></tr><tr><td>16 of 26, then 26</td><td>one-off check on 18 sentences, not in the repository</td><td>commit e9cd771 message</td></tr><tr><td>17 of 31, then 31</td><td>23 fixture pairs; sentences with no colour went from 9 to 0</td><td>commit 9ed4dca test</td></tr></tbody></table></div>
+      <p>On November 16, 2026, a Python port of the same comparison run over this fixture gave 17 of 31 again. All nine zero-colour sentences have a single error, in the last word: five were written for exactly that case, and the other four mix in a line break, a long number, a Latin word or a trailing space.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/naver-speller-highlight-missing-shot2-en.webp" width="1200" height="860" alt="Per-sentence chart of the 21 fixture sentences with errors: 17 highlights before the fix, 31 after; the five error-at-end sentences and the four with a line break, long number, Latin word or trailing space had none before" loading="lazy"><figcaption>Nine of the 21 sentences with errors had no colour before the fix (fixture 9ed4dca, recomputed 2026-11-16).</figcaption></figure>
+    </section>
+    <section aria-labelledby="fix">
+      <h2 id="fix">The chunk number now rides in the request tag</h2>
+      <p>Never put identifiers into the body you send to an external API. The app now carries the chunk number in the OkHttp request tag, a value that never leaves the device and comes back with the response callback. It dropped the old approach of stripping the tag from the response with regular expressions: those patterns could also delete a user's 13-digit numbers or long Latin words, which is what the long-number and Latin-word sentences in the chart contain.</p>
+      <div class="table-wrap"><table><thead><tr><th>What changed</th><th>Previous behaviour, and why it went</th></tr></thead><tbody><tr><td>a range that ends at the last character is coloured</td><td>the old comparison; the final error was always dropped</td></tr><tr><td>a word that isn't found is skipped and the search position kept</td><td>the position was left at -1; the next word was searched from the start and colour landed in the wrong place</td></tr><tr><td>both screens count errors with <code>errata_count</code></td><td>count of words found; a miss turned into "no errors"</td></tr><tr><td>one shared colouring class (<code>SpellHighlighter</code>)</td><td>three copies (Chat, Classic, Daum); fixing one let the others drift</td></tr></tbody></table></div>
+      <p>The same evening the Daum checker (another Korean portal) turned out to be failing outright; that story is in <a href="https://sugarmount21.com/en/ax/daum-speller-js-redirect-200-empty/">Daum spell check failed: OkHttp and a JS redirect</a>.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">The fixture is one day of responses</h2>
+      <p>If Naver changes its response format, the offline tests keep passing while the app breaks again, and since this is not a public API there is no notice of such changes.</p>
+      <p>No response seen so far has put a line break or a character like <code>&lt;</code> inside a correction span. The current code turns <code>&amp;lt;</code> back into <code>&lt;</code> only in the displayed sentence, so such a response would leave <code>&amp;lt;</code> in the corrected word and <code>&lt;</code> on screen, and the word would not be found. The mobile responses have only ever used two error types (spacing and spelling); the colours for the other two are untested against real data.</p>
+      <p>Still to check: fetch the same 23 sentences from the live server and compare the format with the fixture, and look for a sentence that puts a special character inside a correction span.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20fix%3A%20Naver%20spelling%20highlights%20missing">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+    <h2 id="faq">FAQ</h2>
+    <div class="faq"><details><summary>Why does only the last word miss its highlight in Naver spell check results?</summary><div><p>In this app there were two causes. A tag appended to the request ended up inside the last correction span, so the word could not be located, and a comparison refused any range ending at the last character. Both only hit the error at the end of a sentence.</p></div></details><details><summary>Can a SpannableString span end exactly at the string length?</summary><div><p>Yes. The end index is exclusive, so an end equal to the length colours up to the last character. Only an end beyond the length throws IndexOutOfBoundsException.</p></div></details></div>
+    </section>
+    <p class="note">Checked 2026-11-16. App repository git history (commits 6baa0ae, 3ad9ba4, 02cbb15, 5f082f8, e9cd771, 9ed4dca, 0b74357; the 2025-08 commits co-authored with Claude, the 2026-09 commits with Claude Opus 5), real-response fixtures (48 Naver lines, 28 Daum lines) and their cross-check tests, changelog section 1.6.017, Claude Code session log of 2026-09-13 (KST), project memory note on measured Naver responses (2026-09-13).</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Tue, 17 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Claude Code handoff to a session that had stopped – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/stale-doc-phantom-session/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/stale-doc-phantom-session/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/stale-doc-phantom-session-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Short note</span>
+      <h1>Claude Code handoff to a session that had stopped</h1>
+      <p class="lead">Our Claude Code session handed work to the "dev session" its own docs named, but that session had stopped 25 hours before. We now write the owner, with a date, as one line in memory.</p>
+      <p>Six lines in three documents assigned work to "the other session" or "the dev session". On the afternoon of October 18, 2026, the Claude Code session running marketing for two of our Android games followed the rule line, said it would pass its day-one drop-off analysis to the dev session, and wrote four more dev-session lines into its drop-off report. The dev session's last record was a commit at 15:30 the day before.</p>
+      <p>At 16:52 the operator corrected it: there is no other dev session right now, and you own both games. Within three minutes the marketing session itself had built the test-device filter it had meant to ask the dev session for.</p>
+    </section>
+    <section aria-labelledby="was-true">
+      <h2 id="was-true">The plan line was written while the dev session ran</h2>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/stale-doc-phantom-session-1-en.webp" width="1200" height="780" alt="Five steps from 08:48 on October 17 to 16:54 on October 18" loading="lazy"><figcaption>Times of the operator's instruction, the dev session's last commit, the marketing session's replies, the correction and the fix.</figcaption></figure>
+      <p>At 08:48 on October 17 the operator told the marketing session that another session was fixing the games from GA4 (Google Analytics 4) data, so it should stay on marketing. A dev session opened in the game repository had been working since 07:52 and committing fixes since 08:55. The plan document's third line, saying game fixes were being done by the other session, was written that morning. The operating rules that every scheduled run reads first also said "app code or build changes: the other session handles these."</p>
+      <p>At 15:29 the operator told the dev session, roughly, "commit, and another session will pick it up." It made commit 64267f2 and went quiet until October 22. Nothing the marketing session reads recorded that ending.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/stale-doc-phantom-session-shot1-en.webp" width="1200" height="420" alt="Timeline of message times in the two session logs: the dev session has no records after 15:30 on October 17, and 5 of the marketing session&#x27;s 9 replies that point at another session come after that" loading="lazy"><figcaption>Message times from the two session logs, Oct 17 to 18, 2026. Orange dots are marketing-session replies that point at another session.</figcaption></figure>
+      <p>Not knowing that, the marketing session pointed at another session in 9 replies, 5 of them after the dev session had stopped. The last three came on October 18 between 16:27 and 16:41.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20handoff%20to%20a%20session%20that%20had%20stopped">Email us</a></p></aside>
+    <section aria-labelledby="misread">
+      <h2 id="misread">A present-tense rule outlived its session</h2>
+      <p>The marketing session kept following the rule line its 09:17 scheduled run on October 18 had read, "the other session handles these", 25 hours after that session stopped. The day-one drop-off report it wrote at 16:38 mentioned the dev session four times; one line asked the dev session to filter two test phones out of GA4. Those phones were the ones this same work used.</p>
+      <p>Ten seconds after the correction the agent said the earlier "dev session" was just an earlier part of this same work, then grepped the three documents and found the six lines.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/stale-doc-phantom-session-shot2-en.webp" width="1200" height="629" alt="The six lines grep found in the rules, plan and drop-off documents, each handing work to another session" loading="lazy"><figcaption>The grep output saved in the session log at 16:52 on 2026-10-18, redrawn from the log text with English glosses. A local path is masked.</figcaption></figure>
+      <p>Once the GA4 report tool dropped test and review devices by default, organic installs in Korea (installs not from ads) for <a href="https://sugarmount21.com/en/apps/blocks/">Block Turn</a> since October 11 went from 7 to 2; the rest were test devices. The session deleted the rule line and rewrote the four report lines as past facts, but it left the plan alone, and its third line is still there on November 17.</p>
+    </section>
+    <section aria-labelledby="owner-memory">
+      <h2 id="owner-memory">Ownership as one dated memory line</h2>
+      <p>Don't hand work to a session by name. Find the lines in your plan and rule documents that point at a session, then check the last message time in that session's log (a per-project jsonl file).</p>
+      <pre><code>grep -n "다른 세션\|개발 세션" *.md</code></pre>
+      <p>If the session has stopped, rewrite the line as a past fact and write the owner into project memory, the notes file Claude Code reads when a session starts. Fixing document lines alone means hunting down every document already written, and it does nothing for the next one. This project's memory now says the "dev session" in older documents was "Claude's own work in an earlier conversation" and must not be handed anything, and the memory index (MEMORY.md) carries one line: no other session (10/18).</p>
+      <p>That line is false when sessions really do run in parallel. At 16:34 the same day the operator told a session in another app repository that search work (SEO and GEO) would be handled in a different session. For that case we write an owner for each file, as in <a href="https://sugarmount21.com/en/ax/file-owner-table/">Multiple Claude Code sessions: one owner per file</a>.</p>
+      <p>The same misreading also ran the other way. When the operator reopened the October 17 dev conversation on October 22, it listed the marketing session's GA4 analysis and test-device filter from the 18th and said other sessions had carried the work on in the meantime. Next to check: whether two sessions worked in the game repository at the same time after that, and how the "no other session" line was read that day.</p>
+    </section>
+    <p class="note">Checked 2026-11-17. Two Claude Code session logs (marketing Oct 9 to 21, dev Oct 15 to 30, 2026, times in KST), game repository git history (commits d1f6de1, 64267f2, 44c6acd), current copies of the three operating documents and the grep output from 2026-10-18, project memory (2026-10-18).</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20handoff%20to%20a%20session%20that%20had%20stopped">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Tue, 17 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>Claude Code re-review: the bug survived via HTTP – SugarMount</title>
     <link>https://sugarmount21.com/en/ax/adversarial-review-other-paths/</link>
@@ -76,7 +298,7 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>Give the 
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
         <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
@@ -157,7 +379,7 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>Give the 
         <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -229,8 +451,8 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>Give the 
         <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-ad-creatives-from-play-recordings/">App campaign ad assets from gameplay recordings</a></li>
         <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/daum-speller-js-redirect-200-empty/">Daum spell check failed: OkHttp and a JS redirect</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -312,8 +534,8 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>Give the 
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">Claude Code for Android app development: 4 apps in 20 days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/daum-speller-js-redirect-200-empty/">Daum spell check failed: OkHttp and a JS redirect</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -455,8 +677,8 @@ OK  en head  26/30 1,000 brain-teasing levels</code></pre>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/stale-doc-phantom-session/">Claude Code handoff to a session that had stopped</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
       </ul>
@@ -551,7 +773,7 @@ light/temp4 #ee4b4b on #fafdff = 3.58:1</code></pre>
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/daum-speller-js-redirect-200-empty/">Daum spell check failed: OkHttp and a JS redirect</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>
@@ -661,7 +883,7 @@ light/temp4 #ee4b4b on #fafdff = 3.58:1</code></pre>
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/daum-speller-js-redirect-200-empty/">Daum spell check failed: OkHttp and a JS redirect</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1026,8 +1248,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
-        <li><a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release: a plaintext AAB and one missing dart-define</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1462,8 +1684,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/stale-doc-phantom-session/">Claude Code handoff to a session that had stopped</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1695,7 +1917,7 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/daum-speller-js-redirect-200-empty/">Daum spell check failed: OkHttp and a JS redirect</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1891,8 +2113,8 @@ assumeTrue(dir != null &amp;&amp; dir.isDirectory)</code></pre></li>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2274,8 +2496,8 @@ answers per open  = quiz_answer(mode!=chat) events / quiz_open events</code></pr
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
-        <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/adversarial-review-other-paths/">Claude Code re-review: the bug survived via HTTP</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/stale-doc-phantom-session/">Claude Code handoff to a session that had stopped</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/naver-speller-highlight-missing/">Claude Code fix: Naver spelling highlights missing</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2377,9 +2599,9 @@ adb reboot                       # clears the two log.tag values</code></pre>
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/stale-doc-phantom-session/">Claude Code handoff to a session that had stopped</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
       </ul>
@@ -2505,411 +2727,6 @@ adb reboot                       # clears the two log.tag values</code></pre>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
     <pubDate>Sun, 08 Nov 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Silently skipped Flutter tests and a green CI – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/silent-skip-green-ci/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/silent-skip-green-ci/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/silent-skip-green-ci-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · How-to</span>
-      <h1>Silently skipped tests keep CI green: three crypto cross-checks and an integration test that went stale for six days</h1>
-      <p class="lead">Make a required test fail in CI instead of skipping. Our three crypto cross-check tests skipped when a Python module was missing, and the CI job had no step to install it.</p>
-    <p class="note ax-series-line"><a href="https://sugarmount21.com/en/ax/series/green-but-broken/">When green does not mean tested</a> 3/6</p>
-      <p>A green CI run does not mean every test ran. <code>flutter test</code> does not count a skipped test as a failure, so on a machine missing a prerequisite (a Python module, a server, an environment variable) an important test drops out quietly and the exit code is still 0. In September 2026 our Flutter peer-to-peer chat app recorded 13 skips every time. One of those 13 was a relay integration test that had been broken for six days, and outside them sat three crypto cross-check tests that would join the skips whenever one Python module was missing.</p>
-      <p>On the night of September 15 we added an install-and-check step to CI, so those three can no longer drop out there unnoticed. Below is how it happened, and the steps for finding the skips in your own repository that must never be silent.</p>
-    </section>
-    <section aria-labelledby="skip-13">
-      <h2 id="skip-13">Three crypto tests outside the 13 skips</h2>
-      <p>Recounting the <code>skip:</code> declarations at the September 15 commit that added the CI guard gives 13 tests that drop out when an environment variable or server is missing: 9 soak tests (<code>BOS_SOAK</code>), 2 signaling server integration tests, 1 DB benchmark and 1 live two-process E2E. The September 13 record of 3,160 passed / 13 skipped is covered in <a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What "100% E2E pass" really meant</a>; the September 15 release cross-check read 3,186 passed / 13 skipped.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/silent-skip-green-ci-1-en.webp" width="1200" height="680" alt="Bar chart: tests skipped for missing environment are 9 soak tests, 2 signaling server integration tests, 1 DB benchmark and 1 live two-process E2E, 13 in all, and 3 crypto cross-check tests join them when the Python module is missing." loading="lazy"><figcaption>On a machine without the module the count becomes 16 and the exit code is still 0.</figcaption></figure>
-      <p>The three crypto tests run when they find the Python <code>cryptography</code> package and skip when they don't. On September 15 the development machine had it (version 50.0.1) and all three ran; the skip count of 13 recorded since September 11 matches the 13 environment-gated tests, so nothing suggests these three were among the skips.</p>
-    </section>
-    <section aria-labelledby="cause">
-      <h2 id="cause">The CI Flutter job installed only SQLite before testing</h2>
-      <p>The cross-check recomputes the app's X25519, HKDF, AES-256-GCM and frame layout with Python <code>cryptography</code> and compares the results. According to the file's header comment, it is the only test that can catch both sides being wrong in the same way, and the same comment settles what happens without the module:</p>
-      <pre><code>// External-process dependency: this test SKIPS (it does not fail) when
-// `python3 -c "import cryptography"` does not succeed, so it is safe on
-// machines and CI images without the module.</code></pre>
-      <p>Until September 15 the CI Flutter job installed nothing but SQLite before running <code>flutter test</code>. From there to a green check:</p>
-      <ol>
-        <li>The CI job looks only at the exit code of <code>flutter test</code>.</li>
-        <li>That exit code ignores skips; the count appears only as <code>~N</code> on the result line.</li>
-        <li>The test skipped without the module, and CI had no step that installed or checked it.</li>
-        <li>Nothing compared the skip count against a baseline, so 13 turning into 16 had nowhere to raise an alarm.</li>
-      </ol>
-    </section>
-    <section aria-labelledby="ai-wrong">
-      <h2 id="ai-wrong">"Safe" in a comment, and a browser guard the same day</h2>
-      <p>That comment and the test arrived in a commit at 10:45 on September 11, co-authored by Claude. At 14:32 the same day, a commit also co-authored by Claude fixed message eviction guards that sat behind an environment variable CI never set, so switching eviction off left 659 tests green (that commit's story is in <a href="https://sugarmount21.com/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database</a>). That commit also gave the CI web step a guard that fails loudly when no browser exists. The same rule never reached the crypto test written four hours earlier.</p>
-      <p>On September 15 the operator asked whether the E2E tests were done. Checking showed that since the UI redesign of September 13 and 14, only the in-process E2E tests had been running; everything else was skipping behind environment gates. That night the gates were opened one at a time, and at 22:12 a commit added this step to CI:</p>
-      <pre><code>- name: Ensure python cryptography exists (the crypto cross-check must never silently skip)
-  run: |
-    python3 -m pip install --quiet --upgrade cryptography || true
-    python3 -c 'import cryptography; print("cryptography", cryptography.__version__)' || {
-      echo "::error::(message: cryptography is missing, so the cross-check would skip and CI would pass)"
-      exit 1
-    }</code></pre>
-    </section>
-    <section aria-labelledby="rotted">
-      <h2 id="rotted">While skipped, the relay test fell behind two rules</h2>
-      <p>The relay integration test, one of the 13, had not been touched since September 6. On September 9 two rules landed in production: a fingerprint gate that refuses to send when no approval hook is wired, and a room binding that drops frames whose roomId is not the session's room. When the test finally ran against a live signaling server on September 15, it hit both. <code>sendMessage</code> without the hook was refused with "Peer identity is not verified yet", and a message sent to the literal <code>'room-relay'</code> was dropped with no error.</p>
-      <p>A commit at 21:13 put it as "the product is right and the test is stale" (translated from Korean). The fix wired an approval hook into the test and read the room the handshake had bound through <code>debugSessionRoomId</code>, rather than copying the naming rule into the test where the next rule change would break it again. With the server running, all 13 tests in <code>test/integration</code> passed.</p>
-      <p>The device smoke test (emulator, API 35) stalled on the settings screen the same night. <code>tester.pageBack()</code> looks for a back button by the English tooltip "Back", and since the app was pinned to Korean that tooltip reads "뒤로" (Korean for "back"). Finding the widget with <code>find.byType(BackButton)</code> made it pass 2 of 2.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Silently%20skipped%20tests%20keep%20CI%20green%3A%20three%20crypto%20cross-checks%20and%20an%20integration%20test%20that%20went%20stale%20for%20six%20days">Email us</a></p></aside>
-    <section aria-labelledby="alternatives">
-      <h2 id="alternatives">Why a skip-count check or "always fail" falls short</h2>
-      <p>The judgment below is our own analysis while writing this note; the repository has no record of it. Failing the build when the skip count differs from 13 would catch 13 becoming 16, but not a test that is always skipped going stale, which is what the relay test did (the count was 13 on all three recorded dates). Making the test fail whenever the module is missing would turn the whole suite red on any development machine without it, the case the original comment chose skipping to avoid. What the repository added was a CI step guard, and the commit says it follows the same pattern as the browser guard on the web job.</p>
-      <p>Starting the signaling server inside CI to run the integration tests was also possible. It wasn't done, and no reason is recorded. Instead, the commands for the three kinds CI does not run (live two-process, signaling integration, device smoke) went into the deployment doc, to be run by a person before each release.</p>
-      <p>GitHub Actions sets <code>CI=true</code> on every run. If the test stops skipping when it sees that value, a missing prerequisite turns the run red on the spot, and development machines behave as before. We have not run this in the repository; it is a proposal.</p>
-      <pre><code>final onCi = Platform.environment['CI'] == 'true';
-test('bidirectional cross-check against python cryptography', () async {
-  // ...
-}, skip: onCi ? false : skipReason);</code></pre>
-      <p>The branch uses <code>dart:io</code>, so it cannot go into a test that runs in a browser. This repository's web step runs only <code>test/web/</code> in the browser, which does not include the crypto file.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">One skip path the guard misses, and no CI run on record</h2>
-      <p>The CI guard added on September 15 checks only that python3 runs and the package imports. The test has three skip paths, and one of them, failing to find the Python cross-check script within the working directory or the four folders above it, sits outside the guard. CI runs from the repository root, so the script is found today, but nothing pins that down.</p>
-      <p>The repository keeps no results from the CI Flutter job, and the deployment doc says the CI web step could not be run locally, so a green CI run has not been demonstrated yet. So we could not confirm that these three tests were ever actually skipped in CI. Since the guard went in, if the module still cannot be imported after the install attempt, the CI job stops with exit 1.</p>
-    </section>
-    <section aria-labelledby="how-to">
-      <h2 id="how-to">Four steps to find required skips and make them fail</h2>
-      <ol>
-        <li>Find them with <code>grep -rn "skip:" test/</code> and <code>grep -rn "markTestSkipped" test/</code> (why the skip count belongs in every report is covered in <a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">What "100% E2E pass" really meant</a>). Line counts are not skip counts: this app's 17 <code>skip:</code> lines become 13 only after dropping the 3 conditional crypto lines, 1 line that skips only on the web and runs on the VM and 1 helper parameter, and counting 1 relay group line as 2 tests. The 6 <code>markTestSkipped</code> calls are decided at run time.</li>
-        <li>Mark each one required or optional. Required means no other test would catch what it catches, such as a cross-check against an independent implementation or a real server path.</li>
-        <li>For required tests, add a CI step that installs and verifies the prerequisite, or stop skipping when <code>CI=true</code> as in the snippet above. With this app's guard, if the install fails and the module is absent, the check command turns CI red.</li>
-        <li>Put tests CI cannot run on a pre-release checklist with the command and the date of the last run. When a long-skipped test fails on its first run back, check whether the test went stale before blaming the product; all 3 failures in this app were stale tests.</li>
-      </ol>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">Still open: the test's own skip condition and two-device E2E</h2>
-      <p>The crypto cross-check file has not changed since September 11, so it still skips without the module. Once a <code>CI=true</code> branch is added, a GitHub Actions run should show the same skip count as the development machine. There is also no automated E2E across two devices yet.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Silently%20skipped%20tests%20keep%20CI%20green%3A%20three%20crypto%20cross-checks%20and%20an%20integration%20test%20that%20went%20stale%20for%20six%20days">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <nav class="box ax-series-box" aria-label="Series contents"><p><strong><a href="https://sugarmount21.com/en/ax/series/green-but-broken/">When green does not mean tested: all 6 parts</a></strong></p><ol><li value="2"><a href="https://sugarmount21.com/en/ax/zero-expect-e2e-runners/">AI agent says all tests pass: 7 E2E runners with zero expect()</a></li><li value="4"><a href="https://sugarmount21.com/en/ax/guard-removal-test/">Catch fake AI-written tests by deleting their guards</a></li></ol></nav>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Does a skipped test make flutter test fail in CI?</summary><div><p>A skip never fails the run: the exit code stays 0 and the count shows up only as <code>~N</code> on the result line. This app's own records list a run with 13 skipped as 0 failed.</p></div></details>
-        <details><summary>How do I fail a GitHub Actions step when a Python module is missing?</summary><div><p>Install it, then run <code>python3 -c 'import module'</code>; if that fails, print an <code>::error::</code> line and <code>exit 1</code>. The install command can carry <code>|| true</code>, but the check must not.</p></div></details>
-      </div>
-    </section>
-    <p class="note">Sources: the chat app's git history, CI workflow, test files and the September 15 E2E report. Skip counts were recounted from the tree at that commit, not rerun (checked November 3, 2026).</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/adversarial-review-other-paths/">Claude Code re-review: the bug survived via HTTP</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Sun, 08 Nov 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Game feel fix: a heart that fell 109 ms early – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/game-feel-frame-review/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/game-feel-frame-review/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/game-feel-frame-review-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX Notes · Method</span>
-      <h1>Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</h1>
-      <p class="lead">Don't stop at asking an agent to fix the animation. Give it the code and the recording's frames, and have it list each event's cause and effect in order. Use timing measurements to prove the fix.</p>
-      <p>When players say a game has no feel, the cause is often not missing effects but events landing in the wrong order. In <a href="https://sugarmount21.com/en/apps/arrow-knots/">Arrow Knots</a>, our then-unreleased puzzle game, tapping a blocked arrow made the heart drop first; the arrow reached its blocker 109 ms later. The effect came before its cause.</p>
-      <p>On the night of October 1, 2026, when the operator called the animation sloppy, the AI agent committed 719 lines of new effects within 11 minutes and the order stayed wrong. It changed only after a code and frame review that asked, event by event, what causes what and in which order. In the recording after the fix, the heart moves 16 ms after contact. Below: how to measure a recording, and what to tell the agent.</p>
-    </section>
-    <section aria-labelledby="measured-order">
-      <h2 id="measured-order">Measured again, the heart led by 109 ms</h2>
-      <p>The recordings from before and after the fix each hold one blocked tap. We decoded both frame by frame, counted pixels whose brightness changed by more than 25 between frames, split the count into the header and the board, then checked the result against contact sheets by eye. The median frame gap was about 8 ms, which set the resolution. A 60 Hz screen would limit it to about 17 ms.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Event</th><th scope="col">Before (level 151)</th><th scope="col">After (level 52)</th></tr></thead>
-          <tbody>
-            <tr><td>Arrow starts moving</td><td>3,807 ms</td><td>3,851 ms</td></tr>
-            <tr><td>Heart starts changing</td><td>3,815 ms</td><td>3,984 ms</td></tr>
-            <tr><td>Contact (board shake before, contact ring after)</td><td>3,924 ms</td><td>3,968 ms</td></tr>
-            <tr><td>Heart relative to contact</td><td>109 ms early</td><td>16 ms late</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>Before the fix, the heart began to swell 8 ms after the arrow set off and had faded about halfway by the time anything touched. The review document describes this scene as the effect coming before the cause. That night the reviewer printed time-stamped 60 fps frame differences, and the output showed the heart changing at 3.817 s and the board at 3.933 s, but the review document recorded no measured value. The 109 ms was measured from the original frames a month after the fix.</p>
-      <p>In the fixed code, the contact callback runs before the ring is drawn. The 16 ms in the video is about two frames, so read it as the delay until each change reaches the screen. Nobody tuned it to that value.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/apps/arrows/shot1-en.webp" width="360" height="640" alt="Arrow Knots store screenshot: a heart-shaped knot of arrows, three hearts at the top right and a timer" loading="lazy"><figcaption>Arrow Knots in play (store screenshot). Tapping a blocked arrow costs one of the hearts at the top right; before the fix, that heart moved before the arrow reached its blocker.</figcaption></figure>
-    </section>
-    <section aria-labelledby="first-rebuild">
-      <h2 id="first-rebuild">A 719-line rewrite left the order alone</h2>
-      <p>At 22:05 the operator's verdict, roughly, was that the animation was too sloppy for anyone to bother playing. The agent assumed the game lacked effects. It added snake-like exits, five synthesized sound effects, vibration, confetti and a star card, and committed it at 22:16.</p>
-      <p>It had looked at frames too: 89 at 5 fps, then 162 and 149 at 10 fps, recorded on the S21. Its notes from that pass say the blocked bump and the heart animation checked out. Nothing in the log times their order. What it changed afterward was the result backdrop, the confetti and the coloring of touching arrows. The report said the work was checked frame by frame. In the rewritten code the heart still dropped at the moment of the tap.</p>
-      <p>About fifteen minutes later the operator told it to analyze more deeply. The agent split the work into three tracks, and the game-feel reviewer came back in 4 minutes 51 seconds with 6 problems seen on video and 14 recommendations.</p>
-    </section>
-    <section aria-labelledby="cause-chain">
-      <h2 id="cause-chain">The heart code sat one line after the animation call</h2>
-      <p><code>bump</code> launches its animation in a coroutine and returns immediately, so the next two lines run in the same frame that handles the tap.</p>
-      <pre><code>is TapResult.Blocked -&gt; {
-    fx.bump(id, distance, r.blockers)  // starts the animation, returns at once
-    lives = state.lives                // heart drops at the tap
-    feedback.blocked(view)             // sound and vibration at the tap
-}</code></pre>
-      <p>One level down, <code>state.tap()</code> settled the outcome on the spot and the UI code sat right there, so nothing separated rule time from display time.</p>
-      <p>The poke that sends a blocked arrow to its blocker took longer with distance: <code>(90 + 45 * distance).toInt().coerceAtMost(260)</code>. The review document put contact 90 to 260 ms after the tap; those are the two ends of this formula. Distance is <code>k + 0.55</code>, so a real blocked tap takes at least about 114 ms. The recording showed 117 ms. This tap sits near the formula's shortest case; by the formula, a far-blocked arrow would have widened the reversal to nearly 260 ms.</p>
-    </section>
-    <section aria-labelledby="review-question">
-      <h2 id="review-question">The reviewer was asked a different question</h2>
-      <p>The blocked-tap behavior the first pass approved came back as a problem in the review. The reviewer also cut the same video into 149 frames at 10 fps. Its brief asked for motion timing and easing per event, feedback layering per event (visual, audio, haptic), and any abrupt cuts visible frame by frame.</p>
-      <p>At 10 fps, frames are 100 ms apart, so a 109 ms gap is a single step. The reviewer read the code first, skimmed the 149 frames, then recut only the blocked-tap section at 30 and 60 fps.</p>
-      <p>The review document pinned the reversed order on code lines and cited no frame numbers for it. An arrow flying over the hearts and status bar (frames 58, 62 and 89), the opening pop-in hidden by the splash fade (frame 21), and a red warning tint that barely showed on the vermilion arrow all came from frames. Take call order and the timing of sound and vibration from the code; take what shows on screen and the actual timestamps from the frames.</p>
-    </section>
-    <section aria-labelledby="display-only">
-      <h2 id="display-only">The rule stayed instant; only the display moved</h2>
-      <p>Delaying the rule result until contact was an option, but the review said to keep it immediate and the build followed. The document doesn't give a reason. <code>bump</code> gained an <code>onContact</code> callback, and heart, sound and vibration moved inside it.</p>
-      <pre><code>fx.bump(id, dist, r.blockers) {        // called when the poke lands
-    feedback.contact(view, costsLife = !tutorial)
-    if (!tutorial) lives = state.lives
-}</code></pre>
-      <p>The poke became a fixed 110 ms instead of scaling with distance, so contact no longer shifts with distance. The poke in these two taps took 117 ms both before and after; what moved was the heart. Board shake dropped from 0.12 of a cell to 4 dp, and red now appears only in the contact ring. The blocked arrow darkens and its blocker gets a white outline.</p>
-      <p>Under rapid taps, <code>lives = state.lives</code> in the callback jumped straight to the final count, and a fix the next morning made it drop one heart per contact. That incident has its own note: <a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button</a>.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Mobile%20game%20feel%3A%20frame%20timing%20showed%20our%20heart%20penalty%20landing%20109%20ms%20before%20the%20collision">Email us</a></p></aside>
-    <section aria-labelledby="colors">
-      <h2 id="colors">Eight colors became six</h2>
-      <p>The review measured color as well, using the Machado 2009 simulation matrices with the CIEDE2000 color-difference formula, and treated a difference under 10 as hard to tell apart. We implemented the formula separately on November 4, 2026, and every value matched.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Vision</th><th scope="col">Old 8 colors, smallest difference</th><th scope="col">New 6 colors, smallest difference</th></tr></thead>
-          <tbody>
-            <tr><td>Typical</td><td>12.8</td><td>22.5</td></tr>
-            <tr><td>Protan</td><td>5.5</td><td>17.0</td></tr>
-            <tr><td>Deutan</td><td>7.4</td><td>16.7</td></tr>
-            <tr><td>Tritan</td><td>2.7</td><td>18.5</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>Against the paper background, amber reached 2.43:1 and green 2.9:1, both under the 3:1 in WCAG 1.4.11. The warning red and the vermilion arrow differed by 11.1 for typical vision but only 2.0 under tritan simulation, so blocked state ended up carried by shape and motion. The review judged that making all eight colors safe for color vision deficiency was close to impossible, and noted that six colors are enough because the neighbor graph is planar.</p>
-      <p>To fix contrast the review recommended darkening amber to <code>B87A00</code>, which made things worse: it cuts the deutan difference from vermilion from 7.4 to 2.4. The reviewer saw that number in its own 22:35 run and left the advice in. The agent doing the implementation searched six-color combinations and replaced the whole palette. That search missed the review's target of 20, and 16.7 became the accepted minimum.</p>
-    </section>
-    <section aria-labelledby="first-tap-crash">
-      <h2 id="first-tap-crash">Following the review crashed the first tap</h2>
-      <p>Recommendation 14 said to replace weak vibration on Samsung devices with <code>VibrationEffect.Composition</code>. It didn't mention permissions, and the commit that applied the review shipped the change without declaring <code>VIBRATE</code>, so the first arrow to leave the board threw <code>SecurityException</code>.</p>
-      <p>At 22:46 the agent had a tutorial script finish without a crash, and on the S24 it had only confirmed install and launch. Asked whether testing was done, it said no. About four minutes later the operator found the tutorial error by hand on that S24. A monkey run on an S21 from fresh state died at event 15 of 800. At 22:47 a level-check script had removed 16 arrows on the same code without dying. The logs don't settle why either script missed it.</p>
-      <p>The next commit declared the permission and made vibration failures fall back to standard haptics. Three seeds of 800 events each on the S21 gave zero fatal errors. Right after that, the fresh-state monkey run became a script.</p>
-    </section>
-    <section aria-labelledby="procedure">
-      <h2 id="procedure">Record a blocked tap, fill the table, fix, fill it again</h2>
-      <ol>
-        <li>Record a level on a real device, with every event in it at least once: blocked, removed, cleared.</li>
-        <li>Cut the whole clip at 10 fps, number the frames on a contact sheet, and show the agent.</li>
-        <li>Have the agent read the code too, and tell it: "For each event, give me a table of cause frame, effect frame, and where sound and vibration are called. Find where an effect comes before its cause. Mark each number as a code formula or a video measurement." Leave "make it better" out of the brief.</li>
-        <li>Recut only the suspect section at 60 fps to look at it, and read times from the original frames' timestamps.</li>
-        <li>After the fix, record the same scene, fill in the same table, and run monkey from fresh state, as in <a href="https://sugarmount21.com/en/ax/fresh-install-monkey-test/">the fresh-install monkey test</a> note.</li>
-      </ol>
-      <pre><code>adb shell screenrecord --time-limit 25 --bit-rate 8000000 /sdcard/run.mp4
-adb pull /sdcard/run.mp4
-ffmpeg -i run.mp4 -vf fps=10,scale=360:-1 f_%04d.png
-ffmpeg -ss 3.6 -t 0.9 -i run.mp4 -vf fps=60,scale=360:-1 g_%03d.png</code></pre>
-      <p>Replace <code>-ss 3.6 -t 0.9</code> with the time of the blocked tap in your own video. The code below prints each frame's time and, for the header and board regions, how many pixels changed in brightness by more than 25. Region ratios differ per game.</p>
-      <pre><code>import cv2
-c = cv2.VideoCapture("run.mp4")
-H = int(c.get(cv2.CAP_PROP_FRAME_HEIGHT)); prev = None
-while True:
-    ok, f = c.read()
-    if not ok: break
-    t = c.get(cv2.CAP_PROP_POS_MSEC)
-    g = cv2.cvtColor(f, cv2.COLOR_BGR2GRAY)
-    if prev is not None:
-        d = cv2.absdiff(g, prev) &gt; 25
-        print(round(t), d[int(H*.04):int(H*.1)].sum(), d[int(H*.12):int(H*.8)].sum())
-    prev = g</code></pre>
-      <p>The table above came from decoding every original frame with OpenCV: 1,276 before the fix and 1,840 after. No frames arrive while the screen is still. Gaps in these recordings had a median of 8 ms and a maximum of 3 seconds, so never convert frame numbers to time.</p>
-    </section>
-    <section aria-labelledby="outside-video">
-      <h2 id="outside-video">Sound, haptics, fingers and long sessions stay off camera</h2>
-      <p>Sound didn't make it into the screen recording, and video can't show vibration strength. Automated taps hit the exact center of a cell, so they say nothing about real finger accuracy. Long-session defects are missed as well: this game's spring-back crash appeared 28 times in a 300-level stress run the next day.</p>
-      <p>The boards being too easy was already flagged in the rewrite report, and separate level analysis measured and fixed it the same night. The generator side is covered in <a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a>.</p>
-    </section>
-    <section aria-labelledby="next-checks">
-      <h2 id="next-checks">Far-blocked taps and retention weren't measured</h2>
-      <p>An arrow blocked from far away wasn't timed. We have no player metric, such as retention, comparing game feel before and after.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Mobile%20game%20feel%3A%20frame%20timing%20showed%20our%20heart%20penalty%20landing%20109%20ms%20before%20the%20collision">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">Frequently asked questions</h2>
-      <div class="faq">
-        <details><summary>How many milliseconds should game feedback animation take?</summary><div><p>This game fixes the poke at 110 ms and puts heart, sound and vibration in the contact callback. We haven't validated those values for any other game.</p></div></details>
-        <details><summary>What frame rate should I use to review a recording?</summary><div><p>Use 10 fps to skim and 60 fps to look at a section, and read times from the original frames. This recording averaged 85.58 fps.</p></div></details>
-        <details><summary>Is a debug build good enough for this?</summary><div><p>It was enough to find the order; both recordings here are debug builds. We didn't repeat the measurement on a release build, so use one if you also want to compare frame delays.</p></div></details>
-      </div>
-    </section>
-    <p class="note">Checked 2026-11-04. The game repository's git history and review document, and that night's agent session logs. The 109 ms and 16 ms figures were remeasured from the original recordings. Clock times are Korea time.</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/play-store-title-aso-no-clear-gain/">Play Store title keywords: two weeks, no verdict</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Sat, 07 Nov 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Why we replaced an app privacy policy template – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/privacy-policy-code-audit/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/privacy-policy-code-audit/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/privacy-policy-code-audit-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX note · Retrospective</span>
-      <h1>App privacy policy templates: we threw ours out and rewrote it from a code audit</h1>
-      <p class="lead">Four apps shared one generated privacy policy. We replaced it with 8 pages written from source, each checked by a second agent looking for counter-evidence.</p>
-      <p>Plenty of first-time app makers fill in their privacy policy from a generator template. Four of our Android apps shared one such English template, which said user information "is not collected by me in any way", while one of them, the Korean spell checker <a href="https://sugarmount21.com/en/apps/sugarspeller/">SugarSpeller</a> 1.6.025, was sending AI explanation requests and an anonymous ID to our own server.</p>
-      <p>On October 4, 2026, eight AI agents read the four codebases for 11 min 46 s and wrote 8 Korean and English policy pages. We treat a privacy policy as a code audit report first and a legal document second. Below: where the template was wrong, where the agents' drafts were wrong, and an audit order you can reuse. This note is not legal review.</p>
-    </section>
-    <section aria-labelledby="template-text">
-      <h2 id="template-text">Where the template and the 1.6.025 code disagreed</h2>
-      <p>The template still ended with "created at privacypolicytemplate.net and modified/generated by App Privacy Policy Generator". It opened with a line ending "built the This app as a Free app." The word This sat where the app name belonged.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Template</th><th scope="col">SugarSpeller 1.6.025 code</th></tr></thead>
-          <tbody>
-            <tr><td>"retained on your device and is not collected by me in any way"</td><td>AI explanation requests (corrected words up to 60 characters each, error type, checker, subscription status, app version) and a Firebase anonymous ID reach our server.</td></tr>
-            <tr><td>Two third parties: Google Play Services, AdMob</td><td>Naver and Daum (Korean portals whose spell checkers do the checking), Firebase, Vertex AI (Gemini) and the ad partner Liftoff also receive data.</td></tr>
-            <tr><td>"Free app", "at no cost"</td><td>Sells Google Play subscriptions.</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>1.6.025 was the first version to send data to our own server, but text to be checked had gone to Naver and Daum for longer than that, so the third-party list was already short. The design of the AI feature is in <a href="https://sugarmount21.com/en/ax/llm-explain-cost-limits/">the first LLM in our spell checker</a>.</p>
-    </section>
-    <section aria-labelledby="wrote-it-down">
-      <h2 id="wrote-it-down">We wrote down that it was wrong, and it stayed until October 4</h2>
-      <p>At 21:49 on September 29, draft policy text and a Play Data safety answer table were committed to the SugarSpeller repository. The draft states that the published policy "is the template as is" and does not match reality. Step 3 of the release runbook says to fix the policy and the Data safety form before submitting the app.</p>
-      <p>When an agent fetched the Google Sites page at 11:05 on October 4, the paragraph was not there. 1.6.025 was rolling out by the night of October 1, so that version ran under the wrong policy for about two and a half days. The monitoring log counted 254 users on 1.6.025 between September 22 and October 3, with no note that test devices were excluded.</p>
-      <p>The agent's release notes on the night of September 29 said the policy had to change before submission, and on September 30 it handed the item back as the owner's third remaining task. Nothing records why the item stayed open, but the structure that allowed it is visible.</p>
-      <ol>
-        <li>The policy's sentences had no source in the code. A generator wrote them, so nothing could flag a mismatch when the code moved.</li>
-        <li>The policy lived on Google Sites, outside any repository. Fixing it was one manual line in a runbook, and the four app repositories have no <code>.github/workflows</code> (checked November 4).</li>
-        <li>Four apps shared one URL, as their Play listings showed. There was no page on which to state a fact about one app.</li>
-      </ol>
-    </section>
-    <section aria-labelledby="first-guess">
-      <h2 id="first-guess">The one-paragraph plan rested on a sentence that did not exist</h2>
-      <p>The September 29 plan kept the template and added a paragraph under "Information Collection and Use". The agent-written draft says the analytics and ads section could keep its "existing text (Google Analytics for Firebase, AdMob)". Searching the template for Analytics returns zero hits.</p>
-      <p>The paragraph would not have been enough anyway. On a shared page, a sentence about sending text to Naver would also have landed in the policy of SugarAlbum, a video maker, and "Free app" would have stayed.</p>
-      <p>The owner's request on October 4 was to move policies and app information to one site. Moving alone would have carried the same sentence to a new address. The audit was the agent's addition, and so was its size: 8 agents and about 1 million tokens excluding cache reads, which the agent reported as not requested.</p>
-    </section>
-    <section aria-labelledby="two-agents">
-      <h2 id="two-agents">One writer per app, one reviewer hunting counter-evidence</h2>
-      <p>Four writer agents were told to "only claim what the code does" and, when unsure, to "disclose rather than deny". Four other agents then took the files, looked for evidence against every "we don't collect or send X" sentence, and fixed what was wrong. All four apps needed fixes.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">App</th><th scope="col">Writer's draft</th><th scope="col">After review</th></tr></thead>
-          <tbody>
-            <tr><td>SugarSpeller</td><td>Sends words, error type and checker name to Vertex AI</td><td>Words and error type only. The server passes <code>original</code>, <code>corrected</code> and <code>type</code>.</td></tr>
-            <tr><td><a href="https://sugarmount21.com/en/apps/sugarcard/">SugarCard</a></td><td>No ads while subscribed</td><td>The basic plan keeps the banner, and the exit-screen ad shows on every plan.</td></tr>
-            <tr><td>SugarAlbum</td><td>Three groups of permissions missing</td><td>Added storage write, ad API and Firebase permissions after reading the merged release manifest.</td></tr>
-            <tr><td>SugarClip</td><td>Android erases it beyond recovery</td><td>Removed with app data or the app; backup copies are deleted in the Google account.</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>The first row claimed too much and the second flattered the app. These agents had the source open and the "only claim what the code does" instruction in front of them, and they still wrote those sentences. The workflow script had split writers from reviewers before any draft existed.</p>
-      <p>Reviewers also settled values that live outside the code. The SugarSpeller writer flagged that "deleted after 30 days" depended on a Firestore TTL policy it could not confirm. The reviewer read it from the API (<code>ttlConfig.state: ACTIVE</code>) and read <code>retentionDays: 30</code> from the log bucket. That TTL was step 1 of the same runbook, also manual: a query at 16:00 on October 3 found it unset, and one at 01:00 on October 4 found it ACTIVE.</p>
-    </section>
-    <section aria-labelledby="leave-it-out">
-      <h2 id="leave-it-out">The numbers we deleted and the claim the owner dropped</h2>
-      <p>On October 5 we put "Policies describe the actual code. Don't add claims the code doesn't back." into the site's agent instructions. On October 18 we added "If a fact cannot be verified there, leave it out."</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/privacy-policy-code-audit-shot-1-en.webp" width="660" height="1132" alt="Section 1 summary table of SugarSpeller's privacy policy on this site: text to check goes to Naver or Daum, AI explanation requests go to our server and Vertex AI, and the table lists who handles the anonymous identifier, advertising data, usage stats and subscription details" loading="lazy"><figcaption>The summary table of SugarSpeller's policy after the code audit (site screenshot, 2026-11-13). The template's single "not collected" line became seven rows, one per kind of data.</figcaption></figure>
-      <p>An October 10 commit in our family calendar app AXFamily changed the invite link default from 72 hours to the 24 in the code, replaced "an internal ID instead of a name" with the fact that display names are sent, and deleted two numbers found nowhere in code or repository: "integrity tokens 12 hours" and "Play grace period 7 days". The same commit's move to the Seoul region turned out wrong, a story told in <a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">the AI processing notice we changed twice in a day</a>.</p>
-      <p>On November 1 a person made the call. The Block Turn page promised no banner or interstitial in the first three games, but a classic game over counts as two runs, so an interstitial could appear from the second game over. The owner kept the code and removed the sentence, and the commit records it as an owner decision.</p>
-      <p>Policy work kept coming. After the new policies went up, through November 4, 22 of 104 commits have privacy, policy or the Korean word for it in the subject line, mostly policies for new apps. Across the whole repository it is 29 of 117. That is a subject-line grep, so one AX notes commit is in there by accident.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20App%20privacy%20policy%20templates%3A%20we%20threw%20ours%20out%20and%20rewrote%20it%20from%20a%20code%20audit">Email us</a></p></aside>
-    <section aria-labelledby="store-form">
-      <h2 id="store-form">The same defect in a Play Data safety form on October 17</h2>
-      <p>One more place states the same facts. At 14:41 on October 17, the owner asked whether Block Turn and Arrow Knots needed a Data safety fix. That day both public store pages listed four shared data types, but the collected section said no data was collected, while our site policies already listed Firebase Analytics and Crashlytics (added on October 8 and October 11).</p>
-      <p>The agent lacked console permission, so the owner entered the answers from a table, and at 14:58 the agent expanded the console preview and compared it line by line. On October 4, Play policy URLs couldn't be changed through the API either, so the owner changed four by hand. No app had the URL hard-coded, so that finished the move.</p>
-    </section>
-    <section aria-labelledby="options">
-      <h2 id="options">Nowhere to run a check between the four apps' code and a table</h2>
-      <p>AXFamily goes further. Its processors live in <code>processors.json</code>, the policy tables are generated, and the CI job <code>legal-consistency</code> compares the output with the JSON and the in-app notice with the function constants. Its policy wasn't public on October 4, so we never compared the two side by side. We would still run the per-app audit on the four old apps.</p>
-      <p>Generating the tables alone could sit in the pre-commit check of the site repository, where the policies live. The hard part is comparing the JSON with app code: the four app repositories have no CI to run that, and SugarAlbum has had no commit since January 3. A per-app audit must be redone when the code changes; generation fails a check on a mismatch but needs somewhere in the app repository to run it. So far only AXFamily uses generation. Start any new app with it.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">What reading the source cannot tell you, and legal review</h2>
-      <ul>
-        <li>Code can't confirm legal requirements. The section list came from a list of Korean privacy law items the agent wrote into its own prompt (purpose, items, retention, third parties and overseas transfers, destruction, user rights, privacy officer) plus earlier policies, and we have no record of a person or professional reviewing that list. The photo app policy the writers took their structure from on October 4 had no section on processors and overseas transfers; they added one, and the original got its own only 18 days later.</li>
-        <li>Source is not the shipped build. The SugarCard reviewer noted it could not tell which build was on Play, and SugarAlbum's merged manifest came from a January 3 build.</li>
-        <li>What an SDK collects isn't in the app's code. A September 23 commit added IP address, ad interactions and diagnostics to our first policy after the fact.</li>
-      </ul>
-      <p>We haven't tried this on a service with many servers and processors, or on an outsourced app without source. We've only run it on Android apps with one operator.</p>
-    </section>
-    <section aria-labelledby="how-to">
-      <h2 id="how-to">Start by marking the negative claims in your published policy</h2>
-      <p>If a sentence can't be tied to a line of code or a console value, delete it. Doubt "we don't collect" first.</p>
-      <ol>
-        <li>Fetch the published policy, split it into sentences and mark every negative claim.</li>
-        <li>Note the app version and build a data flow table: data, destination, code location.</li>
-        <li>Count permissions from the merged release manifest, not the source manifest. Permissions added by libraries appear only there.</li>
-        <li>Read each SDK vendor's data disclosure and copy the items over.</li>
-        <li>Read retention and deletion settings from the API instead of assuming them.</li>
-        <li>Give the table and policy to a different agent or person and ask only for counter-evidence.</li>
-        <li>Compare your Play Data safety answers with the same table.</li>
-        <li>Record the audited commit next to the policy and run the diff below at each release. We have not done this step for the four apps.</li>
-      </ol>
-      <pre><code># Permissions and dependencies changed since the audit
-git diff $AUDITED HEAD -- '*AndroidManifest.xml' '*build.gradle*' '*libs.versions.toml'
-# Permissions in the merged release manifest (path varies with AGP version)
-grep -rh 'uses-permission' app/build/intermediates/merged_manifest/release/
-# Firestore TTL and log retention
-TOKEN=$(gcloud auth application-default print-access-token)
-curl -s -H "Authorization: Bearer $TOKEN" -H "x-goog-user-project: $PROJECT" \
-  "https://firestore.googleapis.com/v1/projects/$PROJECT/databases/(default)/collectionGroups/$GROUP/fields/$FIELD" \
-  | grep -A3 ttlConfig
-curl -s -H "Authorization: Bearer $TOKEN" -H "x-goog-user-project: $PROJECT" \
-  "https://logging.googleapis.com/v2/projects/$PROJECT/locations/global/buckets/_Default" \
-  | grep retentionDays</code></pre>
-      <p>This diff does not see server code or request fields. SugarSpeller's repeated AI requests live under <code>functions/</code>, so these paths miss them. Add your server and network code paths.</p>
-      <p>Step 6 used a review prompt along these lines, shortened and with file paths removed.</p>
-      <pre><code>Adversarially review the privacy policy pages against the real app source.
-Read-only on the source repo. Check: every claim matches code (especially any
-"we don't collect/send X" claims: look for counter-evidence: ad SDK, Firebase,
-network calls, other paths), ko/en say the same thing.
-FIX problems directly in those two files only.
-Report: what you fixed, what remains uncertain.</code></pre>
-      <p>The gate in <a href="https://sugarmount21.com/en/ax/release-gate/">our release gate and R8 crash note</a> confirms the policy URL returns 200, which proves a page exists and says nothing about its sentences. The Firestore and logging calls copy the form the reviewer used on October 4; we did not rerun them for this note.</p>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">Four policies still dated October 4</h2>
-      <p>All four policies still carry an effective date of October 4. In the repositories, SugarSpeller has reached 1.6.033, SugarCard 1.0.003 and SugarClip 1.2.002. A diff of SugarSpeller shows no new dependency in <code>build.gradle</code>, a manifest with queries for 3 sibling apps and one new game screen, and a server that can now send the same AI request up to 3 times. We haven't done the re-audit that decides whether any of this changes the policy.</p>
-      <p>The Play Data safety forms of those four apps have not finished being compared with these policies.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20App%20privacy%20policy%20templates%3A%20we%20threw%20ours%20out%20and%20rewrote%20it%20from%20a%20code%20audit">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Is a privacy policy template risky for an app?</summary><div><p>It is when its sentences differ from the code. Ours said "not collected by me" while the app sent data to our server. Use a template as a table of contents and rewrite the sentences from code.</p></div></details>
-        <details><summary>Can an AI agent write my privacy policy?</summary><div><p>It can draft one, but don't publish that draft unreviewed. All four of our source-based drafts needed fixes from a second agent. Keep writer and reviewer separate, and decide on professional review separately.</p></div></details>
-        <details><summary>What do I write when I can't verify something?</summary><div><p>Delete the claim or state it broadly on the side of disclosure. We deleted unsupported numbers such as "integrity tokens 12 hours", and kept a permission we could not tie to a build as "may be declared". Don't write a denial like "we don't store this" until you've checked.</p></div></details>
-      </div>
-    </section>
-    <p class="note">Checked 2026-11-04. Git history of this site and the app repositories, work session records (September 29 to October 4, October 17), and SugarSpeller's release runbook and monitoring log. Not legal review; we do not judge whether our policies meet any statute.</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/build-measures-contrast/">4.5:1 contrast in the site build: the dark hover pair that failed for 7 of 11 apps</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/daum-speller-js-redirect-200-empty/">Daum spell check failed: OkHttp and a JS redirect</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/play-store-title-aso-no-clear-gain/">Play Store title keywords: two weeks, no verdict</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Sat, 07 Nov 2026 09:00:00 +0900</pubDate>
   </item>
 </channel>
 </rss>
