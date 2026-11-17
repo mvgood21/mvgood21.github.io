@@ -6,7 +6,254 @@
   <description>Small Android apps that each do one thing simply, from shrinking photos and opening Korean HWP documents to checking Korean spelling and playing puzzle games.</description>
   <language>en</language>
   <atom:link href="https://sugarmount21.com/en/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Tue, 17 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Wed, 18 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Claude Code Android: a build gate for zero ads – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/ads-free-release-gate/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/ads-free-release-gate/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/ads-free-release-gate-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · How-to</span>
+      <h1>Claude Code Android: a build gate for zero ads</h1>
+      <p class="lead">The zero-ads gate Claude Code built had to read both the release dependency graph and the merged manifest; with the dependency check alone, a build carrying AD_ID passed.</p>
+      <p>An Android app that ships no ad SDK at all can still request the advertising ID permission. <a href="https://sugarmount21.com/en/apps/doc-viewer/">HWP Viewer SugarDoc</a>, our viewer for Korean word-processor files, was built with no ads by decision. Firebase Analytics, which it uses for statistics, pulls in four libraries that declare <code>AD_ID</code>, and the manifest merger copies that into the app. Left alone, the Play Console listing says "no ads, no advertising ID" while the AAB asks for it.</p>
+      <p>The first gate a Claude Code agent wrote looked only at the dependency graph, and a review agent caught the hole. When we reran the same repository in a throwaway folder on November 18, 2026, a gate that checks dependencies alone passed a build whose merged manifest still had AD_ID.</p>
+    </section>
+    <section aria-labelledby="first-gate">
+      <h2 id="first-gate">The first gate checked dependencies only</h2>
+      <p>The three photo apps in the same repository show banner, interstitial and app-open ads. When the viewer started, the agent offered two ad plans (no ad SDK, or one home-screen banner), and early on October 5 (Korea time) the operator picked no ads. The app's config file got one line, <code>adsMode=NONE</code>.</p>
+      <p>About two hours later an implementing agent built the gate. The release config task <code>verifyReleaseConfig</code> gained rules that every ad id field must be empty and that the release dependency graph must not contain Google Mobile Ads (GMA, Google's ad SDK) or its consent SDK (UMP). The app manifest got four <code>tools:node="remove"</code> lines that strip the advertising-id permissions, and two unit tests reading the merged release manifest guarded those lines.</p>
+      <p>The workflow instructions said to remove each new guard for a moment and confirm a test fails, and the agent ran several deliberately broken copies. Copies that added an ad id or an ad module were run through <code>verifyReleaseConfig</code>, the task the AAB build depends on; the copy with the remove lines deleted was run through unit tests only and never through that task.</p>
+      <p>Four review agents started as soon as the implementer finished. The one assigned to rules and gates wrote: "<code>bundleRelease</code> depends on only one gate, <code>verifyReleaseConfig</code>, and it checks the dependency graph but not the merged manifest." Delete the remove lines, build and upload, and the store declares no advertising ID while the AAB has it. The reviewer filed it as minor and noted that the manifest unit tests ran only from the release script, never from the AAB build command.</p>
+      <p>A fix agent spent about 20 minutes moving the rules into a separate file and adding the merged-manifest check to the same task. Later that morning the operator asked again whether the app really had no ads at all, then set both the ads and advertising-ID answers in Play Console's app content section to "no". The gate, fix included, landed in the repository with commit ca1ade4 on October 8; the dependency-only version was never committed.</p>
+    </section>
+    <section aria-labelledby="firebase-ad-id">
+      <h2 id="firebase-ad-id">How Firebase puts AD_ID back</h2>
+      <p>The viewer's telemetry module depends on Firebase Analytics. In the release dependency graph we pulled again on November 18, firebase-analytics 23.2.0 brings a set of measurement libraries, and among them is <code>play-services-ads-identifier</code> 18.0.0, the library that reads the advertising ID.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/ads-free-release-gate-shot2-en.webp" width="1200" height="608" alt="Release dependency graph with play-services-ads-identifier and ads-adservices under firebase-analytics highlighted, and the merger report listing the four libraries that add AD_ID" loading="lazy"><figcaption>Gradle dependency output and manifest merger report, excerpt (rerun 2026-11-18, state B with the remove lines deleted). Local paths are covered with grey boxes.</figcaption></figure>
+      <p>The manifest merger report says which library added each permission. With the remove lines gone, <code>AD_ID</code> was declared by four libraries, and two of them added two permissions from Android's newer ad-measurement APIs (AdServices). <code>ACCESS_ADSERVICES_TOPICS</code>, which the app manifest also removes, is declared by nothing in this version; the merger only warned that there was nothing to remove.</p>
+      <p>The dependency check stays silent because <code>play-services-ads-identifier</code> is not on its deny list. Adding it would block Firebase Analytics itself, so a code comment says it is not an ad SDK and leaves it out on purpose. Permissions live in the manifest, so a check that reads only the dependency list cannot see this path.</p>
+      <div class="table-wrap"><table><thead><tr><th>Widening the deny list</th><th>What happens with today's graph</th><th>Why not</th></tr></thead><tbody><tr><td>Deny <code>play-services-ads-identifier</code> too</td><td>Always fails, Firebase Analytics brings it</td><td>Statistics would have to go</td></tr><tr><td>Fail on any module named <code>ads</code></td><td>ads-identifier and privacysandbox <code>ads-adservices</code> match via Firebase</td><td>False positives</td></tr><tr><td>Check config values only</td><td>Config is clean in state D, where the ad module is added</td><td>Misses an ad module coming in</td></tr><tr><td>Make <code>bundleRelease</code> depend on all release unit tests</td><td>The reviewer's second suggestion</td><td>No reason for not picking it is on record</td></tr></tbody></table></div>
+      <p>When the remove lines go away, four Firebase libraries add <code>AD_ID</code> again, the dependency check stays quiet because those libraries are allowed, and the tests that read the manifest sit outside the AAB build path. The fix agent cut the last link: the merged-manifest check now runs inside <code>verifyReleaseConfig</code>, so <code>bundleRelease</code> fails even with the first three in place.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20Android%3A%20a%20build%20gate%20for%20zero%20ads">Email us</a></p></aside>
+    <section aria-labelledby="four-states">
+      <h2 id="four-states">One app, four states</h2>
+      <p>Without touching the source repository, we unpacked <code>origin/main</code> into a temporary folder and ran the viewer's <code>verifyReleaseConfig</code> four times. The Firebase config file was the fake template the repository ships (without it, every run adds a "google-services.json is missing" line).</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/ads-free-release-gate-shot1-en.webp" width="1200" height="598" alt="verifyReleaseConfig output for one app in four states: A and C succeed, B fails on three AD_ID-related permissions, D fails with three dependency lines and twelve manifest lines" loading="lazy"><figcaption>Output rerun on 2026-11-18 with Gradle 9.6.0 and AGP 9.4.1. C passes although the merged manifest has AD_ID.</figcaption></figure>
+      <div class="table-wrap"><table><thead><tr><th>State</th><th>Change</th><th>Result</th><th>AD_ID in merged manifest</th></tr></thead><tbody><tr><td>A</td><td>none</td><td>pass</td><td>no</td></tr><tr><td>B</td><td>four remove lines deleted</td><td>fail, 3 manifest lines</td><td>yes</td></tr><tr><td>C</td><td>B, plus the manifest check call removed</td><td>pass</td><td>yes</td></tr><tr><td>D</td><td>the photo apps' ad module added</td><td>fail, 3 dependency + 12 manifest lines</td><td>no</td></tr></tbody></table></div>
+      <p>C is close to the gate as first built on October 5: the advertising-id permission is in, and the build succeeds. D goes the other way. The remove lines are intact, so <code>AD_ID</code> is stripped, but the ad SDK, UMP and the WorkManager library the ad SDK pulls in trip the dependency rule, and the manifest rule catches one ad activity and eleven WorkManager components. B is caught only by the manifest check; D trips both layers.</p>
+      <p>In the same copy, with the manifest check call removed, we also ran the rule tests (<code>./gradlew -p build-logic test</code>). All 15 passed. The tests guard the rule functions; nothing tests that the task calls them.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Wiring both checks into one task</h2>
+      <p>This can live in a convention plugin (a Gradle build-config plugin shared by several modules) or in an app module's <code>build.gradle.kts</code>. Our repository keeps it in the convention plugin every app applies and switches it on with <code>adsMode</code> in each app's config file.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/ads-free-release-gate-1-en.webp" width="1200" height="882" alt="Five steps of a release gate for an app without ads: config, dependency graph, merged manifest, wiring to bundleRelease, breaking it four ways" loading="lazy"><figcaption>Check the dependency graph and the merged manifest in one task, and put that task in front of the AAB build.</figcaption></figure>
+      <ol class="steps"><li><p>Give the app config an ads mode. With <code>NONE</code>, pass only when every ad id is empty and every ad flag is false.</p></li><li><p>Walk the release runtime graph (<code>releaseRuntimeClasspath</code>) to the end, collect each external module's <code>group:name</code>, and compare against exact names. Our list has seven: four Google ad SDK artifacts, UMP and two WorkManager artifacts. <code>play-services-ads-identifier</code> is not on it.</p></li><li><p>Strip the advertising-id permissions in the app manifest.</p><pre><code>&lt;uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" /&gt;
+&lt;uses-permission android:name="android.permission.ACCESS_ADSERVICES_AD_ID" tools:node="remove" /&gt;
+&lt;uses-permission android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION" tools:node="remove" /&gt;
+&lt;uses-permission android:name="android.permission.ACCESS_ADSERVICES_TOPICS" tools:node="remove" /&gt;</code></pre></li><li><p>In the same task, read the release variant's merged manifest and fail on <code>AD_ID</code> or <code>ACCESS_ADSERVICES_*</code> permissions, GMA meta-data, or GMA, UMP and WorkManager components. This is the step that catches step 3 disappearing. The permission part, taken from the repository:</p><pre><code>// plugin: hand the release variant's merged manifest to the task as an input
+onVariants(selector().withBuildType("release")) { variant -&gt;
+    mergedReleaseManifest.set(variant.artifacts.get(SingleArtifact.MERGED_MANIFEST))
+    releasePackage.set(variant.applicationId)
+}
+// rule function: match permission names
+(elements("uses-permission") + elements("uses-permission-sdk-23")).map { it.name() }
+    .filter { it == "com.google.android.gms.permission.AD_ID" || it.startsWith("android.permission.ACCESS_ADSERVICES_") }
+    .forEach { problems += "adsMode=NONE but the merged manifest requests $it" }</code></pre></li><li><p>Make the AAB task depend on it.</p><pre><code>tasks.matching { it.name == "bundleRelease" }.configureEach { dependsOn(verifyReleaseConfig) }</code></pre></li><li><p>Move the rules into functions with no Gradle types and give each rule a "break it and it fails" unit test. Then run the real project in states A to D and confirm A and C pass while B and D fail; of the broken states, only C should pass.</p></li><li><p>Find which library adds a permission in <code>build/outputs/logs/manifest-merger-release-report.txt</code>, and what pulls it in with <code>./gradlew :app:dependencies --configuration releaseRuntimeClasspath</code>.</p></li></ol>
+      <p>Don't write the lists from memory. Pull your dependency graph and merger report once; those two outputs are where the lists in steps 2 and 4 come from.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">Ad SDKs off the list, and wiring without a test</h2>
+      <p>The gate knows only Google's ad SDKs. The dependency list is seven exact module names, and the manifest prefixes cover GMA, UMP and WorkManager. Another ad network's SDK would pass both layers. We have not tried one in the viewer.</p>
+      <p>Blocking WorkManager works because the viewer uses none (it even cleans its document inbox without it). An app that needs scheduled work would have to change that line first. The gate hangs off <code>bundleRelease</code> only, so <code>assembleRelease</code>, which builds a release APK, does not run it.</p>
+      <p>Whether the task calls the rule functions is covered today by the release unit tests the release script runs. They read the same merged manifest, but the AAB build command alone does not run them. Next is pinning state C as a build-logic test, so that deleting the call fails a test.</p>
+      <p>A gate in another app whose input itself differed from the release is covered in <a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release</a>; here the input was the same build, and the gate skipped its manifest layer. The photo apps' full gate order is in <a href="https://sugarmount21.com/en/ax/release-gate/">AI-built Android app release checklist</a>.</p>
+    </section>
+    <p class="note">As of 2026-11-18. Session and workflow records from Oct 4-5 (implementer, reviewer and fixer agent reports), app repository git history (the Oct 8 commit that carried the gate), Gradle output and manifest merger report rerun in a throwaway copy.</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20Android%3A%20a%20build%20gate%20for%20zero%20ads">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/play-store-title-aso-no-clear-gain/">Play Store title keywords: two weeks, no verdict</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 18 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Claude in Chrome set up 4 Google Ads campaigns – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/claude-chrome-google-ads-campaigns-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Measurement</span>
+      <h1>Claude in Chrome set up 4 Google Ads campaigns</h1>
+      <p class="lead">Two Claude in Chrome sessions built four Google Ads app campaigns with 966 screen actions, and the operator's corrections were all settings: budget, bid, country and language.</p>
+      <p>While two browser agents built four Google Ads app campaigns, the operator had to give the same budget correction twice, 24 minutes 40 seconds apart, once to each session. The operator never once pointed out a wrong click. There was one report of a frozen screen, which the agent itself put down to a dialog it had hidden with a page script.</p>
+      <p>The two Claude Code sessions, one per puzzle game, started 24 seconds apart on the night of October 8, 2026, in the same Chrome and on the same ads account.</p>
+    </section>
+    <section aria-labelledby="method">
+      <h2 id="method">What we counted: 1,436 tool calls in two session logs</h2>
+      <p>The tool was Claude in Chrome, a browser extension that lets the agent take screenshots, click and type in the user's signed-in tabs. Session A handled Arrow Knots, session B handled Block Turn. Both were told to stop on the review screen, the summary page shown right before Publish, and never press Publish. We didn't use the Google Ads API that night; the prompt asked for Chrome from the start.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/claude-chrome-google-ads-campaigns-shot1-en.webp" width="1200" height="760" alt="Cumulative tool calls for both sessions, with setting fixes, video upload instructions, the frozen screen report and memory writes marked" loading="lazy"><figcaption>Every tool_use in two session logs, Oct 8 to 9, 2026. Vertical lines mark setting fixes, video upload instructions, the frozen screen report, the auto permission denial and memory file writes.</figcaption></figure>
+      <p>We counted each tool_use entry (one call the agent made to a tool) by tool name.</p>
+      <div class="table-wrap"><table><thead><tr><th>Session</th><th>All</th><th>Screen actions</th><th>Page scripts</th><th>Find element</th><th>Navigate</th><th>File upload</th></tr></thead><tbody><tr><td>A, Arrow Knots</td><td>977</td><td>703</td><td>136</td><td>65</td><td>39</td><td>9</td></tr><tr><td>B, Block Turn</td><td>459</td><td>263</td><td>119</td><td>35</td><td>13</td><td>11</td></tr></tbody></table></div>
+      <p>The flat stretch (from 22:51 for B and 23:06 for A until about 00:40) has no operator messages, and neither session made a tool call in it.</p>
+    </section>
+    <section aria-labelledby="clicks">
+      <h2 id="clicks">Only 201 of the 703 screen actions were clicks</h2>
+      <p>When we picked this topic, the working title was "703 clicks." Splitting the screen action calls by kind showed that number was never a click count.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/claude-chrome-google-ads-campaigns-1-en.webp" width="1200" height="620" alt="Bar chart of session A&#x27;s 703 screen actions: 249 waits, 201 clicks, 164 screenshots, 55 text inputs, 34 others" loading="lazy"><figcaption>201 were clicks; the largest group was 249 waits for the page to change.</figcaption></figure>
+      <p>140 of the 201 clicks were followed by a wait as the very next call, mostly 1 to 6 seconds (231 of the 249 waits), and the agent often took a screenshot to check the result.</p>
+      <p>Of its 136 page script calls (javascript_tool, which runs JavaScript inside the tab), just under half, 67 by a rough split on the code text, only read text off the page.</p>
+      <p>There were screen mistakes. The agent picked another app's item, hit "Yes" when the layout shifted, and merged two headlines into one field. The agents' own status messages mention 8 such slips, and the agent noticed and fixed or backed out of each before the operator said anything.</p>
+      <div class="table-wrap"><table><thead><tr><th>Operator messages (excluding the opening prompt, including ones queued mid-task)</th><th>Session A</th><th>Session B</th></tr></thead><tbody><tr><td>Setting fixes and questions (budget, bid, country, language)</td><td>3</td><td>6</td></tr><tr><td>Video upload</td><td>3</td><td>4</td></tr><tr><td>Go-aheads, image folder access</td><td>3</td><td>6</td></tr><tr><td>Frozen screen reported</td><td>0</td><td>1</td></tr><tr><td>Wrong clicks pointed out</td><td>0</td><td>0</td></tr></tbody></table></div>
+    </section>
+    <section aria-labelledby="same-fix-twice">
+      <h2 id="same-fix-twice">The same budget fix, given to each session separately</h2>
+      <p>Session A's prompt told it to take settings from an ads doc in the game repo, which said a daily budget of 25,000 won and a target cost per install (target CPI). Before A entered anything, 65 seconds in, the operator overrode that. The new values were 2,000 won a day, no target CPI, all countries.</p>
+      <p>Session B got only the country part, told separately at 22:03; the budget and target CPI never reached it. The Block Turn runbook that B read said United States, a 1,400 won target CPI and 25,000 won a day.</p>
+      <p>After the operator told it to "analyze in depth and proceed," B entered the runbook's daily budget and, by its own calculation, a 700 won target CPI instead of the runbook's US-based figure.</p>
+      <p>At 22:22 the operator gave B the budget and CPI correction, 24 minutes and 40 seconds after giving it to A, less politely. The 2,000 won decided that evening was in neither document the prompts pointed to. The budget and CPI correction lived only in session A's chat, and parallel sessions don't read each other's conversations.</p>
+      <p>The language fix also went to each session separately. A's Korean-copy campaign targeted all countries, and the operator had added English to its languages directly. When the operator asked whether Korean-only assets could run worldwide, A answered that this would show Korean ads to English speakers. Within the next two minutes the operator told both sessions to split campaigns by language, pasting the instruction sent to A into B's window as well. Each game ended with a Korean campaign for Korea and an English one for Southeast Asia, each at 2,000 won a day.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20in%20Chrome%20set%20up%204%20Google%20Ads%20campaigns">Email us</a></p></aside>
+    <section aria-labelledby="video">
+      <h2 id="video">Videos hit a channel permission, then the auto permission check</h2>
+      <p>App campaigns take video only as YouTube links. Session A tried uploading from the asset picker, got an error, and when the operator asked it to upload them, put three Korean videos up as unlisted through YouTube Studio, starting at 22:35 and taking a little over four minutes.</p>
+      <p>At the same moment session B was stuck in the ads console's upload dialog. The Upload button was grey with a note saying the account lacked permission to upload to the channel. The account signed in to Google Ads was not the one that owned the video channel. The operator pasted A's reply ("Yes, I can upload them…") into B's window and asked why the other one could and B couldn't.</p>
+      <p>Session B once hid a video picker that wouldn't close by running a page script. When the operator reported the console frozen on "checking for errors" (22:37), B reloaded it and then named its own script as the cause. Under our current rule, if the Chrome extension is refused a site permission, the agent does not fall back to page scripts and hands that step to a person.</p>
+      <p>When B moved to YouTube Studio and sent the file, Claude Code's auto permission check stopped it. That check screens the agent's tool calls before they run when Claude Code is in auto mode. The reason given was "Unrequested Commit in a Connected App," which B read as the checker seeing an external publish nobody had clearly asked for.</p>
+      <p>B stopped there instead of working around it. When the operator asked at 00:39 why the videos weren't in, B proposed a one-line instruction naming the channel, three English and three Korean files, unlisted, not made for kids. The operator typed it as written, and all six were up within five minutes. Attaching them to the campaigns didn't finish that night because the ads tab stopped responding.</p>
+    </section>
+    <section aria-labelledby="memory">
+      <h2 id="memory">A memory file appeared 40 seconds after the fix</h2>
+      <p>Forty seconds after the budget correction, session B wrote a memory file. Memory files are the project notes Claude Code reads, starting from their index (MEMORY.md), when a session begins. Its opening lines set the values the operator had chosen and said not to use the runbook's "US, tCPI 1,400, 25,000 a day." tCPI is short for target CPI.</p>
+      <p>Nine minutes after the language split it rewrote the file with the two-campaigns-per-language structure and the video upload route. Session A wrote its own file for Arrow Knots at 23:06, saying ad copy language matches target language.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/claude-chrome-google-ads-campaigns-shot2-en.webp" width="1200" height="472" alt="The two versions of the Block Turn ad settings memory file, account and channel identifiers and the repo path masked with black boxes" loading="lazy"><figcaption>Memory file write commands as recorded in the session log, Oct 8, 2026, 22:23 and 22:51. Text is Korean; identifiers and the repo path masked.</figcaption></figure>
+      <p>Three days later, on October 11, the marketing session read both files six seconds after the operator mentioned the 2,000 won campaigns. When the operator said the dates had been changed in the console by hand, it updated the file on the spot. We found no later operator message in the marketing session log correcting budget, bid or language again.</p>
+      <div class="table-wrap"><table><thead><tr><th>Where the values lived</th><th>What happened that night</th><th>Why we didn't keep it</th></tr></thead><tbody><tr><td>Repo docs and runbook</td><td>B entered planning values (A was corrected before it started)</td><td>Written as a plan, missing that day's decision</td></tr><tr><td>Correction in chat</td><td>Fixed in that session only</td><td>The other session needed the same fix 24 min 40 s later</td></tr><tr><td>Memory file</td><td>Later sessions read it first</td><td>Kept</td></tr></tbody></table></div>
+      <p>Don't tell a browser agent a setting that isn't already in a memory file.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Settings go into the memory file first</h2>
+      <ol class="steps"><li><p>Before opening the browser, write location, language, daily budget, bid, copy language, video channel, the account that owns it, and the made-for-kids answer into a dated memory file, and point the prompt at that file, saying it wins over the docs if they disagree.</p></li><li><p>Have the agent stop before Publish and return the review screen values in a table matched line by line against the memory file.</p></li><li><p>To correct something, edit the memory file first, then tell every running session to reread it.</p></li><li><p>For steps that publish outside the console, such as video upload, put channel, visibility and made-for-kids in one instruction.</p></li></ol>
+      <p>The video assets came from <a href="https://sugarmount21.com/en/ax/game-ad-creatives-from-play-recordings/">app campaign ad assets from gameplay recordings</a>, and the daily budget check on these campaigns is in <a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">a daily Google Ads budget check that only suggests</a>. Another case of an agent reading a stale doc line as current is in <a href="https://sugarmount21.com/en/ax/stale-doc-phantom-session/">the stale-doc session handoff note</a>.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">The memory file held a wrong number for nine days</h2>
+      <p>On October 17 the marketing session asked to link GA4 using the ads account number from memory and got "invalid Google Ads account ID." Session B had copied an internal number out of the console's URL, and nobody noticed for nine days.</p>
+      <p>At 22:29 session A was handed, mid-run, the one-line index entry B had just written (all countries, 2,000 won a day, no target CPI) and later linked B's file from its own, but it never opened that file. Session B shows no sign of receiving A's file at all.</p>
+      <p>Next we'll confirm in the channel's permission settings which account really owns the video channel, since the two memory files disagree, and keep the ad settings in one file. We also haven't reopened the Block Turn runbook to see whether the US and 25,000 won values are still there.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20in%20Chrome%20set%20up%204%20Google%20Ads%20campaigns">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+    <h2 id="faq">FAQ</h2>
+    <div class="faq"><details><summary>Should Claude in Chrome press Publish on a Google Ads campaign?</summary><div><p>We didn't let it. Both sessions stopped on the review screen, and the operator handled Publish and identity verification. Publishing starts spending the daily budget, so compare the review screen against the memory file and let a person press it.</p></div></details><details><summary>Why is the YouTube upload button grey in Google Ads?</summary><div><p>Check whether the account signed in to Google Ads can upload to that channel. In our case the channel belonged to a different account, so the videos went up through YouTube Studio on that channel; attaching the links to the campaign didn't finish that night because the ads tab stopped responding.</p></div></details></div>
+    </section>
+    <p class="note">Checked 2026-11-17. Tool call counts (no sidechain calls) and operator message times (including queued messages) from three Claude Code session logs (Oct 8 to Oct 21, 2026), plus the memory files and their write records.</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 18 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Claude Code agents told to build a No. 1 app – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/number-one-app-agent-instruction/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/number-one-app-agent-instruction/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/number-one-app-agent-instruction-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Retrospective</span>
+      <h1>Claude Code agents told to build a No. 1 app</h1>
+      <p class="lead">One vague Claude Code instruction set 11 agents running and put two versions into production within 23 hours; two weeks later the app had moved from 20th to 16th for its main keyword.</p>
+      <p>"Make it the No. 1 app in the Android store" came with no number attached. A week after the Korean document viewer SugarDoc went public, the operator, in rough language, told the agent to launch a huge number of agents and keep working for three days. Before planning anything, the Claude Code agent measured where the app stood: 1+ installs and 0 reviews.</p>
+      <p>Over the next 23 hours two versions were submitted to the production track, the stage where a release goes to every user. The operator typed the 1.2.0 promotion and the store-listing commands himself, and also vetoed a ₩140,000 ad test. Two weeks later the verdict written in the repository was "no clear gain".</p>
+    </section>
+    <section aria-labelledby="baseline">
+      <h2 id="baseline">20th for the main keyword, unlisted for the other four</h2>
+      <p>The instruction arrived at 21:22 on October 17 (Korea time). Within five minutes the agent had read the repository docs, the Play release tracks and the public store page, and pulled Play search results for five keywords. For 한글뷰어 ("Hangul viewer", the main Korean query) SugarDoc was 20th of 29 apps. For the other four, including hwp and hwpx (the Korean word processor's file formats), it was not listed at all. A research agent counting the same page that day got 21st.</p>
+      <p>The operator had named three dashboards: GA4, AdMob and Google Ads. AdMob had nothing to show because the app carries no ads, and Google Ads only came up as a plan for a new campaign. GA4 could not be read at first: the machine's Google login lacked the analytics scope. The operator tried the login command himself and it failed, then said to use the browser extension and that everything was approved. The agent opened GA4 and the Play Console through Claude in Chrome, an extension that reads and clicks in the user's own Chrome tabs.</p>
+      <p>The 23:50 status report, after saying seven agents were running, went on: "I can't create ten million agents running for three days, and I can't promise the No. 1 spot. Instead I'm starting with what actually blocks the ranking."</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/number-one-app-agent-instruction-shot1-en.webp" width="1200" height="720" alt="One time axis from 21:00 on October 17 to 21:30 on October 18 with operator messages, the run spans of 11 agents, 21 permission denials, 9 commits and 2 production submissions" loading="lazy"><figcaption>Timestamps only, from the session log, subagent logs, the workflow result file and git history (Oct 17 to 18, 2026). No message text is shown.</figcaption></figure>
+    </section>
+    <section aria-labelledby="seven-agents">
+      <h2 id="seven-agents">Seven agents in three stages</h2>
+      <p>The agent wrote a workflow script, a file that sets which agents run in which order and which run in parallel, and the run started at 23:50. The stages were research, build and review, and each stage's written results became the next stage's input.</p>
+      <div class="table-wrap"><table><thead><tr><th>Stage</th><th>What the agent did</th><th>Time</th></tr></thead><tbody><tr><td>Research</td><td>14 competitor apps and 231 of their reviews</td><td>10 min</td></tr><tr><td>Research</td><td>What the app really does, read from the code</td><td>5 min</td></tr><tr><td>Build</td><td>New store title and description (ko/en)</td><td>11 min</td></tr><tr><td>Build</td><td>"Save as PDF" without the print screen</td><td>76 min</td></tr><tr><td>Build</td><td>Ads and search acquisition plan, help article draft</td><td>8 min</td></tr><tr><td>Review</td><td>Adversarial review of the new code (a review that only hunts for defects; 3 fixed)</td><td>18 min</td></tr><tr><td>Review</td><td>Check of the store copy's claims (the plan file had not been written)</td><td>8 min</td></tr></tbody></table></div>
+      <p>Every agent's shared instructions said not to commit, push, upload to Play or publish.</p>
+      <p>The workflow took 104 minutes. Run back to back, the seven agents add up to 137, so parallelism saved about 33 minutes. One development agent, with 193 tool calls over 76 minutes, set the length of the whole run. How many agents could run at once on this machine is covered in <a href="https://sugarmount21.com/en/ax/parallel-agent-workstreams/">Claude Code parallel agents: 10 tasks, 3 at a time</a>.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/number-one-app-agent-instruction-1-en.webp" width="1200" height="1004" alt="Seven steps from the instruction to the re-measurement two weeks later: baseline, 2 research, 3 build, 2 review agents, two releases, 16th place" loading="lazy"><figcaption>A vague instruction turned into a baseline, three stages of work, two releases and a re-measurement.</figcaption></figure>
+      <p>Counting four agents outside the workflow, 11 agents ran in this session (purple in the timeline above).</p>
+    </section>
+    <section aria-labelledby="wrong-premises">
+      <h2 id="wrong-premises">Both of the lead agent's premises were wrong</h2>
+      <p>The lead agent, the main session that talked with the operator and launched the others, suspected two things. Most top competitors put "PDF save" or "PDF convert" in their titles and SugarDoc lacked it, and GA4 showed zero for 28 days, so measurement looked broken.</p>
+      <p>The research agent that read the code corrected the first. PDF save had shipped in 1.0.0 through the system print screen; what was missing was a direct save that skips that screen, and store copy that said so. How 1.2.0's save was tested is in <a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">SAF PDF save: cancelling without empty files</a>.</p>
+      <p>The second came from reading a dashboard before it finished loading, and the agent withdrew it ten minutes later, once the GA4 diagnosis agent reported back. That story is in <a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">GA4 shows zero? Read the total row first</a>.</p>
+      <p>With both premises gone, the remaining problem was traffic. The research agent widened the check to seven keywords, and places 1 to 4 rotated among the same five apps, each with 100,000 or more installs. Yet a small app with 100+ installs and no ratings sat 3rd to 7th on all seven keywords, with the search words written into its title exactly as people type them.</p>
+      <p>At that point the research agent rewrote the goal in its document: "No. 1 is not realistic in the short term," while the top 10 for three keywords, the main one included, had evidence behind it. Its estimated condition was a first 20 to 50 reviews.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20agents%20told%20to%20build%20a%20No.%201%20app">Email us</a></p></aside>
+    <section aria-labelledby="permission-check">
+      <h2 id="permission-check">Telling the agent to do it all did not get production promotion past the permission checker</h2>
+      <p>On the morning of October 18 the agent committed 1.2.0. Its upload to the internal test track was denied once and went through when it was run again after the operator told the agent to do it all itself; the log does not say why it passed.</p>
+      <p>Promotion to production was blocked once the night before for 1.1.0 and twice that morning for 1.2.0. The blocker was Claude Code's auto-mode permission checker, which classifies a command's risk before it runs, and each time the reason was "Production Deploy".</p>
+      <p>The agent did not work around it. It told the operator that permission given in chat does not lift this checker, and offered two ways out: the operator could run the command himself, or add it to the allow list under Claude Code's /permissions. At 12:08 the operator ran the promotion command, and in the afternoon he ran the store-listing upload too.</p>
+      <div class="table-wrap"><table><thead><tr><th>Denial reason</th><th>Count</th><th>What it blocked</th></tr></thead><tbody><tr><td>Production Deploy</td><td>6</td><td>3 promotions, 1 internal-track upload, 1 store listing, launching 1 site-fix agent</td></tr><tr><td>Permission Grant</td><td>1</td><td>Clicking "Enable" on the Play reporting API</td></tr><tr><td>Modify Shared Resources</td><td>1</td><td>A commit plus merge to main (the commit alone went in on retry)</td></tr><tr><td>No verdict</td><td>13</td><td>12 document writes by subagents, 1 status-file edit by the lead</td></tr></tbody></table></div>
+      <p>"No verdict" means the checker made no call at all. Four subagents could not write to the repository, and the lead copied or applied their results itself.</p>
+      <p>Version 1.3.0 turned on editing, so it was still open whether an edited file would open and re-save in the Hancom app (the Korean word processor's mobile suite). That evening the agent advised holding the release until that check. The operator answered that he approved publishing to production. After that approval the agent promoted the build itself, and no denial was logged for that command. The log does not say why the checker let it through, so we don't recommend this as a way past the checker. The Hancom check passed 38 minutes after release.</p>
+    </section>
+    <section aria-labelledby="two-weeks">
+      <h2 id="two-weeks">Two weeks with a new title instead of ₩140,000 in ads</h2>
+      <p>At 15:46, reporting the 1.2.0 submission, the agent listed a Google Ads test at ₩10,000 a day for 14 days as the next step. About six minutes later the operator asked whether a ₩140,000 experiment was really needed, and 17 seconds after that the answer was "Don't do it now." It gave two reasons: the ad money could not be earned back, and with the store title changed that same day, more installs could not be traced to either cause. The second reason was already true at 15:46. The agent reversed its own advice only once the operator questioned the amount.</p>
+      <p>The operator asked about ₩1,000 to ₩2,000 a day instead, and the agent advised against it because ad learning (the early period in which the ad platform works out whom to show the ad) would never finish on that budget. Thirty seconds after that answer the operator decided: spend as little as possible, publish the help article, watch for two weeks, then plan paid marketing properly. The agent saved the decision to a memory file, notes that later agent sessions also read, as a rule not to propose ad spend before November 1.</p>
+      <p>At 16:19 the operator pointed out that the site's robots.txt needed attention too. The agent found the old file allowed everything and listed only the sitemap, so build tools and data folders were open to crawlers, and pushed a fix within a minute (3f504be).</p>
+      <div class="table-wrap"><table><thead><tr><th>Option</th><th>Raised by</th><th>What happened</th></tr></thead><tbody><tr><td>₩10,000 a day for 14 days</td><td>The agent, 15:46</td><td>Withdrawn by the agent after the operator asked about the amount (can't be earned back; mixes with the title test)</td></tr><tr><td>₩1,000 to ₩2,000 a day</td><td>The operator</td><td>Advised against: ad learning would not finish</td></tr><tr><td>One agent, tasks in sequence</td><td>Nobody</td><td>About 33 more minutes by the numbers; whether the output would match is unknown</td></tr><tr><td>Title, feature and help article only</td><td>The agent at 15:53; the operator chose it at 15:54</td><td>Re-measured November 1</td></tr></tbody></table></div>
+      <figure><img src="https://sugarmount21.com/assets/ax/number-one-app-agent-instruction-shot2-en.webp" width="1200" height="660" alt="Play search rank grid for 7 keywords on October 17, 23, 28 and November 1; the main keyword reads 20, 13, 14, 16" loading="lazy"><figcaption>October 17 from the session report and competitor doc; other dates from three rank files in the repository (logged-out web search, Korea).</figcaption></figure>
+      <p>The title changed on October 18 to one that spells out "open HWP Hangul files" and "PDF save". On a search where apps with 100,000 or more installs rotate through places 1 to 4, the November 1 record says no clear gain. The main keyword stood at 16th, four places above the 20th it started from, but within the two weeks it went 13th, 14th, 16th. "한글 파일 열기" (open Hangul file), which is in the title, still did not list the app.</p>
+      <p>For "hwp" and "한글 문서" (Hangul document) the app rose from 28th and 22nd on October 28 to 20th and 11th on November 1; before that, those result pages listed only 10 or 11 apps. The same record notes about one real user a day, too few to tie such rank moves to installs.</p>
+      <p>Nor was this a one-change test: in the same two weeks, updates 1.3.1 to 1.3.3, a site search-visibility pass and one short video on October 31 also went out. The day-7 check planned for October 25 was never run.</p>
+    </section>
+    <section aria-labelledby="split-steps">
+      <h2 id="split-steps">How to split a vague instruction</h2>
+      <p>When an agent gets a vague goal, make it measure a baseline before it plans. Here, 20th place and zero reviews were measured first, and the 23:50 report said plainly that No. 1 could not be promised. Both wrong premises came out when separate agents re-checked the code and the reports.</p>
+      <ol class="steps"><li><p>Measure search rank per keyword, installs, reviews and release-track state. Count the same value a second way (here it came out 20th and 21st).</p></li><li><p>Rewrite the goal from the baseline and competitor data. Split what cannot be promised from what has evidence, and say so in the first report.</p></li><li><p>Split the work into research, build and review, and get each agent's result as text or a file. Put "no commit, upload or publish" in the shared instructions.</p></li><li><p>Have a separate agent that reads the code check the lead's premises, such as "this feature is missing" or "this metric is zero".</p></li><li><p>List what a person must do (production deploys, enabling APIs, ad spend) in the first report. Under auto mode, add those commands to the /permissions allow list beforehand or have a person run them.</p></li><li><p>Change one thing at a time, and write the re-measurement date and who will run it into a file.</p></li></ol>
+      <p>There is no ad plan yet. The operator wanted it written properly after two weeks, but as of November 17 the growth plan document is the October 18 version. Reviews are the next number to watch.</p>
+    </section>
+    <p class="note">As of 2026-11-17. Claude Code session and subagent logs (2026-10-17 to 19), the workflow result file, git history of the app and site repositories, Play search rank records in the app repository (Oct 23, Oct 28, Nov 1) and daily check documents (GA4, test devices excluded).</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20agents%20told%20to%20build%20a%20No.%201%20app">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 18 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>Claude Code real-device E2E: 31 fixes in 3 rounds – SugarMount</title>
     <link>https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/</link>
@@ -169,8 +416,8 @@ adb -s &lt;device&gt; reverse tcp:8180 tcp:8180</code></pre></li><li><p>Have the
         <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -221,7 +468,7 @@ adb -s &lt;device&gt; reverse tcp:8180 tcp:8180</code></pre></li><li><p>Have the
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
       </ul>
@@ -299,8 +546,8 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>Give the 
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
         <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -379,7 +626,7 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>Give the 
         <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -448,11 +695,11 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>Give the 
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-ad-creatives-from-play-recordings/">App campaign ad assets from gameplay recordings</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -534,8 +781,8 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>Give the 
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">Claude Code for Android app development: 4 apps in 20 days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -677,8 +924,8 @@ OK  en head  26/30 1,000 brain-teasing levels</code></pre>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/stale-doc-phantom-session/">Claude Code handoff to a session that had stopped</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
       </ul>
@@ -964,8 +1211,8 @@ light/temp4 #ee4b4b on #fafdff = 3.58:1</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1398,8 +1645,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1684,8 +1931,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
-        <li><a href="https://sugarmount21.com/en/ax/stale-doc-phantom-session/">Claude Code handoff to a session that had stopped</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1765,8 +2012,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1916,8 +2163,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2114,7 +2361,7 @@ assumeTrue(dir != null &amp;&amp; dir.isDirectory)</code></pre></li>
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2496,8 +2743,8 @@ answers per open  = quiz_answer(mode!=chat) events / quiz_open events</code></pr
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
-        <li><a href="https://sugarmount21.com/en/ax/stale-doc-phantom-session/">Claude Code handoff to a session that had stopped</a></li>
         <li><a href="https://sugarmount21.com/en/ax/naver-speller-highlight-missing/">Claude Code fix: Naver spelling highlights missing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2599,7 +2846,7 @@ adb reboot                       # clears the two log.tag values</code></pre>
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/stale-doc-phantom-session/">Claude Code handoff to a session that had stopped</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
@@ -2721,8 +2968,8 @@ adb reboot                       # clears the two log.tag values</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2824,7 +3071,7 @@ test('bidirectional cross-check against python cryptography', () async {
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/adversarial-review-other-paths/">Claude Code re-review: the bug survived via HTTP</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3255,8 +3502,8 @@ private val codePopulated = setOf("com.example.Response#requestId")
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3570,8 +3817,8 @@ private val codePopulated = setOf("com.example.Response#requestId")
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3931,9 +4178,9 @@ adb -s emulator-5554 logcat -d -b crash</code></pre>
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/stale-doc-phantom-session/">Claude Code handoff to a session that had stopped</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
@@ -4302,8 +4549,8 @@ git log --diff-filter=A --format="%h %ad %s" --date=iso -- &lt;scoring file&gt;
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/stale-doc-phantom-session/">Claude Code handoff to a session that had stopped</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5041,8 +5288,8 @@ expect(all.sort()).toEqual(files.sort());</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
-        <li><a href="https://sugarmount21.com/en/ax/stale-doc-phantom-session/">Claude Code handoff to a session that had stopped</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5353,7 +5600,7 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/naver-speller-highlight-missing/">Claude Code fix: Naver spelling highlights missing</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/stale-doc-phantom-session/">Claude Code handoff to a session that had stopped</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
@@ -5440,8 +5687,8 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
         <li><a href="https://sugarmount21.com/en/ax/naver-speller-highlight-missing/">Claude Code fix: Naver spelling highlights missing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5648,8 +5895,8 @@ depth(board):                   # peel
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
         <li><a href="https://sugarmount21.com/en/ax/naver-speller-highlight-missing/">Claude Code fix: Naver spelling highlights missing</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5903,335 +6150,6 @@ if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
     <pubDate>Fri, 30 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Multiple Claude Code sessions: one owner per file – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/file-owner-table/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/file-owner-table/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/file-owner-table-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · How-to</span>
-      <h1>Multiple Claude Code sessions in one repo: a file owner table</h1>
-      <p class="lead">Two Claude Code sessions shared one working tree, and one commit carried off 50 files the other was still writing. Since then we split parallel work with a table that names one owner for each shared file.</p>
-    <p class="note ax-series-line"><a href="https://sugarmount21.com/en/ax/series/multi-agent-one-repo/">Many agents, one repository</a> 3/6</p>
-      <p>Run several Claude Code sessions or subagents and they will edit the same repository at the same time. On September 23, 2026, a release-fix commit in our utility app repository picked up 50 files that another session was still writing for the next app. Sixteen days later, the family calendar app AXFamily wrote an owner for every shared file into its plan first, then merged 13 feature branches in a little over two minutes. The table did not remove hand merges, but it told us in advance where they would happen.</p>
-    </section>
-    <section aria-labelledby="swept-commit">
-      <h2 id="swept-commit">A release fix swept in 50 files from another session</h2>
-      <p>On the evening of September 23, two sessions were running in one working tree of the utility app repository. One was finishing release 1.0.3 of the photo compression app; the other was building the next app, <a href="https://sugarmount21.com/en/apps/image-flip/">Flip &amp; Rotate Image</a>. At 10:24 pm the release session committed. Its message covered a release crash fix, a launch-check script and an analytics default, with no word about the flip app. The commit actually changed 74 files, and 50 in the flip app's folders plus 5 in the image engine were the other session's unfinished code. The other session's memory note called it being swept in "git add -A style."</p>
-      <p>The launch-check script added in that commit ran <code>./gradlew --stop</code>. Gradle's documentation says this stops every daemon of the same version. A session building our Korean spacing app on the same PC used that same Gradle version, and two of its clean builds that day died with "stop command received." Each session suspected the other, but across both repositories' history that script is the only place <code>--stop</code> ever appears. The line was replaced with <code>--no-daemon</code> 15 days later.</p>
-    </section>
-    <section aria-labelledby="why-git-missed">
-      <h2 id="why-git-missed">In one working tree, git cannot tell your changes from theirs</h2>
-      <p>Two sessions in one working tree never produce a conflict for git to report. Their changes land in the same index, and whoever commits first becomes the owner of every file in the tree at that moment. Without an owner per file, an agent has no way to know whether it changed a file itself. The Gradle daemon had the same shape: not a file, but something every session on the PC shared, and any session could stop it.</p>
-      <p>The flip-app session wrote down rules that day. Re-read shared files right before editing them and change only the part you need. Never commit, stash, reset or run <code>gradlew --stop</code>. Builds can be killed by another session, so trust the timestamps in the test result files, not the exit code. Those rules are now in the agent instructions for every project, along with running long Gradle builds with <code>--no-daemon</code>.</p>
-    </section>
-    <section aria-labelledby="worktree-wiring">
-      <h2 id="worktree-wiring">Worktrees did not stop hand merges in the wiring file</h2>
-      <p>A git worktree is an extra checkout of the same repository in its own folder, so each agent can work on its own branch. When this repository was created on September 20, four base tasks (file handling, image engine, ads and billing, analytics) went to subagents in one worktree each, and four branches were merged within 12 minutes. Three of those merges needed <code>AppContainer.kt</code>, the file that wires dependencies, resolved by hand. The repository wires each app by hand in that one file instead of using a DI framework, so every base task had to add its own lines there.</p>
-      <p>Worktrees keep work in progress apart. A wiring file that every task adds a line to still conflicts at merge time. The game repository handled this with an "exclusive files" column per workstream when deciding <a href="https://sugarmount21.com/en/ax/parallel-agent-workstreams/">how many AI coding agents to run at once</a>, and AXFamily added the shared wiring files that column had left out.</p>
-    </section>
-    <section aria-labelledby="owner-table">
-      <h2 id="owner-table">AXFamily's plan named an owner and a workaround for each shared file</h2>
-      <p>AXFamily's release plan of October 9 put this first: "One base agent lays down every shared file first. After that, nobody edits those files." Its conflict-rule table, shortened:</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">Shared file</th><th scope="col">Owner</th><th scope="col">What other packages do instead</th></tr></thead>
-          <tbody>
-            <tr><td>API contract schema and generated code</td><td>Base agent</td><td>Never touch it; queue contract requests for the base agent</td></tr>
-            <tr><td>Database security rules, index file</td><td>Security-rules package</td><td>Keep test data in their own folder only</td></tr>
-            <tr><td>Server function list, error codes</td><td>Base agent</td><td>Every planned function is registered up front as a stub; each package fills in its own handler file</td></tr>
-            <tr><td>App skeleton (dependencies, router, manifest, Gradle)</td><td>Base agent</td><td>Routes and ad settings ship as files in the feature folder, collected by a registry</td></tr>
-            <tr><td>Combined translation file</td><td>Merge tool</td><td>Each feature writes only its own fragment file; the tool combines them</td></tr>
-            <tr><td>CI workflows</td><td>Base agent</td><td>Add one check file and it is discovered automatically</td></tr>
-            <tr><td>Gradle builds and devices</td><td>Nobody</td><td>One at a time regardless of worktree, <code>--no-daemon</code></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>The base agent laid these files down one after another, then 12 packages worked in parallel inside their own folders. Coordinating by conversation had mixed 50 files; worktrees alone had needed 3 hand merges out of 4. A single session doing everything in sequence would have had no conflicts, but 12 packages one by one; that time was never measured.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Multiple%20Claude%20Code%20sessions%20in%20one%20repo%3A%20a%20file%20owner%20table">Email us</a></p></aside>
-    <section aria-labelledby="merge-count">
-      <h2 id="merge-count">Seven of 13 merges needed a hand; translation fragments, none</h2>
-      <p>Early on October 10, 13 feature branches went into the integration branch in 2 minutes 11 seconds: the plan's 12 plus a design-system branch. Listing, with <code>git show --cc</code>, the files where each merge had to combine both sides finds such hunks in 7 merges.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/file-owner-table-1-en.webp" width="1200" height="768" alt="Bar chart: with worktrees only, 3 of 4 base merges on Sep 20 needed hand resolution; with an owner table, 7 of 13 merges on Oct 10 did, and none of them came from the per-feature string files." loading="lazy"><figcaption>The owner table did not remove hand merges, but the files split into per-feature fragments never caused one.</figcaption></figure>
-      <ul>
-        <li>Four app-screen packages: the combined translation files and three Dart files generated from them. CI demanded "if the combined file differs from the fragments, run the merge tool and commit," so every branch committed its own regenerated copy. The fragment files never appear in any of the 13 merges.</li>
-        <li>The media package: the server function list and error codes. It added a function that was not among the 16 stubs, and it and the account package each edited the same error-code line.</li>
-        <li>Two app packages: the index file owned by the security-rules package.</li>
-        <li>The rest were test files.</li>
-      </ul>
-      <p>Checking each branch's changed files against the table shows that 8 of the 13 branches edited a file someone else owned. "Nobody edits those files" did not hold. Small edits, two lines in a dependency file or four in the manifest, merged silently; only edits to the same line by two branches showed up as hand merges.</p>
-    </section>
-    <section aria-labelledby="contract-drift">
-      <h2 id="contract-drift">Where git stayed quiet, contracts drifted</h2>
-      <p>Sixteen minutes after the merges, a minimal fix repaired six pairs of packages. The app's paid-access check disagreed with the billing server's rules, and two packages each declared their own ad-consent type. All were different files, so git saw no conflict, and an integration review then confirmed 12 more defects. The table had owners for files but none for concepts such as "guardian" or "current family." Those 12 are covered in <a href="https://sugarmount21.com/en/ax/integration-review-defects/">the 12 defects an integration review found after 13 parallel branches</a>. Use an owner table to cut text conflicts, and leave contract drift to an integration review.</p>
-    </section>
-    <section aria-labelledby="how-to">
-      <h2 id="how-to">One table before you split the work, two commands after you merge</h2>
-      <p>Write down the shared files and their owners before you decide how many agents to run. Sessions sharing one working tree get no commit rights.</p>
-      <ol>
-        <li>Find the files every task adds a line to: DI container, router, endpoint list, dependency files, combined translations, CI config, database indexes.</li>
-        <li>Give each file one owner, and on the same row write how others contribute instead (fragment files, their own files picked up by a registry). Add rows for shared things that are not files, such as builds and devices.</li>
-        <li>Have the owner lay down the wiring files first, with every planned name registered as a stub.</li>
-        <li>Files a tool generates, like a combined file, are rebuilt after the merge by the integrator. This site follows the same rule (<a href="https://sugarmount21.com/en/ax/static-site-check-gate/">one --check gate for a static site that agents co-edit</a>).</li>
-        <li>If sessions must share a working tree: re-read right before editing, edit only the part you need, no commit, stash, reset or <code>--stop</code>, Gradle with <code>--no-daemon</code>, and judge success by the timestamps in test result files.</li>
-        <li>After merging, count where the table leaked.<pre><code># files where a merge combined both sides
-git show --cc --format= &lt;merge&gt; | grep '^diff --cc'
-# files a branch changed, to compare with the table
-git diff --name-only $(git merge-base &lt;base&gt; &lt;branch&gt;) &lt;branch&gt;</code></pre></li>
-      </ol>
-      <p>At AXFamily the first command found the 7 hand-resolved merges, and the second found the 8 branches that edited someone else's files. How to write rules like these into an instruction file is in <a href="https://sugarmount21.com/en/ax/agents-md/">how to write AGENTS.md</a>.</p>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">The combined translation file is still committed, and concepts still have no owner</h2>
-      <p>AXFamily's development branch still holds the combined translation file and three generated Dart files, and CI checks that they are current. Moving them to an integrator-only rebuild has not happened yet. Whether adding "concept" rows (guardian check, current family) to the owner table reduces integration defects has not been tried either.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Multiple%20Claude%20Code%20sessions%20in%20one%20repo%3A%20a%20file%20owner%20table">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <nav class="box ax-series-box" aria-label="Series contents"><p><strong><a href="https://sugarmount21.com/en/ax/series/multi-agent-one-repo/">Many agents, one repository: all 6 parts</a></strong></p><ol><li value="2"><a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Claude Code subagent prompts: rules after 5 cut-off agents</a></li><li value="4"><a href="https://sugarmount21.com/en/ax/static-site-check-gate/">Keeping a static site safe when several AI agents edit it: one --check before every commit</a></li></ol></nav>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Can two Claude Code sessions run in the same working tree?</summary><div><p>They can, but do not let a session commit unless asked. After one session's commit carried off 50 files another session was writing, sessions in a shared tree no longer commit, stash, reset or run <code>gradlew --stop</code>.</p></div></details>
-        <details><summary>Do git worktrees remove conflicts between parallel agents?</summary><div><p>They stop work in progress from mixing, but a wiring file that several tasks edit still conflicts at merge time. On September 20, 3 of 4 merges needed the dependency wiring file resolved by hand.</p></div></details>
-        <details><summary>Does gradlew --stop stop builds in other projects?</summary><div><p>Yes, if their daemons run the same Gradle version. Gradle's documentation says so, and two clean builds in another repository on the same PC died with "stop command received." Run long builds with <code>--no-daemon</code>.</p></div></details>
-      </div>
-    </section>
-    <p class="note">Sources: git history of both app repositories, AXFamily's release plan (October 9, 2026) and the sessions' memory notes. Hand merges were recounted with <code>git show --cc</code> on October 28, 2026, and the September 20 merges rechecked on November 13.</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/stale-doc-phantom-session/">Claude Code handoff to a session that had stopped</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Thu, 29 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Why R8 kept 5 AdMob test IDs in a release AAB – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/release-ad-id-grep/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/release-ad-id-grep/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/release-ad-id-grep-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · Measurement</span>
-      <h1>R8 kept 5 AdMob test IDs in our release build: one listOf().any line and a dex count</h1>
-      <p class="lead">Four ad unit checks wrapped in listOf(...).any were something R8 could not fold, so 5 test ad strings stayed in the release dex. A plain || over the same constants left none.</p>
-    <p class="note ax-series-line"><a href="https://sugarmount21.com/en/ax/series/r8-release-only/">Release-only bugs from R8</a> 3/4</p>
-      <p>Test ad IDs are the IDs Google publishes for development, so you never show real ads while building. They should not ship, yet one line of code can be shaped so that R8, the shrinker for Android release builds, cannot remove the branch that leads to them. Before uploading version code 2 of our puzzle game <a href="https://sugarmount21.com/en/apps/blocks/">Block Turn</a>, we counted the dex (the compiled app code) of the first bundle built with real ad IDs: next to the 4 real ad units sat 5 Google test ad strings.</p>
-      <p>That bundle, built at 17:16 on October 4, 2026, had passed a Gradle guard that checks the inputs. A rebuild two minutes later overwrote it, so it was never uploaded, and the version code 2 we did upload has no test strings. With all real IDs present, either version of the code picks the real units at runtime. Below are the shape of the condition that caused it and commands that count ad IDs in a dex without printing them.</p>
-    </section>
-    <section aria-labelledby="gate-passed">
-      <h2 id="gate-passed">The bundle passed the Gradle guard with 5 test strings inside</h2>
-      <p>The code that picks the ad units gives a debug build, or a build with any empty ad unit field in BuildConfig, <code>AdUnits.TEST</code>, the set of Google test units; anything else gets the real ones. Version code 1, built at 12:25 that day, only checked the banner field, and when we counted that bundle on October 28 it had 4 real ad units and 0 test strings.</p>
-      <p>At 16:14 Claude Code widened the check to all four units, so that a build missing any one unit would treat itself as having no real IDs and use test units for all four. The comment it left says "never a half-real mix". This is the line:</p>
-      <pre><code>units = if (BuildConfig.DEBUG || listOf(BuildConfig.AD_BANNER, BuildConfig.AD_INTERSTITIAL,
-        BuildConfig.AD_REWARDED, BuildConfig.AD_APP_OPEN).any { it.isEmpty() }) AdUnits.TEST
-    else AdUnits(BuildConfig.AD_BANNER, BuildConfig.AD_INTERSTITIAL, BuildConfig.AD_REWARDED, BuildConfig.AD_APP_OPEN)</code></pre>
-      <p>In the same hour a review agent showed that the old Gradle guard, which decided by task name, could be bypassed. The agent moved the check into a <code>checkReleaseAdIds</code> task hooked to <code>preReleaseBuild</code>, which every release variant runs. That guard only looks at its input, ads.properties.</p>
-      <p>The agent committed at 17:14 and built the bundle with the real IDs; the guard passed. The checklist's build step asked for the guard and the signature. The agent also ran <code>grep -c</code> over the dex strings, printing no values: 4 for our publisher number, 5 for the test publisher number. All 5 strings of <code>AdUnits.TEST</code> (banner, interstitial, rewarded, rewarded interstitial, app open) were in the dex.</p>
-      <p>The 16:14 comment and the review brief covered runtime behavior only; nobody checked whether R8 removed the branch until the dex of a build was counted.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/release-ad-id-grep-1-en.webp" width="1200" height="700" alt="Bar chart: test ad strings in the Block Turn dex were 0 in version code 1, 5 in the first real-ID bundle at 17:16, 0 in the uploaded version code 2, and 5 in the -PallowTestAds measurement APK." loading="lazy"><figcaption>Only the first real-ID bundle, which had passed the guard, kept 5 test strings; the version code 2 we uploaded had none.</figcaption></figure>
-    </section>
-    <section aria-labelledby="why-r8">
-      <h2 id="why-r8">R8 could not evaluate the listOf condition at build time</h2>
-      <p>In a real-ID build the condition is always false, yet R8 could not work that out at build time and kept the branch that returns <code>AdUnits.TEST</code>. On October 28 we reproduced it in a small project: a BuildConfig of the same shape and a 5-string test set, all dummy strings, and both versions of the condition. We compiled it with Kotlin 2.3.21 and shrank it with R8 9.4.24, the version bundled with Android Gradle Plugin 9.4.1, using that plugin's proguard-android-optimize.txt unchanged. The listOf version left 5 test strings and 4 real ones in the dex. The <code>||</code> version left only the 4 real ones.</p>
-      <p>In javap output, kotlinc has already inlined the BuildConfig constants as string literals in both versions. The listOf version puts the four into an array, builds a list with <code>listOf</code>, and walks it with an Iterator, calling <code>length()</code> on each element. In R8's output dex the <code>listOf</code> call has become <code>Arrays.asList</code>, and the Iterator loop is still there. The <code>||</code> version calls <code>length()</code> directly on each literal; R8 computed those, folded the whole condition to false and dropped the test branch. Version code 1, which checked the banner alone, had the same shape and 0 test strings.</p>
-      <p>Write test-unit fallbacks as a plain <code>||</code> over BuildConfig constants, and don't wrap them in collection functions (we only measured <code>any</code>). Another case where we read R8's output by the numbers: <a href="https://sugarmount21.com/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized</a>.</p>
-    </section>
-    <section aria-labelledby="missed">
-      <h2 id="missed">The review agent made 19 findings and missed the test strings</h2>
-      <p>The 16:49 review agent read the whole change without building it. Its brief listed "if any ad unit is empty, use TEST for all" and "what could break under R8 (keep rules for the Review API)". It came back with 2 high, 6 medium and 11 low findings, and none of them said the release would keep the test strings.</p>
-      <p>The Gradle guard only sees inputs, so it could not catch this. At 16:55 the agent had counted the dex of the measurement build (<code>-PallowTestAds</code>) the same way and logged "0 real, 5 test" in the rehearsal checklist; at 17:16 it ran the same check on the real-ID build. The top of the checklist says not to write secrets down. Our full pre-upload checks are in <a href="https://sugarmount21.com/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>.</p>
-      <p>The fix landed at 17:18. The agent described it as a change that removes the test ID strings from a real-ID build. The 17:42 commit records the check that followed: 4 real, 0 test.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20R8%20kept%205%20AdMob%20test%20IDs%20in%20our%20release%20build%3A%20one%20listOf%28%29.any%20line%20and%20a%20dex%20count">Email us</a></p></aside>
-    <section aria-labelledby="alternatives">
-      <h2 id="alternatives">Why the debug source set is a poor home for the test units here</h2>
-      <p>Moving the test units into the debug source set would keep them out of release builds entirely. It does not fit Block Turn. The <code>-PallowTestAds</code> build we use for device measurements and monkey runs is a release variant, and it has to ignore ads.properties and run on test units, because automated taps on real ads count as invalid clicks.</p>
-      <p>Left alone, every real-ID build would carry 5 test strings, "0 test strings" could no longer be the pass condition, and each time someone would have to work out whether those strings are dead code. So the condition was rewritten into a shape R8 folds. Today the input guard runs before the build, and the dex count is still run by hand after it.</p>
-    </section>
-    <section aria-labelledby="count-steps">
-      <h2 id="count-steps">Counting ad IDs in the dex without printing them</h2>
-      <p>Don't decide what went into a release by reading code. Count it in the build output. These are the Git Bash commands we used for the October 28 recount; the publisher number is read into a variable and never echoed.</p>
-      <pre><code># 1. Read your publisher number into a variable (not printed)
-MY_PUB=$(sed -n 's/^admob\.banner=[^0-9]*\([0-9]*\)\/.*/\1/p' app/ads.properties)
-TEST_PUB=...   # the 16-digit test publisher number from Google's test ads page
-A=app/build/outputs/bundle/release/app-release.aab   # for an APK use 'classes*.dex'
-# 2. Your ad units: must equal the number of units the app uses
-unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$MY_PUB/[0-9]*" | sort -u | wc -l
-# 3. Test strings: must be 0 in a real-ID build
-unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$TEST_PUB[~/][0-9]*" | sort -u | wc -l</code></pre>
-      <p>These commands give 4 and 0 for the vc1, vc2 and October 25 bundles, and 0 and 5 for the <code>-PallowTestAds</code> APK from October 25. For the check before the build, hook it to <code>preReleaseBuild</code> instead of guessing from task names:</p>
-      <pre><code>tasks.matching { it.name == "preReleaseBuild" }.configureEach {
-    if (!allowTestAds) dependsOn(checkReleaseAdIds)
-}</code></pre>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">Counting by prefix alone picks up one string from UMP</h2>
-      <p>Counted by the ad ID prefix alone on October 28, each of the three bundles showed 5. Four were our ad units (the '/' form). The fifth was an app ID-shaped string ('~' form) under a different publisher. Searching 135 Google Play services, consent library (UMP, user-messaging-platform) and Firebase library files in the Gradle cache found the same string in UMP 4.0.0. Count with your own publisher number and the '/' to get 4.</p>
-      <p>A <code>-PallowTestAds</code> build is supposed to carry the 5 test strings, so the check only applies to real-ID builds. Because it runs after the build, all it can stop is the upload. The R8 reproduction covers one version (9.4.24) and one shape, a BuildConfig string constant; we did not test IDs read from resources or remote config. The manifest app ID is not in the dex; the release checklist covers it separately.</p>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">Arrow Knots still guesses from task names</h2>
-      <p>Arrow Knots, the other game in the same repository, still checks only the banner field as of the October 27 commit, and its release guard still looks for "release" in task names. Moving it to the <code>checkReleaseAdIds</code> setup and turning the hand-run dex count into a script in the repository are the next jobs.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20R8%20kept%205%20AdMob%20test%20IDs%20in%20our%20release%20build%3A%20one%20listOf%28%29.any%20line%20and%20a%20dex%20count">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <nav class="box ax-series-box" aria-label="Series contents"><p><strong><a href="https://sugarmount21.com/en/ax/series/r8-release-only/">Release-only bugs from R8: all 4 parts</a></strong></p><ol><li value="2"><a href="https://sugarmount21.com/en/ax/r8-gson-field-names/">203 unit tests missed a release-only blank result: R8 and Gson field names</a></li><li value="4"><a href="https://sugarmount21.com/en/ax/r8-dex-optimization-keep-rule/">Play Console said our DEX was 39% optimized. The culprit was a keep rule for an SDK we never used</a></li></ol></nav>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Does listOf().any change how the app behaves?</summary><div><p>It doesn't. With all real IDs present, both versions pick the real units.</p></div></details>
-        <details><summary>Would all or none instead of any also keep the branch?</summary><div><p>We haven't measured those. Until we do, we write the fallback as a plain || over the constants.</p></div></details>
-        <details><summary>Do these commands work on Windows?</summary><div><p>Git Bash ships unzip, grep, sort and wc, so they run as written there.</p></div></details>
-      </div>
-    </section>
-    <p class="note">Sources: the game repository's git history, the launch rehearsal checklist and that day's agent session log; on 2026-10-28 we recounted three bundles and two APKs and built a small R8 reproduction. No ID value was printed.</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Thu, 29 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Play Billing subscription screen &#x27;temporary error&#x27; – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/subscription-details-94-percent/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/subscription-details-94-percent/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/subscription-details-94-percent-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · Incident</span>
-      <h1>A month of 'temporary error': our subscription details screen never waited for products, and 1 of 16 users started checkout</h1>
-      <p class="lead">A "temporary error" on a subscription screen may not be Play's fault. Our details screen decided the product list was empty before Play Billing had answered, and sent users away.</p>
-    <p class="note ax-series-line"><a href="https://sugarmount21.com/en/ax/series/sugarspeller-maintenance/">Reworking a long-running spelling app</a> 3/8</p>
-      <p>When an Android app opens its subscription screen, it asks the Play Billing Library for product details, and the answer arrives a moment later. Our spell checker's details screen did not wait for it: it checked the list right away, and over 90 days only 1 of the 16 users who reached the screen started checkout. This note follows one Play review to the cause, the fix (wait up to 8 seconds), the seven billing defects found after it, and a checklist for your own subscription screen.</p>
-    </section>
-    <section aria-labelledby="funnel">
-      <h2 id="funnel">The 90-day funnel: 45 on the plans screen, 16 on details, 1 at checkout</h2>
-      <p>On September 26 we pulled the subscription events for our Korean spell checker, <a href="https://sugarmount21.com/en/apps/sugarspeller/">SugarSpeller</a>, counted by user, over 90 days. 45 users saw the plans screen, 16 went on to the details screen where you pick a billing period, and 1 started checkout. Fifteen of the sixteen (94%) left the details screen without starting a purchase. The details-screen events split 18 premium and 2 basic, spread across seven versions between 1.6.016 and 1.6.024.</p>
-      <p>It started with a review with 18 "helpful" votes: trying to subscribe to premium gave a "temporary error", and had for a month. That "temporary error" is the app's generic retry toast, which in Korean reads roughly "A temporary error occurred. Please try again."</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/subscription-details-94-percent-1-en.webp" width="1200" height="584" alt="Bar chart: over the 90 days before the fix, 16 users reached the subscription details screen and 1 started checkout; after version 1.6.025, 4 of 13 (31%) started checkout." loading="lazy"><figcaption>Checkout starts from the details screen went from 1 in 16 users to 4 in 13.</figcaption></figure>
-    </section>
-    <section aria-labelledby="same-function">
-      <h2 id="same-function">The function that requested products judged an empty list one line later</h2>
-      <p><code>addSubsItems()</code> on the details screen launched a coroutine in <code>lifecycleScope</code> that waited on the product flow with <code>firstOrNull()</code>, and then, further down the same function, checked the list size straight away. Trimmed, the old code looked like this:</p>
-      <pre><code>getProductDetails(repo.premiumProductDetails)   // inside: launch { flow.firstOrNull() }
-if (recyclerAdapterSubscription!!.mItemList!!.size &lt;= 0) {
-    Toast.makeText(..., R.string.string_common_error_retry, ...).show()
-    startActivity(main screen)
-}</code></pre>
-      <p>If the billing manager's StateFlow already held the product, <code>firstOrNull()</code> returned on the spot and the list filled. If not, the coroutine suspended, the function moved on, and the size check saw an empty list. Every user whose products were not already cached got the toast and landed back on the main screen. The size check came in with a commit on January 4, 2024; the <code>firstOrNull()</code> call with one on October 3, 2024.</p>
-      <p>The September 26 fix turned the check into a wait. The screen now shows a progress dialog and waits inside <code>withTimeoutOrNull(8_000)</code>; only if nothing arrives in 8 seconds does it show the toast and go back. The code comment gives the reasoning: connecting to billing and querying products usually takes 1 to 2 seconds, so wait several times that. We did not measure a latency distribution to pick 8 seconds.</p>
-    </section>
-    <section aria-labelledby="size-two">
-      <h2 id="size-two">The 2024 belief that Play 'sometimes splits the response' came from our own for loop</h2>
-      <p><code>BillingClientManager</code> stored the products Play returned only <code>if(newMap.size &gt;= 2)</code>, that is, only when basic and premium arrived in the same response. The commit that added the line, on October 4, 2024, says the product details response "intermittently comes in separately or together", so only store it when both arrive at once.</p>
-      <p>The split came from the app. Since December 30, 2023, <code>queryProductDetails()</code> had called <code>queryProductDetailsAsync</code> inside the loop that built the product list, once per iteration. With two products, that sent a one-product query and then a two-product query, and the responses came back as a one-item list and a two-item list. The 2024 fix hid the symptom by throwing away the one-item response. In exchange, whenever Play returned only one product (for example when one product's base plan is turned off), the map stayed empty for good.</p>
-      <p>The same fix queries once and merges whatever arrives into the existing map. In Play Billing Library 9.1.0, <code>QueryProductDetailsResult</code> reports products Play could not return in <code>unfetchedProductList</code>; we now log it, which separates Play Console setup problems from app problems.</p>
-    </section>
-    <section aria-labelledby="test-product-details">
-      <h2 id="test-product-details">Three of the agent's first five tests stopped at Mockito</h2>
-      <p>The fix was made with an AI coding agent (Claude Code), tests first: three Robolectric screen tests (waits while products are missing, lists plans when they arrive late, errors only when they never arrive) and two billing manager tests (single-product response, split responses merged). All five failed on the first run, but three of them were not reproducing the bug:</p>
-      <pre><code>java.lang.NullPointerException: Cannot invoke "org.mockito.plugins.MockMaker$TypeMockability.mockable()" because "typeMockability" is null</code></pre>
-      <p>The agent had mocked <code>ProductDetails</code> with Mockito. The class is final, and this project's test classpath mixes in <code>mockito-android</code>, so final mocks could not be created, and we dropped the mock. <code>ProductDetails</code> has a package-private constructor that takes a JSON string, so a test helper, <code>TestProductDetails</code>, lives under the same package name, <code>com.android.billingclient.api</code>, and builds real objects from the JSON shape Play sends (productId, type, subscriptionOfferDetails, pricingPhases). On the next run all five failed for the intended reasons: the screen test with "sent the user to main even though products simply had not arrived yet", the merge test expecting basic and premium and getting an empty set. After the fix they passed. A trimmed version of the helper, with product IDs and price replaced by placeholders:</p>
-      <pre><code>package com.android.billingclient.api   // test sources; the constructor is package-private
-fun subscriptionMonthly(productId: String, basePlanId: String): ProductDetails {
-    val phase = JSONObject().put("priceAmountMicros", 1_000_000_000).put("priceCurrencyCode", "KRW")
-        .put("formattedPrice", "KRW 1,000").put("billingPeriod", "P1M").put("recurrenceMode", 1)
-    val offer = JSONObject().put("basePlanId", basePlanId).put("offerIdToken", "token-$basePlanId")
-        .put("offerTags", JSONArray()).put("pricingPhases", JSONArray().put(phase))
-    val json = JSONObject().put("productId", productId).put("type", "subs")
-        .put("title", productId).put("name", productId).put("description", "test")
-        .put("subscriptionOfferDetails", JSONArray().put(offer))
-    return ProductDetails(json.toString())     // a real object, not a mock
-}
-// usage: subscriptionMonthly("premium", "premium-monthly")</code></pre>
-    </section>
-    <section aria-labelledby="s21-billing">
-      <h2 id="s21-billing">On a Galaxy S21 the screen still bounced, and a rebuild from the Sep 26 evening code did the same</h2>
-      <p>On September 28 we opened the details screen on a Galaxy S21. The progress indicator spun, the screen closed, and the app went back to main. The first suspect was the changes from the past two days, so we built a release APK from the Sep 26 evening code (which already had the wait fix) and installed it on the same phone. It failed the same way, after 8 seconds. The billing connection's error was <code>In-app billing API version 3 is not supported</code>, and the phone's Google Play services build was from December 2024.</p>
-      <p>The phone was the cause, but two app defects showed up with it. When billing setup ended in failure, no disconnect callback followed, so nothing ever reconnected; until the app was restarted, the screen waited the full 8 seconds every time and then showed a "please try again" that had nothing to do with the cause. The same day we made the billing manager expose a connection state (connecting, ready, or unavailable with a response code). In 1.6.025 the wait looks like this:</p>
-      <pre><code>repo.ensureConnected()                       // reconnect if an earlier attempt failed
-popupDialog.showDialog(POPUP_TYPE.PROGRESS, true)
-lifecycleScope.launch {
-    val outcome: Any? = try {
-        withTimeoutOrNull(PRODUCT_LOAD_TIMEOUT_MS) {   // 8_000L
-            merge(source, repo.connectionState.filterIsInstance&lt;BillingConnectionState.Unavailable&gt;())
-                .firstOrNull()                        // products or a failed connection, whichever comes first
-        }
-    } finally { popupDialog.stopDialog() }
-    // Unavailable: (on BILLING/SERVICE_UNAVAILABLE) "check the Play Store" + subscription_unavailable / null (over 8 s): retry toast / else: list the plans
-}</code></pre>
-      <p>On <code>BILLING_UNAVAILABLE</code> it skips the wait, tells the user to check the Play Store, and sends a <code>subscription_unavailable</code> event to GA4.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20month%20of%20%27temporary%20error%27%3A%20our%20subscription%20details%20screen%20never%20waited%20for%20products%2C%20and%201%20of%2016%20users%20started%20checkout">Email us</a></p></aside>
-    <section aria-labelledby="seven-defects">
-      <h2 id="seven-defects">The day after 'ready to ship', the operator's own test on an S23 led to seven more billing defects</h2>
-      <p>On September 29, version 1.6.025 was logged as ready to ship (the review process that day is in <a href="https://sugarmount21.com/en/ax/agent-review-refutation/">How to trust an AI agent's code review</a>). The next morning the operator installed the latest build on a Galaxy S23, tried subscribing, reported that it was not working, and said the release could not go out like this. That prompted another round on the S21 with agent cross-checking: three analysis agents, two refutation passes, three fix agents and two adversarial reviews. It found seven billing defects that had been in the app since 1.6.024 or earlier:</p>
-      <ol>
-        <li>When the purchase sheet failed immediately, the progress indicator never went away, and a background thread kept one CPU core busy.</li>
-        <li>The billing setup callback wrote OK into the same global value as purchase results, which read as "subscription complete".</li>
-        <li>A PENDING purchase was treated as a success.</li>
-        <li>Every return to the app created a new BillingClient (a leak), and the Classic screen saw an empty purchase list before the query finished and saved subscribers as free users.</li>
-        <li>The Chat screen did not apply benefits after a purchase.</li>
-        <li>Starting checkout without knowing the current purchases let an existing subscriber buy a second subscription.</li>
-        <li>A screen's onDestroy closed the billing connection the whole app shared.</li>
-      </ol>
-      <p>The September 30 fixes moved purchase results into their own flow, separate from connection state, and read purchases from a signal that fills only after a successful query, so a user is downgraded only when the query succeeded and found no active subscription. Checkout now re-queries purchases right before it starts and does not open the purchase sheet when they are unknown. Counting every fix that day, unit tests went from 250 to 292.</p>
-      <p>We never read the S23's logs, but the same test on the S21 showed the problem was how we were testing. A sideloaded release build that was never uploaded to Play gets Play's "Google Play billing is not available for this version" message, and the debug build, whose package name ends in <code>.debug</code>, has no products registered in Play. The only way to run a real purchase end to end is to upload to the internal testing track and install from Play with a license tester account, so that check became a step in the release procedure.</p>
-    </section>
-    <section aria-labelledby="eight-seconds">
-      <h2 id="eight-seconds">Judge now, wait forever, or wait 8 seconds</h2>
-      <p>Judging right away, the old behavior, treats "the list is empty the moment the screen opens" as an error, so it went. Waiting forever was already half there in the old code: <code>firstOrNull()</code> never returns if the product never comes, so deleting only the size check would have left users staring at an empty screen. We also wrote down the next move in case the 8-second wait was the wrong fix: if checkout starts from details were still 0 to 10% 30 days after release, the product query itself is failing, and the next step is retrying the billing connection.</p>
-      <p>Do not judge asynchronously loaded product details the moment the screen opens. Set a ceiling on the wait, and when the failure already has a known cause, such as an unavailable billing connection, report it right away instead of waiting. The same two rules now sit in the subscription section of the agent instructions (CLAUDE.md) in this app's repository.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">4 of 13 is an interim number, and device-side billing failures stay</h2>
-      <p>The other half of the September 26 rule: 30 days after release, if more than 30% of details-screen users start checkout, the cause is confirmed. The interim 31% on October 17 clears the bar, and two purchases went through, but it rests on 13 users. A log entry on October 18 found that Play's pre-launch robots had inflated version 1.6.030's subscription screen numbers; whether any of these 13 were robots is not recorded. (How we filter those devices in GA4 is in <a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real</a>.)</p>
-      <p>On the same day, <code>subscription_unavailable</code> fired for 2 of the 13 (15%). Users whose device cannot bill, through outdated Play services or a sign-in problem, are still there after the fix, and the most the app can do is say so clearly. We have only used <code>TestProductDetails</code> with Play Billing Library 9.1.0, and the Robolectric tests never see a real purchase or Play's signature check.</p>
-    </section>
-    <section aria-labelledby="checklist">
-      <h2 id="checklist">Checking whether your own subscription screen turns users away</h2>
-      <ol>
-        <li>Put the plans-screen, details-screen and checkout-start events side by side in GA4, counted by user. If checkout starts from details are in single-digit percent, open the details screen code first.</li>
-        <li>In any function that launches a collector on the product flow, look for a list-size check further down the same function.</li>
-        <li>Check whether <code>queryProductDetailsAsync</code> runs inside a loop and whether the response handler stores products only when all of them arrive. Merge what arrives, and log <code>unfetchedProductList</code>.</li>
-        <li>Have the details screen wait with a progress indicator and a ceiling, and end immediately with a "update Play" message when billing setup finishes with <code>BILLING_UNAVAILABLE</code> or <code>SERVICE_UNAVAILABLE</code>.</li>
-        <li>Create a <code>com.android.billingclient.api</code> package in your test sources with a helper that builds <code>ProductDetails</code> from JSON. Make the three screen cases (waiting, late arrival, never arrives) and the two manager cases (single and split responses) fail first, then fix.</li>
-        <li>Verify real purchases through the internal testing track and a license tester.</li>
-        <li>Before release, write down the decision rule with a date: above what rate the cause is confirmed, below what rate it is something else.</li>
-      </ol>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">What the October 31 check has to answer</h2>
-      <p>The final check is due on October 31, 30 days after 1.6.025 shipped. First we check for pre-launch robots among the details-screen users. Then we look at two numbers: checkout starts against the 30% line, and <code>subscription_unavailable</code> against 5%, above which a button that goes straight to the Play Store is on the table. The records do not show whether the internal-track real purchase check we added to the release procedure was done before 1.6.025 shipped.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20month%20of%20%27temporary%20error%27%3A%20our%20subscription%20details%20screen%20never%20waited%20for%20products%2C%20and%201%20of%2016%20users%20started%20checkout">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <nav class="box ax-series-box" aria-label="Series contents"><p><strong><a href="https://sugarmount21.com/en/ax/series/sugarspeller-maintenance/">Reworking a long-running spelling app: all 8 parts</a></strong></p><ol><li value="2"><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li><li value="4"><a href="https://sugarmount21.com/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li></ol></nav>
-    <section aria-labelledby="faq">
-      <h2 id="faq">Frequently asked questions</h2>
-      <div class="faq">
-        <details><summary>My subscription screen keeps showing a "temporary error". Is Google Play down?</summary><div><p>Check your own code first. Our details screen decided the product list was empty before the asynchronous product details arrived, and sent every user without cached products away. If retrying always gives the same result, it is not a temporary outage.</p></div></details>
-        <details><summary>How do I test with ProductDetails when Mockito cannot mock it?</summary><div><p>Create the com.android.billingclient.api package in your test sources and call the package-private constructor with JSON shaped like Play's response, which gives you a real object. We ran five tests this way on Play Billing Library 9.1.0.</p></div></details>
-        <details><summary>Is "Google Play billing is not available for this version" on a sideloaded APK a bug?</summary><div><p>No. Builds that were never uploaded to Play, and debug packages, cannot bill. Upload to the internal testing track and install from Play with a license tester account to check a real purchase.</p></div></details>
-      </div>
-    </section>
-    <p class="note">Sources: the app repository's git history and CHANGELOG (September 26 and 30, 2026), the monitoring log, and work session logs from September 26 to 30. User counts are GA4 users.</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Thu, 29 Oct 2026 09:00:00 +0900</pubDate>
   </item>
 </channel>
 </rss>

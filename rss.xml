@@ -6,7 +6,254 @@
   <description>한 가지 일을 간단하게 하는 Android 앱을 만듭니다. 사진 용량 줄이기부터 한글 문서 보기, 한글 맞춤법, 퍼즐 게임까지 앱마다 하는 일은 하나입니다.</description>
   <language>ko</language>
   <atom:link href="https://sugarmount21.com/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Tue, 17 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Wed, 18 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>클로드 코드 안드로이드 광고 SDK, 빌드로 막기 – SugarMount</title>
+    <link>https://sugarmount21.com/ax/ads-free-release-gate/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/ax/ads-free-release-gate/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/ads-free-release-gate-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX 노트 · 방법</span>
+      <h1>클로드 코드 안드로이드 광고 SDK, 빌드로 막기</h1>
+      <p class="lead">클로드 코드로 만든 광고 0 게이트는 의존성 그래프와 병합 매니페스트를 함께 봐야 했습니다. 의존성만 보면 AD_ID가 들어와도 통과했습니다.</p>
+      <p>광고 SDK를 한 줄도 넣지 않은 안드로이드 앱에도 광고 ID 권한은 들어옵니다. <a href="https://sugarmount21.com/apps/doc-viewer/">한글뷰어 슈가독</a>은 광고를 아예 넣지 않기로 한 앱인데, 통계용 Firebase Analytics가 끌고 오는 라이브러리 4개가 <code>AD_ID</code> 권한을 선언하고, 빌드가 그것을 앱 매니페스트에 합쳐 넣습니다. 그대로 두면 스토어에는 "광고 없음, 광고 ID 안 씀"이라고 신고해 놓고 AAB에는 그 권한이 들어가게 됩니다.</p>
+      <p>클로드 코드(Claude Code) 에이전트가 처음 만든 게이트는 의존성 그래프만 봤고, 리뷰 에이전트가 그 구멍을 짚었습니다. 2026년 11월 18일 같은 저장소를 임시 사본으로 풀어 다시 돌려 보니, 의존성만 보는 게이트는 병합 매니페스트에 AD_ID가 든 빌드를 그대로 통과시켰습니다.</p>
+    </section>
+    <section aria-labelledby="first-gate">
+      <h2 id="first-gate">광고 0을 고른 날, 게이트는 의존성만 봤습니다</h2>
+      <p>같은 저장소의 사진 앱 세 개는 배너, 전면, 앱 오프닝 광고를 넣습니다. 문서 뷰어를 시작할 때 에이전트는 광고안을 두 가지로 올렸고(광고 SDK 0, 또는 홈 배너 1개), 운영자는 10월 5일 새벽 "광고 0"을 골랐습니다. 저장소 설정 파일에는 <code>adsMode=NONE</code> 한 줄이 생겼습니다.</p>
+      <p>두 시간쯤 뒤 구현 에이전트가 게이트를 만들었습니다. 릴리스 설정 검사 작업 <code>verifyReleaseConfig</code>에 광고 ID 칸은 비어 있어야 하고, 릴리스 의존성 그래프에 구글 광고 SDK(Google Mobile Ads, 줄여서 GMA)나 동의 화면 SDK(UMP)가 없어야 한다는 규칙이 들어갔습니다. 앱 매니페스트에는 광고 ID 권한을 지우는 <code>tools:node="remove"</code> 줄 4개를 넣었고, 병합된 릴리스 매니페스트를 읽는 단위 테스트 2개가 그 줄을 지켰습니다.</p>
+      <p>워크플로 지시문에는 "가드를 하나 넣을 때마다 잠깐 지워 보고 테스트가 실패하는지 확인하라"는 줄이 있었고, 구현 에이전트는 일부러 깬 사본을 여러 개 만들어 돌렸습니다. 다만 광고 ID나 광고 모듈을 넣은 사본은 AAB 빌드가 의존하는 <code>verifyReleaseConfig</code>까지 돌렸지만, remove 줄을 지운 사본은 단위 테스트로만 돌렸고 그 작업으로는 확인하지 않았습니다.</p>
+      <p>구현이 끝나자 곧바로 리뷰 에이전트 4명이 붙었고, 규칙·게이트 관점의 리뷰어가 이렇게 적었습니다. "<code>bundleRelease</code>는 게이트 하나, <code>verifyReleaseConfig</code>에만 의존하고, 그 작업은 의존성 그래프는 보지만 병합 매니페스트는 보지 않는다." remove 줄을 지우고 AAB를 만들어 올리면, 스토어에는 광고 ID 없음이라 신고했는데 AAB에는 AD_ID가 있게 된다는 지적이었습니다. 리뷰어는 이 지적을 minor로 분류했고, 매니페스트를 읽는 단위 테스트는 출시 스크립트에서만 돌고 AAB 빌드 명령으로는 돌지 않는다고 함께 적었습니다.</p>
+      <p>수정 에이전트는 20분쯤 걸려 규칙을 별도 파일로 빼고, 병합 매니페스트 검사를 같은 작업 안에 넣었습니다. 같은 날 오전 운영자는 "광고가 전혀 없는 거냐"고 다시 물었고, Play Console 앱 콘텐츠의 광고 항목과 광고 ID 항목을 모두 "없음"으로 입력했습니다. 수정까지 거친 이 게이트가 10월 8일 커밋 ca1ade4로 저장소에 들어갔습니다. 의존성만 보던 첫 게이트는 커밋되지 않았습니다.</p>
+    </section>
+    <section aria-labelledby="firebase-ad-id">
+      <h2 id="firebase-ad-id">Firebase가 AD_ID를 다시 넣는 경로</h2>
+      <p>뷰어의 통계 모듈은 Firebase Analytics에 의존합니다. 11월 18일 다시 뽑은 릴리스 의존성 그래프에서 firebase-analytics 23.2.0은 측정 라이브러리 묶음을 끌고 오고, 그 안에 광고 ID를 읽는 <code>play-services-ads-identifier</code> 18.0.0이 있습니다.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/ads-free-release-gate-shot2-ko.webp" width="1200" height="608" alt="릴리스 의존성 그래프에서 firebase-analytics 아래 play-services-ads-identifier와 ads-adservices가 붉게 표시되고, 병합 보고서에서 AD_ID를 넣은 라이브러리 4종이 보이는 화면" loading="lazy"><figcaption>Gradle 의존성 출력과 매니페스트 병합 보고서 일부(2026-11-18 재실행, remove 줄을 지운 B 상태). 로컬 경로는 회색 칸으로 가렸습니다.</figcaption></figure>
+      <p>매니페스트 병합 보고서는 권한마다 어느 라이브러리가 넣었는지 적습니다. remove 줄을 지운 상태에서 <code>AD_ID</code>는 라이브러리 4개가 선언했고, 안드로이드의 새 광고 측정 API(AdServices) 권한 2종은 그중 2개가 넣었습니다. 앱 매니페스트가 함께 지우던 <code>ACCESS_ADSERVICES_TOPICS</code>는 이번 버전에서는 아무 라이브러리도 선언하지 않아, 병합기가 "지울 대상이 없다"는 경고만 냈습니다.</p>
+      <p>의존성 검사가 조용한 것은 거부 목록에 <code>play-services-ads-identifier</code>가 없기 때문입니다. 넣으면 Firebase Analytics 자체가 막히므로 코드 주석에 "이것은 광고 SDK가 아니다"라고 적어 두고 일부러 목록에서 제외했습니다. 권한은 매니페스트에 선언되므로, 의존성 목록만 보는 검사는 처음부터 이 경로를 볼 수 없습니다.</p>
+      <div class="table-wrap"><table><thead><tr><th>거부 목록을 넓히는 방법</th><th>지금 그래프에서 생기는 일</th><th>고르지 않은 이유</th></tr></thead><tbody><tr><td><code>play-services-ads-identifier</code>도 거부</td><td>Firebase Analytics가 끌고 오므로 항상 실패</td><td>통계를 빼야 함</td></tr><tr><td>모듈 이름에 <code>ads</code>가 있으면 실패</td><td>ads-identifier와 privacysandbox <code>ads-adservices</code>가 Firebase 경유로 걸림</td><td>오탐</td></tr><tr><td>설정값만 검사</td><td>광고 모듈을 넣은 D 상태에서도 설정은 깨끗함</td><td>광고 모듈이 들어와도 못 봄</td></tr><tr><td><code>bundleRelease</code>가 릴리스 단위 테스트 전체에 의존</td><td>리뷰어가 낸 두 번째 안</td><td>기록에 고르지 않은 이유가 없음</td></tr></tbody></table></div>
+      <p>remove 줄이 사라지면 Firebase의 라이브러리 4개가 <code>AD_ID</code>를 다시 넣고, 허용된 의존성이라 의존성 검사는 조용하고, 매니페스트를 보는 테스트는 AAB 빌드 경로 밖에 있었습니다. 수정 에이전트는 이 가운데 마지막 고리를 끊었습니다. 병합 매니페스트 검사가 <code>verifyReleaseConfig</code> 안으로 들어가, 앞의 세 고리가 그대로여도 <code>bundleRelease</code>가 실패합니다.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%ED%81%B4%EB%A1%9C%EB%93%9C%20%EC%BD%94%EB%93%9C%20%EC%95%88%EB%93%9C%EB%A1%9C%EC%9D%B4%EB%93%9C%20%EA%B4%91%EA%B3%A0%20SDK%2C%20%EB%B9%8C%EB%93%9C%EB%A1%9C%20%EB%A7%89%EA%B8%B0">메일로 문의하기</a></p></aside>
+    <section aria-labelledby="four-states">
+      <h2 id="four-states">같은 앱을 네 상태로 돌린 결과</h2>
+      <p>원본 저장소는 건드리지 않고 <code>origin/main</code>을 임시 폴더로 풀어 뷰어 앱의 <code>verifyReleaseConfig</code>를 네 번 돌렸습니다. Firebase 설정 파일은 저장소에 있는 가짜 템플릿을 넣었습니다(없으면 모든 실행에 "google-services.json is missing" 한 줄이 붙습니다).</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/ads-free-release-gate-shot1-ko.webp" width="1200" height="598" alt="같은 앱을 네 상태로 돌린 verifyReleaseConfig 출력. A와 C는 BUILD SUCCESSFUL, B는 AD_ID·AdServices 권한 3줄로 실패, D는 의존성 3줄과 매니페스트 12줄로 실패" loading="lazy"><figcaption>Gradle 9.6.0, AGP 9.4.1에서 2026-11-18 다시 돌린 출력입니다. C는 병합 매니페스트에 AD_ID가 있는데도 통과합니다.</figcaption></figure>
+      <div class="table-wrap"><table><thead><tr><th>상태</th><th>바꾼 것</th><th>결과</th><th>병합 매니페스트의 AD_ID</th></tr></thead><tbody><tr><td>A</td><td>없음</td><td>통과</td><td>없음</td></tr><tr><td>B</td><td>remove 줄 4개 삭제</td><td>실패, 매니페스트 3줄</td><td>있음</td></tr><tr><td>C</td><td>B + 매니페스트 검사 호출 제거</td><td>통과</td><td>있음</td></tr><tr><td>D</td><td>사진 앱 광고 모듈 의존 추가</td><td>실패, 의존성 3줄 + 매니페스트 12줄</td><td>없음</td></tr></tbody></table></div>
+      <p>C가 10월 5일 처음 만든 게이트에 가까운 상태입니다. 광고 ID 권한이 들어 있는데 빌드가 성공합니다. D는 반대 방향입니다. remove 줄이 그대로라 <code>AD_ID</code>는 지워졌지만, 광고 SDK와 UMP, 광고 SDK가 끌고 오는 WorkManager가 의존성에 걸리고, 매니페스트에는 광고 화면 하나와 WorkManager 컴포넌트 11개가 걸립니다. B는 매니페스트 검사만 잡고, D는 두 겹이 모두 잡습니다.</p>
+      <p>같은 사본에서 매니페스트 검사 호출을 지운 채 규칙 테스트(<code>./gradlew -p build-logic test</code>)도 돌렸습니다. 15개가 모두 통과했습니다. 규칙 함수는 테스트가 지키지만, 작업이 그 함수를 부르는지는 아무 테스트도 보지 않습니다.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">의존성과 병합 매니페스트를 한 작업에 걸기</h2>
+      <p>컨벤션 플러그인(여러 모듈이 같이 쓰는 Gradle 빌드 설정 플러그인)이나 앱 모듈의 <code>build.gradle.kts</code> 어디에 둬도 됩니다. 이 저장소는 모든 앱이 쓰는 컨벤션 플러그인에 두고, 앱별 설정 파일의 <code>adsMode</code>로 적용 여부를 정합니다.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/ads-free-release-gate-1-ko.webp" width="1200" height="798" alt="광고 없는 앱의 릴리스 게이트 다섯 단계: 설정, 의존성 그래프, 병합 매니페스트, bundleRelease 연결, 네 상태로 깨 보기" loading="lazy"><figcaption>의존성 그래프와 병합 매니페스트를 같은 작업에서 보고, 그 작업을 AAB 빌드 앞에 겁니다.</figcaption></figure>
+      <ol class="steps"><li><p>앱 설정에 광고 모드 항목을 만듭니다. <code>NONE</code>이면 광고 ID 칸은 모두 빈 값, 광고 플래그는 모두 false여야 통과하게 합니다.</p></li><li><p>릴리스 런타임 의존성 그래프(<code>releaseRuntimeClasspath</code>)를 끝까지 따라가 외부 모듈의 <code>group:name</code>을 모으고, 정확한 이름 목록과 대조합니다. 뷰어의 목록은 구글 광고 SDK 4종, UMP, WorkManager 2종을 합쳐 7개이고, <code>play-services-ads-identifier</code>는 넣지 않습니다.</p></li><li><p>앱 매니페스트에 광고 ID 권한을 지우는 줄을 넣습니다.</p><pre><code>&lt;uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" /&gt;
+&lt;uses-permission android:name="android.permission.ACCESS_ADSERVICES_AD_ID" tools:node="remove" /&gt;
+&lt;uses-permission android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION" tools:node="remove" /&gt;
+&lt;uses-permission android:name="android.permission.ACCESS_ADSERVICES_TOPICS" tools:node="remove" /&gt;</code></pre></li><li><p>같은 작업 안에서 릴리스 변형의 병합 매니페스트를 읽고, <code>AD_ID</code>와 <code>ACCESS_ADSERVICES_*</code> 권한, GMA 메타데이터, GMA·UMP·WorkManager 컴포넌트가 있으면 실패시킵니다. 3번 줄이 사라졌을 때 잡는 것이 이 단계입니다. 저장소 코드에서 권한 부분만 옮기면 이렇습니다.</p><pre><code>// 플러그인: 릴리스 변형의 병합 매니페스트를 작업 입력으로 연결
+onVariants(selector().withBuildType("release")) { variant -&gt;
+    mergedReleaseManifest.set(variant.artifacts.get(SingleArtifact.MERGED_MANIFEST))
+    releasePackage.set(variant.applicationId)
+}
+// 규칙 함수: 권한 이름 대조
+(elements("uses-permission") + elements("uses-permission-sdk-23")).map { it.name() }
+    .filter { it == "com.google.android.gms.permission.AD_ID" || it.startsWith("android.permission.ACCESS_ADSERVICES_") }
+    .forEach { problems += "adsMode=NONE but the merged manifest requests $it" }</code></pre></li><li><p>AAB를 만드는 작업이 이 작업에 의존하게 합니다.</p><pre><code>tasks.matching { it.name == "bundleRelease" }.configureEach { dependsOn(verifyReleaseConfig) }</code></pre></li><li><p>규칙은 Gradle 타입이 없는 함수로 빼서 규칙마다 "깨면 실패한다"는 단위 테스트를 붙입니다. 그다음 실제 프로젝트를 위 A~D 네 상태로 돌려, A와 C는 통과하고 B와 D는 실패하는지 봅니다. 깨뜨린 상태 가운데 통과하는 것은 C뿐이어야 합니다.</p></li><li><p>어느 라이브러리가 권한을 넣는지는 <code>build/outputs/logs/manifest-merger-release-report.txt</code>에서, 무엇이 끌고 오는지는 <code>./gradlew :app:dependencies --configuration releaseRuntimeClasspath</code>에서 확인합니다.</p></li></ol>
+      <p>2번과 4번 목록은 기억으로 채우지 말고, 지금 프로젝트에서 뽑은 의존성 그래프와 병합 보고서를 보고 쓰십시오.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">목록 밖 광고 SDK와 테스트 없는 배선</h2>
+      <p>이 게이트가 아는 광고 SDK는 구글 것뿐입니다. 의존성 목록은 정확한 모듈 이름 7개이고, 매니페스트 접두사는 4개로, GMA(2개)·UMP·WorkManager를 봅니다. 다른 광고 네트워크 SDK가 들어오면 두 겹 모두 통과합니다. 뷰어에 그런 SDK를 넣어 돌려 보지는 않았습니다.</p>
+      <p>WorkManager를 막는 규칙은 뷰어가 WorkManager를 전혀 쓰지 않아서 성립합니다(받은 문서함 정리도 WorkManager 없이 합니다). 예약 작업이 필요한 앱이라면 이 줄부터 바꿔야 합니다. 게이트는 <code>bundleRelease</code>에만 걸려 있어서, 릴리스 APK를 만드는 <code>assembleRelease</code>로는 돌지 않습니다.</p>
+      <p>작업이 규칙 함수를 부르는지는 지금 출시 스크립트가 돌리는 릴리스 단위 테스트가 대신 지킵니다. 이 테스트도 같은 병합 매니페스트를 보지만, AAB 빌드 명령 하나로는 돌지 않습니다. 다음에 할 일은 C 상태를 빌드 로직 테스트로 고정해, 배선을 지우면 테스트가 실패하게 만드는 것입니다.</p>
+      <p>다른 앱에서 게이트의 입력 자체가 출시물과 달랐던 사례는 <a href="https://sugarmount21.com/ax/gate-checked-wrong-artifact/">출시 게이트가 출시물이 아닌 것을 검사하고 있었다</a>에 썼습니다. 이 글은 같은 빌드에서 매니페스트 겹을 안 본 경우입니다. 사진 앱 쪽 게이트 전체 순서는 <a href="https://sugarmount21.com/ax/release-gate/">바이브코딩 앱 출시 전 점검</a>에 있습니다.</p>
+    </section>
+    <p class="note">2026-11-18 기준. 10월 4~5일 세션·워크플로 기록(구현·리뷰·수정 에이전트 보고), 앱 저장소 git 기록(그 게이트가 들어간 10월 8일 커밋), 임시 사본에서 다시 돌린 Gradle 출력과 매니페스트 병합 보고서.</p>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%ED%81%B4%EB%A1%9C%EB%93%9C%20%EC%BD%94%EB%93%9C%20%EC%95%88%EB%93%9C%EB%A1%9C%EC%9D%B4%EB%93%9C%20%EA%B4%91%EA%B3%A0%20SDK%2C%20%EB%B9%8C%EB%93%9C%EB%A1%9C%20%EB%A7%89%EA%B8%B0">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://sugarmount21.com/ax/play-store-title-aso-no-clear-gain/">플레이스토어 앱 제목 키워드 2주, 판정 못 한 이유</a></li>
+        <li><a href="https://sugarmount21.com/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
+        <li><a href="https://sugarmount21.com/ax/google-ads-break-even-cpi/">Google Ads 앱 캠페인 4개에 $36.4, 설치 105건, ROAS 약 3%: CPI가 손익분기의 30배였다</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">클로드 코드 WSL vs 윈도우 네이티브: 옮겨 보고 달라진 것</a></li>
+        <li><a href="https://sugarmount21.com/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 18 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>클로드 코드 크롬 확장으로 구글 광고 4개 만든 기록 – SugarMount</title>
+    <link>https://sugarmount21.com/ax/claude-chrome-google-ads-campaigns/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/ax/claude-chrome-google-ads-campaigns/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/claude-chrome-google-ads-campaigns-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX 노트 · 측정</span>
+      <h1>클로드 코드 크롬 확장으로 구글 광고 4개 만든 기록</h1>
+      <p class="lead">클로드 코드 크롬 확장으로 구글 광고 캠페인 4개를 만들며 화면 동작 966번을 썼고, 운영자가 바로잡은 것은 예산·입찰·국가·언어 설정값이었습니다.</p>
+      <p>크롬 확장 에이전트 둘이 구글 광고(Google Ads) 앱 캠페인 4개를 만드는 동안, 운영자는 같은 예산 정정을 두 세션에 24분 40초 간격으로 따로 해야 했습니다. 잘못된 클릭을 짚은 메시지는 하나도 없었고, 화면이 멈췄다고 알린 한 번은 에이전트 스스로 페이지 스크립트로 창을 숨긴 탓으로 봤습니다.</p>
+      <p>클로드 코드(Claude Code) 세션 두 개가 2026년 10월 8일 밤 24초 차이로 같은 크롬, 같은 광고 계정에서 두 게임의 캠페인을 맡아 일을 시작했습니다.</p>
+    </section>
+    <section aria-labelledby="method">
+      <h2 id="method">측정 대상: 세션 기록 두 개의 도구 호출 1,436번</h2>
+      <p>도구는 Claude in Chrome입니다. 사용자의 크롬에 붙는 확장 프로그램으로, 에이전트가 로그인된 탭에서 화면을 캡처하고 클릭하고 글자를 넣습니다. 세션 A는 화살표 매듭풀기, 세션 B는 한판블록 캠페인을 맡았습니다. 두 세션 모두 게시 버튼은 누르지 말고 검토 화면(게시 직전에 설정을 모아 보여 주는 화면)에서 멈추라는 지시를 받았습니다. 이날 구글 광고 API는 쓰지 않았고, 지시문이 처음부터 크롬 작업이었습니다.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/claude-chrome-google-ads-campaigns-shot1-ko.webp" width="1200" height="760" alt="두 세션의 도구 호출 누적 그래프와 설정값 정정, 영상 업로드 지시, 화면 멈춤 신고, 메모리 저장 시각 표시" loading="lazy"><figcaption>세션 기록 2개(2026-10-08~09)의 tool_use 전체입니다. 세로선은 설정값 정정, 영상 업로드 지시, 화면 멈춤 신고, 자동 권한 검사 거부, 메모리 파일 쓰기 시각입니다.</figcaption></figure>
+      <p>세션 기록의 tool_use(에이전트가 도구를 부른 한 번)를 도구 이름별로 집계했습니다.</p>
+      <div class="table-wrap"><table><thead><tr><th>세션</th><th>전체</th><th>화면 동작</th><th>페이지 스크립트</th><th>요소 찾기</th><th>주소 이동</th><th>파일 올리기</th></tr></thead><tbody><tr><td>A 화살표 매듭풀기</td><td>977</td><td>703</td><td>136</td><td>65</td><td>39</td><td>9</td></tr><tr><td>B 한판블록</td><td>459</td><td>263</td><td>119</td><td>35</td><td>13</td><td>11</td></tr></tbody></table></div>
+      <p>그래프에서 두 선이 평평한 구간(B는 22시 51분, A는 23시 06분부터 0시 40분 무렵까지)에는 운영자 메시지가 없었고, 두 세션의 도구 호출도 멈춰 있었습니다.</p>
+    </section>
+    <section aria-labelledby="clicks">
+      <h2 id="clicks">703번 가운데 클릭은 201번이었습니다</h2>
+      <p>글감을 고를 때 붙인 제목은 "클릭 703번"이었습니다. 화면 동작 도구의 호출을 종류별로 집계해 보니 그 숫자는 클릭 수가 아니었습니다.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/claude-chrome-google-ads-campaigns-1-ko.webp" width="1200" height="620" alt="세션 A의 화면 동작 703번을 종류별로 나눈 막대그래프: 대기 249, 클릭 201, 화면 캡처 164, 글자 입력 55, 나머지 34" loading="lazy"><figcaption>클릭은 201번이고, 가장 많은 것은 화면이 바뀌기를 기다린 249번입니다.</figcaption></figure>
+      <p>에이전트는 클릭 201번 가운데 140번은 바로 다음 호출이 대기였고, 기다린 시간은 대부분 1~6초였습니다(대기 249번 중 231번). 결과는 화면 캡처로 확인하는 일이 잦았습니다.</p>
+      <p>페이지 스크립트(javascript_tool, 탭 안에서 자바스크립트를 실행하는 도구) 136번을 코드 문자열 기준으로 분류하면 절반 가까운 67번이 화면 글자를 읽는 호출입니다.</p>
+      <p>화면 실수도 있었습니다. 다른 앱의 항목을 고르거나, 화면이 밀려 '예'가 눌리거나, 헤드라인 두 줄이 한 칸에 합쳐졌습니다. 보고 문장에 남은 이런 실수는 8번이고, 모두 운영자가 말하기 전에 에이전트가 알아채고 바로잡거나 빠져나왔습니다.</p>
+      <div class="table-wrap"><table><thead><tr><th>운영자 메시지(첫 지시 제외, 작업 중 대기열로 보낸 메시지 포함)</th><th>세션 A</th><th>세션 B</th></tr></thead><tbody><tr><td>설정값 정정·질문(예산·입찰·국가·언어)</td><td>3</td><td>6</td></tr><tr><td>영상 업로드</td><td>3</td><td>4</td></tr><tr><td>진행 확인·이미지 폴더 읽기 허용</td><td>3</td><td>6</td></tr><tr><td>화면 멈춤 신고</td><td>0</td><td>1</td></tr><tr><td>잘못된 클릭 지적</td><td>0</td><td>0</td></tr></tbody></table></div>
+    </section>
+    <section aria-labelledby="same-fix-twice">
+      <h2 id="same-fix-twice">같은 예산 정정을 두 세션에 따로 했습니다</h2>
+      <p>세션 A의 첫 지시는 설정값을 게임 저장소의 광고 문서에서 읽으라고 했고, 문서에는 일 예산 25,000원과 목표 CPI(설치당 목표 비용)가 적혀 있었습니다. A가 값을 넣기 전, 시작 65초 뒤 운영자가 정정했습니다. 일 예산 2,000원, 목표 CPI 없음, 전 세계.</p>
+      <p>세션 B는 22시 03분에 국가를 전 세계로 하라는 정정만 따로 받았고, 예산과 목표 CPI 정정은 받지 못했습니다. B가 읽은 한판블록 실행서(runbook)에는 미국, 목표 CPI 1,400원, 일 25,000원이 적혀 있었습니다.</p>
+      <p>운영자가 "심층분석해서 진행해"라고 하자, B는 일 예산은 실행서대로 넣고 목표 CPI만 실행서 값(미국 기준) 대신 자기 계산으로 700원을 넣었습니다.</p>
+      <p>22시 22분 운영자가 B에게 예산·CPI 정정을 했습니다. A에게 말하고 24분 40초 뒤였고, 말투가 거칠었습니다. 그날 정한 2,000원은 두 지시문이 가리킨 문서 어디에도 없었습니다. 예산·CPI 정정은 세션 A의 대화창에만 있었고, 병렬로 도는 세션은 서로의 대화를 읽지 않습니다.</p>
+      <p>언어 정정도 두 세션에 따로 했습니다. A의 한국어 소재 캠페인은 위치가 전 세계였고, 운영자가 언어에 영어를 직접 더해 둔 상태였습니다. 운영자가 한국어 소재로 전 세계에 나가도 되느냐고 묻자, A는 이대로면 영어 사용자에게 한국어 광고가 나간다고 답했습니다. 운영자는 그 뒤 2분이 안 되는 사이에 두 세션 모두에게 언어별 캠페인을 따로 만들라고 했고, B 창에는 A에게 보낸 지시를 그대로 붙여 넣기도 했습니다. 결과는 앱마다 한국 한국어 캠페인 하나와 동남아 영어 캠페인 하나, 각 일 2,000원이었습니다.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%ED%81%B4%EB%A1%9C%EB%93%9C%20%EC%BD%94%EB%93%9C%20%ED%81%AC%EB%A1%AC%20%ED%99%95%EC%9E%A5%EC%9C%BC%EB%A1%9C%20%EA%B5%AC%EA%B8%80%20%EA%B4%91%EA%B3%A0%204%EA%B0%9C%20%EB%A7%8C%EB%93%A0%20%EA%B8%B0%EB%A1%9D">메일로 문의하기</a></p></aside>
+    <section aria-labelledby="video">
+      <h2 id="video">영상은 채널 권한과 자동 권한 검사에서 막혔습니다</h2>
+      <p>앱 캠페인은 영상을 YouTube 링크로만 받습니다. 세션 A는 광고 소재 창에서 바로 올리려다 오류를 냈고, 운영자가 올려 달라고 하자 YouTube Studio에서 한국어 영상 3개를 '일부 공개'로 올렸습니다. 22시 35분에 시작해 4분 남짓 걸렸습니다.</p>
+      <p>같은 시각 세션 B는 광고 화면의 업로드 창에서 멈췄습니다. 업로드 버튼이 회색이었고, 안내 문구는 채널에 올릴 권한이 없다는 것이었습니다. 광고에 로그인된 계정과 영상 채널을 가진 계정이 달랐습니다. 운영자는 A의 답("네, 올릴 수 있습니다…")을 B 창에 그대로 붙여 넣고, 저쪽은 된다는데 왜 못 하느냐고 물었습니다.</p>
+      <p>세션 B는 닫히지 않는 영상 선택 창을 페이지 스크립트로 숨긴 적이 있습니다. 운영자가 광고 화면이 '오류 확인 중'에서 멈췄다고 알리자, B는 새로고침으로 풀고 원인을 자기 스크립트로 지목했습니다. 지금 운영 규칙은 크롬 확장이 사이트 권한을 거부하면 페이지 스크립트로 우회하지 않고 그 단계를 사람에게 넘기는 것입니다.</p>
+      <p>B가 YouTube Studio로 옮겨 파일을 보내자 이번에는 클로드 코드의 자동 권한 검사가 막았습니다. 자동 모드에서 에이전트의 도구 호출을 실행 전에 걸러 내는 검사입니다. 사유는 "Unrequested Commit in a Connected App"이었고, B는 YouTube에 올리면 외부에 게시되는데 그만큼 분명한 요청이 없었다고 검사기가 판단했다고 설명했습니다.</p>
+      <p>B는 우회하지 않고 멈췄고, 0시 39분 운영자가 영상을 왜 못 넣었느냐고 묻자 한 줄 지시 문안을 제안했습니다. 채널, 영어·한국어 각 3개, 일부 공개, 아동용 아님. 운영자가 그 문장을 그대로 입력하자 6개가 5분 안에 올라갔습니다. 광고 탭이 응답하지 않아 캠페인에 붙이는 일은 그날 끝내지 못했습니다.</p>
+    </section>
+    <section aria-labelledby="memory">
+      <h2 id="memory">정정 40초 뒤 메모리 파일이 생겼습니다</h2>
+      <p>세션 B는 운영자의 예산 정정 40초 뒤 메모리 파일을 썼습니다. 메모리 파일은 클로드 코드가 세션을 시작할 때 목차(MEMORY.md)부터 읽는 프로젝트 메모입니다. 본문 첫 단락은 운영자가 정한 값을 적고, 실행서의 "미국, tCPI 1,400, 일 25,000"은 쓰지 않는다고 못 박았습니다. tCPI는 목표 CPI를 줄인 말입니다.</p>
+      <p>언어별로 나누라는 지시 9분 뒤에는 같은 파일을 덮어써 언어별 2개 구조와 영상 업로드 경로를 넣었습니다. 세션 A도 23시 06분 자기 앱 파일에 "소재 언어 = 타겟 언어"를 적었습니다.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/claude-chrome-google-ads-campaigns-shot2-ko.webp" width="1200" height="472" alt="메모리 파일 한판블록 광고 설정의 1판과 2판 원문, 계정·채널 식별값과 저장소 경로는 검은 사각형으로 가림" loading="lazy"><figcaption>세션 기록에 남은 메모리 파일 쓰기 명령 원문(2026-10-08 22:23, 22:51)입니다. 식별값과 저장소 경로는 가렸습니다.</figcaption></figure>
+      <p>사흘 뒤 10월 11일, 게임 마케팅을 맡은 다른 세션은 운영자가 일 2,000원 광고 얘기를 꺼내자 6초 만에 이 두 파일부터 읽었습니다. 운영자가 콘솔에서 기간을 직접 고쳤다고 하자 그 자리에서 파일을 고쳤습니다. 마케팅 세션 기록에서 운영자가 예산·입찰·언어를 다시 정정한 메시지는 찾지 못했습니다.</p>
+      <div class="table-wrap"><table><thead><tr><th>값을 둔 곳</th><th>그날 결과</th><th>고르지 않은 이유</th></tr></thead><tbody><tr><td>저장소 문서·실행서</td><td>B가 계획 때 값을 넣음(A는 넣기 전에 정정)</td><td>계획을 적은 문서라 당일 결정이 없음</td></tr><tr><td>대화창 정정</td><td>그 세션만 바로 고침</td><td>옆 세션은 24분 40초 뒤 같은 정정</td></tr><tr><td>메모리 파일</td><td>이후 세션이 먼저 읽음</td><td>채택</td></tr></tbody></table></div>
+      <p>메모리 파일에 먼저 쓰지 않은 값은 브라우저 에이전트에게 말하지 마십시오.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">설정값은 메모리 파일에 먼저 씁니다</h2>
+      <ol class="steps"><li><p>브라우저를 열기 전에 위치, 언어, 일 예산, 입찰, 소재 언어, 영상 채널과 그 채널을 가진 계정, 아동용 여부를 메모리 파일에 날짜와 함께 적고, 지시문에는 그 파일을 읽되 저장소 문서와 다르면 메모리가 우선이라고 씁니다.</p></li><li><p>게시 직전에서 멈추게 하고, 검토 화면 값을 메모리 파일과 줄마다 맞춘 표로 받습니다.</p></li><li><p>정정할 때는 메모리 파일을 먼저 고치고, 돌고 있는 세션마다 그 파일을 다시 읽으라고 말합니다.</p></li><li><p>영상 업로드처럼 외부에 게시되는 단계는 채널, 공개 범위, 아동용 여부를 한 줄에 다 넣어 지시합니다.</p></li></ol>
+      <p>영상 소재를 만든 과정은 <a href="https://sugarmount21.com/ax/game-ad-creatives-from-play-recordings/">구글 앱 캠페인 광고 소재를 플레이 녹화로 만들기</a>에, 이 캠페인들의 예산을 매일 점검하게 한 일은 <a href="https://sugarmount21.com/ax/windows-harness-google-ads/">Google Ads 일 예산 점검 보고서 매일 받기</a>에 적었습니다. 문서에 남은 옛 줄을 에이전트가 지금 사실로 읽은 다른 사례는 <a href="https://sugarmount21.com/ax/stale-doc-phantom-session/">클로드 코드 세션 인수인계: 멈춘 세션에 일 넘기기</a>에 있습니다.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">메모리 파일도 9일 동안 틀린 번호를 들고 있었습니다</h2>
+      <p>10월 17일 마케팅 세션이 메모리에 적힌 광고 계정 번호로 GA4 연결을 요청하자 "잘못된 Google Ads 계정 ID" 오류가 났습니다. 그 번호는 세션 B가 광고 화면 주소에서 읽은 내부 번호였고, 9일 동안 아무도 몰랐습니다.</p>
+      <p>A는 22시 29분 B가 쓴 목차 한 줄(모든 국가, 일 2,000원, 목표 CPI 없음)을 실행 도중 자동으로 받았고 23시 06분 자기 파일에 B 파일을 링크했지만, B 파일 본문을 여는 호출은 없었습니다. B 쪽에는 A가 쓴 파일을 받은 기록이 없습니다.</p>
+      <p>다음에는 두 메모리 파일이 영상 채널의 소유 계정을 서로 다르게 적은 것을 실제 채널 권한 화면에서 확인하고, 광고 설정을 파일 하나로 정리합니다. 한판블록 실행서에 미국·일 25,000원 값이 아직 남아 있는지도 이번에는 열어 보지 않았습니다.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%ED%81%B4%EB%A1%9C%EB%93%9C%20%EC%BD%94%EB%93%9C%20%ED%81%AC%EB%A1%AC%20%ED%99%95%EC%9E%A5%EC%9C%BC%EB%A1%9C%20%EA%B5%AC%EA%B8%80%20%EA%B4%91%EA%B3%A0%204%EA%B0%9C%20%EB%A7%8C%EB%93%A0%20%EA%B8%B0%EB%A1%9D">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+    <h2 id="faq">자주 묻는 질문</h2>
+    <div class="faq"><details><summary>Claude in Chrome에 구글 광고 캠페인 게시까지 맡겨도 되나요?</summary><div><p>이 기록에서는 맡기지 않았습니다. 두 세션 모두 게시 직전에 멈추게 했고, 게시와 본인 인증은 운영자가 했습니다. 일 예산이 바로 나가는 단계라 검토 화면의 값을 메모리 파일과 대조한 뒤 사람이 누르는 쪽을 권합니다.</p></div></details><details><summary>구글 광고 화면에서 YouTube 영상 업로드 버튼이 회색이면 무엇을 봐야 하나요?</summary><div><p>광고에 로그인된 계정이 그 채널에 업로드 권한을 가졌는지 봅니다. 이 기록에서는 채널을 가진 계정이 달라서, YouTube Studio에서 그 채널로 직접 올렸습니다. 링크를 캠페인에 붙이는 일은 그날 광고 탭이 응답하지 않아 끝내지 못했습니다.</p></div></details></div>
+    </section>
+    <p class="note">2026-11-17 확인. 클로드 코드 세션 기록 3개(2026-10-08~10-21)의 도구 호출 집계(사이드체인 호출 없음)와 운영자 메시지 시각(대기열 메시지 포함), 메모리 파일 원문과 쓰기 기록.</p>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/number-one-app-agent-instruction/">클로드 코드 에이전트에 &#x27;1등 앱&#x27; 지시를 준 결과</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">클로드 코드 WSL vs 윈도우 네이티브: 옮겨 보고 달라진 것</a></li>
+        <li><a href="https://sugarmount21.com/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
+        <li><a href="https://sugarmount21.com/ax/local-e2e-harness-three-rounds/">클로드 코드 실기기 테스트: E2E 세 번 돌린 기록</a></li>
+        <li><a href="https://sugarmount21.com/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 18 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>클로드 코드 에이전트에 &#x27;1등 앱&#x27; 지시를 준 결과 – SugarMount</title>
+    <link>https://sugarmount21.com/ax/number-one-app-agent-instruction/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/ax/number-one-app-agent-instruction/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/number-one-app-agent-instruction-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX 노트 · 회고</span>
+      <h1>클로드 코드 에이전트에 '1등 앱' 지시를 준 결과</h1>
+      <p class="lead">클로드 코드 에이전트 지시 하나에 에이전트 11개가 돌았고 23시간 만에 두 판이 제출됐습니다. 2주 뒤 '한글뷰어' 검색은 20위에서 16위가 됐습니다.</p>
+      <p>"안드로이드 스토어 1등 앱 만들어 놔"라는 지시에는 기준이 될 숫자가 하나도 없었습니다. HWP 문서를 여는 앱 한글뷰어 슈가독을 출시하고 1주일 뒤, 운영자는 거친 말투로 에이전트를 아주 많이 띄워 사흘 동안 일하라고 했습니다. 클로드 코드(Claude Code) 에이전트는 계획을 세우기 전에 기준값부터 확인했고, 설치 1+, 리뷰 0개였습니다.</p>
+      <p>그 뒤 23시간 동안 두 판이 정식 배포 단계인 production 트랙에 제출됐습니다. 1.2.0 승격 명령과 스토어 문안 반영은 운영자가 직접 쳤고, 광고비 14만 원은 운영자가 막았습니다. 2주 뒤 저장소에 남은 판정은 "분명한 효과 없음"이었습니다.</p>
+    </section>
+    <section aria-labelledby="baseline">
+      <h2 id="baseline">'한글뷰어' 20위, 나머지 키워드 4개는 목록 밖</h2>
+      <p>지시는 10월 17일 21시 22분(한국 시각)에 들어왔습니다. 에이전트는 5분 동안 저장소 문서, Play 트랙 상태, Play 공개 페이지를 읽고, 검색 결과 페이지를 키워드 5개로 받아 왔습니다. '한글뷰어'에서는 29개 앱 가운데 20위였고, 'hwp', 'hwpx', '한글 파일 열기' 같은 나머지 4개 키워드에서는 목록에 아예 없었습니다. 같은 날 경쟁 조사 에이전트는 같은 검색을 21위로 집계했습니다.</p>
+      <p>운영자가 확인하라고 한 지표는 GA4, AdMob, Google Ads였습니다. AdMob은 광고를 넣지 않은 앱이라 볼 것이 없었고, Google Ads는 새로 시작할 캠페인 계획으로만 다뤘습니다. GA4는 이 PC의 로그인 정보에 분석 권한이 없어 바로 읽지 못했습니다. 운영자가 로그인 명령을 직접 쳐 봤지만 실패했고, 브라우저 확장으로 하라며 모두 승인한다고 하자 에이전트는 Claude in Chrome(사용자의 크롬 탭에서 화면을 읽고 클릭하는 확장)으로 GA4와 Play Console을 열었습니다.</p>
+      <p>23시 50분 보고는 에이전트 7개를 돌리고 있다는 말 다음에 이렇게 적었습니다. "3일 동안 돌아가는 에이전트 천만 개는 만들 수 없고, 스토어 1등을 약속할 수도 없습니다. 대신 순위를 실제로 막고 있는 지점부터 손대고 있습니다."</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/number-one-app-agent-instruction-shot1-ko.webp" width="1200" height="720" alt="10월 17일 21시부터 18일 21시 30분까지 운영자 메시지, 에이전트 11개의 실행 구간, 권한 거부 21건, 커밋 9개, production 제출 2번을 한 시간축에 놓은 그래프" loading="lazy"><figcaption>세션 기록과 하위 에이전트 기록, 워크플로 결과 파일, git 기록(2026-10-17~18)에서 시각만 뽑아 그렸습니다. 메시지 내용은 넣지 않았습니다.</figcaption></figure>
+    </section>
+    <section aria-labelledby="seven-agents">
+      <h2 id="seven-agents">일곱 에이전트를 세 단계로 돌렸습니다</h2>
+      <p>에이전트는 워크플로 스크립트(여러 에이전트의 순서와 병렬 구간을 적은 파일)를 썼고, 실행은 23시 50분에 시작했습니다. 단계는 조사, 만들기, 검토였고, 앞 단계의 결과 글이 다음 단계 에이전트의 입력으로 들어갔습니다.</p>
+      <div class="table-wrap"><table><thead><tr><th>단계</th><th>에이전트가 맡은 일</th><th>걸린 시간</th></tr></thead><tbody><tr><td>조사</td><td>경쟁 앱 14개와 리뷰 231개 분석</td><td>10분</td></tr><tr><td>조사</td><td>앱이 지금 실제로 하는 일을 코드에서 확인</td><td>5분</td></tr><tr><td>만들기</td><td>스토어 제목·설명 개편안(ko/en)</td><td>11분</td></tr><tr><td>만들기</td><td>인쇄 화면 없이 바로 저장하는 'PDF로 저장' 개발</td><td>76분</td></tr><tr><td>만들기</td><td>광고·검색 유입 계획과 도움말 글 초안</td><td>8분</td></tr><tr><td>검토</td><td>개발 결과 적대적 리뷰(결함을 찾는 것만 맡은 검토, 결함 3건 수정)</td><td>18분</td></tr><tr><td>검토</td><td>개편안 주장 검증(계획 파일은 쓰기가 막혀 없었음)</td><td>8분</td></tr></tbody></table></div>
+      <p>모든 에이전트의 공통 지시에는 커밋, push, Play 업로드, 게시를 하지 말라는 줄이 들어 있었습니다.</p>
+      <p>워크플로는 104분 걸렸습니다. 일곱 에이전트를 한 줄로 이어 돌렸다면 합이 137분이니, 병렬로 아낀 시간은 33분 정도입니다. 개발 에이전트 하나가 도구를 193번 부르며 76분을 쓴 것이 전체 길이를 정했습니다. 동시에 몇 개까지 돌릴 수 있었는지는 <a href="https://sugarmount21.com/ax/parallel-agent-workstreams/">클로드 코드 병렬 에이전트: 작업 10개, 동시 3개</a>에 따로 적었습니다.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/number-one-app-agent-instruction-1-ko.webp" width="1200" height="920" alt="지시부터 2주 뒤 측정까지 일곱 단계: 기준값, 조사 2개, 만들기 3개, 검토 2개, 두 판 출시, 16위" loading="lazy"><figcaption>막연한 지시가 기준값, 세 단계 작업, 출시, 재측정으로 이어진 순서입니다.</figcaption></figure>
+      <p>이 세션에서 실행된 에이전트는 워크플로 밖 4개를 더해 11개였습니다(위 시간축 그림의 보라색).</p>
+    </section>
+    <section aria-labelledby="wrong-premises">
+      <h2 id="wrong-premises">리드가 세운 전제 둘이 모두 틀렸습니다</h2>
+      <p>리드 에이전트(운영자와 대화하며 하위 에이전트를 띄운 메인 세션)는 두 가지를 의심했습니다. 상위 경쟁 앱 제목 대부분에 'PDF 저장·변환'이 있는데 이 앱에는 그 기능이 없다는 것, 그리고 GA4가 28일 동안 0건이라 측정부터 깨져 있다는 것이었습니다.</p>
+      <p>첫째는 코드를 읽은 조사 에이전트가 바로잡았습니다. PDF 저장은 1.0.0부터 시스템 인쇄 화면을 거치는 방식으로 이미 있었고, 빠진 것은 인쇄 화면 없이 바로 저장하는 길과 그 사실을 알리는 스토어 문구였습니다. 1.2.0의 저장 기능을 어떻게 검증했는지는 <a href="https://sugarmount21.com/ax/pdf-save-back-seven-points/">안드로이드 PDF 저장 취소 처리와 SAF 빈 파일</a>에 있습니다.</p>
+      <p>둘째는 리드가 화면이 다 뜨기 전에 글자를 읽어 생긴 오판이었고, 10분 뒤 GA4 진단 에이전트의 보고를 받고 거뒀습니다. 그 과정은 <a href="https://sugarmount21.com/ax/ga4-zero-report-reversed/">GA4 0건·데이터 없음, 표 보고서 합계부터</a>에 썼습니다.</p>
+      <p>두 전제가 빠지자 남은 원인은 유입이었습니다. 경쟁 조사 에이전트는 키워드를 7개로 늘려 봤는데, 상위 1~4위는 설치 10만 이상인 같은 다섯 앱이 돌려 가며 차지했습니다. 반대로 설치 100+에 평가 0인 작은 앱 하나는 검색어를 띄어 쓴 그대로 제목에 넣고 일곱 키워드 모두 3~7위에 있었습니다.</p>
+      <p>경쟁 조사 에이전트는 여기서 문서에 목표를 고쳐 적었습니다. 문서의 문장은 "1위는 단기에 현실적이지 않다"였고, '한글뷰어'를 포함한 세 키워드의 10위권은 근거상 가능하다고 봤습니다. 그 조건으로는 첫 리뷰 20~50개를 추정치로 적었습니다.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%ED%81%B4%EB%A1%9C%EB%93%9C%20%EC%BD%94%EB%93%9C%20%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%EC%97%90%20%271%EB%93%B1%20%EC%95%B1%27%20%EC%A7%80%EC%8B%9C%EB%A5%BC%20%EC%A4%80%20%EA%B2%B0%EA%B3%BC">메일로 문의하기</a></p></aside>
+    <section aria-labelledby="permission-check">
+      <h2 id="permission-check">네가 다 하라는 말로도 production 승격은 풀리지 않았습니다</h2>
+      <p>10월 18일 오전, 1.2.0 커밋까지는 에이전트가 했습니다. 내부 테스트 트랙 업로드는 한 번 거부됐고, 운영자가 네가 다 하라고 한 뒤 다시 실행했을 때는 통과했습니다. 통과한 이유는 기록에 남아 있지 않습니다.</p>
+      <p>production 승격은 전날 밤 1.1.0 때 한 번, 이날 오전 1.2.0 때 두 번 막혔습니다. 막은 쪽은 클로드 코드 자동 모드의 권한 검사기로, 명령을 실행하기 전에 위험 종류를 판정하는 장치입니다. 거부 사유는 세 번 다 "Production Deploy"였습니다.</p>
+      <p>에이전트는 우회하지 않았고, 채팅에서 허락해도 이 검사기는 풀리지 않는다고 답했습니다. 방법으로는 운영자가 명령을 직접 치거나, 클로드 코드 /permissions의 허용 목록에 그 명령을 넣는 것 두 가지를 냈습니다. 운영자는 12시 8분에 승격 명령을 쳤고, 오후에는 스토어 문안 업로드도 운영자가 실행했습니다.</p>
+      <div class="table-wrap"><table><thead><tr><th>거부 사유</th><th>건수</th><th>막힌 일</th></tr></thead><tbody><tr><td>Production Deploy</td><td>6</td><td>production 승격 3, 내부 트랙 업로드 1, 스토어 문안 1, 사이트 수정 에이전트 생성 1</td></tr><tr><td>Permission Grant</td><td>1</td><td>Play 통계 API 사용 설정 클릭</td></tr><tr><td>Modify Shared Resources</td><td>1</td><td>커밋과 main 병합(커밋만 따로 다시 시도해 들어감)</td></tr><tr><td>판정 없음</td><td>13</td><td>하위 에이전트의 문서 쓰기 12, 리드의 상태 문서 편집 1</td></tr></tbody></table></div>
+      <p>판정 없음은 검사기가 아예 판단을 내리지 않은 경우입니다. 하위 에이전트 넷의 저장소 쓰기가 막혔고, 리드가 그 결과를 옮기거나 직접 반영했습니다.</p>
+      <p>1.3.0은 편집 기능을 넣은 판이라, 고친 파일이 한컴 앱에서 열리고 다시 저장되는지가 남아 있었습니다. 저녁에 에이전트는 그 확인 전에는 내지 말자고 권했는데, 운영자는 production 게시를 승인한다고 답했습니다. 이번에는 그 승인 뒤 에이전트가 직접 승격했고, 이 명령에는 거부 기록이 없습니다. 검사기가 막지 않은 이유는 기록에 남아 있지 않아, 이 차이를 검사기를 넘는 방법으로 권하지 않습니다. 한컴 확인은 출시 38분 뒤에 통과했습니다.</p>
+    </section>
+    <section aria-labelledby="two-weeks">
+      <h2 id="two-weeks">광고비 14만 원 대신 제목만 바꾸고 2주를 봤습니다</h2>
+      <p>15시 46분, 에이전트는 1.2.0 제출을 보고하면서 다음 할 일로 Google Ads 하루 1만 원, 14일 실험을 권했습니다. 약 6분 뒤 운영자가 14만 원짜리 실험을 꼭 해야 하느냐고 묻자, 17초 뒤 답은 "지금은 하지 마세요"였습니다. 이유는 둘이었습니다. 광고비를 돈으로 회수할 수 없고, 그날 바꾼 스토어 제목과 광고를 같이 돌리면 설치가 늘어도 원인을 가를 수 없다는 것이었습니다. 두 번째 이유는 15시 46분에도 이미 있던 사실입니다. 에이전트는 금액을 묻는 질문을 받고서야 자기 권고를 뒤집었습니다.</p>
+      <p>운영자는 하루 1,000~2,000원은 어떠냐고 다시 물었고, 에이전트는 그 예산이면 광고 학습(광고 플랫폼이 누구에게 보일지 맞춰 가는 초기 기간)이 끝나지 않는다며 권하지 않았습니다. 그 답이 나오고 30초 뒤 운영자가 정했습니다. 비용은 되도록 쓰지 않고, 도움말 글을 올리고, 2주를 본 뒤 광고는 제대로 계획을 짜서 하자는 것이었습니다. 에이전트는 이 결정을 메모리 파일(다음 세션의 에이전트도 읽는 메모)에 11월 1일까지 광고를 제안하지 않는다는 규칙으로 남겼습니다.</p>
+      <p>16시 19분에는 운영자가 사이트의 robots.txt도 챙겨야 한다고 짚었습니다. 에이전트는 기존 파일이 전부 허용에 사이트맵 한 줄뿐이라 빌드 도구와 데이터 폴더까지 검색엔진에 열려 있었다고 확인하고 1분 안에 고쳐 올렸습니다(3f504be).</p>
+      <div class="table-wrap"><table><thead><tr><th>방법</th><th>누가 꺼냈나</th><th>어떻게 됐나</th></tr></thead><tbody><tr><td>하루 1만 원 x 14일</td><td>에이전트, 15시 46분</td><td>금액 질문 뒤 에이전트가 철회(회수 불가, 제목 시험과 섞임)</td></tr><tr><td>하루 1,000~2,000원</td><td>운영자</td><td>에이전트가 권하지 않음(광고 학습이 끝나지 않음)</td></tr><tr><td>에이전트 1개로 차례대로</td><td>아무도 꺼내지 않음</td><td>계산상 33분 더 걸림. 결과물이 같았을지는 알 수 없음</td></tr><tr><td>제목·기능·도움말 글만 바꾸기</td><td>에이전트 15시 53분, 운영자가 15시 54분에 채택</td><td>11월 1일 재측정</td></tr></tbody></table></div>
+      <figure><img src="https://sugarmount21.com/assets/ax/number-one-app-agent-instruction-shot2-ko.webp" width="1200" height="660" alt="한글뷰어 등 키워드 7개의 Play 검색 순위를 10월 17일, 23일, 28일, 11월 1일 네 번 확인한 표. 한글뷰어는 20, 13, 14, 16위" loading="lazy"><figcaption>10월 17일 값은 세션 보고와 경쟁 조사 문서, 나머지는 저장소의 순위 기록 3개(로그아웃 웹 검색, 한국)입니다.</figcaption></figure>
+      <p>제목은 10월 18일에 '한글뷰어 슈가독: HWP 한글 파일 열기·PDF 저장'으로 바뀌었습니다. 1~4위를 설치 10만 이상 앱이 돌려 가며 차지하는 이 검색에서, 11월 1일 기록의 판정은 "분명한 효과 없음"이었습니다. '한글뷰어'는 출발점 20위보다 4칸 위인 16위였지만, 2주 안에서는 13위, 14위, 16위로 내려가는 중이었습니다. 제목에 넣은 '한글 파일 열기'에서는 여전히 목록에 없었습니다.</p>
+      <p>'hwp'와 '한글 문서'는 10월 28일 28위, 22위에서 11월 1일 20위, 11위로 올랐습니다. 그전에 보이지 않은 것은 결과 목록이 10~11개뿐이었기 때문입니다. 같은 기록은 실제 사용자가 하루 1명 수준이라 이런 순위 변화를 설치와 묶을 수 없다고 적었습니다.</p>
+      <p>이 2주는 제목 하나만 바꾼 시험도 아니었습니다. 같은 기간에 1.3.1~1.3.3 업데이트, 사이트 검색 노출 정비, 10월 31일 짧은 영상 한 편이 함께 나갔습니다. 10월 25일로 잡아 둔 7일째 측정은 하지 않았습니다.</p>
+    </section>
+    <section aria-labelledby="split-steps">
+      <h2 id="split-steps">막연한 지시를 받았을 때 쪼개는 순서</h2>
+      <p>막연한 목표를 받으면 에이전트에게 계획보다 기준값을 먼저 재게 하십시오. 이번에는 20위와 리뷰 0을 먼저 확인했고, 23시 50분 보고는 '1등은 약속할 수 없다'고 적었습니다. 틀린 두 전제는 별도 에이전트가 코드와 보고서를 다시 확인하면서 드러났습니다.</p>
+      <ol class="steps"><li><p>키워드별 검색 순위, 설치 수, 리뷰 수, 출시 트랙 상태를 먼저 확인합니다. 같은 값을 다른 방법으로 한 번 더 셉니다(이번에는 20위와 21위로 갈렸습니다).</p></li><li><p>기준값과 경쟁 자료로 목표를 고쳐 적습니다. 약속할 수 없는 것과 근거가 있는 것을 나눠 첫 보고에 적습니다.</p></li><li><p>일을 조사, 만들기, 검토로 나누고 에이전트마다 결과를 글이나 파일로 받습니다. 공통 지시에 커밋·업로드·게시 금지를 넣습니다.</p></li><li><p>리드가 세운 "이 기능이 없다", "이 지표가 0이다" 같은 전제는 코드를 읽는 별도 에이전트에게 확인시킵니다.</p></li><li><p>production 배포, API 사용 설정, 광고비처럼 사람이 눌러야 하는 일을 첫 보고에 목록으로 냅니다. 자동 모드를 쓰면 그 명령을 /permissions 허용 목록에 미리 넣거나 사람이 직접 실행합니다.</p></li><li><p>한 번에 한 가지만 바꾸고, 재측정 날짜와 그 측정을 누가 할지를 파일에 적습니다.</p></li></ol>
+      <p>광고 계획은 아직 없습니다. 운영자는 2주 뒤에 제대로 짜자고 했지만, 성장 계획 문서는 11월 17일 현재 10월 18일 판 그대로입니다. 다음에는 리뷰 수를 봅니다.</p>
+    </section>
+    <p class="note">기준일 2026-11-17. 클로드 코드 세션 기록과 하위 에이전트 기록(2026-10-17~19), 워크플로 결과 파일, 앱 저장소와 사이트 저장소의 git 기록, 앱 저장소의 Play 검색 순위 기록(10-23, 10-28, 11-01)과 일일 점검 문서(GA4, 테스트 기기 제외).</p>
+    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%ED%81%B4%EB%A1%9C%EB%93%9C%20%EC%BD%94%EB%93%9C%20%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8%EC%97%90%20%271%EB%93%B1%20%EC%95%B1%27%20%EC%A7%80%EC%8B%9C%EB%A5%BC%20%EC%A4%80%20%EA%B2%B0%EA%B3%BC">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">다른 AX 노트</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
+        <li><a href="https://sugarmount21.com/ax/claude-chrome-google-ads-campaigns/">클로드 코드 크롬 확장으로 구글 광고 4개 만든 기록</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">클로드 코드 WSL vs 윈도우 네이티브: 옮겨 보고 달라진 것</a></li>
+        <li><a href="https://sugarmount21.com/ax/greeting-card-removal/">AI로 붙인 기능을 AI로 걷어냈다: 인사카드 10,001줄과 형제 앱</a></li>
+        <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/ax/topic/workflow/">에이전트와 일하는 법 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 18 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>클로드 코드 실기기 테스트: E2E 세 번 돌린 기록 – SugarMount</title>
     <link>https://sugarmount21.com/ax/local-e2e-harness-three-rounds/</link>
@@ -167,7 +414,7 @@ adb -s &lt;기기&gt; reverse tcp:8180 tcp:8180</code></pre></li><li><p>운영 A
         <li><a href="https://sugarmount21.com/ax/splash-listener-onstop/">addOnCompleteListener(this)가 onStop에서 지운 리스너 때문에 스플래시에 멈춘 버그</a></li>
         <li><a href="https://sugarmount21.com/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
         <li><a href="https://sugarmount21.com/ax/hwp-hancom-resave-check/">고친 HWP 7개 한컴 호환성 테스트: 열기 7/7, 다른 이름으로 저장은 로그인 뒤 2/2</a></li>
-        <li><a href="https://sugarmount21.com/ax/stale-doc-phantom-session/">클로드 코드 세션 인수인계: 멈춘 세션에 일 넘기기</a></li>
+        <li><a href="https://sugarmount21.com/ax/number-one-app-agent-instruction/">클로드 코드 에이전트에 &#x27;1등 앱&#x27; 지시를 준 결과</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -216,9 +463,9 @@ adb -s &lt;기기&gt; reverse tcp:8180 tcp:8180</code></pre></li><li><p>운영 A
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
         <li><a href="https://sugarmount21.com/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
+        <li><a href="https://sugarmount21.com/ax/claude-chrome-google-ads-campaigns/">클로드 코드 크롬 확장으로 구글 광고 4개 만든 기록</a></li>
+        <li><a href="https://sugarmount21.com/ax/number-one-app-agent-instruction/">클로드 코드 에이전트에 &#x27;1등 앱&#x27; 지시를 준 결과</a></li>
         <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">클로드 코드 WSL vs 윈도우 네이티브: 옮겨 보고 달라진 것</a></li>
-        <li><a href="https://sugarmount21.com/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
-        <li><a href="https://sugarmount21.com/ax/compaction-summary-memory/">클로드 코드 자동 압축 뒤 남는 것: 요약 9번과 메모리 파일</a></li>
         <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">AI 에이전트 완료 보고 검증: 95.2%가 러너에서 안 나온 이유</a></li>
         <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
       </ul>
@@ -296,8 +543,8 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>수정 di
         <li><a href="https://sugarmount21.com/ax/docviewer-malicious-file-set/">문서 뷰어 악성 파일 세트: ZIP 폭탄·CFB 루프·XSS를 생성기로 만들어 테스트에 묶기</a></li>
         <li><a href="https://sugarmount21.com/ax/hwp-hancom-resave-check/">고친 HWP 7개 한컴 호환성 테스트: 열기 7/7, 다른 이름으로 저장은 로그인 뒤 2/2</a></li>
         <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">AI 에이전트 완료 보고 검증: 95.2%가 러너에서 안 나온 이유</a></li>
+        <li><a href="https://sugarmount21.com/ax/ads-free-release-gate/">클로드 코드 안드로이드 광고 SDK, 빌드로 막기</a></li>
         <li><a href="https://sugarmount21.com/ax/ndk-16kb-page-blue-tint/">Android 16KB 페이지 대응, NDK를 올리기 전에 링커 플래그부터: NDK 27·29의 파란 색조</a></li>
-        <li><a href="https://sugarmount21.com/ax/privacy-policy-code-audit/">앱 개인정보처리방침 직접 작성: &#x27;수집하지 않음&#x27; 템플릿을 버리고 코드 감사로 다시 썼다</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/quality/">검증과 출시 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -446,11 +693,11 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>수정 di
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
         <li><a href="https://sugarmount21.com/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://sugarmount21.com/ax/ads-free-release-gate/">클로드 코드 안드로이드 광고 SDK, 빌드로 막기</a></li>
         <li><a href="https://sugarmount21.com/ax/play-staged-rollout-completed/">20% 단계적 출시가 100%로 나갔다: Play Publisher API의 completed는 단계 출시로 되돌릴 수 없다</a></li>
         <li><a href="https://sugarmount21.com/ax/interstitial-frequency-timeline/">전면 광고 빈도를 기기 타임라인으로 정했다: 안내 퍼즐은 세지 않는다</a></li>
-        <li><a href="https://sugarmount21.com/ax/google-ads-break-even-cpi/">Google Ads 앱 캠페인 4개에 $36.4, 설치 105건, ROAS 약 3%: CPI가 손익분기의 30배였다</a></li>
         <li><a href="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</a></li>
-        <li><a href="https://sugarmount21.com/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
+        <li><a href="https://sugarmount21.com/ax/number-one-app-agent-instruction/">클로드 코드 에이전트에 &#x27;1등 앱&#x27; 지시를 준 결과</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/store/">스토어와 수익화 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -532,8 +779,8 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>수정 di
         <li><a href="https://sugarmount21.com/ax/greeting-card-removal/">AI로 붙인 기능을 AI로 걷어냈다: 인사카드 10,001줄과 형제 앱</a></li>
         <li><a href="https://sugarmount21.com/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li>
         <li><a href="https://sugarmount21.com/ax/20-days-4-apps/">클로드 코드로 안드로이드 앱 개발: 20일에 4개 출시한 기록</a></li>
-        <li><a href="https://sugarmount21.com/ax/stale-doc-phantom-session/">클로드 코드 세션 인수인계: 멈춘 세션에 일 넘기기</a></li>
         <li><a href="https://sugarmount21.com/ax/android-assets-gz-suffix/">Android assets를 미리 gzip한 실측: APK 이득은 0, .pack.gz는 .pack이 되어 FileNotFoundException</a></li>
+        <li><a href="https://sugarmount21.com/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/retro/">회고와 숫자 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -673,10 +920,10 @@ OK  en head  28/30 A bonus game every 25 levels</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/claude-chrome-google-ads-campaigns/">클로드 코드 크롬 확장으로 구글 광고 4개 만든 기록</a></li>
         <li><a href="https://sugarmount21.com/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
         <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">클로드 코드 WSL vs 윈도우 네이티브: 옮겨 보고 달라진 것</a></li>
-        <li><a href="https://sugarmount21.com/ax/stale-doc-phantom-session/">클로드 코드 세션 인수인계: 멈춘 세션에 일 넘기기</a></li>
-        <li><a href="https://sugarmount21.com/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
+        <li><a href="https://sugarmount21.com/ax/number-one-app-agent-instruction/">클로드 코드 에이전트에 &#x27;1등 앱&#x27; 지시를 준 결과</a></li>
         <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">AI 에이전트 완료 보고 검증: 95.2%가 러너에서 안 나온 이유</a></li>
         <li><a href="https://sugarmount21.com/ax/local-e2e-harness-three-rounds/">클로드 코드 실기기 테스트: E2E 세 번 돌린 기록</a></li>
       </ul>
@@ -1311,7 +1558,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
         <li><a href="https://sugarmount21.com/ax/privacy-policy-code-audit/">앱 개인정보처리방침 직접 작성: &#x27;수집하지 않음&#x27; 템플릿을 버리고 코드 감사로 다시 썼다</a></li>
-        <li><a href="https://sugarmount21.com/ax/naver-speller-highlight-missing/">네이버 맞춤법 하이라이트 안 됨: 문장 끝 오류 누락</a></li>
+        <li><a href="https://sugarmount21.com/ax/ads-free-release-gate/">클로드 코드 안드로이드 광고 SDK, 빌드로 막기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1389,7 +1636,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
         <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">클로드 코드 WSL vs 윈도우 네이티브: 옮겨 보고 달라진 것</a></li>
-        <li><a href="https://sugarmount21.com/ax/greeting-card-removal/">AI로 붙인 기능을 AI로 걷어냈다: 인사카드 10,001줄과 형제 앱</a></li>
+        <li><a href="https://sugarmount21.com/ax/claude-chrome-google-ads-campaigns/">클로드 코드 크롬 확장으로 구글 광고 4개 만든 기록</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -1755,8 +2002,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/number-one-app-agent-instruction/">클로드 코드 에이전트에 &#x27;1등 앱&#x27; 지시를 준 결과</a></li>
         <li><a href="https://sugarmount21.com/ax/compose-korean-line-break/">Compose 한글 줄바꿈은 음절에서 끊기고, &#x27;R/u/l/e&#x27; 세로 깨짐은 Row 측정 순서 탓이었다</a></li>
-        <li><a href="https://sugarmount21.com/ax/stale-doc-phantom-session/">클로드 코드 세션 인수인계: 멈춘 세션에 일 넘기기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -2591,10 +2838,10 @@ adb reboot                       # log.tag 두 값 정리</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/number-one-app-agent-instruction/">클로드 코드 에이전트에 &#x27;1등 앱&#x27; 지시를 준 결과</a></li>
+        <li><a href="https://sugarmount21.com/ax/claude-chrome-google-ads-campaigns/">클로드 코드 크롬 확장으로 구글 광고 4개 만든 기록</a></li>
         <li><a href="https://sugarmount21.com/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
-        <li><a href="https://sugarmount21.com/ax/stale-doc-phantom-session/">클로드 코드 세션 인수인계: 멈춘 세션에 일 넘기기</a></li>
         <li><a href="https://sugarmount21.com/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
-        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">클로드 코드 WSL vs 윈도우 네이티브: 옮겨 보고 달라진 것</a></li>
         <li><a href="https://sugarmount21.com/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
         <li><a href="https://sugarmount21.com/ax/hwpx-octet-stream-intent-filter/">안드로이드에서 HWPX는 octet-stream으로도 온다: 보낸 앱별 인텐트 18행과 intent-filter 설계</a></li>
       </ul>
@@ -2965,8 +3212,8 @@ while True:
         <li><a href="https://sugarmount21.com/ax/puzzle-time-limit-simulation/">&#x27;시간이 너무 길어서 쉬움&#x27; 테스터 의견을 시뮬레이션으로 검증해 퍼즐 목표 시간을 30% 줄였다</a></li>
         <li><a href="https://sugarmount21.com/ax/block-puzzle-bot-playtest/">블록 퍼즐 난이도 설계: 지지 않는 게임을 시뮬레이션 봇으로 고친 과정</a></li>
         <li><a href="https://sugarmount21.com/ax/arrow-puzzle-level-generator/">화살표 퍼즐 1,100판을 만든 역구성 생성기와 G2 게이트</a></li>
-        <li><a href="https://sugarmount21.com/ax/stale-doc-phantom-session/">클로드 코드 세션 인수인계: 멈춘 세션에 일 넘기기</a></li>
         <li><a href="https://sugarmount21.com/ax/ndk-16kb-page-blue-tint/">Android 16KB 페이지 대응, NDK를 올리기 전에 링커 플래그부터: NDK 27·29의 파란 색조</a></li>
+        <li><a href="https://sugarmount21.com/ax/claude-chrome-google-ads-campaigns/">클로드 코드 크롬 확장으로 구글 광고 4개 만든 기록</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/games/">게임 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3355,8 +3602,8 @@ private val codePopulated = setOf("com.example.Response#requestId")
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
-        <li><a href="https://sugarmount21.com/ax/privacy-policy-code-audit/">앱 개인정보처리방침 직접 작성: &#x27;수집하지 않음&#x27; 템플릿을 버리고 코드 감사로 다시 썼다</a></li>
-        <li><a href="https://sugarmount21.com/ax/greeting-card-removal/">AI로 붙인 기능을 AI로 걷어냈다: 인사카드 10,001줄과 형제 앱</a></li>
+        <li><a href="https://sugarmount21.com/ax/number-one-app-agent-instruction/">클로드 코드 에이전트에 &#x27;1등 앱&#x27; 지시를 준 결과</a></li>
+        <li><a href="https://sugarmount21.com/ax/claude-chrome-google-ads-campaigns/">클로드 코드 크롬 확장으로 구글 광고 4개 만든 기록</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3676,7 +3923,7 @@ thinkingConfig: { thinkingBudget: 0 },</code></pre>
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
         <li><a href="https://sugarmount21.com/ax/docviewer-malicious-file-set/">문서 뷰어 악성 파일 세트: ZIP 폭탄·CFB 루프·XSS를 생성기로 만들어 테스트에 묶기</a></li>
-        <li><a href="https://sugarmount21.com/ax/stale-doc-phantom-session/">클로드 코드 세션 인수인계: 멈춘 세션에 일 넘기기</a></li>
+        <li><a href="https://sugarmount21.com/ax/market-check-before-app/">사진 앱 3개를 만든 뒤에야 시장 조사를 했다: 올해 나온 경쟁 앱 설치 중앙값 1,166</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -3920,10 +4167,10 @@ adb -s emulator-5554 logcat -d -b crash</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
-        <li><a href="https://sugarmount21.com/ax/stale-doc-phantom-session/">클로드 코드 세션 인수인계: 멈춘 세션에 일 넘기기</a></li>
+        <li><a href="https://sugarmount21.com/ax/claude-chrome-google-ads-campaigns/">클로드 코드 크롬 확장으로 구글 광고 4개 만든 기록</a></li>
         <li><a href="https://sugarmount21.com/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
+        <li><a href="https://sugarmount21.com/ax/number-one-app-agent-instruction/">클로드 코드 에이전트에 &#x27;1등 앱&#x27; 지시를 준 결과</a></li>
         <li><a href="https://sugarmount21.com/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
-        <li><a href="https://sugarmount21.com/ax/vertex-test-cost-hard-cap/">Vertex AI 테스트 비용 하드캡: 2,500원 중단선이 결제 2,956원을 놓친 뒤 바꾼 기본값</a></li>
         <li><a href="https://sugarmount21.com/ax/adversarial-review-other-paths/">클로드 코드 재리뷰: 닫은 결함이 HTTP로 남았다</a></li>
         <li><a href="https://sugarmount21.com/ax/spell-rain-difficulty-recall/">미니 게임 난이도를 속도로 두 번 고쳤다: 막힌 곳은 답 떠올리기였다</a></li>
       </ul>
@@ -4396,8 +4643,8 @@ POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/claude-chrome-google-ads-campaigns/">클로드 코드 크롬 확장으로 구글 광고 4개 만든 기록</a></li>
         <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
-        <li><a href="https://sugarmount21.com/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5029,8 +5276,8 @@ expect(all.sort()).toEqual(files.sort());</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/ads-free-release-gate/">클로드 코드 안드로이드 광고 SDK, 빌드로 막기</a></li>
         <li><a href="https://sugarmount21.com/ax/three-designs-three-judges/">설계 3안을 심사자 3명이 채점했다: 시장 심사자 혼자였다면 카톡 열기마다 죽는 안이 1위였다</a></li>
-        <li><a href="https://sugarmount21.com/ax/docviewer-malicious-file-set/">문서 뷰어 악성 파일 세트: ZIP 폭탄·CFB 루프·XSS를 생성기로 만들어 테스트에 묶기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5342,7 +5589,7 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
         <li><a href="https://sugarmount21.com/ax/ndk-16kb-page-blue-tint/">Android 16KB 페이지 대응, NDK를 올리기 전에 링커 플래그부터: NDK 27·29의 파란 색조</a></li>
         <li><a href="https://sugarmount21.com/ax/jpeg-target-size-search/">JPEG를 용량 상한에 맞추는 법: 품질 이분 탐색, 긴 변 예측, 마지막에 원본과 비교</a></li>
         <li><a href="https://sugarmount21.com/ax/realism-score-not-3d/">AI 에이전트 완료 보고 검증: 95.2%가 러너에서 안 나온 이유</a></li>
-        <li><a href="https://sugarmount21.com/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
+        <li><a href="https://sugarmount21.com/ax/ads-free-release-gate/">클로드 코드 안드로이드 광고 SDK, 빌드로 막기</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/topic/android/">Android 개발 글 전체 보기</a> · <a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5636,8 +5883,8 @@ depth(board):                   # peel
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/ax/claude-chrome-google-ads-campaigns/">클로드 코드 크롬 확장으로 구글 광고 4개 만든 기록</a></li>
         <li><a href="https://sugarmount21.com/ax/local-e2e-harness-three-rounds/">클로드 코드 실기기 테스트: E2E 세 번 돌린 기록</a></li>
-        <li><a href="https://sugarmount21.com/ax/game-feel-frame-review/">모바일 게임 손맛 개선: 하트가 충돌보다 109ms 먼저 줄던 순서를 코드와 녹화 프레임으로 찾았다</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
@@ -5886,339 +6133,11 @@ if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
       <h2 id="ax-related-heading">다른 AX 노트</h2>
       <ul>
         <li><a href="https://sugarmount21.com/ax/naver-speller-highlight-missing/">네이버 맞춤법 하이라이트 안 됨: 문장 끝 오류 누락</a></li>
-        <li><a href="https://sugarmount21.com/ax/stale-doc-phantom-session/">클로드 코드 세션 인수인계: 멈춘 세션에 일 넘기기</a></li>
+        <li><a href="https://sugarmount21.com/ax/wsl-to-windows-claude-code/">클로드 코드 WSL vs 윈도우 네이티브: 옮겨 보고 달라진 것</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
     </section>]]></description>
     <pubDate>Fri, 30 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>클로드 코드 여러 세션 동시 작업과 파일 주인 표 – SugarMount</title>
-    <link>https://sugarmount21.com/ax/file-owner-table/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/ax/file-owner-table/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/file-owner-table-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX 노트 · 방법</span>
-      <h1>클로드 코드 여러 세션 동시 작업: 공유 파일마다 주인을 정한 표</h1>
-      <p class="lead">클로드 코드 세션 둘이 한 작업 트리에서 일하자 한쪽 커밋이 남의 파일 50개를 담아 갔습니다. 그 뒤로 공유 파일마다 주인을 한 명씩 적는 표로 일을 나눕니다.</p>
-    <p class="note ax-series-line"><a href="https://sugarmount21.com/ax/series/multi-agent-one-repo/">에이전트 여럿을 한 저장소에서</a> 3/6</p>
-      <p>클로드 코드(Claude Code) 세션이나 서브에이전트를 여러 개 돌리면 같은 저장소의 파일을 동시에 고치게 됩니다. 2026년 9월 23일, 유틸리티 앱 저장소에서 출시 수정 커밋 하나가 다른 세션이 만들던 다음 앱의 파일 50개를 함께 담아 갔습니다. 16일 뒤 가족 일정 앱 AXFamily는 공유 파일마다 주인을 적은 표를 먼저 만들고, 기능 브랜치 13개를 2분 남짓에 머지했습니다. 주인 표는 손 머지를 없애지는 못했지만, 어디서 날지는 미리 알려 줬습니다.</p>
-    </section>
-    <section aria-labelledby="swept-commit">
-      <h2 id="swept-commit">출시 수정 커밋에 다른 세션의 파일 50개가 들어갔습니다</h2>
-      <p>9월 23일 저녁, 유틸리티 앱 저장소의 한 작업 트리에서 세션 두 개가 돌고 있었습니다. 하나는 사진 용량 줄이기 앱의 1.0.3 출시를 마무리했고, 다른 하나는 다음 앱인 <a href="https://sugarmount21.com/apps/image-flip/">사진 반전·회전</a>을 만들고 있었습니다. 밤 10시 24분 출시 세션의 커밋 메시지는 출시 빌드 크래시 수정, 출시 점검 스크립트, 분석 기본값 변경을 적었을 뿐 반전·회전 앱 이야기는 없었습니다. 실제로는 74개 파일이 바뀌었고 그중 반전·회전 앱 폴더의 50개와 이미지 엔진 5개는 옆 세션이 아직 만들던 코드였습니다. 옆 세션의 메모리 노트는 이것을 "git add -A 식으로 쓸어 담았다"고 적었습니다.</p>
-      <p>같은 커밋이 넣은 출시 점검 스크립트에는 <code>./gradlew --stop</code>이 있었습니다. Gradle 문서에 따르면 이 명령은 같은 버전으로 뜬 데몬을 모두 끝냅니다. 같은 PC에서 한글 띄어쓰기 앱을 빌드하던 세션도 같은 Gradle 버전을 썼고, 그날 clean 빌드 두 번이 "stop command received"로 끊겼습니다. 두 세션은 서로 상대를 의심했지만, 두 저장소 이력에서 <code>--stop</code>이 들어간 곳은 그 스크립트 하나뿐입니다. 이 줄은 15일 뒤 <code>--no-daemon</code>으로 바뀌었습니다.</p>
-    </section>
-    <section aria-labelledby="why-git-missed">
-      <h2 id="why-git-missed">같은 작업 트리에서는 git이 내 변경과 남의 변경을 가르지 못합니다</h2>
-      <p>같은 작업 트리에서는 git이 알릴 충돌이 생기지 않습니다. 두 세션의 변경이 한 인덱스에 섞이고, 먼저 커밋한 세션이 그 순간 작업 트리에 있던 모든 파일의 주인이 됩니다. 파일마다 주인이 정해져 있지 않으면 에이전트는 "이 파일은 내가 고친 것"인지 판단할 근거가 없습니다. Gradle 데몬도 같은 구조였습니다. 파일이 아닌데도 같은 PC의 세션들이 함께 쓰는 공유물이었고, 아무 세션이나 끌 수 있었습니다.</p>
-      <p>옆 세션은 그날 규칙을 남겼습니다. 공유 파일은 고치기 직전에 다시 읽고 파일 전체 대신 부분만 고친다. commit, stash, reset, <code>gradlew --stop</code>은 하지 않는다. 다른 세션 때문에 빌드가 끊길 수 있으니 종료 코드 대신 테스트 결과 파일의 시각을 본다. 이 규칙은 지금 모든 프로젝트의 에이전트 지침에 들어 있고, 긴 Gradle 빌드는 <code>--no-daemon</code>으로 돌린다는 줄이 함께 있습니다.</p>
-    </section>
-    <section aria-labelledby="worktree-wiring">
-      <h2 id="worktree-wiring">worktree로 나눠도 연결 파일은 손으로 합쳤습니다</h2>
-      <p>git worktree는 같은 저장소를 폴더 하나 더 꺼내 각자 다른 브랜치에서 일하게 하는 기능입니다. 9월 20일 이 저장소를 만들 때 기반 작업 4개(파일 처리, 이미지 엔진, 광고·결제, 분석)를 서브에이전트마다 worktree 하나씩 맡겼고, 12분 동안 브랜치 4개가 머지됐습니다. 그중 3개에서 의존성을 엮는 파일 <code>AppContainer.kt</code>를 손으로 합쳤습니다. 이 저장소는 DI 프레임워크 없이 앱마다 이 파일 하나에서 의존성을 직접 엮기로 했기 때문에, 모든 기반 작업이 이 파일에 자기 줄을 보태야 했습니다.</p>
-      <p>worktree는 작업 중인 파일이 섞이는 것을 막아 줍니다. 여러 작업이 한 줄씩 보태야 하는 연결 파일의 충돌은 머지할 때 그대로 나옵니다. 게임 저장소에서는 <a href="https://sugarmount21.com/ax/parallel-agent-workstreams/">AI 코딩 에이전트를 동시에 몇 개 돌릴 수 있는지</a> 정할 때 워크스트림마다 "독점 소유" 파일 열을 두었고, AXFamily는 거기서 빠져 있던 공유 연결 파일을 표로 따로 적었습니다.</p>
-    </section>
-    <section aria-labelledby="owner-table">
-      <h2 id="owner-table">AXFamily 계획서는 공유 파일마다 주인과 대신 쓸 길을 적었습니다</h2>
-      <p>10월 9일 AXFamily의 출시 계획서는 결론 1번에 "기반 담당 한 명이 공유 파일을 먼저 전부 깐다. 그 뒤로는 아무도 이 파일들을 고치지 않는다"를 두었습니다. 충돌 규칙 표를 줄이면 이렇습니다.</p>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th scope="col">공유 파일</th><th scope="col">주인</th><th scope="col">다른 패키지가 하는 방법</th></tr></thead>
-          <tbody>
-            <tr><td>API 계약 스키마와 생성물</td><td>기반 담당</td><td>손대지 않고, 필요한 계약은 기반 담당의 후속 작업 목록에 올린다</td></tr>
-            <tr><td>DB 보안 규칙, 색인 파일</td><td>보안 규칙 패키지</td><td>테스트용 데이터만 자기 폴더에 둔다</td></tr>
-            <tr><td>서버 함수 목록, 오류 코드</td><td>기반 담당</td><td>예정된 함수를 모두 빈 껍데기(stub)로 미리 등록하고, 각 패키지는 자기 함수 파일만 채운다</td></tr>
-            <tr><td>앱 기본 틀(의존성, 라우터, 매니페스트, Gradle)</td><td>기반 담당</td><td>라우트·광고 설정은 기능 폴더의 파일로 내고 레지스트리가 모은다</td></tr>
-            <tr><td>합본 번역 파일</td><td>병합 도구</td><td>각 기능은 자기 번역 조각 파일에만 쓰고 도구가 합친다</td></tr>
-            <tr><td>CI 워크플로</td><td>기반 담당</td><td>검사 파일 하나를 추가하면 자동으로 발견된다</td></tr>
-            <tr><td>Gradle 빌드·기기</td><td>없음</td><td>워크트리와 관계없이 동시에 하나만, <code>--no-daemon</code></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>기반 담당 에이전트가 이 파일들을 직렬로 깐 뒤, 패키지 12개가 각자 배타 폴더 안에서 병렬로 일했습니다. 세션끼리 말로 맞추는 방식은 파일 50개가 섞였고, worktree만 나누는 방식은 연결 파일을 머지 4번 중 3번 손으로 합쳤습니다. 세션 하나로 전부 직렬 처리하면 충돌은 없지만 패키지 12개를 하나씩 해야 하고, 그 시간은 재지 않았습니다.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%ED%81%B4%EB%A1%9C%EB%93%9C%20%EC%BD%94%EB%93%9C%20%EC%97%AC%EB%9F%AC%20%EC%84%B8%EC%85%98%20%EB%8F%99%EC%8B%9C%20%EC%9E%91%EC%97%85%3A%20%EA%B3%B5%EC%9C%A0%20%ED%8C%8C%EC%9D%BC%EB%A7%88%EB%8B%A4%20%EC%A3%BC%EC%9D%B8%EC%9D%84%20%EC%A0%95%ED%95%9C%20%ED%91%9C">메일로 문의하기</a></p></aside>
-    <section aria-labelledby="merge-count">
-      <h2 id="merge-count">머지 13개 중 7개를 손으로 합쳤고, 번역 조각 파일은 0번</h2>
-      <p>10월 10일 새벽 2분 11초 동안 통합 브랜치에 기능 브랜치 13개가 들어갔습니다. 계획서의 12개에 디자인 시스템 브랜치가 더해진 수입니다. <code>git show --cc</code>로 머지마다 양쪽을 섞어 합친 구간이 남은 파일을 뽑으면 7개 머지에 그런 구간이 있었습니다.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/file-owner-table-1-ko.webp" width="1200" height="708" alt="막대 그림: worktree만 나눈 9월 20일에는 기반 작업 머지 4개 중 3개를 손으로 합쳤고, 주인 표를 깐 10월 10일에는 머지 13개 중 7개를 손으로 합쳤으며 번역 조각 파일 때문인 것은 0개였다." loading="lazy"><figcaption>주인 표를 깐 뒤에도 손 머지는 남았지만, 조각 파일로 나눈 곳에서는 한 번도 나지 않았습니다.</figcaption></figure>
-      <ul>
-        <li>앱 화면 패키지 4개: 합본 번역 파일과 거기서 생성한 Dart 파일 3개. CI가 "합본이 조각과 다르면 병합 도구를 돌리고 커밋하라"고 요구해서 브랜치마다 합본을 다시 만들어 커밋했습니다. 조각 파일은 13개 머지 어디에도 나오지 않았습니다.</li>
-        <li>미디어 패키지: 서버 함수 목록과 오류 코드 파일. 미리 등록한 함수 16개에 없던 함수를 하나 추가했고, 오류 코드 한 줄을 계정 패키지와 각자 고쳤습니다.</li>
-        <li>앱 패키지 두 곳: 보안 규칙 패키지가 주인인 색인 파일.</li>
-        <li>나머지는 테스트 파일이었습니다.</li>
-      </ul>
-      <p>브랜치마다 고친 파일을 표와 맞춰 보면, 13개 중 8개 브랜치가 다른 주인의 파일을 고쳤습니다. "그 뒤로는 아무도 고치지 않는다"는 지켜지지 않았습니다. 의존성 파일 두 줄, 매니페스트 네 줄 같은 수정은 git이 조용히 합쳤고, 손 머지로 드러난 것은 두 브랜치가 같은 줄을 고친 경우뿐이었습니다.</p>
-    </section>
-    <section aria-labelledby="contract-drift">
-      <h2 id="contract-drift">git이 조용했던 곳에서 계약이 어긋났습니다</h2>
-      <p>머지 16분 뒤의 최소 수정이 패키지 쌍 6개를 고쳤습니다. 앱의 유료 이용권 판정이 결제 서버 규칙과 달랐고, 광고 동의 타입은 두 패키지가 따로 선언했습니다. 모두 서로 다른 파일이라 git 충돌은 없었고, 그 뒤 통합 리뷰가 확정 결함 12건을 더 찾았습니다. 표에는 파일의 주인은 있었지만 "보호자"나 "현재 가족" 같은 개념의 주인은 없었습니다. 그 12건은 <a href="https://sugarmount21.com/ax/integration-review-defects/">병렬 브랜치 13개를 합친 뒤 통합 리뷰가 찾은 결함 12건</a>에 정리했습니다. 파일 주인 표는 텍스트 충돌을 줄이는 도구로 쓰고, 계약 어긋남은 통합 리뷰에 맡기십시오.</p>
-    </section>
-    <section aria-labelledby="how-to">
-      <h2 id="how-to">나누기 전에 적는 표 한 장과 머지 뒤에 돌리는 명령 두 개</h2>
-      <p>에이전트 수를 정하기 전에 공유 파일 목록과 주인부터 적으십시오. 같은 작업 트리를 쓰는 세션에는 커밋 권한을 주지 않습니다.</p>
-      <ol>
-        <li>여러 작업이 한 줄씩 보태야 하는 파일을 찾습니다. DI 컨테이너, 라우터, 엔드포인트 목록, 의존성 파일, 번역 합본, CI 설정, DB 색인이 후보입니다.</li>
-        <li>파일마다 주인을 한 명 정하고, 같은 행에 다른 작업이 대신 쓸 길(조각 파일, 레지스트리에 등록되는 자기 파일)을 적습니다. 빌드와 기기처럼 파일이 아닌 공유물에도 행을 하나 만듭니다.</li>
-        <li>주인 한 명이 연결 파일을 먼저 깔고, 예정된 이름은 전부 빈 껍데기로 등록합니다.</li>
-        <li>합본처럼 도구가 만드는 파일은 머지 뒤에 통합 담당이 다시 만듭니다. 이 사이트도 같은 원칙입니다(<a href="https://sugarmount21.com/ax/static-site-check-gate/">여러 에이전트 세션이 고치는 정적 사이트의 --check 게이트</a>).</li>
-        <li>같은 작업 트리를 쓸 수밖에 없다면: 편집 직전에 다시 읽기, 부분 편집, commit·stash·reset·<code>--stop</code> 금지, Gradle은 <code>--no-daemon</code>, 성공 여부는 테스트 결과 파일의 시각으로 확인.</li>
-        <li>머지 뒤에 표가 샌 곳을 셉니다.<pre><code># 머지에서 양쪽을 섞어 합친 구간이 남은 파일
-git show --cc --format= &lt;merge&gt; | grep '^diff --cc'
-# 브랜치가 고친 파일을 표와 대조
-git diff --name-only $(git merge-base &lt;base&gt; &lt;branch&gt;) &lt;branch&gt;</code></pre></li>
-      </ol>
-      <p>AXFamily에서는 첫 명령이 손 머지가 있는 머지 7개를, 둘째 명령이 다른 주인의 파일을 고친 브랜치 8개를 찾았습니다. 지침 파일에 이런 규칙을 적는 법은 <a href="https://sugarmount21.com/ax/agents-md/">AGENTS.md 작성법</a>에 따로 정리했습니다.</p>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">아직 커밋되고 있는 합본 번역 파일과 개념 주인 칸</h2>
-      <p>AXFamily의 개발 브랜치에는 지금도 합본 번역 파일과 생성된 Dart 파일 3개가 들어 있고, CI가 그 최신 여부를 검사합니다. 이 파일들을 통합 담당만 다시 만들게 바꾸는 일은 아직 하지 않았습니다. 주인 표에 "개념" 행(보호자 판정, 현재 가족)을 더하면 통합 결함이 줄어드는지도 아직 시험하지 않았습니다.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%ED%81%B4%EB%A1%9C%EB%93%9C%20%EC%BD%94%EB%93%9C%20%EC%97%AC%EB%9F%AC%20%EC%84%B8%EC%85%98%20%EB%8F%99%EC%8B%9C%20%EC%9E%91%EC%97%85%3A%20%EA%B3%B5%EC%9C%A0%20%ED%8C%8C%EC%9D%BC%EB%A7%88%EB%8B%A4%20%EC%A3%BC%EC%9D%B8%EC%9D%84%20%EC%A0%95%ED%95%9C%20%ED%91%9C">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <nav class="box ax-series-box" aria-label="연재 목차"><p><strong><a href="https://sugarmount21.com/ax/series/multi-agent-one-repo/">에이전트 여럿을 한 저장소에서 전체 6편</a></strong></p><ol><li value="2"><a href="https://sugarmount21.com/ax/subagent-brief-rules/">클로드 코드 서브에이전트 프롬프트 규칙: 한도로 끊긴 5건</a></li><li value="4"><a href="https://sugarmount21.com/ax/static-site-check-gate/">여러 AI 에이전트가 함께 고치는 정적 사이트: 커밋 전 --check 하나로 지키기</a></li></ol></nav>
-    <section aria-labelledby="faq">
-      <h2 id="faq">자주 묻는 질문</h2>
-      <div class="faq">
-        <details><summary>Claude Code 세션 두 개를 같은 작업 트리에서 돌려도 되나요?</summary><div><p>돌릴 수는 있지만, 요청받지 않은 세션은 커밋하지 않게 하십시오. 한 세션의 커밋이 다른 세션이 만들던 파일 50개를 함께 담아 간 뒤로, 같은 트리의 세션은 commit, stash, reset, <code>gradlew --stop</code>을 하지 않습니다.</p></div></details>
-        <details><summary>git worktree를 쓰면 병렬 에이전트 충돌이 없어지나요?</summary><div><p>작업 중 파일이 섞이는 문제는 없어지지만, 여러 작업이 함께 고치는 연결 파일의 충돌은 머지 때 그대로 나옵니다. 9월 20일 머지 4개 중 3개에서 의존성 연결 파일을 손으로 합쳤습니다.</p></div></details>
-        <details><summary>gradlew --stop이 다른 프로젝트 빌드까지 멈추나요?</summary><div><p>같은 Gradle 버전으로 뜬 데몬이면 함께 끝납니다. Gradle 문서가 그렇게 적고 있고, 같은 PC의 다른 저장소에서 clean 빌드 두 번이 "stop command received"로 끊겼습니다. 긴 빌드는 <code>--no-daemon</code>으로 돌리십시오.</p></div></details>
-      </div>
-    </section>
-    <p class="note">근거는 두 앱 저장소의 git 기록, AXFamily의 출시 계획서(2026-10-09), 당시 세션들의 메모리 노트입니다. 손 머지 수는 2026년 10월 28일에 <code>git show --cc</code>로 다시 셌고, 11월 13일에 9월 20일 머지를 다시 확인했습니다.</p>
-    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">다른 AX 노트</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/ax/subscription-details-94-percent/">&#x27;한 달째 일시적인 오류&#x27;라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</a></li>
-        <li><a href="https://sugarmount21.com/ax/local-e2e-harness-three-rounds/">클로드 코드 실기기 테스트: E2E 세 번 돌린 기록</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
-    </section>]]></description>
-    <pubDate>Thu, 29 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>R8이 남긴 테스트 광고 ID 5개와 dex 건수 검사 – SugarMount</title>
-    <link>https://sugarmount21.com/ax/release-ad-id-grep/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/ax/release-ad-id-grep/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/release-ad-id-grep-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX 노트 · 측정</span>
-      <h1>R8이 지우지 못한 테스트 광고 ID 5개: listOf().any 한 줄과 dex 건수 검사</h1>
-      <p class="lead">광고 단위 넷을 listOf(...).any로 묶은 조건은 R8이 접지 못해 테스트 문자열 5개를 남겼고, 상수끼리 ||로 쓰자 0개가 됐습니다.</p>
-    <p class="note ax-series-line"><a href="https://sugarmount21.com/ax/series/r8-release-only/">릴리스 빌드에서만 나는 결함(R8)</a> 3/4</p>
-      <p>테스트 광고 ID는 개발 중에 실제 광고 대신 쓰라고 Google이 공개해 둔 ID입니다. 출시 빌드에는 없어야 하지만, 코드 조건 한 줄의 모양 때문에 R8(Android 출시 빌드의 코드 축소 도구)이 테스트 ID로 가는 분기를 지우지 못하는 일이 있습니다. 저희 퍼즐 게임 <a href="https://sugarmount21.com/apps/blocks/">한판블록</a> vc2를 업로드하기 전, 실제 광고 ID로 처음 만든 AAB의 dex(컴파일된 앱 코드)를 세어 보니 실제 광고 단위 4개 옆에 Google 테스트 광고 문자열 5개가 남아 있었습니다.</p>
-      <p>2026년 10월 4일 오후 5시 16분, 입력을 검사하는 Gradle 가드를 통과한 빌드였습니다. 이 AAB는 2분 뒤 빌드가 덮어써 올라가지 않았고, 실제로 업로드한 vc2에는 테스트 문자열이 없습니다. 실제 ID가 다 들어 있으면 두 판 모두 앱은 테스트 단위를 고르지 않습니다. 아래는 원인이 된 조건의 모양과, 값을 출력하지 않고 dex의 광고 ID를 세는 명령입니다.</p>
-    </section>
-    <section aria-labelledby="gate-passed">
-      <h2 id="gate-passed">Gradle 가드를 통과한 AAB에 테스트 문자열이 5개 있었습니다</h2>
-      <p>광고 단위를 고르는 코드는 디버그 빌드이거나 BuildConfig의 광고 단위 필드가 비어 있으면 Google 테스트 단위 묶음인 <code>AdUnits.TEST</code>를, 아니면 실제 단위를 고릅니다. 낮 12시 25분에 만든 vc1은 배너 필드 하나만 확인했고, 10월 28일에 그 AAB를 세 보니 실제 광고 단위 4개, 테스트 문자열 0개였습니다.</p>
-      <p>오후 4시 14분, Claude Code 에이전트가 이 조건을 네 단위 전부로 넓혔습니다. 단위가 하나라도 비어 있으면 실제 ID가 없는 빌드로 보고 넷 모두 테스트 단위를 쓰려는 수정이었고, 주석에는 "never a half-real mix"라고 적었습니다. 아래가 그 줄입니다.</p>
-      <pre><code>units = if (BuildConfig.DEBUG || listOf(BuildConfig.AD_BANNER, BuildConfig.AD_INTERSTITIAL,
-        BuildConfig.AD_REWARDED, BuildConfig.AD_APP_OPEN).any { it.isEmpty() }) AdUnits.TEST
-    else AdUnits(BuildConfig.AD_BANNER, BuildConfig.AD_INTERSTITIAL, BuildConfig.AD_REWARDED, BuildConfig.AD_APP_OPEN)</code></pre>
-      <p>같은 시간대에 리뷰 에이전트가 태스크 이름으로 판단하던 Gradle 가드의 우회 경로를 짚자, 에이전트는 검사를 <code>checkReleaseAdIds</code> 태스크로 옮겨 모든 release 변형이 거치는 <code>preReleaseBuild</code>에 걸었습니다. 이 가드가 보는 것은 입력인 ads.properties뿐입니다.</p>
-      <p>5시 14분에 커밋하고 실제 ID로 AAB를 만들었고, 가드는 통과했습니다. 리허설 체크리스트의 이 빌드 단계가 요구한 것은 가드 통과와 서명 확인이었는데, 에이전트는 dex 문자열도 <code>grep -c</code>로 함께 셌습니다(값은 출력하지 않음). 자기 게시자 번호가 4, 테스트 게시자 번호가 5였고, <code>AdUnits.TEST</code>의 문자열 5개(배너, 전면, 보상형, 보상형 전면, 앱 오프닝)가 모두 dex에 있었습니다.</p>
-      <p>16시 14분 수정의 주석과 리뷰 요청은 런타임 동작만 다뤘고, 빌드한 뒤 dex를 세기 전까지는 R8이 그 분기를 지우는지 아무도 확인하지 않았습니다.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/release-ad-id-grep-1-ko.webp" width="1200" height="644" alt="막대그래프: 한판블록 dex의 테스트 광고 문자열은 vc1 0개, 17시 16분 첫 실제 ID AAB 5개, 업로드한 vc2 0개, 측정용 -PallowTestAds APK 5개." loading="lazy"><figcaption>가드를 통과한 첫 실제 ID AAB에만 테스트 문자열 5개가 남았고, 조건을 바꿔 업로드한 vc2에는 0개였습니다.</figcaption></figure>
-    </section>
-    <section aria-labelledby="why-r8">
-      <h2 id="why-r8">listOf로 묶은 조건은 R8이 빌드 때 계산하지 못했습니다</h2>
-      <p>실제 ID 빌드에서 이 조건은 늘 false인데도, R8은 그 값을 빌드 때 정하지 못해 <code>AdUnits.TEST</code>로 가는 분기를 살려 두었습니다. 10월 28일 재현에서는 가짜 문자열로 같은 모양의 BuildConfig와 5개짜리 테스트 묶음을 만들어 두 조건을 Kotlin 2.3.21로 컴파일하고, AGP 9.4.1에 들어 있는 R8 9.4.24로 proguard-android-optimize.txt를 그대로 써서 줄였습니다. listOf 판의 dex에는 테스트 문자열 5개와 실제 4개가 남았고, || 판에는 실제 4개만 남았습니다.</p>
-      <p>javap로 보면 두 판 모두 kotlinc가 BuildConfig 상수를 문자열 리터럴로 이미 박아 넣었습니다. listOf 판은 그 넷을 배열에 담아 <code>listOf</code>로 리스트를 만들고, Iterator로 돌며 원소마다 <code>length()</code>를 부릅니다. R8 출력 dex에도 <code>listOf</code>가 <code>Arrays.asList</code>로 바뀌었을 뿐 Iterator 루프가 그대로 남았습니다. || 판은 리터럴마다 <code>length()</code>를 바로 부르고, R8은 그 값을 계산해 조건 전체를 false로 접었습니다. 배너 하나만 보던 vc1도 이 모양이라 테스트 문자열이 0개였습니다.</p>
-      <p>테스트용 대체 분기는 BuildConfig 상수끼리 ||로 쓰고, 컬렉션 함수로 묶지 않습니다(잰 것은 <code>any</code> 하나입니다). R8 결과를 숫자로 읽은 다른 기록은 <a href="https://sugarmount21.com/ax/r8-dex-optimization-keep-rule/">Play Console 'DEX 최적화 39%'의 범인</a>에 있습니다.</p>
-    </section>
-    <section aria-labelledby="missed">
-      <h2 id="missed">리뷰 에이전트는 19건을 찾았고 테스트 문자열은 짚지 않았습니다</h2>
-      <p>4시 49분의 리뷰 에이전트는 코드만 읽고 빌드는 하지 않는 조건으로 변경 전체를 봤습니다. 요청 목록에 "광고 단위 중 하나라도 비면 전부 TEST"와 "R8에서 깨질 것(Review API keep 규칙)"이 있었습니다. 높음 2건, 중간 6건, 낮음 11건을 찾았지만 테스트 문자열이 릴리스에 남는다는 지적은 없었습니다.</p>
-      <p>Gradle 가드는 입력만 보므로 이 문제를 볼 수 없었습니다. 에이전트는 4시 55분에 측정용(<code>-PallowTestAds</code>) 빌드의 dex를 같은 방식으로 세어 리허설 문서에 "실제 0건, 테스트 5건"으로 적어 두었고, 5시 16분에는 같은 확인을 실제 ID 빌드에 붙였습니다. 리허설 문서 머리말은 비밀값을 적지 않게 합니다. 업로드 전 검사 전체는 <a href="https://sugarmount21.com/ax/release-gate/">AI가 만든 Android 앱, 출시 전에 무엇을 검사하나</a>에 있습니다.</p>
-      <p>5시 18분에 고쳤습니다. 에이전트는 이 수정을 "실제 ID 빌드에서 테스트 ID 문자열을 없애는 변경"이라고 설명했습니다. 5시 42분 커밋에서 실제 4, 테스트 0을 다시 확인했습니다.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20R8%EC%9D%B4%20%EC%A7%80%EC%9A%B0%EC%A7%80%20%EB%AA%BB%ED%95%9C%20%ED%85%8C%EC%8A%A4%ED%8A%B8%20%EA%B4%91%EA%B3%A0%20ID%205%EA%B0%9C%3A%20listOf%28%29.any%20%ED%95%9C%20%EC%A4%84%EA%B3%BC%20dex%20%EA%B1%B4%EC%88%98%20%EA%B2%80%EC%82%AC">메일로 문의하기</a></p></aside>
-    <section aria-labelledby="alternatives">
-      <h2 id="alternatives">테스트 단위를 debug 소스 세트로 옮기기 어려운 이유</h2>
-      <p>테스트 단위를 debug 소스 세트로 옮기면 release에서 아예 빠지지만, 한판블록에는 맞지 않습니다. 기기 측정과 몽키 테스트에 쓰는 <code>-PallowTestAds</code> 빌드가 release 변형이고, 이 빌드는 ads.properties를 읽지 않고 테스트 단위로 돌아야 합니다. 실제 ID 빌드에 자동 탭을 하면 무효 클릭이 되기 때문입니다.</p>
-      <p>그대로 두면 실제 ID 빌드에 테스트 문자열 5개가 늘 남아 "테스트 0개"를 통과 조건으로 쓸 수 없고, 남은 문자열이 죽은 분기인지를 매번 따져야 합니다. 그래서 조건을 R8이 접는 모양으로 바꿨습니다. 지금은 빌드 전에 입력 가드를 걸고, 빌드 뒤에는 dex 건수를 손으로 셉니다.</p>
-    </section>
-    <section aria-labelledby="count-steps">
-      <h2 id="count-steps">값을 출력하지 않고 dex의 광고 ID를 세는 명령</h2>
-      <p>릴리스에 무엇이 들어갔는지는 코드 리뷰로 판정하지 마십시오. 산출물의 dex를 건수로 세십시오. 아래는 10월 28일 재측정에 쓴 Git Bash 명령입니다. 게시자 번호는 파일에서 변수로만 읽고 화면에 찍지 않습니다.</p>
-      <pre><code># 1. 자기 게시자 번호를 변수로만 읽는다(출력하지 않음)
-MY_PUB=$(sed -n 's/^admob\.banner=[^0-9]*\([0-9]*\)\/.*/\1/p' app/ads.properties)
-TEST_PUB=...   # Google 테스트 광고 문서에 나오는 테스트 게시자 번호(16자리)
-A=app/build/outputs/bundle/release/app-release.aab   # APK면 'classes*.dex'
-# 2. 자기 광고 단위 수: 쓰는 광고 단위 개수와 같아야 한다
-unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$MY_PUB/[0-9]*" | sort -u | wc -l
-# 3. 테스트 문자열 수: 실제 ID 빌드면 0
-unzip -p "$A" 'base/dex/*.dex' | grep -a -o "$TEST_PUB[~/][0-9]*" | sort -u | wc -l</code></pre>
-      <p>이 명령을 vc1과 vc2, 10월 25일 AAB에 돌리면 4와 0이, 같은 날의 <code>-PallowTestAds</code> APK에 돌리면 0과 5가 나옵니다. 빌드 전 입력 검사는 태스크 이름을 추측하지 말고 <code>preReleaseBuild</code>에 겁니다.</p>
-      <pre><code>tasks.matching { it.name == "preReleaseBuild" }.configureEach {
-    if (!allowTestAds) dependsOn(checkReleaseAdIds)
-}</code></pre>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">게시자 번호 없이 세면 UMP 문자열 1개가 섞입니다</h2>
-      <p>10월 28일 재측정에서 광고 ID 접두어만으로 세면 AAB 셋 모두 5개였습니다. 넷은 자기 광고 단위('/' 형식)이고, 하나는 다른 게시자의 앱 ID 형식('~') 문자열이었습니다. Gradle 캐시의 Google Play 서비스, 동의 화면 라이브러리 UMP(user-messaging-platform), Firebase 라이브러리 파일 135개를 뒤져 보니 UMP 4.0.0에 같은 문자열이 있었습니다. 자기 게시자 번호와 '/'를 함께 넣어 세야 4가 나옵니다.</p>
-      <p><code>-PallowTestAds</code> 빌드는 테스트 문자열 5개가 정상이므로, 이 검사는 실제 ID 빌드에만 겁니다. 빌드 뒤에 세는 방식이라 막을 수 있는 것은 업로드뿐입니다. R8 재현은 9.4.24 한 버전과 BuildConfig 문자열 상수 모양으로만 했고, 광고 ID를 리소스나 원격 설정에서 읽는 구조는 재 보지 않았습니다. 매니페스트의 앱 ID는 dex에 없어서 출시 체크리스트에서 따로 확인합니다.</p>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">화살표 매듭풀기는 아직 태스크 이름 가드입니다</h2>
-      <p>같은 저장소의 화살표 매듭풀기는 10월 27일 커밋 기준으로 배너 필드 하나만 확인하고, 릴리스 가드도 태스크 이름에 release가 들어 있는지로 판단합니다. 이 앱을 <code>checkReleaseAdIds</code> 방식으로 옮기고, dex 건수 검사를 저장소 스크립트로 넣는 일이 남았습니다.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20R8%EC%9D%B4%20%EC%A7%80%EC%9A%B0%EC%A7%80%20%EB%AA%BB%ED%95%9C%20%ED%85%8C%EC%8A%A4%ED%8A%B8%20%EA%B4%91%EA%B3%A0%20ID%205%EA%B0%9C%3A%20listOf%28%29.any%20%ED%95%9C%20%EC%A4%84%EA%B3%BC%20dex%20%EA%B1%B4%EC%88%98%20%EA%B2%80%EC%82%AC">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <nav class="box ax-series-box" aria-label="연재 목차"><p><strong><a href="https://sugarmount21.com/ax/series/r8-release-only/">릴리스 빌드에서만 나는 결함(R8) 전체 4편</a></strong></p><ol><li value="2"><a href="https://sugarmount21.com/ax/r8-gson-field-names/">단위 테스트 203개가 놓친 릴리스 전용 빈 값: R8과 Gson 필드 이름</a></li><li value="4"><a href="https://sugarmount21.com/ax/r8-dex-optimization-keep-rule/">Play Console &#x27;DEX 최적화 39%&#x27;의 범인: 쓰지도 않는 Kakao SDK keep 규칙</a></li></ol></nav>
-    <section aria-labelledby="faq">
-      <h2 id="faq">자주 묻는 질문</h2>
-      <div class="faq">
-        <details><summary>listOf().any로 쓰면 앱 동작이 달라지나요?</summary><div><p>달라지지 않습니다. 실제 ID가 모두 있으면 두 판 모두 실제 단위를 고릅니다.</p></div></details>
-        <details><summary>all이나 none으로 묶어도 R8이 분기를 남기나요?</summary><div><p>재 보지 않았습니다. 확인하기 전에는 상수끼리 ||로 씁니다.</p></div></details>
-        <details><summary>Windows에서도 이 명령을 쓸 수 있나요?</summary><div><p>Git Bash에 unzip, grep, sort, wc가 들어 있어 그대로 돌아갑니다.</p></div></details>
-      </div>
-    </section>
-    <p class="note">근거: 게임 저장소의 git 기록, 출시 리허설 문서, 당시 세션 기록, 2026-10-28에 다시 센 AAB 3개·APK 2개와 R8 재현 프로젝트. ID 값은 출력하지 않았습니다.</p>
-    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">다른 AX 노트</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/ax/android7-java-time-crash/">Android 7에서만 실행 즉시 꺼지던 크래시: java.time 한 줄과 NewApi 린트 게이트</a></li>
-        <li><a href="https://sugarmount21.com/ax/privacy-policy-code-audit/">앱 개인정보처리방침 직접 작성: &#x27;수집하지 않음&#x27; 템플릿을 버리고 코드 감사로 다시 썼다</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
-    </section>]]></description>
-    <pubDate>Thu, 29 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Play 구독 상세 화면 &#x27;일시적인 오류&#x27;의 원인 – SugarMount</title>
-    <link>https://sugarmount21.com/ax/subscription-details-94-percent/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/ax/subscription-details-94-percent/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/subscription-details-94-percent-ko.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX 노트 · 사고 기록</span>
-      <h1>'한 달째 일시적인 오류'라는 리뷰: 상품을 기다리지 않던 구독 상세 화면, 16명 중 1명만 결제를 시작했다</h1>
-      <p class="lead">구독 화면의 '일시적인 오류'는 Play 장애가 아닐 수 있습니다. 이 앱의 상세 화면은 상품 정보가 오기 전에 목록이 비었다고 판정해 사용자를 돌려보냈습니다.</p>
-    <p class="note ax-series-line"><a href="https://sugarmount21.com/ax/series/sugarspeller-maintenance/">한글 띄어쓰기 앱 다시 손보기</a> 3/8</p>
-      <p>Android 앱에서 구독 화면을 열면 앱은 Play 결제 라이브러리에 상품 정보를 묻고, 답은 조금 뒤에 옵니다. 한글 띄어쓰기 앱의 상세 화면은 그 답을 기다리지 않고 목록을 바로 검사했고, 90일 동안 이 화면에 온 16명 중 1명만 결제를 시작했습니다. Play 리뷰 하나에서 시작해 원인을 찾고 8초 대기로 고친 과정, 그 뒤 결제 결함 7개가 더 나온 경위, 자기 구독 화면을 점검하는 순서를 적습니다.</p>
-    </section>
-    <section aria-labelledby="funnel">
-      <h2 id="funnel">GA4 90일 퍼널: 구독 화면 45명, 상세 화면 16명, 결제 시작 1명</h2>
-      <p>2026년 9월 26일에 <a href="https://sugarmount21.com/apps/sugarspeller/">한글 띄어쓰기</a> 앱의 구독 이벤트를 사용자 기준으로 90일 치 뽑았습니다. 구독 안내 화면에 45명, 요금제를 고르는 상세 화면에 16명, 결제 시작에 1명이었습니다. 상세 화면까지 온 16명 가운데 15명(94%)은 결제를 시작하지 않았습니다. 상세 화면 진입 이벤트는 고급(premium)이 18건, 기본(basic)이 2건이었고, 1.6.016~1.6.024 사이 7개 버전에 걸쳐 나왔습니다.</p>
-      <p>계기는 유용 표 18개가 붙은 리뷰 "고급 구독을 하려 하면 일시적인 오류… 한 달째"였습니다. 리뷰가 말한 "일시적인 오류"는 앱의 공용 문구 <code>일시적인 오류가 발생되었습니다. 다시 시도해주세요.</code>입니다.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/subscription-details-94-percent-1-ko.webp" width="1200" height="504" alt="막대 그림: 수정 전 90일 동안 구독 상세 화면에 16명이 왔고 결제를 시작한 사람은 1명, 1.6.025 배포 뒤에는 13명 중 4명(31%)이 결제를 시작함." loading="lazy"><figcaption>상세 화면에서 결제를 시작한 비율이 16명 중 1명에서 13명 중 4명으로 바뀌었습니다.</figcaption></figure>
-    </section>
-    <section aria-labelledby="same-function">
-      <h2 id="same-function">빈 목록을 바로 오류로 판정한 함수</h2>
-      <p>상세 화면의 <code>addSubsItems()</code>는 상품 정보 흐름을 <code>lifecycleScope.launch</code> 안에서 <code>firstOrNull()</code>로 기다리게 걸어 두고, 같은 함수 아래에서 목록 크기를 바로 검사했습니다. 수정 전 코드를 줄여 옮기면 이렇습니다.</p>
-      <pre><code>getProductDetails(repo.premiumProductDetails)   // 안에서 launch { flow.firstOrNull() }
-if (recyclerAdapterSubscription!!.mItemList!!.size &lt;= 0) {
-    Toast.makeText(..., R.string.string_common_error_retry, ...).show()
-    startActivity(메인 화면)
-}</code></pre>
-      <p>상품이 결제 관리자의 StateFlow에 이미 들어 있으면 <code>firstOrNull()</code>이 그 자리에서 값을 내 목록이 채워졌고, 아직 없으면 코루틴은 기다리는 동안 함수는 다음 줄로 넘어가 빈 목록을 봤습니다. 상품이 미리 캐시돼 있지 않은 사용자는 전부 토스트를 보고 메인으로 돌아갔습니다. 크기 검사 줄은 2024년 1월 4일 커밋에서, <code>firstOrNull()</code>은 2024년 10월 3일 커밋에서 들어왔습니다.</p>
-      <p>9월 26일 수정은 이 판정을 기다림으로 바꿨습니다. 이제 화면은 진행 다이얼로그를 띄운 채 <code>withTimeoutOrNull(8_000)</code> 안에서 상품을 기다리고, 8초가 지나도 안 오면 그때 토스트를 띄우고 돌아갑니다. 코드 주석에 적힌 근거는 "결제 연결부터 상품 조회까지 보통 1~2초, 그 몇 배"입니다. 8초는 지연 분포를 재서 정한 값이 아닙니다.</p>
-    </section>
-    <section aria-labelledby="size-two">
-      <h2 id="size-two">2024년의 '응답이 나뉘어 온다'는 판단은 for 루프가 만든 증상이었습니다</h2>
-      <p>결제 관리자 <code>BillingClientManager</code>는 Play가 돌려준 상품을 맵에 담을 때 <code>if(newMap.size &gt;= 2)</code>, 즉 basic과 premium이 한 응답에 함께 왔을 때만 저장했습니다. 이 줄을 넣은 2024년 10월 4일 커밋의 메시지는 "간헐적으로 product details response 가 따로 혹은 같이 입력됨", "basic, premium 한번에 입력될때만 저장"입니다.</p>
-      <p>2023년 12월 30일부터 <code>queryProductDetails()</code>는 상품 목록을 만드는 for 루프 안에서 반복마다 <code>queryProductDetailsAsync</code>를 불렀습니다. 상품이 두 개라 basic 하나짜리 요청과 둘짜리 요청이 차례로 나갔고, 응답도 1개짜리와 2개짜리로 왔습니다. 2024년 수정은 1개짜리를 버려 증상을 가렸고, 그 대가로 Play가 상품을 하나만 돌려주는 경우(한 상품의 base plan이 꺼져 있을 때 등)에는 맵이 끝까지 비게 만들었습니다.</p>
-      <p>같은 수정은 조회를 한 번만 하고, 온 상품은 온 대로 기존 맵에 합치게 고쳤습니다. Play Billing Library 9.1.0의 <code>QueryProductDetailsResult</code>는 돌려주지 못한 상품을 <code>unfetchedProductList</code>로 따로 주는데, 이것을 로그로 남겨 Play Console 쪽 문제와 앱 문제를 가를 수 있게 했습니다.</p>
-    </section>
-    <section aria-labelledby="test-product-details">
-      <h2 id="test-product-details">AI가 쓴 첫 테스트 5개 중 3개는 Mockito에서 실패했습니다</h2>
-      <p>수정은 AI 코딩 에이전트(Claude Code)와 함께 했고, 고치기 전에 실패하는 테스트부터 썼습니다. Robolectric 화면 테스트 3개(안 왔을 때 기다림, 나중에 오면 목록 표시, 끝내 안 오면 오류)와 결제 관리자 테스트 2개(한 상품만 온 응답, 나뉘어 온 응답 합치기)입니다. 첫 실행에서 5개가 모두 실패했지만 그중 3개는 버그를 재현한 실패가 아니었습니다.</p>
-      <pre><code>java.lang.NullPointerException: Cannot invoke "org.mockito.plugins.MockMaker$TypeMockability.mockable()" because "typeMockability" is null</code></pre>
-      <p>에이전트가 <code>ProductDetails</code>를 Mockito 목으로 만들었는데, 이 클래스는 final이고 이 프로젝트 테스트 클래스패스에는 <code>mockito-android</code>가 섞여 있어 final 목을 만들지 못했습니다. 그래서 목을 버렸습니다. <code>ProductDetails</code>의 생성자는 JSON 문자열을 받는 패키지 전용 생성자라서, 테스트 코드에 같은 패키지 이름 <code>com.android.billingclient.api</code>로 <code>TestProductDetails</code>를 두고 Play가 내려 주는 모양의 JSON(productId, type, subscriptionOfferDetails, pricingPhases)으로 진짜 객체를 만들었습니다. 다시 돌리자 5개가 모두 의도한 이유로 실패했습니다. 화면 테스트는 "상품이 아직 안 왔을 뿐인데 메인으로 내보냈다"로, 합치기 테스트는 기대값 basic·premium에 실제값 빈 집합으로 실패했고, 수정 뒤 통과했습니다. 그때 쓴 도우미의 축약본입니다(상품 ID와 가격은 자리 표시로 대신했습니다).</p>
-      <pre><code>package com.android.billingclient.api   // 테스트 소스. 생성자가 패키지 전용이라 같은 패키지에 둔다
-fun subscriptionMonthly(productId: String, basePlanId: String): ProductDetails {
-    val phase = JSONObject().put("priceAmountMicros", 1_000_000_000).put("priceCurrencyCode", "KRW")
-        .put("formattedPrice", "1,000원").put("billingPeriod", "P1M").put("recurrenceMode", 1)
-    val offer = JSONObject().put("basePlanId", basePlanId).put("offerIdToken", "token-$basePlanId")
-        .put("offerTags", JSONArray()).put("pricingPhases", JSONArray().put(phase))
-    val json = JSONObject().put("productId", productId).put("type", "subs")
-        .put("title", productId).put("name", productId).put("description", "test")
-        .put("subscriptionOfferDetails", JSONArray().put(offer))
-    return ProductDetails(json.toString())     // 목이 아니라 진짜 객체
-}
-// 사용: subscriptionMonthly("premium", "premium-monthly")</code></pre>
-    </section>
-    <section aria-labelledby="s21-billing">
-      <h2 id="s21-billing">S21에서 메인으로 돌아간 원인은 기기의 Play 결제 연결이었습니다</h2>
-      <p>9월 28일 Galaxy S21에서 구독 상세 화면을 열자, 진행 표시가 돌다가 화면이 닫히고 메인으로 돌아갔습니다. 최근 이틀 사이 변경부터 의심해서, 그 변경 전 코드(9월 26일 저녁, 대기 수정은 포함)로 릴리스 빌드를 따로 만들어 같은 폰에 설치했는데 똑같이 8초 뒤 실패했습니다. 결제 연결이 남긴 오류는 <code>In-app billing API version 3 is not supported</code>였고, 이 폰의 Google Play 서비스는 2024년 12월판이었습니다.</p>
-      <p>원인은 기기였어도 앱 결함 두 개가 함께 드러났습니다. 결제 연결 설정이 실패로 끝나면 끊김 콜백이 오지 않아 아무도 다시 연결하지 않았고, 앱을 다시 켜기 전까지 구독 화면은 매번 8초를 기다린 뒤 원인과 상관없는 "다시 시도해주세요"를 띄웠습니다. 같은 날 결제 관리자가 연결 상태(연결 중, 연결됨, 사용 불가와 응답 코드)를 내보내게 했습니다. 1.6.025에 들어간 대기 부분은 이렇습니다.</p>
-      <pre><code>repo.ensureConnected()                       // 앞서 실패한 연결은 여기서 다시 건다
-popupDialog.showDialog(POPUP_TYPE.PROGRESS, true)
-lifecycleScope.launch {
-    val outcome: Any? = try {
-        withTimeoutOrNull(PRODUCT_LOAD_TIMEOUT_MS) {   // 8_000L
-            merge(source, repo.connectionState.filterIsInstance&lt;BillingConnectionState.Unavailable&gt;())
-                .firstOrNull()                        // 상품 도착과 연결 실패 중 먼저 오는 쪽
-        }
-    } finally { popupDialog.stopDialog() }
-    // Unavailable: (BILLING/SERVICE_UNAVAILABLE이면) Play 확인 안내 + subscription_unavailable / null(8초 초과): 재시도 문구 / 그 밖: 요금제 목록
-}</code></pre>
-      <p><code>BILLING_UNAVAILABLE</code>이면 8초를 채우지 않고 Play 스토어를 확인하라는 안내를 띄우고 GA4에 <code>subscription_unavailable</code>을 보냅니다.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%27%ED%95%9C%20%EB%8B%AC%EC%A7%B8%20%EC%9D%BC%EC%8B%9C%EC%A0%81%EC%9D%B8%20%EC%98%A4%EB%A5%98%27%EB%9D%BC%EB%8A%94%20%EB%A6%AC%EB%B7%B0%3A%20%EC%83%81%ED%92%88%EC%9D%84%20%EA%B8%B0%EB%8B%A4%EB%A6%AC%EC%A7%80%20%EC%95%8A%EB%8D%98%20%EA%B5%AC%EB%8F%85%20%EC%83%81%EC%84%B8%20%ED%99%94%EB%A9%B4%2C%2016%EB%AA%85%20%EC%A4%91%201%EB%AA%85%EB%A7%8C%20%EA%B2%B0%EC%A0%9C%EB%A5%BC%20%EC%8B%9C%EC%9E%91%ED%96%88%EB%8B%A4">메일로 문의하기</a></p></aside>
-    <section aria-labelledby="seven-defects">
-      <h2 id="seven-defects">'배포 준비 완료' 다음 날 S23 시험에서 결제 결함 7개가 더 나왔습니다</h2>
-      <p>9월 29일 1.6.025는 배포 준비 완료로 기록됐습니다(그날 검토 과정은 <a href="https://sugarmount21.com/ax/agent-review-refutation/">AI 에이전트 코드 리뷰를 믿는 법</a>에 있습니다). 다음 날 아침 운영자가 Galaxy S23에서 구독을 직접 눌러 보고 이대로는 배포할 수 없다고 해서, S21 실기기 점검과 에이전트 교차 검증을 다시 돌렸고, 1.6.024 이전부터 있던 결제 결함 7개가 나왔습니다.</p>
-      <ol>
-        <li>결제 창이 바로 실패하면 대기 표시가 남고, 뒤에서 도는 스레드가 CPU 한 코어를 계속 씀</li>
-        <li>결제 연결 완료 콜백의 OK가 구매 결과와 같은 전역 값에 쓰여 "구독 완료"로 읽힘</li>
-        <li>결제 대기(PENDING)를 성공으로 처리</li>
-        <li>앱으로 돌아올 때마다 BillingClient를 새로 만들어 누수가 생김. 구매 목록 조회가 끝나기 전의 빈 목록을 보고 Classic 화면이 구독자를 무료로 저장</li>
-        <li>Chat 화면은 구매 뒤 혜택을 반영하지 않음</li>
-        <li>구매 목록을 모르는 채 결제하면 기존 구독자가 두 번째 구독을 살 수 있음</li>
-        <li>화면의 onDestroy가 앱 전체가 쓰는 결제 연결을 끊음</li>
-      </ol>
-      <p>9월 30일 수정은 구매 결과를 연결 상태와 다른 흐름으로 받고, 구매 목록은 성공한 조회에만 채워지는 신호로 읽어 "조회 성공이고 활성 구독이 없을 때"만 무료로 내리게 했습니다. 결제 직전에는 구매 목록을 새로 묻고, 모르면 결제 창을 띄우지 않게 했습니다. 그날 수정 전체로 단위 테스트는 250개에서 292개가 됐습니다.</p>
-      <p>S23 로그는 보지 못했지만, 같은 시험을 S21에서 해 보니 원인은 시험 방식이었습니다. Play에 올리지 않은 사이드로드 릴리스 빌드는 Play가 "이 버전은 Google Play 결제를 사용할 수 없습니다"를 띄우고, 패키지 이름 끝에 <code>.debug</code>가 붙는 디버그 빌드는 Play에 등록된 상품이 없습니다. 실결제는 내부 테스트 트랙에 올리고 라이선스 테스터 계정으로 Play에서 받아 설치해야만 끝까지 볼 수 있어서, 이 확인을 배포 절차에 한 단계로 넣었습니다.</p>
-    </section>
-    <section aria-labelledby="eight-seconds">
-      <h2 id="eight-seconds">즉시 판정, 무한 대기, 8초 대기 중에서 고른 것</h2>
-      <p>예전 방식인 즉시 판정은 화면을 연 순간 목록이 비어 있다는 사실을 오류로 본 것이라 버렸습니다. 반대쪽 끝인 무한 대기는 수정 전 코드에 이미 반쯤 있었습니다. <code>firstOrNull()</code>은 상품이 끝내 오지 않으면 돌아오지 않으니, 크기 검사 줄만 지웠다면 사용자는 빈 화면을 계속 봤을 겁니다. 배포 30일 뒤에도 상세에서 결제 시작이 0~10%면 상품 조회 자체가 실패하는 것으로 보고 결제 연결 재시도로 간다는 규칙도 9월 26일에 적어 두었습니다.</p>
-      <p>비동기로 오는 상품 정보를 화면을 연 직후에 판정하지 마십시오. 기다릴 상한을 정하고, 결제 연결 실패처럼 원인을 아는 실패는 기다리지 말고 바로 알리십시오. 같은 규칙이 지금 이 앱 저장소의 에이전트 지침(CLAUDE.md) 구독 절에 들어 있습니다.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">13명 중 4명은 중간값이고, 기기 쪽 결제 불가는 남습니다</h2>
-      <p>9월 26일에 정한 판정 규칙의 나머지 절반은 "배포 30일 뒤 상세에서 결제 시작이 30%를 넘으면 원인 확정"이었습니다. 10월 17일 중간값 31%는 이 선을 넘었고 결제 성공도 2명 생겼지만, 상세 화면 13명짜리 표본입니다. 10월 18일 기록에서는 Play 사전 출시 로봇이 1.6.030의 구독 화면 수치를 부풀린 것이 확인됐는데, 이 13명에 로봇이 섞였는지는 기록에 없습니다(GA4에서 로봇을 거른 방법은 <a href="https://sugarmount21.com/ax/ga4-test-device-filter/">GA4의 '어제 설치 19건'은 사실 8건이었다</a>에 있습니다).</p>
-      <p>같은 날 <code>subscription_unavailable</code>은 상세 화면 13명 중 2명(15%)이었습니다. 오래된 Play 서비스나 로그인 문제처럼 기기 쪽에서 결제를 못 하는 사용자는 수정 뒤에도 남고, 앱이 할 수 있는 일은 정확한 안내까지입니다. <code>TestProductDetails</code>는 Play Billing Library 9.1.0에서만 써 봤고, Robolectric 테스트는 실결제와 Play 서명을 보지 못합니다.</p>
-    </section>
-    <section aria-labelledby="checklist">
-      <h2 id="checklist">내 구독 화면 점검 순서</h2>
-      <ol>
-        <li>GA4에서 구독 안내, 상세, 결제 시작 이벤트를 사용자 기준으로 나란히 봅니다. 상세에서 결제 시작이 한 자릿수 비율이면 상세 화면 코드부터 엽니다.</li>
-        <li>상품 흐름을 <code>launch</code>로 걸어 둔 함수 안에서, 같은 함수 아래에 목록 크기를 검사하는 줄이 있는지 찾습니다.</li>
-        <li><code>queryProductDetailsAsync</code>가 루프 안에 있는지, 응답 처리부가 "모든 상품이 와야" 저장하는지 봅니다. 온 상품은 합치고 <code>unfetchedProductList</code>는 로그에 기록합니다.</li>
-        <li>상세 화면은 진행 표시와 함께 상한을 두고 기다리고, 결제 연결이 <code>BILLING_UNAVAILABLE</code>이나 <code>SERVICE_UNAVAILABLE</code>로 끝나면 바로 Play 업데이트 안내로 끝냅니다.</li>
-        <li>JSON으로 <code>ProductDetails</code>를 만드는 테스트 도우미를 두고, 화면 3경우와 관리자 2경우를 먼저 실패시킨 뒤 고칩니다.</li>
-        <li>배포 전에 판정 기준(몇 % 넘으면 원인 확정, 얼마 아래면 다른 원인)을 날짜와 함께 적습니다.</li>
-      </ol>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">10월 31일 +30일 판정에서 볼 것</h2>
-      <p>최종 판정일은 1.6.025 배포 30일째인 10월 31일입니다. 상세 화면 사용자에 사전 출시 로봇이 섞였는지 확인한 뒤에도 결제 시작 비율이 30% 위에 남는지, <code>subscription_unavailable</code>이 5%를 계속 넘어 Play 스토어로 바로 가는 버튼이 필요한지 봅니다. 배포 절차에 넣은 내부 테스트 트랙 실결제 확인을 1.6.025 배포 전에 실제로 마쳤는지는 기록에서 확인하지 못했습니다.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">질문이나 제안이 있나요?</p><p>글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20%EB%85%B8%ED%8A%B8%5D%20%27%ED%95%9C%20%EB%8B%AC%EC%A7%B8%20%EC%9D%BC%EC%8B%9C%EC%A0%81%EC%9D%B8%20%EC%98%A4%EB%A5%98%27%EB%9D%BC%EB%8A%94%20%EB%A6%AC%EB%B7%B0%3A%20%EC%83%81%ED%92%88%EC%9D%84%20%EA%B8%B0%EB%8B%A4%EB%A6%AC%EC%A7%80%20%EC%95%8A%EB%8D%98%20%EA%B5%AC%EB%8F%85%20%EC%83%81%EC%84%B8%20%ED%99%94%EB%A9%B4%2C%2016%EB%AA%85%20%EC%A4%91%201%EB%AA%85%EB%A7%8C%20%EA%B2%B0%EC%A0%9C%EB%A5%BC%20%EC%8B%9C%EC%9E%91%ED%96%88%EB%8B%A4">메일로 문의하기</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <nav class="box ax-series-box" aria-label="연재 목차"><p><strong><a href="https://sugarmount21.com/ax/series/sugarspeller-maintenance/">한글 띄어쓰기 앱 다시 손보기 전체 8편</a></strong></p><ol><li value="2"><a href="https://sugarmount21.com/ax/retention-cohort-break/">대개편 직후 DAU는 올랐고, 자연 유입 코호트 D1은 15.2%에서 11.2%로 내려갔다</a></li><li value="4"><a href="https://sugarmount21.com/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot;이 거짓이라 콘텐츠 갱신이 멈췄다: 6.2~6.9 기기만 막힌 Remote Config 버전 비교</a></li></ol></nav>
-    <section aria-labelledby="faq">
-      <h2 id="faq">자주 묻는 질문</h2>
-      <div class="faq">
-        <details><summary>구독 화면에서 "일시적인 오류"가 계속 나는데 Play 쪽 장애인가요?</summary><div><p>앱 코드일 가능성부터 보십시오. 한글 띄어쓰기 앱은 상품 정보가 오기 전에 목록이 비었다고 판정해, 캐시가 없는 사용자를 전부 돌려보냈습니다. 다시 시도해도 같으면 일시적인 장애가 아닙니다.</p></div></details>
-        <details><summary>ProductDetails를 Mockito로 목으로 만들 수 없을 때는 어떻게 테스트하나요?</summary><div><p>테스트 소스에 com.android.billingclient.api 패키지를 만들고, 패키지 전용 생성자에 Play가 내려 주는 모양의 JSON을 넣어 진짜 객체를 만듭니다. Play Billing Library 9.1.0에서 이 방식으로 테스트 5개를 돌렸습니다.</p></div></details>
-        <details><summary>사이드로드한 릴리스 APK에서 "Google Play 결제를 사용할 수 없습니다"가 뜨면 결함인가요?</summary><div><p>아닙니다. Play에 올리지 않은 빌드나 디버그 패키지에서는 결제가 안 되는 것이 정상입니다. 실결제는 내부 테스트 트랙에 올리고 라이선스 테스터 계정으로 Play에서 설치해 확인합니다.</p></div></details>
-      </div>
-    </section>
-    <p class="note">근거: 앱 저장소 git 기록과 CHANGELOG(2026-09-26, 09-30), 관측 기록, 9월 26~30일 작업 세션 기록. 사용자 수는 GA4 사용자 기준입니다.</p>
-    <p class="muted">이 글은 SugarMount가 직접 측정한 값으로 쓰고, 초안 작성에 AI 코딩 에이전트를 썼습니다.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">다른 AX 노트</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/ax/android-theme-color-leak/">XML 어디에도 흰색이 없는데 다이얼로그 글자가 사라졌다: 테마 색이 새는 자리 3곳</a></li>
-        <li><a href="https://sugarmount21.com/ax/co-authored-by-trailer-audit/">Co-Authored-By 트레일러 없는 커밋, 확인한 29개 중 26개는 에이전트가 만들었다</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/ax/">AX 노트 전체 보기</a></p>
-    </section>]]></description>
-    <pubDate>Thu, 29 Oct 2026 09:00:00 +0900</pubDate>
   </item>
 </channel>
 </rss>

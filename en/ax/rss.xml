@@ -6,7 +6,254 @@
   <description>Notes from shipping Android apps on Google Play with an AI coding agent: release gates, R8 crashes, staged rollouts, agent permissions. Dated numbers from git.</description>
   <language>en</language>
   <atom:link href="https://sugarmount21.com/en/ax/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Tue, 17 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Wed, 18 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Claude Code Android: a build gate for zero ads – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/ads-free-release-gate/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/ads-free-release-gate/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/ads-free-release-gate-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · How-to</span>
+      <h1>Claude Code Android: a build gate for zero ads</h1>
+      <p class="lead">The zero-ads gate Claude Code built had to read both the release dependency graph and the merged manifest; with the dependency check alone, a build carrying AD_ID passed.</p>
+      <p>An Android app that ships no ad SDK at all can still request the advertising ID permission. <a href="https://sugarmount21.com/en/apps/doc-viewer/">HWP Viewer SugarDoc</a>, our viewer for Korean word-processor files, was built with no ads by decision. Firebase Analytics, which it uses for statistics, pulls in four libraries that declare <code>AD_ID</code>, and the manifest merger copies that into the app. Left alone, the Play Console listing says "no ads, no advertising ID" while the AAB asks for it.</p>
+      <p>The first gate a Claude Code agent wrote looked only at the dependency graph, and a review agent caught the hole. When we reran the same repository in a throwaway folder on November 18, 2026, a gate that checks dependencies alone passed a build whose merged manifest still had AD_ID.</p>
+    </section>
+    <section aria-labelledby="first-gate">
+      <h2 id="first-gate">The first gate checked dependencies only</h2>
+      <p>The three photo apps in the same repository show banner, interstitial and app-open ads. When the viewer started, the agent offered two ad plans (no ad SDK, or one home-screen banner), and early on October 5 (Korea time) the operator picked no ads. The app's config file got one line, <code>adsMode=NONE</code>.</p>
+      <p>About two hours later an implementing agent built the gate. The release config task <code>verifyReleaseConfig</code> gained rules that every ad id field must be empty and that the release dependency graph must not contain Google Mobile Ads (GMA, Google's ad SDK) or its consent SDK (UMP). The app manifest got four <code>tools:node="remove"</code> lines that strip the advertising-id permissions, and two unit tests reading the merged release manifest guarded those lines.</p>
+      <p>The workflow instructions said to remove each new guard for a moment and confirm a test fails, and the agent ran several deliberately broken copies. Copies that added an ad id or an ad module were run through <code>verifyReleaseConfig</code>, the task the AAB build depends on; the copy with the remove lines deleted was run through unit tests only and never through that task.</p>
+      <p>Four review agents started as soon as the implementer finished. The one assigned to rules and gates wrote: "<code>bundleRelease</code> depends on only one gate, <code>verifyReleaseConfig</code>, and it checks the dependency graph but not the merged manifest." Delete the remove lines, build and upload, and the store declares no advertising ID while the AAB has it. The reviewer filed it as minor and noted that the manifest unit tests ran only from the release script, never from the AAB build command.</p>
+      <p>A fix agent spent about 20 minutes moving the rules into a separate file and adding the merged-manifest check to the same task. Later that morning the operator asked again whether the app really had no ads at all, then set both the ads and advertising-ID answers in Play Console's app content section to "no". The gate, fix included, landed in the repository with commit ca1ade4 on October 8; the dependency-only version was never committed.</p>
+    </section>
+    <section aria-labelledby="firebase-ad-id">
+      <h2 id="firebase-ad-id">How Firebase puts AD_ID back</h2>
+      <p>The viewer's telemetry module depends on Firebase Analytics. In the release dependency graph we pulled again on November 18, firebase-analytics 23.2.0 brings a set of measurement libraries, and among them is <code>play-services-ads-identifier</code> 18.0.0, the library that reads the advertising ID.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/ads-free-release-gate-shot2-en.webp" width="1200" height="608" alt="Release dependency graph with play-services-ads-identifier and ads-adservices under firebase-analytics highlighted, and the merger report listing the four libraries that add AD_ID" loading="lazy"><figcaption>Gradle dependency output and manifest merger report, excerpt (rerun 2026-11-18, state B with the remove lines deleted). Local paths are covered with grey boxes.</figcaption></figure>
+      <p>The manifest merger report says which library added each permission. With the remove lines gone, <code>AD_ID</code> was declared by four libraries, and two of them added two permissions from Android's newer ad-measurement APIs (AdServices). <code>ACCESS_ADSERVICES_TOPICS</code>, which the app manifest also removes, is declared by nothing in this version; the merger only warned that there was nothing to remove.</p>
+      <p>The dependency check stays silent because <code>play-services-ads-identifier</code> is not on its deny list. Adding it would block Firebase Analytics itself, so a code comment says it is not an ad SDK and leaves it out on purpose. Permissions live in the manifest, so a check that reads only the dependency list cannot see this path.</p>
+      <div class="table-wrap"><table><thead><tr><th>Widening the deny list</th><th>What happens with today's graph</th><th>Why not</th></tr></thead><tbody><tr><td>Deny <code>play-services-ads-identifier</code> too</td><td>Always fails, Firebase Analytics brings it</td><td>Statistics would have to go</td></tr><tr><td>Fail on any module named <code>ads</code></td><td>ads-identifier and privacysandbox <code>ads-adservices</code> match via Firebase</td><td>False positives</td></tr><tr><td>Check config values only</td><td>Config is clean in state D, where the ad module is added</td><td>Misses an ad module coming in</td></tr><tr><td>Make <code>bundleRelease</code> depend on all release unit tests</td><td>The reviewer's second suggestion</td><td>No reason for not picking it is on record</td></tr></tbody></table></div>
+      <p>When the remove lines go away, four Firebase libraries add <code>AD_ID</code> again, the dependency check stays quiet because those libraries are allowed, and the tests that read the manifest sit outside the AAB build path. The fix agent cut the last link: the merged-manifest check now runs inside <code>verifyReleaseConfig</code>, so <code>bundleRelease</code> fails even with the first three in place.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20Android%3A%20a%20build%20gate%20for%20zero%20ads">Email us</a></p></aside>
+    <section aria-labelledby="four-states">
+      <h2 id="four-states">One app, four states</h2>
+      <p>Without touching the source repository, we unpacked <code>origin/main</code> into a temporary folder and ran the viewer's <code>verifyReleaseConfig</code> four times. The Firebase config file was the fake template the repository ships (without it, every run adds a "google-services.json is missing" line).</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/ads-free-release-gate-shot1-en.webp" width="1200" height="598" alt="verifyReleaseConfig output for one app in four states: A and C succeed, B fails on three AD_ID-related permissions, D fails with three dependency lines and twelve manifest lines" loading="lazy"><figcaption>Output rerun on 2026-11-18 with Gradle 9.6.0 and AGP 9.4.1. C passes although the merged manifest has AD_ID.</figcaption></figure>
+      <div class="table-wrap"><table><thead><tr><th>State</th><th>Change</th><th>Result</th><th>AD_ID in merged manifest</th></tr></thead><tbody><tr><td>A</td><td>none</td><td>pass</td><td>no</td></tr><tr><td>B</td><td>four remove lines deleted</td><td>fail, 3 manifest lines</td><td>yes</td></tr><tr><td>C</td><td>B, plus the manifest check call removed</td><td>pass</td><td>yes</td></tr><tr><td>D</td><td>the photo apps' ad module added</td><td>fail, 3 dependency + 12 manifest lines</td><td>no</td></tr></tbody></table></div>
+      <p>C is close to the gate as first built on October 5: the advertising-id permission is in, and the build succeeds. D goes the other way. The remove lines are intact, so <code>AD_ID</code> is stripped, but the ad SDK, UMP and the WorkManager library the ad SDK pulls in trip the dependency rule, and the manifest rule catches one ad activity and eleven WorkManager components. B is caught only by the manifest check; D trips both layers.</p>
+      <p>In the same copy, with the manifest check call removed, we also ran the rule tests (<code>./gradlew -p build-logic test</code>). All 15 passed. The tests guard the rule functions; nothing tests that the task calls them.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Wiring both checks into one task</h2>
+      <p>This can live in a convention plugin (a Gradle build-config plugin shared by several modules) or in an app module's <code>build.gradle.kts</code>. Our repository keeps it in the convention plugin every app applies and switches it on with <code>adsMode</code> in each app's config file.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/ads-free-release-gate-1-en.webp" width="1200" height="882" alt="Five steps of a release gate for an app without ads: config, dependency graph, merged manifest, wiring to bundleRelease, breaking it four ways" loading="lazy"><figcaption>Check the dependency graph and the merged manifest in one task, and put that task in front of the AAB build.</figcaption></figure>
+      <ol class="steps"><li><p>Give the app config an ads mode. With <code>NONE</code>, pass only when every ad id is empty and every ad flag is false.</p></li><li><p>Walk the release runtime graph (<code>releaseRuntimeClasspath</code>) to the end, collect each external module's <code>group:name</code>, and compare against exact names. Our list has seven: four Google ad SDK artifacts, UMP and two WorkManager artifacts. <code>play-services-ads-identifier</code> is not on it.</p></li><li><p>Strip the advertising-id permissions in the app manifest.</p><pre><code>&lt;uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" /&gt;
+&lt;uses-permission android:name="android.permission.ACCESS_ADSERVICES_AD_ID" tools:node="remove" /&gt;
+&lt;uses-permission android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION" tools:node="remove" /&gt;
+&lt;uses-permission android:name="android.permission.ACCESS_ADSERVICES_TOPICS" tools:node="remove" /&gt;</code></pre></li><li><p>In the same task, read the release variant's merged manifest and fail on <code>AD_ID</code> or <code>ACCESS_ADSERVICES_*</code> permissions, GMA meta-data, or GMA, UMP and WorkManager components. This is the step that catches step 3 disappearing. The permission part, taken from the repository:</p><pre><code>// plugin: hand the release variant's merged manifest to the task as an input
+onVariants(selector().withBuildType("release")) { variant -&gt;
+    mergedReleaseManifest.set(variant.artifacts.get(SingleArtifact.MERGED_MANIFEST))
+    releasePackage.set(variant.applicationId)
+}
+// rule function: match permission names
+(elements("uses-permission") + elements("uses-permission-sdk-23")).map { it.name() }
+    .filter { it == "com.google.android.gms.permission.AD_ID" || it.startsWith("android.permission.ACCESS_ADSERVICES_") }
+    .forEach { problems += "adsMode=NONE but the merged manifest requests $it" }</code></pre></li><li><p>Make the AAB task depend on it.</p><pre><code>tasks.matching { it.name == "bundleRelease" }.configureEach { dependsOn(verifyReleaseConfig) }</code></pre></li><li><p>Move the rules into functions with no Gradle types and give each rule a "break it and it fails" unit test. Then run the real project in states A to D and confirm A and C pass while B and D fail; of the broken states, only C should pass.</p></li><li><p>Find which library adds a permission in <code>build/outputs/logs/manifest-merger-release-report.txt</code>, and what pulls it in with <code>./gradlew :app:dependencies --configuration releaseRuntimeClasspath</code>.</p></li></ol>
+      <p>Don't write the lists from memory. Pull your dependency graph and merger report once; those two outputs are where the lists in steps 2 and 4 come from.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">Ad SDKs off the list, and wiring without a test</h2>
+      <p>The gate knows only Google's ad SDKs. The dependency list is seven exact module names, and the manifest prefixes cover GMA, UMP and WorkManager. Another ad network's SDK would pass both layers. We have not tried one in the viewer.</p>
+      <p>Blocking WorkManager works because the viewer uses none (it even cleans its document inbox without it). An app that needs scheduled work would have to change that line first. The gate hangs off <code>bundleRelease</code> only, so <code>assembleRelease</code>, which builds a release APK, does not run it.</p>
+      <p>Whether the task calls the rule functions is covered today by the release unit tests the release script runs. They read the same merged manifest, but the AAB build command alone does not run them. Next is pinning state C as a build-logic test, so that deleting the call fails a test.</p>
+      <p>A gate in another app whose input itself differed from the release is covered in <a href="https://sugarmount21.com/en/ax/gate-checked-wrong-artifact/">Our release gates were checking something other than the release</a>; here the input was the same build, and the gate skipped its manifest layer. The photo apps' full gate order is in <a href="https://sugarmount21.com/en/ax/release-gate/">AI-built Android app release checklist</a>.</p>
+    </section>
+    <p class="note">As of 2026-11-18. Session and workflow records from Oct 4-5 (implementer, reviewer and fixer agent reports), app repository git history (the Oct 8 commit that carried the gate), Gradle output and manifest merger report rerun in a throwaway copy.</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20Android%3A%20a%20build%20gate%20for%20zero%20ads">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/play-store-title-aso-no-clear-gain/">Play Store title keywords: two weeks, no verdict</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 18 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Claude in Chrome set up 4 Google Ads campaigns – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/claude-chrome-google-ads-campaigns-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Measurement</span>
+      <h1>Claude in Chrome set up 4 Google Ads campaigns</h1>
+      <p class="lead">Two Claude in Chrome sessions built four Google Ads app campaigns with 966 screen actions, and the operator's corrections were all settings: budget, bid, country and language.</p>
+      <p>While two browser agents built four Google Ads app campaigns, the operator had to give the same budget correction twice, 24 minutes 40 seconds apart, once to each session. The operator never once pointed out a wrong click. There was one report of a frozen screen, which the agent itself put down to a dialog it had hidden with a page script.</p>
+      <p>The two Claude Code sessions, one per puzzle game, started 24 seconds apart on the night of October 8, 2026, in the same Chrome and on the same ads account.</p>
+    </section>
+    <section aria-labelledby="method">
+      <h2 id="method">What we counted: 1,436 tool calls in two session logs</h2>
+      <p>The tool was Claude in Chrome, a browser extension that lets the agent take screenshots, click and type in the user's signed-in tabs. Session A handled Arrow Knots, session B handled Block Turn. Both were told to stop on the review screen, the summary page shown right before Publish, and never press Publish. We didn't use the Google Ads API that night; the prompt asked for Chrome from the start.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/claude-chrome-google-ads-campaigns-shot1-en.webp" width="1200" height="760" alt="Cumulative tool calls for both sessions, with setting fixes, video upload instructions, the frozen screen report and memory writes marked" loading="lazy"><figcaption>Every tool_use in two session logs, Oct 8 to 9, 2026. Vertical lines mark setting fixes, video upload instructions, the frozen screen report, the auto permission denial and memory file writes.</figcaption></figure>
+      <p>We counted each tool_use entry (one call the agent made to a tool) by tool name.</p>
+      <div class="table-wrap"><table><thead><tr><th>Session</th><th>All</th><th>Screen actions</th><th>Page scripts</th><th>Find element</th><th>Navigate</th><th>File upload</th></tr></thead><tbody><tr><td>A, Arrow Knots</td><td>977</td><td>703</td><td>136</td><td>65</td><td>39</td><td>9</td></tr><tr><td>B, Block Turn</td><td>459</td><td>263</td><td>119</td><td>35</td><td>13</td><td>11</td></tr></tbody></table></div>
+      <p>The flat stretch (from 22:51 for B and 23:06 for A until about 00:40) has no operator messages, and neither session made a tool call in it.</p>
+    </section>
+    <section aria-labelledby="clicks">
+      <h2 id="clicks">Only 201 of the 703 screen actions were clicks</h2>
+      <p>When we picked this topic, the working title was "703 clicks." Splitting the screen action calls by kind showed that number was never a click count.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/claude-chrome-google-ads-campaigns-1-en.webp" width="1200" height="620" alt="Bar chart of session A&#x27;s 703 screen actions: 249 waits, 201 clicks, 164 screenshots, 55 text inputs, 34 others" loading="lazy"><figcaption>201 were clicks; the largest group was 249 waits for the page to change.</figcaption></figure>
+      <p>140 of the 201 clicks were followed by a wait as the very next call, mostly 1 to 6 seconds (231 of the 249 waits), and the agent often took a screenshot to check the result.</p>
+      <p>Of its 136 page script calls (javascript_tool, which runs JavaScript inside the tab), just under half, 67 by a rough split on the code text, only read text off the page.</p>
+      <p>There were screen mistakes. The agent picked another app's item, hit "Yes" when the layout shifted, and merged two headlines into one field. The agents' own status messages mention 8 such slips, and the agent noticed and fixed or backed out of each before the operator said anything.</p>
+      <div class="table-wrap"><table><thead><tr><th>Operator messages (excluding the opening prompt, including ones queued mid-task)</th><th>Session A</th><th>Session B</th></tr></thead><tbody><tr><td>Setting fixes and questions (budget, bid, country, language)</td><td>3</td><td>6</td></tr><tr><td>Video upload</td><td>3</td><td>4</td></tr><tr><td>Go-aheads, image folder access</td><td>3</td><td>6</td></tr><tr><td>Frozen screen reported</td><td>0</td><td>1</td></tr><tr><td>Wrong clicks pointed out</td><td>0</td><td>0</td></tr></tbody></table></div>
+    </section>
+    <section aria-labelledby="same-fix-twice">
+      <h2 id="same-fix-twice">The same budget fix, given to each session separately</h2>
+      <p>Session A's prompt told it to take settings from an ads doc in the game repo, which said a daily budget of 25,000 won and a target cost per install (target CPI). Before A entered anything, 65 seconds in, the operator overrode that. The new values were 2,000 won a day, no target CPI, all countries.</p>
+      <p>Session B got only the country part, told separately at 22:03; the budget and target CPI never reached it. The Block Turn runbook that B read said United States, a 1,400 won target CPI and 25,000 won a day.</p>
+      <p>After the operator told it to "analyze in depth and proceed," B entered the runbook's daily budget and, by its own calculation, a 700 won target CPI instead of the runbook's US-based figure.</p>
+      <p>At 22:22 the operator gave B the budget and CPI correction, 24 minutes and 40 seconds after giving it to A, less politely. The 2,000 won decided that evening was in neither document the prompts pointed to. The budget and CPI correction lived only in session A's chat, and parallel sessions don't read each other's conversations.</p>
+      <p>The language fix also went to each session separately. A's Korean-copy campaign targeted all countries, and the operator had added English to its languages directly. When the operator asked whether Korean-only assets could run worldwide, A answered that this would show Korean ads to English speakers. Within the next two minutes the operator told both sessions to split campaigns by language, pasting the instruction sent to A into B's window as well. Each game ended with a Korean campaign for Korea and an English one for Southeast Asia, each at 2,000 won a day.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20in%20Chrome%20set%20up%204%20Google%20Ads%20campaigns">Email us</a></p></aside>
+    <section aria-labelledby="video">
+      <h2 id="video">Videos hit a channel permission, then the auto permission check</h2>
+      <p>App campaigns take video only as YouTube links. Session A tried uploading from the asset picker, got an error, and when the operator asked it to upload them, put three Korean videos up as unlisted through YouTube Studio, starting at 22:35 and taking a little over four minutes.</p>
+      <p>At the same moment session B was stuck in the ads console's upload dialog. The Upload button was grey with a note saying the account lacked permission to upload to the channel. The account signed in to Google Ads was not the one that owned the video channel. The operator pasted A's reply ("Yes, I can upload them…") into B's window and asked why the other one could and B couldn't.</p>
+      <p>Session B once hid a video picker that wouldn't close by running a page script. When the operator reported the console frozen on "checking for errors" (22:37), B reloaded it and then named its own script as the cause. Under our current rule, if the Chrome extension is refused a site permission, the agent does not fall back to page scripts and hands that step to a person.</p>
+      <p>When B moved to YouTube Studio and sent the file, Claude Code's auto permission check stopped it. That check screens the agent's tool calls before they run when Claude Code is in auto mode. The reason given was "Unrequested Commit in a Connected App," which B read as the checker seeing an external publish nobody had clearly asked for.</p>
+      <p>B stopped there instead of working around it. When the operator asked at 00:39 why the videos weren't in, B proposed a one-line instruction naming the channel, three English and three Korean files, unlisted, not made for kids. The operator typed it as written, and all six were up within five minutes. Attaching them to the campaigns didn't finish that night because the ads tab stopped responding.</p>
+    </section>
+    <section aria-labelledby="memory">
+      <h2 id="memory">A memory file appeared 40 seconds after the fix</h2>
+      <p>Forty seconds after the budget correction, session B wrote a memory file. Memory files are the project notes Claude Code reads, starting from their index (MEMORY.md), when a session begins. Its opening lines set the values the operator had chosen and said not to use the runbook's "US, tCPI 1,400, 25,000 a day." tCPI is short for target CPI.</p>
+      <p>Nine minutes after the language split it rewrote the file with the two-campaigns-per-language structure and the video upload route. Session A wrote its own file for Arrow Knots at 23:06, saying ad copy language matches target language.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/claude-chrome-google-ads-campaigns-shot2-en.webp" width="1200" height="472" alt="The two versions of the Block Turn ad settings memory file, account and channel identifiers and the repo path masked with black boxes" loading="lazy"><figcaption>Memory file write commands as recorded in the session log, Oct 8, 2026, 22:23 and 22:51. Text is Korean; identifiers and the repo path masked.</figcaption></figure>
+      <p>Three days later, on October 11, the marketing session read both files six seconds after the operator mentioned the 2,000 won campaigns. When the operator said the dates had been changed in the console by hand, it updated the file on the spot. We found no later operator message in the marketing session log correcting budget, bid or language again.</p>
+      <div class="table-wrap"><table><thead><tr><th>Where the values lived</th><th>What happened that night</th><th>Why we didn't keep it</th></tr></thead><tbody><tr><td>Repo docs and runbook</td><td>B entered planning values (A was corrected before it started)</td><td>Written as a plan, missing that day's decision</td></tr><tr><td>Correction in chat</td><td>Fixed in that session only</td><td>The other session needed the same fix 24 min 40 s later</td></tr><tr><td>Memory file</td><td>Later sessions read it first</td><td>Kept</td></tr></tbody></table></div>
+      <p>Don't tell a browser agent a setting that isn't already in a memory file.</p>
+    </section>
+    <section aria-labelledby="how-to">
+      <h2 id="how-to">Settings go into the memory file first</h2>
+      <ol class="steps"><li><p>Before opening the browser, write location, language, daily budget, bid, copy language, video channel, the account that owns it, and the made-for-kids answer into a dated memory file, and point the prompt at that file, saying it wins over the docs if they disagree.</p></li><li><p>Have the agent stop before Publish and return the review screen values in a table matched line by line against the memory file.</p></li><li><p>To correct something, edit the memory file first, then tell every running session to reread it.</p></li><li><p>For steps that publish outside the console, such as video upload, put channel, visibility and made-for-kids in one instruction.</p></li></ol>
+      <p>The video assets came from <a href="https://sugarmount21.com/en/ax/game-ad-creatives-from-play-recordings/">app campaign ad assets from gameplay recordings</a>, and the daily budget check on these campaigns is in <a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">a daily Google Ads budget check that only suggests</a>. Another case of an agent reading a stale doc line as current is in <a href="https://sugarmount21.com/en/ax/stale-doc-phantom-session/">the stale-doc session handoff note</a>.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">The memory file held a wrong number for nine days</h2>
+      <p>On October 17 the marketing session asked to link GA4 using the ads account number from memory and got "invalid Google Ads account ID." Session B had copied an internal number out of the console's URL, and nobody noticed for nine days.</p>
+      <p>At 22:29 session A was handed, mid-run, the one-line index entry B had just written (all countries, 2,000 won a day, no target CPI) and later linked B's file from its own, but it never opened that file. Session B shows no sign of receiving A's file at all.</p>
+      <p>Next we'll confirm in the channel's permission settings which account really owns the video channel, since the two memory files disagree, and keep the ad settings in one file. We also haven't reopened the Block Turn runbook to see whether the US and 25,000 won values are still there.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20in%20Chrome%20set%20up%204%20Google%20Ads%20campaigns">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+    <h2 id="faq">FAQ</h2>
+    <div class="faq"><details><summary>Should Claude in Chrome press Publish on a Google Ads campaign?</summary><div><p>We didn't let it. Both sessions stopped on the review screen, and the operator handled Publish and identity verification. Publishing starts spending the daily budget, so compare the review screen against the memory file and let a person press it.</p></div></details><details><summary>Why is the YouTube upload button grey in Google Ads?</summary><div><p>Check whether the account signed in to Google Ads can upload to that channel. In our case the channel belonged to a different account, so the videos went up through YouTube Studio on that channel; attaching the links to the campaign didn't finish that night because the ads tab stopped responding.</p></div></details></div>
+    </section>
+    <p class="note">Checked 2026-11-17. Tool call counts (no sidechain calls) and operator message times (including queued messages) from three Claude Code session logs (Oct 8 to Oct 21, 2026), plus the memory files and their write records.</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 18 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Claude Code agents told to build a No. 1 app – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/number-one-app-agent-instruction/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/number-one-app-agent-instruction/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/number-one-app-agent-instruction-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Retrospective</span>
+      <h1>Claude Code agents told to build a No. 1 app</h1>
+      <p class="lead">One vague Claude Code instruction set 11 agents running and put two versions into production within 23 hours; two weeks later the app had moved from 20th to 16th for its main keyword.</p>
+      <p>"Make it the No. 1 app in the Android store" came with no number attached. A week after the Korean document viewer SugarDoc went public, the operator, in rough language, told the agent to launch a huge number of agents and keep working for three days. Before planning anything, the Claude Code agent measured where the app stood: 1+ installs and 0 reviews.</p>
+      <p>Over the next 23 hours two versions were submitted to the production track, the stage where a release goes to every user. The operator typed the 1.2.0 promotion and the store-listing commands himself, and also vetoed a ₩140,000 ad test. Two weeks later the verdict written in the repository was "no clear gain".</p>
+    </section>
+    <section aria-labelledby="baseline">
+      <h2 id="baseline">20th for the main keyword, unlisted for the other four</h2>
+      <p>The instruction arrived at 21:22 on October 17 (Korea time). Within five minutes the agent had read the repository docs, the Play release tracks and the public store page, and pulled Play search results for five keywords. For 한글뷰어 ("Hangul viewer", the main Korean query) SugarDoc was 20th of 29 apps. For the other four, including hwp and hwpx (the Korean word processor's file formats), it was not listed at all. A research agent counting the same page that day got 21st.</p>
+      <p>The operator had named three dashboards: GA4, AdMob and Google Ads. AdMob had nothing to show because the app carries no ads, and Google Ads only came up as a plan for a new campaign. GA4 could not be read at first: the machine's Google login lacked the analytics scope. The operator tried the login command himself and it failed, then said to use the browser extension and that everything was approved. The agent opened GA4 and the Play Console through Claude in Chrome, an extension that reads and clicks in the user's own Chrome tabs.</p>
+      <p>The 23:50 status report, after saying seven agents were running, went on: "I can't create ten million agents running for three days, and I can't promise the No. 1 spot. Instead I'm starting with what actually blocks the ranking."</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/number-one-app-agent-instruction-shot1-en.webp" width="1200" height="720" alt="One time axis from 21:00 on October 17 to 21:30 on October 18 with operator messages, the run spans of 11 agents, 21 permission denials, 9 commits and 2 production submissions" loading="lazy"><figcaption>Timestamps only, from the session log, subagent logs, the workflow result file and git history (Oct 17 to 18, 2026). No message text is shown.</figcaption></figure>
+    </section>
+    <section aria-labelledby="seven-agents">
+      <h2 id="seven-agents">Seven agents in three stages</h2>
+      <p>The agent wrote a workflow script, a file that sets which agents run in which order and which run in parallel, and the run started at 23:50. The stages were research, build and review, and each stage's written results became the next stage's input.</p>
+      <div class="table-wrap"><table><thead><tr><th>Stage</th><th>What the agent did</th><th>Time</th></tr></thead><tbody><tr><td>Research</td><td>14 competitor apps and 231 of their reviews</td><td>10 min</td></tr><tr><td>Research</td><td>What the app really does, read from the code</td><td>5 min</td></tr><tr><td>Build</td><td>New store title and description (ko/en)</td><td>11 min</td></tr><tr><td>Build</td><td>"Save as PDF" without the print screen</td><td>76 min</td></tr><tr><td>Build</td><td>Ads and search acquisition plan, help article draft</td><td>8 min</td></tr><tr><td>Review</td><td>Adversarial review of the new code (a review that only hunts for defects; 3 fixed)</td><td>18 min</td></tr><tr><td>Review</td><td>Check of the store copy's claims (the plan file had not been written)</td><td>8 min</td></tr></tbody></table></div>
+      <p>Every agent's shared instructions said not to commit, push, upload to Play or publish.</p>
+      <p>The workflow took 104 minutes. Run back to back, the seven agents add up to 137, so parallelism saved about 33 minutes. One development agent, with 193 tool calls over 76 minutes, set the length of the whole run. How many agents could run at once on this machine is covered in <a href="https://sugarmount21.com/en/ax/parallel-agent-workstreams/">Claude Code parallel agents: 10 tasks, 3 at a time</a>.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/number-one-app-agent-instruction-1-en.webp" width="1200" height="1004" alt="Seven steps from the instruction to the re-measurement two weeks later: baseline, 2 research, 3 build, 2 review agents, two releases, 16th place" loading="lazy"><figcaption>A vague instruction turned into a baseline, three stages of work, two releases and a re-measurement.</figcaption></figure>
+      <p>Counting four agents outside the workflow, 11 agents ran in this session (purple in the timeline above).</p>
+    </section>
+    <section aria-labelledby="wrong-premises">
+      <h2 id="wrong-premises">Both of the lead agent's premises were wrong</h2>
+      <p>The lead agent, the main session that talked with the operator and launched the others, suspected two things. Most top competitors put "PDF save" or "PDF convert" in their titles and SugarDoc lacked it, and GA4 showed zero for 28 days, so measurement looked broken.</p>
+      <p>The research agent that read the code corrected the first. PDF save had shipped in 1.0.0 through the system print screen; what was missing was a direct save that skips that screen, and store copy that said so. How 1.2.0's save was tested is in <a href="https://sugarmount21.com/en/ax/pdf-save-back-seven-points/">SAF PDF save: cancelling without empty files</a>.</p>
+      <p>The second came from reading a dashboard before it finished loading, and the agent withdrew it ten minutes later, once the GA4 diagnosis agent reported back. That story is in <a href="https://sugarmount21.com/en/ax/ga4-zero-report-reversed/">GA4 shows zero? Read the total row first</a>.</p>
+      <p>With both premises gone, the remaining problem was traffic. The research agent widened the check to seven keywords, and places 1 to 4 rotated among the same five apps, each with 100,000 or more installs. Yet a small app with 100+ installs and no ratings sat 3rd to 7th on all seven keywords, with the search words written into its title exactly as people type them.</p>
+      <p>At that point the research agent rewrote the goal in its document: "No. 1 is not realistic in the short term," while the top 10 for three keywords, the main one included, had evidence behind it. Its estimated condition was a first 20 to 50 reviews.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20agents%20told%20to%20build%20a%20No.%201%20app">Email us</a></p></aside>
+    <section aria-labelledby="permission-check">
+      <h2 id="permission-check">Telling the agent to do it all did not get production promotion past the permission checker</h2>
+      <p>On the morning of October 18 the agent committed 1.2.0. Its upload to the internal test track was denied once and went through when it was run again after the operator told the agent to do it all itself; the log does not say why it passed.</p>
+      <p>Promotion to production was blocked once the night before for 1.1.0 and twice that morning for 1.2.0. The blocker was Claude Code's auto-mode permission checker, which classifies a command's risk before it runs, and each time the reason was "Production Deploy".</p>
+      <p>The agent did not work around it. It told the operator that permission given in chat does not lift this checker, and offered two ways out: the operator could run the command himself, or add it to the allow list under Claude Code's /permissions. At 12:08 the operator ran the promotion command, and in the afternoon he ran the store-listing upload too.</p>
+      <div class="table-wrap"><table><thead><tr><th>Denial reason</th><th>Count</th><th>What it blocked</th></tr></thead><tbody><tr><td>Production Deploy</td><td>6</td><td>3 promotions, 1 internal-track upload, 1 store listing, launching 1 site-fix agent</td></tr><tr><td>Permission Grant</td><td>1</td><td>Clicking "Enable" on the Play reporting API</td></tr><tr><td>Modify Shared Resources</td><td>1</td><td>A commit plus merge to main (the commit alone went in on retry)</td></tr><tr><td>No verdict</td><td>13</td><td>12 document writes by subagents, 1 status-file edit by the lead</td></tr></tbody></table></div>
+      <p>"No verdict" means the checker made no call at all. Four subagents could not write to the repository, and the lead copied or applied their results itself.</p>
+      <p>Version 1.3.0 turned on editing, so it was still open whether an edited file would open and re-save in the Hancom app (the Korean word processor's mobile suite). That evening the agent advised holding the release until that check. The operator answered that he approved publishing to production. After that approval the agent promoted the build itself, and no denial was logged for that command. The log does not say why the checker let it through, so we don't recommend this as a way past the checker. The Hancom check passed 38 minutes after release.</p>
+    </section>
+    <section aria-labelledby="two-weeks">
+      <h2 id="two-weeks">Two weeks with a new title instead of ₩140,000 in ads</h2>
+      <p>At 15:46, reporting the 1.2.0 submission, the agent listed a Google Ads test at ₩10,000 a day for 14 days as the next step. About six minutes later the operator asked whether a ₩140,000 experiment was really needed, and 17 seconds after that the answer was "Don't do it now." It gave two reasons: the ad money could not be earned back, and with the store title changed that same day, more installs could not be traced to either cause. The second reason was already true at 15:46. The agent reversed its own advice only once the operator questioned the amount.</p>
+      <p>The operator asked about ₩1,000 to ₩2,000 a day instead, and the agent advised against it because ad learning (the early period in which the ad platform works out whom to show the ad) would never finish on that budget. Thirty seconds after that answer the operator decided: spend as little as possible, publish the help article, watch for two weeks, then plan paid marketing properly. The agent saved the decision to a memory file, notes that later agent sessions also read, as a rule not to propose ad spend before November 1.</p>
+      <p>At 16:19 the operator pointed out that the site's robots.txt needed attention too. The agent found the old file allowed everything and listed only the sitemap, so build tools and data folders were open to crawlers, and pushed a fix within a minute (3f504be).</p>
+      <div class="table-wrap"><table><thead><tr><th>Option</th><th>Raised by</th><th>What happened</th></tr></thead><tbody><tr><td>₩10,000 a day for 14 days</td><td>The agent, 15:46</td><td>Withdrawn by the agent after the operator asked about the amount (can't be earned back; mixes with the title test)</td></tr><tr><td>₩1,000 to ₩2,000 a day</td><td>The operator</td><td>Advised against: ad learning would not finish</td></tr><tr><td>One agent, tasks in sequence</td><td>Nobody</td><td>About 33 more minutes by the numbers; whether the output would match is unknown</td></tr><tr><td>Title, feature and help article only</td><td>The agent at 15:53; the operator chose it at 15:54</td><td>Re-measured November 1</td></tr></tbody></table></div>
+      <figure><img src="https://sugarmount21.com/assets/ax/number-one-app-agent-instruction-shot2-en.webp" width="1200" height="660" alt="Play search rank grid for 7 keywords on October 17, 23, 28 and November 1; the main keyword reads 20, 13, 14, 16" loading="lazy"><figcaption>October 17 from the session report and competitor doc; other dates from three rank files in the repository (logged-out web search, Korea).</figcaption></figure>
+      <p>The title changed on October 18 to one that spells out "open HWP Hangul files" and "PDF save". On a search where apps with 100,000 or more installs rotate through places 1 to 4, the November 1 record says no clear gain. The main keyword stood at 16th, four places above the 20th it started from, but within the two weeks it went 13th, 14th, 16th. "한글 파일 열기" (open Hangul file), which is in the title, still did not list the app.</p>
+      <p>For "hwp" and "한글 문서" (Hangul document) the app rose from 28th and 22nd on October 28 to 20th and 11th on November 1; before that, those result pages listed only 10 or 11 apps. The same record notes about one real user a day, too few to tie such rank moves to installs.</p>
+      <p>Nor was this a one-change test: in the same two weeks, updates 1.3.1 to 1.3.3, a site search-visibility pass and one short video on October 31 also went out. The day-7 check planned for October 25 was never run.</p>
+    </section>
+    <section aria-labelledby="split-steps">
+      <h2 id="split-steps">How to split a vague instruction</h2>
+      <p>When an agent gets a vague goal, make it measure a baseline before it plans. Here, 20th place and zero reviews were measured first, and the 23:50 report said plainly that No. 1 could not be promised. Both wrong premises came out when separate agents re-checked the code and the reports.</p>
+      <ol class="steps"><li><p>Measure search rank per keyword, installs, reviews and release-track state. Count the same value a second way (here it came out 20th and 21st).</p></li><li><p>Rewrite the goal from the baseline and competitor data. Split what cannot be promised from what has evidence, and say so in the first report.</p></li><li><p>Split the work into research, build and review, and get each agent's result as text or a file. Put "no commit, upload or publish" in the shared instructions.</p></li><li><p>Have a separate agent that reads the code check the lead's premises, such as "this feature is missing" or "this metric is zero".</p></li><li><p>List what a person must do (production deploys, enabling APIs, ad spend) in the first report. Under auto mode, add those commands to the /permissions allow list beforehand or have a person run them.</p></li><li><p>Change one thing at a time, and write the re-measurement date and who will run it into a file.</p></li></ol>
+      <p>There is no ad plan yet. The operator wanted it written properly after two weeks, but as of November 17 the growth plan document is the October 18 version. Reviews are the next number to watch.</p>
+    </section>
+    <p class="note">As of 2026-11-17. Claude Code session and subagent logs (2026-10-17 to 19), the workflow result file, git history of the app and site repositories, Play search rank records in the app repository (Oct 23, Oct 28, Nov 1) and daily check documents (GA4, test devices excluded).</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20agents%20told%20to%20build%20a%20No.%201%20app">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Wed, 18 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>Claude Code real-device E2E: 31 fixes in 3 rounds – SugarMount</title>
     <link>https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/</link>
@@ -169,8 +416,8 @@ adb -s &lt;device&gt; reverse tcp:8180 tcp:8180</code></pre></li><li><p>Have the
         <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -221,7 +468,7 @@ adb -s &lt;device&gt; reverse tcp:8180 tcp:8180</code></pre></li><li><p>Have the
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
       </ul>
@@ -299,8 +546,8 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>Give the 
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
         <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -379,7 +626,7 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>Give the 
         <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -448,11 +695,11 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>Give the 
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-ad-creatives-from-play-recordings/">App campaign ad assets from gameplay recordings</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/">GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -534,8 +781,8 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>Give the 
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">Claude Code for Android app development: 4 apps in 20 days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -677,8 +924,8 @@ OK  en head  26/30 1,000 brain-teasing levels</code></pre>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/stale-doc-phantom-session/">Claude Code handoff to a session that had stopped</a></li>
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
       </ul>
@@ -964,8 +1211,8 @@ light/temp4 #ee4b4b on #fafdff = 3.58:1</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1398,8 +1645,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
         <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1684,8 +1931,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
-        <li><a href="https://sugarmount21.com/en/ax/stale-doc-phantom-session/">Claude Code handoff to a session that had stopped</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1765,8 +2012,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1916,8 +2163,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2114,7 +2361,7 @@ assumeTrue(dir != null &amp;&amp; dir.isDirectory)</code></pre></li>
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2379,354 +2626,6 @@ print(len(ids))</code></pre>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
     <pubDate>Mon, 09 Nov 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Quiz reach 2.6% to 17.7%: a morning notification – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/quiz-reach-entry-point-push-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX note · Measurement</span>
-      <h1>Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</h1>
-      <p class="lead">More in-app entry points rarely bring many more people to a feature. Our spelling app's quiz reach went from 2.6% to 17.7%, and 63% of quiz opens came from one 8 a.m. notification.</p>
-    <p class="note ax-series-line"><a href="https://sugarmount21.com/en/ax/series/sugarspeller-maintenance/">Reworking a long-running spelling app</a> 8/8</p>
-      <p>To get more people into a feature buried in an app, the usual move is to add entry points around the screens. When we revived the quiz in <a href="https://sugarmount21.com/en/apps/sugarspeller/">SugarSpeller</a>, our Korean spelling app, the plan we wrote with the coding agent named a bubble under spell-check results as the biggest lever. Splitting quiz opens by path in GA4 in October 2026, the bubble accounted for 13.5% and a morning notification we had left on the "later" list for 63%. Below: how we measured reach with one event, the numbers per path, why the notification won and where that stops holding, and the order to measure your own paths.</p>
-    </section>
-    <section aria-labelledby="reach-numbers">
-      <h2 id="reach-numbers">Measured on one event, reach went from 2.6% to 17.7%</h2>
-      <p>The metric is users who logged <code>quiz_open</code> divided by active users of that version. The baseline filters <code>appVersion=1.6.020</code> over September 22 to October 5 and was fixed on October 6. The comparison combines 1.6.024 and 1.6.025 over September 26 to October 9 and was read on October 10. The versions differ, and the two windows share only ten days.</p>
-      <p>There is a third number, 3.4%, and it measures something else. It comes from a September 21 query: 339 of 9,859 active users in the previous 90 days viewed the quiz screen (<code>ActivityMistake</code>). <code>quiz_open</code> didn't exist yet, so that figure counts screen views, and it can't sit next to 2.6% or 17.7%. The plan borrowed it as a provisional baseline until the real one arrived on October 6.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/quiz-reach-entry-point-push-1-en.webp" width="1200" height="520" alt="Bar chart: quiz_open reach was 2.6% on 1.6.020 and 17.7% on 1.6.024 plus 1.6.025; paths other than the notification add up to at most 8.9%." loading="lazy"><figcaption>Reach rose from 2.6% to 17.7%, and the paths other than the notification reach 8.9% at most.</figcaption></figure>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Metric (GA4)</th><th>1.6.020 baseline</th><th>1.6.024+025</th></tr></thead>
-        <tbody>
-          <tr><td>Active users</td><td>818</td><td>2,190</td></tr>
-          <tr><td><code>quiz_open</code> users (reach)</td><td>21 (2.6%)</td><td>388 (17.7%)</td></tr>
-          <tr><td><code>quiz_open</code> events</td><td>46</td><td>1,063</td></tr>
-          <tr><td><code>quiz_done</code> users (completion)</td><td>5 (24%)</td><td>227 (58.5%)</td></tr>
-          <tr><td><code>quiz_answer</code> per open</td><td>2.8</td><td>7.9</td></tr>
-          <tr><td>Correct-answer rate</td><td>55% (72/130)</td><td>60% (5,018/8,359)</td></tr>
-          <tr><td>Active users who finished a set</td><td>0.6%</td><td>10.4%</td></tr>
-        </tbody>
-      </table></div>
-    </section>
-    <section aria-labelledby="five-days">
-      <h2 id="five-days">Five main commits and three complaints in five days</h2>
-      <p>Until September 21 the quiz was the eighth of 13 items in the navigation drawer, and nothing in the spell-check flow led to it. People who found it stayed 35 seconds per view, so we read the problem as discovery and reward. Free users who answered correctly saw a subscription prompt in place of the explanation, and 47 of the 124 explanations were still placeholders.</p>
-      <ul>
-        <li>Sep 21: added <code>quiz_open</code> and related events, opened explanations to everyone, added a daily set of five questions and moved the item to second place in the drawer. It shipped in 1.6.020 on September 22.</li>
-        <li>Sep 22: redesigned the screen and added a "Next question" button.</li>
-        <li>Sep 23: added a question bubble after spell-check results in Chat mode and a banner in Classic mode, whose result is a single text field.</li>
-        <li>Sep 24: fixed seven bugs and five UX problems.</li>
-        <li>Sep 25: added numbered progress circles, permanent records of solved questions and an 8 a.m. local notification.</li>
-      </ul>
-      <p>The operator pushed back three times: on September 21 that the screen looked dated, on the 24th that it still looked off and seemed buggy, and on the 25th that not much seemed to have changed and that a morning notification ought to exist. Unit tests and the release build had passed through the September 22 redesign. After the second complaint, a fresh pass over code and screenshots found that "More questions" handed over all 119 remaining questions as one set, which collapsed the progress bar into 119 zero-width segments.</p>
-      <p>A September 21 query, before 1.6.020 shipped, put screen-view reach for September 2026 at 2.8%. With the item moved up and explanations open to everyone, the <code>quiz_open</code> baseline on 1.6.020 was 2.6%.</p>
-    </section>
-    <section aria-labelledby="same-audience">
-      <h2 id="same-audience">Bubble and notification reached crowds of the same size; their conversion differed 2.8-fold</h2>
-      <p>The two paths were shown to nearly identical numbers of people on 1.6.024 and 1.6.025: 1,187 users saw the bubble (<code>quiz_bubble_show</code>) and 1,189 saw the notification (<code>quiz_reminder_show</code>), each about 54% the size of the 2,190 active users. Notification views can include people who didn't open the app, so they aren't necessarily a subset of active users. From the bubble, 96 users (8.1%) continued to the quiz screen. From the notification, 270 (22.7%) did. The verdict table has no bubble view count, so there's no event-based rate to compare. The 2.8 times compares only users who entered at least once in 14 days. Over that window the notification went out about 6.4 times per user who saw it.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/apps/sugarspeller/long-text-check-1-ko.webp" width="360" height="763" alt="SugarSpeller's Korean screen: under a check result, a bubble labelled &quot;Today's spelling quiz&quot; asks the reader to fill in a blank and offers two Korean verbs as choices." loading="lazy"><figcaption>The quiz bubble that appears once per session after a check, in the app's Korean UI. The label reads "Today's spelling quiz", and the two choices are easily confused Korean verbs. Tapping one settles the answer inside the bubble.</figcaption></figure>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/quiz-reach-entry-point-push-2-en.webp" width="1200" height="612" alt="Bar chart: of 1,063 quiz screen opens, 669 (63%) came from the morning notification, 206 from the drawer and Classic icon, 143 from the Chat bubble and 45 from the Classic banner." loading="lazy"><figcaption>669 of the 1,063 quiz screen opens (63%) came from the morning notification.</figcaption></figure>
-      <p>Users of the three other paths sum to 194, duplicates included. Taking the 270 notification users from the 388 who opened the quiz leaves 118, so 118 to 194 distinct users came by other paths, or 5.4% to 8.9% of active users, short of the 10% target. Taking that upper bound of 194 from 388 means at least 194 users came only through the notification, half of reach or more. The 5.4% to 8.9% is not what reach would have been with no notification, because someone reminded by it may have come back through the drawer or the bubble. <code>entry=drawer</code> opens rose from 5.6 to 9.4 per 100 active users. The verdict table has no per-path figure for 1.6.020, but every entry in that version's code sends <code>drawer</code>, so we used all 46. The value combines the drawer item and the quiz icon on the Classic main screen. The icon exists in all three versions, and the drawer layout is the same in 1.6.020, 1.6.024 and 1.6.025.</p>
-      <p>The explanation that follows comes from the app's structure; we did not measure it. The drawer works only if someone opens it. The bubble appears once per session, after a spell check, for people already in the app, and they can answer right there, which reduces the reason to change screens. The notification arrives at 8 a.m. whether or not the app was opened, and its body carries the day's first question with both choices.</p>
-      <p>This does not make the bubble useless. The two rates also differ in depth: the 8.1% answered a question and then tapped More questions, while the 22.7% tapped once. An answer given in the bubble logs <code>quiz_answer</code> with <code>mode=chat</code> and no <code>quiz_open</code>, so reach never counts it. The rule we wrote before release says to read that pattern as people answering in the bubble and stopping there, but the verdict row has no count for them.</p>
-    </section>
-    <section aria-labelledby="wrong-plan">
-      <h2 id="wrong-plan">The plan left the notification for later</h2>
-      <p>The September 21 plan, written with the agent, opened its bubble section with "the biggest lever" and the fact that 78% of users pass through Chat. The 78.0% was correct. The mistake was choosing the lever from in-app traffic alone. Notifications appeared as one line in the list of candidates to consider after the verdict, limited to users who had already solved a question.</p>
-      <p>The operator pulled the notification forward and also reversed its default. In the September 25 commit the agent built it off by default, with a switch on the result card, which you only see at the end of a set. The same day, the next commit turned it on by default. No production build had the default off, so we have no reach number for that setting. Android 13 and later get one permission prompt, and declining leaves the result card switch off.</p>
-      <p>We don't leave notification defaults or frequency to the agent. They land in a user's notification tray, and the retention data that would judge the choice doesn't exist yet, so a person decides and records why.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Quiz%20reach%20rose%20from%202.6%25%20to%2017.7%25%2C%20and%2063%25%20of%20quiz%20opens%20came%20from%20one%20morning%20notification">Email us</a></p></aside>
-    <section aria-labelledby="local-alarm">
-      <h2 id="local-alarm">A local alarm instead of server push</h2>
-      <p>The code says <code>entry=push</code>, but nothing is pushed from a server. <code>QuizReminder</code> schedules a local notification with AlarmManager. The daily set is chosen on the device from a date seed, so the notification can include the question itself. We rejected an FCM console campaign for three reasons: it couldn't carry the question, sending daily would need a recurring console campaign or a scheduler, and without segments it would reach everyone and likely raise opt-outs, a design judgment we never measured. Waking the device with an FCM data message and building the body there never came up in the plan. We didn't measure on-time delivery, and the local notification uses <code>setInexactRepeating</code>, which can deliver minutes late.</p>
-      <p>Two other ideas went too. A time picker was left out because we expected fewer people to turn the feature on. The bubble was set to once per session from the start, because showing it after every check would look like an ad.</p>
-    </section>
-    <section aria-labelledby="completion-mix">
-      <h2 id="completion-mix">The 58.5% completion rate includes bubble answers</h2>
-      <p>The screen hypothesis was that the missing "Next question" button held completion down, since moving on required knowing you could swipe. The table recorded completion rising from 24% to 58.5% and answers per open from 2.8 to 7.9, and marked the hypothesis as supported.</p>
-      <p>Those two numbers overstate the screen's effect. <code>quiz_done</code> and <code>quiz_answer</code> include answers from the Chat bubble, the 7.9 in the table isn't filtered by <code>mode</code>, and since the September 24 fixes a final answer in the bubble also sends <code>quiz_done</code>, so the numerator can grow while <code>quiz_open</code> users stay flat. The redesign, the bubble, the notification and a review of the question bank (47 explanations written, 68 corrected, 26 questions changed) all fall inside the 1.6.024 window, so GA4 can't separate them. The plan said as much for the bubble and the screen, and assigned reach to one and completion to the other.</p>
-      <p>The path breakdown above speaks to reach only. Active users who finished a set went from 0.6% to 10.4% because reach and completion rose together, and we didn't measure how much the redesign contributed.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">21 baseline users and 1,442 who couldn't get the notification</h2>
-      <p>The baseline has 21 users and five completions, so a handful of people would swing the 24%. This is also a before-and-after comparison across versions, not a randomized experiment. A provisional analysis on October 4 (September 28 to October 4, 1.6.025) pointed the same way, with 22.0% reach and 8.2% excluding the notification, but it covers a different window and sample.</p>
-      <p>Apps where many users block notifications may not get this result. On October 22, more users with the alarm set could not receive it (<code>quiz_reminder_blocked</code>, 1,442) than could (1,261). How those background events inflated GA4 <code>totalUsers</code> is covered in <a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a>, so once an app has background alarms, use <code>activeUsers</code> as the denominator.</p>
-      <p>It also won't fit a feature with nothing new to say each day. Our notification body is that day's question.</p>
-      <p>We still don't know what the notification costs. Version 1.6.030 tested four notifications a day on October 17 (<code>qr_extra</code>), and the test ended with no verdict. A 50:50 split showed up as 2,188 to 1,061 active users because the property recorded who was actually receiving extras, so people caught by the fatigue guard (four unopened in a row means mornings only for seven days) and dormant users who never opened the app were tagged as control. Raw uninstall rates of 7.8% for control and 18.9% for the extra arm can't be read as cause and effect.</p>
-    </section>
-    <section aria-labelledby="steps">
-      <h2 id="steps">How to measure this in your own app</h2>
-      <p>If a feature's reach is in single digits, add an <code>entry</code> parameter before you redesign it again, and put the paths that start outside the app in the same verdict.</p>
-      <ol>
-        <li>Add <code>entry</code> to the open event and register the GA4 custom definition before release. Registration doesn't apply to past data.</li>
-        <li>Put a parameter on the completion event for the screen where the set ended. Our <code>quiz_done</code> has none, so completion can't be split by screen.</li>
-        <li>Take a baseline on the last version before new entry points, filtered by <code>appVersion</code>. If the screen and the entry points ship together, assign each its own metric first.</li>
-        <li>Write the target and what a miss would mean before release.</li>
-        <li>Put paths outside the app in the same verdict row as paths inside it. Ours lists <code>entry=push</code> beside the drawer, the bubble and the banner.</li>
-        <li>Pull exposed users, entering users and event counts for each path, using the five formulas below.</li>
-        <li>Label the sum of per-path users as an upper bound, because one person can use two paths. Our three paths other than the notification summed to 194, and adding the 270 notification users overshoots actual reach of 388 by 76.</li>
-        <li>In a notification A/B test, store the assigned arm as a user property from the first day. We only added <code>qr_arm</code> in 1.6.033.</li>
-      </ol>
-<pre><code>reach             = quiz_open users / activeUsers of the same version
-notification rate = quiz_open(entry=push) users / quiz_reminder_show users
-bubble rate       = quiz_open(entry=chat) users / quiz_bubble_show users
-completion        = quiz_done users / quiz_open users
-answers per open  = quiz_answer(mode!=chat) events / quiz_open events</code></pre>
-      <p>Completion's numerator can include users who finished in the bubble without a <code>quiz_open</code>, so it isn't guaranteed to be a subset of the denominator.</p>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">Still open: the November 15 verdict and bubble-only answers</h2>
-      <p>A new reading with <code>qr_arm</code>, on three notifications a day with the afternoon slot removed, is due on November 15, 2026. In the earlier test, opens by slot were 10.4% in the morning, 18.9% at lunch, 7.7% in the afternoon and 12.2% in the evening. If uninstalls in the extra arm are significantly more than 2 percentage points worse than control, the proposal will be to turn extras off.</p>
-      <p>The monitoring table has no reach verdict after October 10, so we don't know whether 17.7% held. Counting <code>quiz_answer</code> users with <code>mode=chat</code> would show what the bubble really contributes. We also haven't measured whether people who arrive by notification finish a set, and the verdict table has no figure for how many users keep it on. The table lists the next improvement: reviewing the questions with correct-answer rates of 13% to 32%.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Quiz%20reach%20rose%20from%202.6%25%20to%2017.7%25%2C%20and%2063%25%20of%20quiz%20opens%20came%20from%20one%20morning%20notification">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <nav class="box ax-series-box" aria-label="Series contents"><p><strong><a href="https://sugarmount21.com/en/ax/series/sugarspeller-maintenance/">Reworking a long-running spelling app: all 8 parts</a></strong></p><ol><li value="7"><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li></ol><p>This is the last part.</p></nav>
-    <section aria-labelledby="faq">
-      <h2 id="faq">Frequently asked questions</h2>
-      <div class="faq">
-        <details><summary>Should you fix the screen or the entry points first?</summary><div><p>Measure first. We then fixed the screen and added entry points after it, reasoning that the destination had to work before we sent people there. Both shipped in one release, and we never tested the opposite order.</p></div></details>
-        <details><summary>Should notification conversion be counted by users or by events?</summary><div><p>Look at both, and judge reach by users. This notification converted 22.7% of users and 8.8% of events, because the same person receives it on many days.</p></div></details>
-      </div>
-    </section>
-    <p class="note">Sources: the app repository's git history, the quiz plan document, and the monitoring table where GA4 values were recorded. Checked on November 7, 2026.</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/stale-doc-phantom-session/">Claude Code handoff to a session that had stopped</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/naver-speller-highlight-missing/">Claude Code fix: Naver spelling highlights missing</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Mon, 09 Nov 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>GA4 shows zero? Read the total row first – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/ga4-zero-report-reversed/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/ga4-zero-report-reversed/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/ga4-zero-report-reversed-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · Incident</span>
-      <h1>GA4 shows zero? Read a table report's total row first</h1>
-      <p class="lead">"No data available" on the GA4 overview was not a zero. The total row of a table report showed 43 active users and 10,522 events in the last 28 days.</p>
-      <p>When you have just shipped an app and the first GA4 (Google Analytics 4) screen shows zeros or "no data available", it is easy to conclude the tracking code is broken. On the night of October 17, 2026, SugarMount's AI coding agent (Claude Code) did exactly that while collecting first-week numbers for <a href="https://sugarmount21.com/en/apps/doc-viewer/">SugarDoc</a>, a viewer for Korean HWP documents: it reported "GA4: zero in 28 days" and proposed holding the next release. Ten minutes and 26 seconds later the same agent withdrew the report. The app code had nothing to fix.</p>
-      <p>Below: where the zero came from, what a zero means on each GA4 screen, and what to check before you open the code.</p>
-    </section>
-    <section aria-labelledby="overview-once">
-      <h2 id="overview-once">The zero came from one read of the overview page</h2>
-      <p>The agent opened the Firebase overview page (the GA4 dashboard) in Chrome. Its screenshot failed, so it waited four seconds and read the page as text, once. That was the only GA4 screen it opened.</p>
-      <p>Of the 1,736 characters it read, the only number that was a value was "active users in the last 30 minutes: 0". Ten cards (events by name, countries, device models) all said "no data available". The agent combined those messages with the 30-minute zero into "28 days: 0 users, 0 events" and put that next to Play Console's 2 to 3 daily active users. Side by side, "the app sends no analytics at all" looked like a good explanation.</p>
-    </section>
-    <section aria-labelledby="version-rows">
-      <h2 id="version-rows">The total row said 43 users</h2>
-      <p>A subagent took over the investigation. It spent three minutes on code and build checks and found no defect. On a Galaxy S21 running the release build, logcat showed a successful upload:</p>
-      <pre><code>V/FA-SVC: Network upload successful with code, uploadAttempted: 204, true</code></pre>
-      <p>The realtime overview showed 0, then six seconds later one app_entry and one session_start. The subagent then opened the "Pages and screens" table report, and 11 seconds later read the total row: 43 active users and 10,522 events in the last 28 days. Split by app version in the tech details report:</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/ga4-zero-report-reversed-1-en.webp" width="1200" height="652" alt="Bar chart: the reported value was 0 users; the table report's last-28-day active users were 43 in total, 34 on the 1.0.0 Play release, 6 on the debug build and 5 on 1.1.0." loading="lazy"><figcaption>In the 28 days reported as zero, the Play release alone had 34 users and 7,728 events.</figcaption></figure>
-      <p>The QA debug build accounted for 25.77% of the events. The version rows add up to 45 users while the total row says 43; someone who used two versions is counted once in each row, so judge by the total row. Midnight passed between the two screens, so the overview's "last 28 days" was September 19 to October 16 and the table report's was September 20 to October 17.</p>
-    </section>
-    <section aria-labelledby="checklist">
-      <h2 id="checklist">A zero means something different on each screen</h2>
-      <p>We looked at four screens. The same zero or "no data" meant different things over different periods.</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Screen</th><th>Period</th><th>What we saw</th><th>How to read it</th></tr></thead>
-        <tbody>
-          <tr><td>Firebase overview cards</td><td>Page range (last 28 days)</td><td>One "active users in the last 30 minutes: 0" and ten "no data" messages</td><td>Not a value</td></tr>
-          <tr><td>Realtime overview</td><td>Last 30 minutes</td><td>0, then one app_entry and one session_start six seconds later</td><td>Only tells you whether data arrives now</td></tr>
-          <tr><td>Data stream status</td><td>Last 48 hours</td><td>"No data received"</td><td>Can be true for an app with few users</td></tr>
-          <tr><td>Table report total row</td><td>Last 28 days (through yesterday)</td><td>43 users, 10,522 events</td><td>The number to decide on</td></tr>
-        </tbody>
-      </table></div>
-      <p>The data stream's "no data received in the past 48 hours" was true as well: the app had no users on October 16 and 17.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20GA4%20shows%20zero%3F%20Read%20a%20table%20report%27s%20total%20row%20first">Email us</a></p></aside>
-    <section aria-labelledby="how-to">
-      <h2 id="how-to">What to check before opening the code</h2>
-      <ol>
-        <li>Write down which screen showed the zero and over what period, using the table above.</li>
-        <li>Read the total row of a table report. We used "Pages and screens" and "Tech details", switching the latter's primary dimension to "App version" to see one row per version. If the screens are awkward to read, the GA4 Data API's runReport returns the same values as JSON (first command below).</li>
-        <li>Check uploads on a device. Turn on the debug-mode property, launch the app, look for the upload response code (204) in logcat, and watch the realtime overview or DebugView for events. Here an app_entry showed up in the realtime overview about two minutes after the upload.</li>
-        <li>Line up the metric definitions. Play Console's active users and GA4's active users are counted differently, and raw GA4 values include debug builds, test devices and Play's pre-launch robots.</li>
-        <li>Only then open the code.</li>
-      </ol>
-      <p>runReport needs a token with the analytics scope. That night both tokens on hand lacked it and the API returned 403. Adding the scope to a gcloud login is blocked, so we now impersonate a service account to get the token (<a href="https://sugarmount21.com/en/ax/gcloud-blocked-app-impersonation/">gcloud 'This app is blocked' for GA4: impersonate</a>). A range of 28daysAgo to yesterday matches the table report.</p>
-      <pre><code>TOKEN=$(gcloud auth print-access-token \
-  --impersonate-service-account=&lt;service account address&gt; \
-  --scopes=https://www.googleapis.com/auth/analytics.readonly)
-curl -s -X POST \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  https://analyticsdata.googleapis.com/v1beta/properties/&lt;property id&gt;:runReport \
-  -d '{"dateRanges":[{"startDate":"28daysAgo","endDate":"yesterday"}],
-       "metrics":[{"name":"activeUsers"},{"name":"eventCount"}]}'</code></pre>
-      <p>The device check for step 3. In our run the two <code>log.tag</code> values would not reset to empty, so a reboot cleared them.</p>
-      <pre><code>adb shell setprop debug.firebase.analytics.app &lt;package name&gt;
-adb shell setprop log.tag.FA VERBOSE
-adb shell setprop log.tag.FA-SVC VERBOSE
-adb logcat -s FA FA-SVC          # look for "Network upload successful with code"
-adb shell setprop debug.firebase.analytics.app .none.
-adb reboot                       # clears the two log.tag values</code></pre>
-    </section>
-    <section aria-labelledby="brief">
-      <h2 id="brief">Where the agent went wrong: the zero went into the brief as a fact</h2>
-      <p>When the main agent handed the investigation to a subagent, the first paragraph of its brief stated "0 users, 0 events in the last 28 days" as fact. All five required checks were about code and build; none said to confirm the zero in a GA4 report. Eighteen seconds later the agent ran the pre-approved command to promote 1.1.0 to production, which Claude Code's auto-mode permission classifier blocked, and told the operator: if the analytics bug is in 1.1.0 too, better to ship a fixed 1.1.1 right away.</p>
-      <p>In its correction the main agent said it had read the page before the cards finished loading, but nobody reopened that page to check. The subagent guessed the main agent had looked at the data stream screen; the session log shows the overview was the only GA4 page it opened. What is certain is that it never opened a report with a total row and never checked the number another way.</p>
-      <p>Don't change a release decision on a zero read off a dashboard. When you delegate, don't write the zero down as a fact; make steps 1 and 2 above the first tasks. More rules for briefs are in <a href="https://sugarmount21.com/en/ax/subagent-brief-rules/">Claude Code subagent prompts: rules after 5 cut-off agents</a>. The 1.1.1 hotfix and the hold were dropped after one look at the table report, and the next day 1.2.0, which added PDF export, went to production.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">Some zeros are real, and raw counts run high</h2>
-      <p>For an app with very little traffic, many zeros are correct. This app had no GA4 users on October 11 to 14 and October 16 to 17. The steps above only tell you which screen and which period a zero belongs to.</p>
-      <p>The opposite happens too. On October 27 the raw active user count was 13; without test devices and Play's pre-launch robots it was 4. How to filter them is in <a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real</a>. The device check used a sideloaded 1.1.0 only; the evidence that the Play 1.0.0 build was fine is a static check of its AAB and the 1.0.0 data already in GA4.</p>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">Still open: 2 to 3 daily users on Play, 0 to 1 on GA4</h2>
-      <p>After launch, Play Console showed 2 to 3 daily active users while GA4 showed 0 to 1. The steps above did not explain the gap, and because the two metrics are defined differently we stopped short of calling it a bug. The next step is to split app_entry since October 10 by entry path (launcher or opening a file) and match first_open counts against Play installs day by day.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20GA4%20shows%20zero%3F%20Read%20a%20table%20report%27s%20total%20row%20first">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>GA4 shows zero for my app. Should I start with the code?</summary><div><p>Read the total row of a table report first. Here the 28-day value read as zero on the overview page was 43 users and 10,522 events in the table report, and three minutes of code and build checks found no defect.</p></div></details>
-        <details><summary>A data stream says "no data received in the past 48 hours". Is collection broken?</summary><div><p>Not necessarily. The same message appears when no events arrived in those 48 hours. This app had no real users on October 16 and 17, which is why the message showed; when a device sent events, app_entry appeared in the realtime overview about two minutes later.</p></div></details>
-      </div>
-    </section>
-    <p class="note">Checked 2026-11-03. Claude Code session transcripts (main session and the investigating subagent; UTC converted to KST), and the docs and git history of the app and game repositories. GA4 property numbers and account identifiers are left out.</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/stale-doc-phantom-session/">Claude Code handoff to a session that had stopped</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Sun, 08 Nov 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Google Ads for a puzzle game: CPI 30x break-even – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/google-ads-break-even-cpi/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/google-ads-break-even-cpi/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/google-ads-break-even-cpi-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · Measurement</span>
-      <h1>Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</h1>
-      <p class="lead">Block Turn KR, the best of four first-round campaigns, paid $0.59 per install, about 30 times its break-even CPI, the ad revenue one installer brings in before leaving.</p>
-    <p class="note ax-series-line"><a href="https://sugarmount21.com/en/ax/series/puzzle-game-marketing/">Ads and metrics for two puzzle games</a> 4/4</p>
-      <p>If your free game earns only from ads, an install campaign has to answer one question: will the player you paid for (your CPI) see enough ads before uninstalling to pay that back? That number is the break-even CPI. Judge a campaign by whether its CPI looks cheap and you skip the question entirely.</p>
-      <p>That is what happened with four Google Ads app campaigns for two puzzle games. By the morning of October 17, 2026 they had spent $36.4 for 105 GA4-attributed installs. The best one returned about 3% of its spend in ad revenue (ROAS), with a CPI about 30 times break-even, and our first go/no-go table had no break-even row. Below are the numbers and five things to compute before you switch a campaign on.</p>
-    </section>
-    <section aria-labelledby="first-round">
-      <h2 id="first-round">First round: four campaigns, $36.4, 105 installs</h2>
-      <p>The first round ran one Korean (KR) and one English campaign for each of <a href="https://sugarmount21.com/en/apps/arrow-knots/">Arrow Knots</a> and <a href="https://sugarmount21.com/en/apps/blocks/">Block Turn</a>; the English ones targeted Southeast Asia (SEA) or the whole world. On the morning of October 17 the agent joined GA4 paid installs to Google Ads cost per campaign. For Block Turn, GA4 logged about 35% less ad revenue than AdMob, so that revenue was corrected to AdMob's figures; the two Arrow Knots rows were not corrected.</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Campaign</th><th>Spend</th><th>GA4 installs</th><th>CPI</th><th>ROAS</th></tr></thead>
-        <tbody>
-          <tr><td>Arrow Knots SEA EN (stopped Oct 15)</td><td>$10.56</td><td>54</td><td>$0.20</td><td>0.1%</td></tr>
-          <tr><td>Arrow Knots KR</td><td>$7.49</td><td>6</td><td>$1.25</td><td>0.7%</td></tr>
-          <tr><td>Block Turn EN / worldwide (stopped Oct 15)</td><td>$7.07</td><td>26</td><td>$0.27</td><td>0.4%</td></tr>
-          <tr><td>Block Turn KR</td><td>$11.24</td><td>19</td><td>$0.59</td><td>about 3%</td></tr>
-          <tr><td>Total</td><td>$36.4</td><td>105</td><td></td><td></td></tr>
-        </tbody>
-      </table></div>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/google-ads-break-even-cpi-1-en.webp" width="1200" height="652" alt="Bar chart: first-round ROAS was 0.1% for Arrow Knots SEA EN, 0.7% for Arrow Knots KR, 0.4% for Block Turn EN and about 3% for Block Turn KR, against a break-even ROAS of 100%." loading="lazy"><figcaption>Even Block Turn KR, the best campaign, got back about 3 cents per ad dollar.</figcaption></figure>
-      <p>By CPI the cheapest campaign was Arrow Knots SEA EN at $0.20; Block Turn KR cost three times as much. By ROAS the order flipped: Block Turn KR led at about 3% and Arrow Knots SEA EN came last at 0.1%.</p>
-    </section>
-    <section aria-labelledby="break-even">
-      <h2 id="break-even">Actual CPI about 30 times break-even</h2>
-      <p>Break-even CPI is the ad revenue one installer brings in before uninstalling: average revenue per daily active user (ARPDAU) times expected active days. The October 17 analysis computed it from the retention of a 22-player Block Turn KR cohort and Korean ARPDAU, and the actual CPI of $0.59 came out about 30 times higher.</p>
-      <p>The same document also tried D1 doubled and ARPDAU tripled, and still found a 7x loss. Its conclusion: at any budget, this funnel could not pay back its ad spend. Nor was there evidence that ads bought store ranking (the analysis counted one organic Block Turn install).</p>
-      <p>Expected active days were short because of the first session. When the analysis rebuilt the event sequences of 17 Block Turn KR paid players (16 device models), 7 of them (41%) finished the three tutorial boards and then left on board R004 without solving it once. It notes that they left before seeing a banner. How the stuck boards were found is in <a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/">Puzzle game day-one churn: per-device event timelines, exact board math and four walls in chapter one</a>.</p>
-      <p>Against the industry benchmarks gathered in the same analysis, our CPI was cheap and D1 sat near the median. Day-0 uninstalls (58%) ran about twice the benchmark, and ARPDAU was at the bottom of the range.</p>
-    </section>
-    <section aria-labelledby="ads-vs-ga4">
-      <h2 id="ads-vs-ga4">Ads counted 94 installs; GA4 saw 24 first opens</h2>
-      <p>The cost per install shown in the Google Ads console was far lower than the CPI above. In the October 17 promotion results document, Ads put it at 101 won for Block Turn EN and 371 won for Block Turn KR. Divided by GA4 installs, the same campaigns cost $0.27 (about 380 won) and $0.59 (about 830 won).</p>
-      <p>The gap is in the denominator. Against 94 install conversions Ads counted for Block Turn EN, GA4 logged 24 first opens in Indonesia (26%); for Block Turn KR it was 19 against 38 (50%). (Ads counted Sep 17 to Oct 16, GA4 from launch to Oct 17.) Three out of four Southeast Asian ad installs never showed up as a GA4 first open. In the October 17 to 23 retest the console had 55 conversions against 25 GA4 paid installs (45%), and for October 26 to November 1 it had 102 conversions against 50 GA4 installs on the dashboard.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/google-ads-break-even-cpi-2-en.webp" width="1200" height="984" alt="Bar chart: Ads conversions against GA4 installs were 94 to 24 for Block Turn EN, 38 to 19 for KR, 55 to 25 in the retest and 102 to 50 in round two." loading="lazy"><figcaption>Work out CPI from the Ads install count and it looks two to four times cheaper than it is.</figcaption></figure>
-      <p>We did not find out why Ads conversions exceed GA4 first opens. This record only gives the ratio, so the payback math uses GA4 first opens as the denominator. The device filter arrived midway: test phones were removed from October 18 and Play pre-launch devices from October 25, so the first-round table predates both. The filter is described in <a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real</a>.</p>
-    </section>
-    <section aria-labelledby="gate">
-      <h2 id="gate">The October 15 criteria had no break-even line</h2>
-      <p>The agent's October 15 analysis blamed the quality of Southeast Asian traffic. Indonesian players all had their phones set to Indonesian, the app only shipped Korean and English, and they played 84 to 92 seconds each. That diagnosis held up. The same document called Block Turn's Korean paid traffic "the only paid traffic that earns anything", and the operator stopped the SEA campaigns and raised Block Turn KR from 2,000 to 4,000 won a day.</p>
-      <p>The document's "decision (user)" section set the criteria for the October 22 verdict: keep or raise the budget if CPI was at most 1,500 won, D1 at least 25% and same-day uninstalls under 40%. A unit-economics document written on September 30 in the same repository had already computed a break-even CPI from assumed values, and the 1,500 won ceiling sat far above it. The retest's 1,107 won per install (27,681 won over 25 GA4 installs) clears that table's CPI line easily. Its D1 of 20% missed 25%, so the table would not have said keep or raise; it would have said extend a week.</p>
-      <p>The October 17 analysis redid that calculation with measured retention and measured ARPDAU instead of assumptions, and break-even came out lower still. Compute break-even CPI before switching a campaign on, and put it in the first row of the go/no-go table. Don't raise a budget on a table that only has a CPI ceiling.</p>
-    </section>
-    <section aria-labelledby="learning-budget">
-      <h2 id="learning-budget">A 7-day learning budget instead of a stop</h2>
-      <p>The October 17 analysis recommended stopping Arrow Knots KR and pausing Block Turn KR until a fixed build shipped, on the grounds that more money into a leaking funnel would only confirm what we knew. That day the operator paused every campaign for both games, said the money should now go to learning who the players are, and turned Block Turn KR alone back on at 4,000 won a day with an end date of October 23.</p>
-      <p>The verdict used the three first-experience criteria the October 17 analysis had set (at least 80% solving the fourth board, at least 30% D1, under 40% same-day uninstalls), and that table had no CPI or break-even row either. On October 24 two of the three missed, and version 1.1.6, which moved the stuck fourth board R294 to position 41, shipped the same day. The board-level numbers are in <a href="https://sugarmount21.com/en/ax/puzzle-first-chapter-walls/#retest-2026-10-24">that note's October 24 addendum</a>.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Four%20Google%20Ads%20app%20campaigns%2C%20%2436.4%2C%20105%20installs%2C%20about%203%25%20ROAS%3A%20CPI%20ran%2030%20times%20break-even">Email us</a></p></aside>
-    <section aria-labelledby="second-round">
-      <h2 id="second-round">Second round: Block Turn KR alone, 7-day ROAS 8 to 10%</h2>
-      <p>On October 24 the operator switched Block Turn KR back on at 4,000 won a day until November 1, with an early-stop check on October 27 and a final verdict on November 2. The dashboard's daily snapshots use a rolling 7-day window, so values up to October 30 still include retest days. The October 31 and November 1 snapshots, which cover only second-round days, show 7-day ROAS of 8% and 10%.</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Snapshot</th><th>10-24</th><th>10-27</th><th>10-29</th><th>10-31</th><th>11-01</th></tr></thead>
-        <tbody>
-          <tr><td>7-day ROAS</td><td>6%</td><td>8%</td><td>9%</td><td>8%</td><td>10%</td></tr>
-          <tr><td>7-day CPI (GA4 installs)</td><td>$0.74</td><td>$0.55</td><td>$0.45</td><td>$0.47</td><td>$0.41</td></tr>
-        </tbody>
-      </table></div>
-      <p>On version 1.1.8 (October 25 to 30), 39 of 46 players solved the first board R001 (85%), which the daily analysis judged level with 6 of 8 on 1.1.6, one player apart. The next wall was the fifth board, R085, solved by 12 of 23 on 1.1.8. The October 26 to 27 new-player cohort had a D1 of 0 out of 16. The October 30 daily analysis noted 7-day ROAS of 8% and kept the budget until the November 2 verdict, and that day version 1.1.9, which moves R085 to position 35, was submitted.</p>
-    </section>
-    <section aria-labelledby="verdict">
-      <h2 id="verdict">November 2 verdict: under the cut line, back on at 3,000 won</h2>
-      <p>The November 2 verdict used the cut line in the budget rule, which shrinks the budget when 7-day ROAS is under 30%; the first-experience criteria were not used. 7-day ROAS was 10%, and the campaign had already stopped at its end date. The Ads screen showed 27,705 won and 102 conversions for October 26 to November 1. The agent recommended not resuming; with the operator's approval it went back on at 14:25 the same day, at 3,000 won a day with no end date.</p>
-      <p>The first 1.1.9 cohort (October 30 to November 1) had fewer than 20 players, so it was read as fractions: R001 12 of 13, the fifth board R005 6 of 7, R364 8 of 10, judged the same as 1.1.8. By then the budget rule had a cut line and a raise condition (7-day ROAS of at least 100% with at least 20 installs in 7 days), but the verdict table had no break-even row at 100%. Both entered the budget rule on October 30.</p>
-    </section>
-    <section aria-labelledby="alternatives">
-      <h2 id="alternatives">Why SEA, event bidding and a bigger budget were dropped</h2>
-      <p>Keeping the SEA English campaigns looked reasonable on one number. In the October 18 document, a player who finished the tutorial cost about 225 won from SEA and about 404 won from Korea. The same document put D1 at 4% for SEA against 22% for Korea; the October 17 comparison had already shown three in four SEA ad installs missing from GA4 first opens, and there was no Indonesian translation, so the option was dropped.</p>
-      <p>Switching the campaign goal from installs to tutorial completions was also considered. The bar written in that document was at least 10 conversions a day, and Block Turn KR produced about 3 tutorial completions a day. The goal stayed on installs, with tutorial completion and reaching level 10 added only as secondary conversions. Raising the budget was ruled out by the October 17 calculation: even with D1 doubled and ARPDAU tripled, the loss was 7x.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">The first-round 3% and the second-round 8% are different formulas</h2>
-      <p>First-round ROAS divides the ad revenue of everyone installed since launch by spend over the same period, with only Block Turn's revenue corrected to AdMob. The dashboard's 7-day ROAS uses GA4 ad revenue: the last 7 days of revenue from all players the campaign ever brought in, over the last 7 days of spend. GA4 logged about 35% less ad revenue than AdMob, so reading the two as "up from 3% to 8%" would be wrong.</p>
-      <p>The samples are small. Sixteen players started the fourth board in the October 24 verdict, so one player moved the rate by 6 points. The exchange rate is an assumption. Break-even here counts ad revenue only; an app that earns mostly from in-app purchases, or a genre that keeps players for weeks, puts different numbers into the same formula.</p>
-    </section>
-    <section aria-labelledby="steps">
-      <h2 id="steps">Five things to compute and compare before the next campaign</h2>
-      <ol>
-        <li>Compute break-even CPI from your own measurements. Expected ad revenue per installer = expected active days x ARPDAU, and that value is the break-even CPI. The September 30 document defines expected active days as the sum of the retention curve. Here, count install day as 1 and add 1 + D1 + D2 + D3 + … A made-up example, unrelated to this game: ARPDAU of 10 won with D1 40%, D2 20%, D3 10% and nothing after gives 1.7 days and a break-even CPI of 17 won.</li>
-        <li>Put break-even CPI or 100% ROAS in the first row of the go/no-go table, then the funnel criteria (first-board solve rate, D1, same-day uninstalls), the verdict date and where the verdict will be written.</li>
-        <li>Per campaign, set the conversions (installs) column on the Ads campaign screen next to GA4 <code>first_open</code> split by <code>firstUserMedium=cpc</code> and country, and take the ratio.</li>
-        <li>Remove test phones and Play pre-launch devices before counting. The first figure in the October 25 midpoint check, 6 of 12 solving R001, included four pre-launch robots; without them it was 6 of 8.</li>
-        <li>Run a fixed budget for 7 days and change one thing between runs. Between the retest and the second round only the fourth board changed (R294 to R364), but during the second round 1.1.8 went live and 1.1.9 was submitted, so this rule was broken.</li>
-      </ol>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">Cut on November 6: 7-day ROAS 6%, down to 2,000 won a day</h2>
-      <p>Block Turn KR, back on at 3,000 won a day, was first set for a verdict on November 4. The November 4 daily analysis corrected that: the date had counted the start day as day one, and with the last budget change on November 2 the rule that a campaign's budget changes only once every three days lands on November 5. That analysis put 7-day ROAS at 9%, under the cut line.</p>
-      <p>The daily analysis slipped a day, so the November 5 verdict was applied on November 6. 7-day ROAS was 6%, 7-day CPI $0.47, 7-day installs 38, and the budget dropped to 2,000 won a day. On 1.1.9, 15 of 18 players solved R005 between October 30 and November 5. This verdict also used the cut line. In the budget rule, 7-day ROAS of 100% appears only as a condition for raising the budget, and the daily analyses' verdicts have no break-even row. The next verdict is due November 9, and its table should have that row.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Four%20Google%20Ads%20app%20campaigns%2C%20%2436.4%2C%20105%20installs%2C%20about%203%25%20ROAS%3A%20CPI%20ran%2030%20times%20break-even">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <nav class="box ax-series-box" aria-label="Series contents"><p><strong><a href="https://sugarmount21.com/en/ax/series/puzzle-game-marketing/">Ads and metrics for two puzzle games: all 4 parts</a></strong></p><ol><li value="3"><a href="https://sugarmount21.com/en/ax/game-ad-creatives-from-play-recordings/">App campaign ad assets from gameplay recordings</a></li></ol><p>This is the last part.</p></nav>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Is a low CPI on game ads a reason to spend more?</summary><div><p>Only if it is below break-even CPI. The cheapest CPI here was $0.20 with 0.1% ROAS, and the best campaign, Block Turn KR, still paid about 30 times its break-even.</p></div></details>
-        <details><summary>Why do Google Ads install conversions and GA4 first_open differ?</summary><div><p>We did not find the cause; we measured the ratio. Block Turn EN had 94 Ads conversions to 24 GA4 first opens (26%), KR had 38 to 19 (50%), and the October 17 to 23 KR retest had 55 to 25 (45%).</p></div></details>
-        <details><summary>How do you compute break-even CPI for an ad-funded game?</summary><div><p>Break-even CPI is the expected ad revenue per installer: expected active days x ARPDAU. Expected active days are 1 for install day plus the daily return rates (D1, D2, D3 and on).</p></div></details>
-      </div>
-    </section>
-    <p class="note">Sources: the game repository's ad analysis and verdict documents and git history, promotion results and ad restart documents, daily dashboard snapshots (Oct 24 to Nov 2), the budget rule and November daily analyses. Won figures use the documents' assumed 1,400 won per dollar; account identifiers and the break-even amount are left out. Checked on 2026-11-06.</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Sun, 08 Nov 2026 09:00:00 +0900</pubDate>
   </item>
 </channel>
 </rss>
