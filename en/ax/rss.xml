@@ -6,7 +6,134 @@
   <description>Notes from shipping Android apps on Google Play with an AI coding agent: release gates, R8 crashes, staged rollouts, agent permissions. Dated numbers from git.</description>
   <language>en</language>
   <atom:link href="https://sugarmount21.com/en/ax/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Wed, 18 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Thu, 19 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Claude Code tapped a real AdMob ad during E2E – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/e2e-agent-real-ad-click-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>Claude Code tapped a real AdMob ad during E2E</h1>
+      <p class="lead">Our AdMob test-device setup applied only to debug builds, so a Claude Code agent testing a release APK on a real phone saw live ads and clicked one of them once.</p>
+      <p>A Claude Code agent was tapping through an Android app on a real phone when an interstitial ad came to the front, and its next tap landed on the ad. AdMob counts live impressions and clicks on a developer's own device as invalid traffic.</p>
+      <p>The setting that sends test ads to our development phones applied only to debug builds, so the release APK served live ads. The agent's screen-check guard read only the package name, so it took an ad screen opened inside the app for the app itself, and the tap that hit the ad never went through that guard at all. The next day the setting went into every build, but banners inside our own screens and ads from other networks are still not fully covered.</p>
+    </section>
+    <section aria-labelledby="chrome-opened">
+      <h2 id="chrome-opened">Chrome opened from behind an interstitial</h2>
+      <p>On the afternoon of September 28, 2026, the agent installed a release APK of our Korean spell checker <a href="https://sugarmount21.com/en/apps/sugarspeller/">SugarSpeller</a> on a Galaxy S21 and walked through the whole check flow. Its script force-stopped the app and relaunched it through a share intent for every check.</p>
+      <p>One agent command dumped the screen, read the coordinates of the result bubble and sent a tap there. The tap landed at 16:19:55, when the dump finished, and a tenth of a second later logcat showed Chrome opening a shopping advertiser's page. When the agent dumped the screen again, the script stopped with "foreground is not our app": Chrome's first-run screen was in front.</p>
+      <p>After Chrome was closed, an interstitial in the Google Mobile Ads SDK's <code>AdActivity</code> was still up inside the app. The agent wrote that it would close the ad with BACK only and never tap it. After BACK, a second ad screen was underneath, from another ad network, Liftoff (formerly Vungle). Twenty-nine minutes later it told the operator it had clicked a real ad once, an invalid click, and recorded the same in the changelog's incident line.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/e2e-agent-real-ad-click-1-en.webp" width="1200" height="847" alt="Step diagram: E2E on a release APK, app restart per check, a guard that checks only the package name, a raw tap outside the guard, and Chrome opening at 16:19:55 for one real ad click" loading="lazy"><figcaption>The steps up to Chrome opening at 16:19:55. The guard read only the package name, and the tap that hit the ad never went through it.</figcaption></figure>
+    </section>
+    <section aria-labelledby="guard">
+      <h2 id="guard">The guard only checked the package name</h2>
+      <p>At 14:56 that day the agent had added a guard to its screen dump and screenshot script. It read the topResumedActivity line, the activity in front, and carried on if the app's package name appeared there. Ad SDK screens run inside the app's process, so that line reads like <code>com.sugarmount.sugarspeller/com.google.android.gms.ads.AdActivity</code> and passes. The guard also sat only in front of the dump and screenshot commands; the tap that clicked the ad was a raw command that never went through it.</p>
+      <p>The guard changed twice within two minutes of the click.</p>
+      <div class="table-wrap"><table><thead><tr><th>Time</th><th>Rule</th><th>What happened</th></tr></thead><tbody><tr><td>14:56 (v1)</td><td>Continue if the app's package name is on the front-screen line</td><td>Ad screens passed. Taps ran outside the guard</td></tr><tr><td>16:20 (v2)</td><td>Stop if the name contains <code>AdActivity</code> or <code>gms.ads</code>; move taps into the script, only with numeric coordinates more than 250 px below the top</td><td>After BACK, Liftoff's <code>VungleActivity</code> underneath was not on the name list</td></tr><tr><td>16:21 (v3)</td><td>Continue only if the front screen is one of the app's own classes; otherwise stop and close with BACK</td><td>At 16:44 it blocked a tap in front of a Liftoff ad</td></tr></tbody></table></div>
+      <p>The v2 assumption was that ad screens can be recognized by name. With mediation, where several ad networks bid for the same slot, each network brings its own screen name, and an unlisted one appeared 13 seconds after v2 went in. v3 lists what is allowed instead of what is blocked. The agent also removed the force-stop from each check that day, because every relaunch showed an app-open ad.</p>
+    </section>
+    <section aria-labelledby="debug-only">
+      <h2 id="debug-only">The test-device list was wired to debug builds only</h2>
+      <p>The app had a test-device list in code, but a September 11 fix applied it only inside a <code>BuildConfig.DEBUG</code> check, which is true only in debug builds. A release APK on a real phone skipped the list entirely, and the S21 was not on it anyway.</p>
+      <p>The next night, while instrumentation tests (Android tests that launch the app on the phone itself) ran on the S21, the operator asked whether the account would get suspended, since ads kept showing during testing. The agent first answered that the instrumentation tests were debug builds using test ad units, so there was no risk. That was wrong. This app's debug build deliberately uses the real ad units so the bidding partners can be verified, and a comment in the same file said so. The logcat the agent then checked had three copies of the SDK hint that only unlisted devices get: call setTestDeviceIds to get test ads on this device.</p>
+      <p>Twenty-seven minutes after the question, commit <code>ec5f400</code> moved the call out of the debug condition. Only listed devices get test ads, so real users are unaffected. The commit added the S21 and a unit test checking that the S21 is on the list and that the configuration carries the whole list.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/e2e-agent-real-ad-click-shot2-en.webp" width="1200" height="729" alt="Excerpt of the ec5f400 diff: the setRequestConfiguration call moves out of the BuildConfig.DEBUG block and a Galaxy S21 line joins the test-device list, with three hashes covered by black boxes" loading="lazy"><figcaption>Diff excerpt of commit ec5f400 (2026-09-29) from git history. The three test-device SDK hashes are covered with solid boxes.</figcaption></figure>
+      <p>The two days of developer-phone testing also show in AdMob reporting. When we pulled daily banner requests again, September 29 alone had more than twice the usual thousand or so requests, and the match rate (the share of ad requests that actually got an ad) fell below half.</p>
+      <p>Our October 1 monitoring note says all of the extra requests came from version 1.6.024 and puts them down to the S21 and S23 running instrumentation tests against real ad units. In the raw data, every unmatched request on September 28 and 29 but one came from that version too. That version number was shared by the development builds and the Play release at the time, so the version alone does not single out the devices.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/e2e-agent-real-ad-click-shot1-en.webp" width="1200" height="620" alt="Stacked bar chart of banner ad requests for the spell checker app, Sep 20 to Oct 6: 1,561 at 74% match on Sep 28, 2,402 at 48% on Sep 29, 1,645 at 95% on Sep 30, 92 to 100% on other days" loading="lazy"><figcaption>Raw AdMob network report data (queried 2026-11-18, banner requests and matched requests only). Unmatched requests jumped only on September 28 and 29.</figcaption></figure>
+      <p>The S23 was on the list and still got live ads. Resetting a phone's advertising ID also changes the test-device value the SDK uses, and the code still held the value from before the reset. The agent said the test-device ID is the MD5 of the advertising ID and computed it, but the result did not match the log, and neither did an MD5 of the Android ID. On the operator's instruction, the code got the value the SDK printed in logcat.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20tapped%20a%20real%20AdMob%20ad%20during%20E2E">Email us</a></p></aside>
+    <section aria-labelledby="choices">
+      <h2 id="choices">We put the test-device list in every build and the console</h2>
+      <p>Five fixes came up. The agent objected to two from the operator's side, and the operator stopped the build flag the agent was writing.</p>
+      <div class="table-wrap"><table><thead><tr><th>Option</th><th>Raised by</th><th>Outcome</th></tr></thead><tbody><tr><td>Turn the app's debug constant on for testing and off for release</td><td>Operator</td><td>Agent objected: the constant also forces a premium subscription, and forgetting to turn it off would give every user test ads and free premium</td></tr><tr><td>Build flag for test ad units that fails the Play upload (AAB) build if left on</td><td>Agent</td><td>Operator stopped it mid-test and switched to console registration. Never built (not in the repository as of November 18)</td></tr><tr><td>Switch the debug build to test ad units</td><td>(Sep 11 review)</td><td>Dropped: test units skip mediation, so bidding partners can't be verified</td></tr><tr><td>Watch a few live ads to check, then ship</td><td>Operator question</td><td>Agent objected: live impressions and clicks on a developer device are invalid traffic at any count</td></tr><tr><td>Apply the code list to every build and register devices in the console</td><td>Agent, operator</td><td>Chosen. Code in <code>ec5f400</code>; console registration left to the operator</td></tr></tbody></table></div>
+      <p>On the morning of September 30 the operator asked whether the S21 was registered as an AdMob test device too. The agent said only in code. The code list only covers builds that contain it. If an older version from Play is installed on a developer phone, only the test-device registration in the AdMob console protects it. The console takes the raw advertising ID and the code takes the SDK hash, so both values went into a per-device table in the repository docs (<code>4595dce</code>).</p>
+    </section>
+    <section aria-labelledby="worktree">
+      <h2 id="worktree">An ad ID file copied into a worktree</h2>
+      <p>About a week later the same risk came in by another route in our puzzle game <a href="https://sugarmount21.com/en/apps/arrow-knots/">Arrow Knots</a>. The game keeps its real ad IDs in one settings file that git ignores, and a release build uses the file whenever it exists. At 01:28 on October 4, the Claude Code session handling ads got the IDs from the operator and, without asking, copied the file into another session's working folder (a git worktree). Twenty-one minutes later that session built what it took to be a test release APK.</p>
+      <p>At 02:06 that session passed on the ad session's warning that random-tap testing must never run on a real-ID build, wrote that its own workspace had no real-ID file and would build with test ads only, so it was safe, and then installed the APK on an S20. A file check in the same command printed that the file was there. The session uninstalled the app without ever opening it, moved the file aside, and rebuilt with test ads. No ad request or click happened.</p>
+      <p>The game's test-ads flag only allowed test IDs when the file was missing; it did not ignore a file that was present. Commit <code>68d501e</code> the next day made the build read the file from its original location through a build argument, so a worktree never needs a copy. Our block puzzle, built in the same days, has a test-ads flag that ignores the file entirely; what its real-ID check still missed is in <a href="https://sugarmount21.com/en/ax/release-ad-id-grep/">Why R8 kept 5 AdMob test IDs in a release AAB</a>.</p>
+    </section>
+    <section aria-labelledby="liftoff-and-banners">
+      <h2 id="liftoff-and-banners">The September 30 check still logged the Liftoff app-open ad as live</h2>
+      <p>The tap guard only checks whether the front screen is one of our activities, so it cannot see a banner or native ad placed inside our own screen. If coordinates happen to land on a banner, the guard lets the tap through. That is why the order below puts test-device registration ahead of the tap rule.</p>
+      <p>The code list only covers AdMob ads. At 08:57 on September 30 the operator said the console registration was done, but the records do not say which consoles or which devices. In the S21 check that followed, AdMob served test ads; the Liftoff app-open ad was still live and did not close with BACK, so the app was force-stopped to close it. The session judged it live from what was on screen and asked the operator to recheck the test-device setting in the Liftoff dashboard.</p>
+    </section>
+    <section aria-labelledby="before-device-e2e">
+      <h2 id="before-device-e2e">Register test devices before any device E2E</h2>
+      <p>Do not run automated taps on a real device with any build that can serve live ads. This is the order we put together from this incident. Of these, using the logcat value and applying the list to every build (steps 1 and 2) are already in the app repository's rules, and tapping only on our own screen (step 5) and never copying the real-ID file into another worktree (step 6) are already in the agent's memory.</p>
+      <ol class="steps"><li><p>Connect the device, launch the app once, and copy the value from the <code>setTestDeviceIds(Arrays.asList("…"))</code> line in logcat. Don't compute it.</p></li><li><p>Add that value to the app's test-device list and keep the <code>MobileAds.setRequestConfiguration</code> call outside any build-type condition. Add a unit test that checks the device is on the list.</p></li><li><p>Register the same phone's raw advertising ID as a test device in the AdMob console and in each mediation partner's console.</p></li><li><p>Relaunch the app, check that ads carry the test-ad label, and confirm the "to get test ads on this device" line no longer shows in logcat.</p></li><li><p>Inside the tap script's tap command, tap only if the activity name from <code>adb shell dumpsys activity activities | grep -m1 topResumedActivity</code> starts with one of the app's own classes, such as <code>&lt;package&gt;/.</code>; otherwise send BACK. Relaunch the app only when you must.</p></li><li><p>Keep the real ad ID file in one place and pass its path to the build. Never copy it into another session's worktree.</p></li><li><p>The next day, check match rate and request counts in the AdMob report. Leaked developer-device traffic shows there first.</p></li></ol>
+      <p>Random-tap crash hunting is in <a href="https://sugarmount21.com/en/ax/fresh-install-monkey-test/">VIBRATE crash and the fresh-install monkey test</a>; we run that only on test-ad builds as well.</p>
+    </section>
+    <p class="note">As of 2026-11-18. App repository git history (ec5f400, 536ce09, 4595dce, ff7a5aa; changelog entries for Sep 28 and Sep 30), game repository git history (68d501e) and agent memory, Claude Code session logs (Sep 28 to 30, Oct 4), and banner request and matched-request counts pulled again from the AdMob Network Report API (2026-11-18).</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20tapped%20a%20real%20AdMob%20ad%20during%20E2E">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/naver-speller-highlight-missing/">Claude Code fix: Naver spelling highlights missing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Thu, 19 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Play Console in-app price VAT: 7,500 became 8,000 – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/play-iap-price-vat/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/play-iap-price-vat/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/play-iap-price-vat-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Short note</span>
+      <h1>Play Console in-app price VAT: 7,500 became 8,000</h1>
+      <p class="lead">The Korea price field in Play Console takes the amount before VAT, so typing KRW 7,500 for our one-time in-app product made the buyer price 8,000 won.</p>
+      <p>We typed 7,500 won into Play Console, and the next day the Pro price on the app's settings screen read 8,000. This was October 2026, while setting up the one-time Pro purchase for <a href="https://sugarmount21.com/en/apps/doc-viewer/">SugarDoc</a>, our viewer for Korean HWP documents. The AI coding agent had guessed the field was tax-inclusive, while the owner's first take, that Play adds 10% to the console price, was the right one.</p>
+    </section>
+    <section aria-labelledby="api-stored-7500">
+      <h2 id="api-stored-7500">We sent 6,900 and Play stored 7,500</h2>
+      <p>On October 5 a Claude Code agent created the product through the Play Developer API (Google's API for doing Play Console work from code) and sent the owner's chosen price of 6,900 won. Reading the product back, the Korea price was 7,500. The agent took that for a conversion bug and tried to overwrite it with 6,900; the auto-mode permission classifier blocked the edit because it changes what real buyers pay.</p>
+      <p>The owner answered on the spot that 6,750 in the console would come to 7,500 for buyers once Play added 10%. The agent replied that 6,750 plus 10% is 7,425, so the numbers did not match, and labeled as a guess that the stored 7,500 was probably already the tax-inclusive buyer price. In the same reply it explained 7,500 as 6,900 plus 10% (7,590) rounded down to a price point, yet left rounding out when it checked the owner's 6,750. The owner typed 7,500 into the console, and the agent updated the docs from the owner's message without reading the stored price again.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/play-iap-price-vat-1-en.webp" width="1200" height="664" alt="KRW 6,900, 7,500 and 5,000 going in and being stored as 7,500, 8,000 and 5,500" loading="lazy"><figcaption>The stored price was higher than what went in every time.</figcaption></figure>
+      <p>On October 6 the on-device end-to-end (E2E) report caught 8,000 won on the settings screen. The app never hard-codes a price; it shows whatever Play returns, so the console value went straight to the screen.</p>
+      <p>On October 8 the agent put the two input and stored pairs side by side and wrote that its tax-inclusive guess had been wrong. The owner typed 5,000, the Korea price the API returned was 5,500, and the agent fixed the docs within the same minute.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Play%20Console%20in-app%20price%20VAT%3A%207%2C500%20became%208%2C000">Email us</a></p></aside>
+    <section aria-labelledby="tax-exclusive-input">
+      <h2 id="tax-exclusive-input">The conversion API takes a pre-tax price and returns a taxed one</h2>
+      <p>Google Play's help page on tax rates lists South Korea among the countries where the price shown to buyers must include tax. The API reference for <code>convertRegionPrices</code> describes its input price as "Tax exclusive" and each converted region price as "tax inclusive."</p>
+    </section>
+    <section aria-labelledby="read-back">
+      <h2 id="read-back">Write down the price you read back</h2>
+      <p>Since the classifier block on October 5, the owner changes prices in the console and the agent only reads them.</p>
+      <ol class="steps"><li><p>Take the Korea price you want buyers to pay and divide by 1.1; that goes in the console (5,000 for 5,500). If the result is not a round number, the stored price may be moved to a nearby price point.</p></li><li><p>After saving, read the buyer price from the product GET's regionCode KR entry or from the store listing.</p></li><li><p>Record both numbers, for example "buyer 5,500 won (console 5,000)."</p></li><li><p>If you create products through the conversion API, note in a code comment that its input is pre-tax.</p></li></ol>
+      <figure><img src="https://sugarmount21.com/assets/ax/play-iap-price-vat-shot1-en.webp" width="1200" height="376" alt="Read-only re-query on 2026-11-18: product ACTIVE in 174 regions, KR 5500 won, US 3.69 dollars" loading="lazy"><figcaption>Where step 2 reads: the units value under regionCode KR is the buyer price. Play Developer API read-only GET, 2026-11-18 19:19 KST.</figcaption></figure>
+      <p>Update a documented price only from the value you read back after saving. A different Play API result we failed to check before acting is in <a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">Play staged rollout API: 20% went out as 100%</a>.</p>
+      <p>These records cover one one-time product in October 2026; we have not checked subscriptions or accounts that file Korean VAT themselves as a local business. The console path, where 7,500 typed in became 8,000, is something we observed; we could not confirm from the help pages that the same rounding rule applies there. The product script overwrites only the Korea price with the buyer price, while converting every other region from that same number as if it were pre-tax, so other regions may be priced higher than intended. We have not rerun it to check.</p>
+    </section>
+    <p class="note">As of 2026-11-18. Sources: app repository git history (commit 2cc25d1, PRD and implementation plan), agent session logs (2026-10-05 to 10-08), a read-only Play Developer API query, Google Play Console Help and the Android Publisher API reference.</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Play%20Console%20in-app%20price%20VAT%3A%207%2C500%20became%208%2C000">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/play-store-title-aso-no-clear-gain/">Play Store title keywords: two weeks, no verdict</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/naver-speller-highlight-missing/">Claude Code fix: Naver spelling highlights missing</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Thu, 19 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>Claude Code Android: a build gate for zero ads – SugarMount</title>
     <link>https://sugarmount21.com/en/ax/ads-free-release-gate/</link>
@@ -76,10 +203,10 @@ onVariants(selector().withBuildType("release")) { variant -&gt;
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/play-iap-price-vat/">Play Console in-app price VAT: 7,500 became 8,000</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-store-title-aso-no-clear-gain/">Play Store title keywords: two weeks, no verdict</a></li>
         <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
         <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
@@ -621,10 +748,10 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>Give the 
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/">Claude Code tapped a real AdMob ad during E2E</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
         <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
       </ul>
@@ -695,11 +822,11 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>Give the 
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/play-iap-price-vat/">Play Console in-app price VAT: 7,500 became 8,000</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-ad-creatives-from-play-recordings/">App campaign ad assets from gameplay recordings</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/">Claude Code tapped a real AdMob ad during E2E</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -782,7 +909,7 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>Give the 
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">Claude Code for Android app development: 4 apps in 20 days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/">Claude Code tapped a real AdMob ad during E2E</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1495,8 +1622,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/">Claude Code tapped a real AdMob ad during E2E</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2164,7 +2291,7 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/">Claude Code tapped a real AdMob ad during E2E</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2366,266 +2493,6 @@ assumeTrue(dir != null &amp;&amp; dir.isDirectory)</code></pre></li>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
     <pubDate>Tue, 10 Nov 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>GMA Next-Gen ad callbacks run off the main thread – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/gma-next-gen-callback-thread/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/gma-next-gen-callback-thread-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX Notes · Incident</span>
-      <h1>GMA Next-Gen called our full-screen ad callback on a background thread: how a photo app crashed after 243 passing unit tests</h1>
-      <p class="lead">Navigating inside an ad SDK callback can crash your app. GMA Next-Gen delivered our interstitial callback on a background thread, and 243 unit tests missed it.</p>
-    <p class="note ax-series-line"><a href="https://sugarmount21.com/en/ax/series/photo-apps-first-20-days/">Three photo apps, the first 20 days</a> 2/4</p>
-      <p>Four minutes after 243 unit tests finished with zero failures, <a href="https://sugarmount21.com/en/apps/image-compress/">Compress Image</a> dropped to the launcher on the emulator when we tapped Start over after a second job. That was 16:10 on September 23, 2026, and the crash log named the thread <code>GMA(BG) 4</code>. We hit two traps that afternoon while adding three ad formats. One is this crash. The other is that UMP, Google's ad consent SDK, returned false from <code>canRequestAds()</code> at every launch, so the splash screen never waited for an app open ad. Both were fixed that afternoon.</p>
-      <p>The same app also crashed that night because R8 stripped a constructor; that story is in <a href="https://sugarmount21.com/en/ax/release-gate/">What to check before shipping an AI-built Android app</a>. How often our block puzzle game shows interstitials is a separate note: <a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines</a>. Both defects here appeared in an unminified debug build and have nothing to do with frequency rules.</p>
-      <p class="note">Sources: the app repository's git history and changelog, the ad design document, code and tests, that day's work log and three review reports (Korea time, checked November 8, 2026).</p>
-    </section>
-    <section aria-labelledby="crash-log">
-      <h2 id="crash-log">popBackStack threw on GMA(BG) 4</h2>
-      <p>The crash was caught by a journey script the agent wrote that afternoon. It launches the debug build against AdMob test ad units and walks six steps (listed in step 4 of the procedure below). Step 6 finishes the second job and taps Start over, the first place an interstitial can appear. In the first journey, finished at 15:31, the interstitial showed there without trouble. In the 16:10 run the app vanished and left the launcher on screen, so the agent read the crash buffer.</p>
-      <pre><code>FATAL EXCEPTION: GMA(BG) 4
-java.lang.IllegalStateException: Method setCurrentState must be called on the main thread
-  at androidx.lifecycle.LifecycleRegistry.enforceMainThreadIfNeeded(LifecycleRegistry.kt:382)
-  at androidx.lifecycle.LifecycleRegistry.setCurrentState(LifecycleRegistry.kt:139)
-  at androidx.navigation.NavBackStackEntry.updateState(NavBackStackEntry.kt:161)
-  ...
-  at androidx.navigation.NavController.popBackStack(NavController.android.kt:244)
-  at ...SugarCompressNavHost...(SugarCompressNavHost.kt:135)</code></pre>
-      <p>The result screen's Start over handler called <code>popBackStack()</code> to return HOME. Navigation then changed the lifecycle of the screen being popped, and <code>LifecycleRegistry</code> refused because it was not on the main thread. The caller was the SDK's <code>onAdShowedFullScreenContent</code> callback, which, in our log, GMA Next-Gen invoked on its own background thread. Nothing caught the exception, so the whole process died.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/apps/sugarcompress/shot3-en.webp" width="360" height="640" alt="Google Play screenshot of the Compress Image result screen: 8.58 MB down to 1.44 MB, with before and after sizes for three photos." loading="lazy"><figcaption>The Compress Image result screen (Google Play screenshot). The crash came when leaving this screen with Start over, the spot where an interstitial can appear (the button is cropped out of the screenshot).</figcaption></figure>
-    </section>
-    <section aria-labelledby="moved-into-callback">
-      <h2 id="moved-into-callback">A review fix moved navigation into the callback</h2>
-      <p>The first interstitial code, written the night before, received the same callback and never crashed. All the callback did was complete a <code>CompletableDeferred</code>, which is safe from any thread. A commit at 00:26 on September 23 confirmed on the emulator that an interstitial showed after the third job and that closing it returned to HOME. Back then the app navigated after the ad closed.</p>
-      <p>On the afternoon of September 23 the operator proposed shipping all three ad formats at once, and asked for a version that had been analyzed in depth and cross-checked. That proposal and request are the operator's whole part on record; no person edited the code afterward. The agent brought in a separate reviewer agent told to report, not edit (it only ever read code). By then the working tree navigated to HOME first and showed the ad second. The second review, at 16:02, said HOME was drawn and tappable before the interstitial appeared. That is the "ad appears unexpectedly while the user is interacting" pattern AdMob warns about, and a quick tap could open the photo picker together with the ad. The reviewer's fix: stay on the result screen and navigate to HOME the moment the ad covers it.</p>
-      <p>The agent took that moment from the SDK's <code>onAdShowedFullScreenContent</code> and passed the navigation function into it. Both installing the callback and calling <code>show()</code> happen inside <code>withContext(Dispatchers.Main.immediate)</code>, which fixes the thread of the code doing the installing, not the thread the SDK later calls back on.</p>
-      <p>The banner loader written on September 20 had posted <code>adView.destroy()</code> to a main-looper Handler from day one. That handling never made it to the full-screen code.</p>
-    </section>
-    <section aria-labelledby="why-missed">
-      <h2 id="why-missed">Why 243 tests and the third review missed it</h2>
-      <p>A unit test covered exactly this behavior. <code>FullScreenControllersTest</code> has a test that checks navigation happens only once the ad covers the screen ("Start over navigates only once the ad covers the screen, or right away without one"). Its fake ad, though, calls <code>onAppeared()</code> directly on the test thread. A single-threaded fake cannot reproduce a threading bug, so the test passed.</p>
-      <p>The first and second reviews came before the callback navigated at all; only the third saw that code. At 16:07 it marked "Navigate under the ad: resolved", and opened its report by saying it had only read code and had built or run nothing. The crash three minutes later is the log above.</p>
-      <p>The cross-check found the eight pacing defects the CHANGELOG lists, including an interstitial after a failed job, a retried job counted twice, ad requests for a Pro user with a stale cache, and an ad shown on a stopped Activity.</p>
-      <p>We don't call an ad build done until it has run on an emulator or device up to the point where a real ad appears.</p>
-    </section>
-    <section aria-labelledby="fix">
-      <h2 id="fix">All four callbacks now go through one main-looper Handler</h2>
-      <p>The 16:12 threading fix lives in one file, <code>GmaFullScreen.kt</code>, which interstitials and app open ads share (other third-review findings were fixed across several files at the same time). The shown, failed-to-show, dismissed and paid callbacks all hand their work to the same main-looper Handler.</p>
-      <pre><code>private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
-onShowed = {
-    mainHandler.post {
-        onAppeared()          // navigates to HOME here
-        appeared.complete(true)
-    }
-},
-onDismissed = {
-    mainHandler.post {
-        onDismissed()
-        dismissed.complete(true)
-    }
-},</code></pre>
-      <p>Posting only the shown callback would have stopped the crash. The code comment gives the reason for moving all four: queued on one looper in arrival order, "shown" is always handled before "dismissed". Going back to the pre-review order, navigating first and showing the ad second, was off the table, since the second review had flagged it as a policy risk.</p>
-      <p>The 16:17 rerun reached step 6, showed the ad screen (<code>AdActivity</code>), and returned to the app after it closed. The crash buffer had no FATAL entries. The ad design document gained a line saying anything new hooked to an SDK callback must assume a background thread.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20GMA%20Next-Gen%20called%20our%20full-screen%20ad%20callback%20on%20a%20background%20thread%3A%20how%20a%20photo%20app%20crashed%20after%20243%20passing%20unit%20tests">Email us</a></p></aside>
-    <section aria-labelledby="ump">
-      <h2 id="ump">UMP starts every cold launch with canRequestAds() false</h2>
-      <p>The UMP problem showed up about 40 minutes before the crash. In the first journey, finished at 15:31, the cold-start app open ad never held the splash. A 15:33 cold start with added logging printed <code>splash not held: BlockedNoConsent</code>. Holding the splash depended on consent state, and a code comment assumed that in Korea, where no consent form is required, consent from the previous session would already allow ads.</p>
-      <p>The agent's next suspect was UMP's debug settings. At 15:45 it cold-started a build with them and a build without them, twice each. All four runs began with <code>canRequestAds=false</code> and status 0 (UNKNOWN). The consent update took 2,246 to 2,413 ms, SDK initialization another 1,266 to 1,412 ms, finishing 4,767 to 5,116 ms after process start. All four timed out the 2 s wait with "consent/SDK not ready in 2000 ms". UMP did not carry "consent not required" into the next launch, so every cold start paid the round trip again.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/gma-next-gen-callback-thread-1-en.webp" width="1200" height="684" alt="Bar chart: the consent round trip took 2,246 to 2,413 ms in all four runs, over the old 2,000 ms budget; the budget became 3,000 ms." loading="lazy"><figcaption>Every cold start pays the consent round trip again, so the SDK could not even start initializing within 2 s.</figcaption></figure>
-      <p>A new <code>AdGate.wants()</code> decides whether to hold the splash from the Pro state and the feature flag alone. Actual ad requests still go through <code>decide()</code>, which checks consent and initialization first. The wait went from 2 s to 3 s. The 2 s came from our Korean spell-check app, which initializes the SDK before consent, an order this app's ad rules forbid. Google's app open sample waits 5 s. A fill that arrives after the budget is kept for the next return.</p>
-      <p>Even 3 s was not enough on the emulator. The final 16:25 journey logged "consent/SDK not ready in 3000 ms" at step 2, with the Play purchase check taking 4,139 ms. The ad design document records this limit with the emulator's 3.4 to 4.1 s for the purchase check.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">Measured only on an API 35 emulator with no consent required</h2>
-      <p>We have not measured the startup state or round trip in the EEA or other regions where the consent form appears, and we have not checked callback threads in the older, pre-Next-Gen GMA SDK. Google's Next-Gen interstitial page and migration guide don't say which thread callbacks arrive on (checked November 8, 2026). The only threading advice in the migration guide is to initialize the SDK on a background thread.</p>
-      <p>Code whose callbacks only do thread-safe work, like the first interstitial code above, doesn't need this fix. The ad design document's October 4 notes say a sideloaded Galaxy S20 got its Play answer in 3.34 s, so it showed no cold-start ad either way, while a Galaxy S21 showed cold-start ads from the second launch. The S21's Play latency wasn't measured.</p>
-    </section>
-    <section aria-labelledby="procedure">
-      <h2 id="procedure">Five steps before hooking an SDK callback</h2>
-      <ol>
-        <li>Find every ad SDK callback body and mark calls that touch navigation, lifecycle or views. <code>rg -n "onAd(Showed|Dismissed|FailedToShow)FullScreenContent"</code> is a start.</li>
-        <li>Post the marked calls to a main-looper Handler, and send all callbacks of one ad through the same Handler so their order holds.</li>
-        <li>Add a test that fires callbacks from another thread. A controller-level fake skips everything below the Handler, so this has to be a Robolectric test that calls the SDK-side function, <code>GmaFullScreen</code> here, directly. The module has no Robolectric dependency yet, and the function waits for dismissal, so the thread should call <code>onDismissed()</code> too. An untested sketch:
-          <pre><code>var onMain: Boolean? = null
-// fire shown and dismissed from another thread, like the SDK, and wait for it
-install = { cb -> thread(name = "fake-GMA(BG)") { cb.onShowed(); cb.onDismissed() }.join() },
-onAppeared = { onMain = Looper.myLooper() == Looper.getMainLooper() },
-// then drain the posts queued on the main looper
-shadowOf(Looper.getMainLooper()).idle()
-assertEquals(true, onMain)  // false once mainHandler.post is removed</code></pre></li>
-        <li>Run the debug build against test ad units up to the point where an interstitial really appears. Our journey has six steps: first launch, cold start, Home key and back after 35 s, open the photo picker and cancel after 35 s, Start over after the first job, Start over after the second job. Then check that <code>adb logcat -b crash</code> has no FATAL entries.</li>
-        <li>Log <code>canRequestAds()</code>, the consent status, the consent round trip and SDK init time at process start, and set the splash wait and its budget from those numbers. These are the lines our app wrote (collected from different runs):
-          <pre><code>GmaAdsAdapter: UMP at start: canRequestAds=false status=0 debugSettings=false
-GmaAdsAdapter: UMP consent update took 2246 ms
-GmaAdsAdapter: GMA initialized in 1295 ms, 4767 ms after process start
-AppOpen: app open skipped (cold): consent/SDK not ready in 2000 ms
-AppOpen: cold: entitlement answered in 4139 ms</code></pre></li>
-      </ol>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">No test guards the main-looper post yet</h2>
-      <p>As of the repository on November 7, 2026, what protects this fix is a comment in <code>GmaFullScreen.kt</code> and one sentence in the ad design document. Deleting <code>mainHandler.post</code> would leave every unit test green, so the test in step 3 is the next thing to add. Tuning the cold-start budget from real-device logs is still to do, and whether to shorten the wait for the Play purchase check is waiting on an operator decision.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20GMA%20Next-Gen%20called%20our%20full-screen%20ad%20callback%20on%20a%20background%20thread%3A%20how%20a%20photo%20app%20crashed%20after%20243%20passing%20unit%20tests">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <nav class="box ax-series-box" aria-label="Series contents"><p><strong><a href="https://sugarmount21.com/en/ax/series/photo-apps-first-20-days/">Three photo apps, the first 20 days: all 4 parts</a></strong></p><ol><li value="1"><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">Claude Code for Android app development: 4 apps in 20 days</a></li><li value="3"><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li></ol></nav>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Which thread do GMA Next-Gen full-screen ad callbacks run on?</summary><div><p>In our crash log it was one of the SDK's background threads, <code>GMA(BG) 4</code>. The Next-Gen guides we checked (interstitial, app open, banner, migration) don't say, so post any UI work from those callbacks to the main looper.</p></div></details>
-        <details><summary>Why does "setCurrentState must be called on the main thread" crash the app?</summary><div><p>Calling Navigation's <code>popBackStack()</code> off the main thread made <code>LifecycleRegistry</code> throw when it tried to change a screen's lifecycle. In this app, the call came from the ad-shown callback returning to HOME.</p></div></details>
-        <details><summary>Is it normal for UMP canRequestAds() to be false at app start?</summary><div><p>In our measurements it was false, with status UNKNOWN, at the start of every cold launch, even where consent is not required. It changed only after the consent update finished, about 2.3 s on the emulator.</p></div></details>
-      </div>
-    </section>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Tue, 10 Nov 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>CLAUDE.md rules: why the same incident came back – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/claude-md-rule-incidents/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/claude-md-rule-incidents/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/claude-md-rule-incidents-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · Retrospective</span>
-      <h1>When Claude breaks a rule written in CLAUDE.md: six incidents and what came back</h1>
-      <p class="lead">CLAUDE.md is context, not enforced configuration, so rules written there still break. Move a rule that bans one command into settings, and count relapses in the session logs instead of trusting memory.</p>
-    <p class="note ax-series-line"><a href="https://sugarmount21.com/en/ax/series/agent-rules-memory/">Giving an agent rules and limits</a> 2/5</p>
-      <p>CLAUDE.md is the instruction file Claude Code reads when a session starts; one in your home folder applies to every project (the global instructions below). SugarMount added a line there, or to a project's memory, after each incident. Recounting the session logs, the rule to reply in Korean still broke on five later dates, and a pkill rule kept in one project's memory failed 7 more times in other projects.</p>
-    </section>
-    <section aria-labelledby="exit-144">
-      <h2 id="exit-144">exit 144 happened more often than the note said</h2>
-      <p>Commands that used <code>pkill -f</code>, or <code>pgrep -f</code> with <code>kill</code>, to stop a process also cut off the agent's own shell. The Bash tool wraps each command in <code>bash -c '...pattern...'</code>, so the pattern also matches the calling shell's command line. The call ends in exit 144 and the rest of it never runs. The note says the target survives, but in the 4 cases we checked, the target had stopped. We could not confirm why the value is 144. A SIGTERM usually gives 143, and the shell changed on October 18, so we could not reproduce it.</p>
-      <p>At 16:53 on October 4 the agent wrote this into the game project's memory and said it had happened twice. Counting Bash calls that ended in exit 144 gives 5 in that project alone and 24 across all counted projects from September 14 up to the note. All 31, including those after the note, contain <code>pkill -f</code> or <code>pgrep -f</code> with <code>kill</code>.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/claude-md-rule-incidents-1-en.webp" width="1200" height="568" alt="Bar chart: the note says exit 144 happened 2 times, but session logs show 5 in that project and 24 across counted projects; after the note, 0 in that project and 7 elsewhere." loading="lazy"><figcaption>Exit 144 stopped in the project that had the note, and 7 more happened in projects that did not.</figcaption></figure>
-      <p>From the note until October 18, none of the game project's 1,348 Bash calls ended in exit 144, and none used <code>pkill -f</code>. Two <code>pgrep -f</code> calls remained, for waiting or checking, and neither led to a kill.</p>
-      <p>Other projects had 4 failures on October 5 and 3 on October 11. The documentation scopes auto memory per repository. The note sat in the game project's memory, and a search for pkill in the global instructions finds nothing, so it did not load in sessions elsewhere. One of those projects wrote the same line into its own memory that day.</p>
-      <p>The shell changed when the development environment moved on October 18, so later logs are left out. Other projects also had no exit 144 after the afternoon of October 11, so we don't claim the note caused the drop.</p>
-    </section>
-    <section aria-labelledby="korean-rule">
-      <h2 id="korean-rule">The Korean rule broke after it was attached</h2>
-      <p>The operator asked for this to go into the global instructions. In a session with the file attached, the same request came back at 01:23 on October 4. The reply before it had 0 Hangul characters and 1,691 Latin letters.</p>
-      <p>The first guess was session age: the relapsing session started two days before the rule, so maybe it never saw it. The logs rule that out. The global instructions were attached to it on October 3, right after its first compaction, and the relapse came later. A session started after the rule, with the file attached from the first moment, also answered in English on October 4 and 5. The five dates are days the operator objected in 4 such sessions; 3 requests where no attachment could be confirmed are left out.</p>
-      <p>The memory files and logs show several paths. On October 4, replies drifted into English after a run of English messages from other sessions. On October 5 the questions and options in the multiple-choice question tool were in English. On October 8 a session answering in Korean gave only its final report in English, right after English table output. On October 24 every reply in the turn was in English, from the first one after a Korean question. On October 11 the operator refused an English question in the spelling app project and had it asked again in Korean.</p>
-      <p>Objection dates only catch days the operator spoke up, so we counted replies too. From the last reply of each turn after a Korean message, with code removed, we pulled the 55 of 80 or more letters with under 10% Hangul and read them all. 21 error messages and automatic classifier turns were false positives and left the denominator too. In 16 of the remaining 34, automatic input such as another session's message had arrived first.</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Period</th><th>English replies / all</th><th>Rate</th></tr></thead>
-        <tbody>
-          <tr><td>Sep to Sep 28</td><td>0 / 218</td><td>0.0%</td></tr>
-          <tr><td>Sep 29 to the rule (Oct 2, 08:44)</td><td>5 / 37</td><td>13.5%</td></tr>
-          <tr><td>First 7 days after the rule</td><td>17 / 248</td><td>6.9%</td></tr>
-          <tr><td>Oct 9, 08:44 to Oct 17</td><td>3 / 201</td><td>1.5%</td></tr>
-          <tr><td>Oct 18 to Nov 7</td><td>9 / 414</td><td>2.2%</td></tr>
-        </tbody>
-      </table></div>
-      <p>There were none through September 28; English replies first appeared in the three days before the rule. Of the 20 after the rule, 17 came in the first seven days, and the rate then fell to 1.5%. The first week includes sessions from before attachment and the samples are small, so we don't read the drop as the rule working. We still don't know why English appeared in late September.</p>
-    </section>
-    <section aria-labelledby="enforce">
-      <h2 id="enforce">Three settings we have only read about</h2>
-      <p>The documentation calls these files "context, not enforced configuration", and to block an action it points to a PreToolUse hook, which runs just before a tool call. A reply sentence is not a tool call, so that hook never sees it. Our reading: pkill is one command to avoid, but reply language follows the input around it, as it did on October 4 after a run of English messages. That doesn't explain days like October 24, when the message just before was in Korean.</p>
-      <p>We checked the three options below in the documentation on 2026-11-07. None is in our user settings now, and we haven't used any of them to enforce a rule.</p>
-      <ul>
-        <li>The <code>language</code> setting passes its value to Claude as "an instruction to always respond in that language". That is one more instruction and enforces nothing.</li>
-        <li>A Stop hook runs when Claude finishes responding and receives <code>last_assistant_message</code>; exit 2 keeps Claude going. This is where reply language could be checked. We haven't measured false positives on code-heavy replies or the cost of retries.</li>
-        <li><code>Bash(pkill *)</code> under <code>permissions.deny</code> in <code>~/.claude/settings.json</code> applies to every project and also matches subcommands. The documentation says other invocation forms such as <code>bash -c</code> get through, and <code>pgrep -f</code> with <code>kill</code>, 2 of the 31, is not covered.</li>
-      </ul>
-    </section>
-    <section aria-labelledby="pairs">
-      <h2 id="pairs">Six rules and the incidents behind them</h2>
-      <p>"Install alone is not verification" in the October 1 memory became the same line in the global instructions. The ban on <code>gradlew --stop</code> came from September 23, when a build in another session kept stopping the Gradle daemons.</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Rule</th><th>Lives in</th><th>Incident</th><th>Date and number</th></tr></thead>
-        <tbody>
-          <tr><td>Reply in Korean</td><td>Global section 1</td><td>English status report on a Korean bug report</td><td>Oct 2, rule 5 minutes later</td></tr>
-          <tr><td>Run the release build before saying done</td><td>Global section 3</td><td>QA never ran the minified build; crash on launch</td><td>Sep 23, 1.0.3 (4)</td></tr>
-          <tr><td>Install alone is not verification</td><td>Global section 3</td><td>Missing VIBRATE permission; crash on first tutorial tap (<a href="https://sugarmount21.com/en/ax/fresh-install-monkey-test/">VIBRATE crash and the fresh-install monkey test</a>)</td><td>Oct 1, Galaxy S24</td></tr>
-          <tr><td>Adversarial review after big changes, other paths of the same defect</td><td>Global section 3</td><td>Chat app: defects found after 1,000 tests passed</td><td>Sep 7-9, 3 reviews</td></tr>
-          <tr><td>Re-read shared files, edit in part, no unrequested commits</td><td>Global section 3</td><td>Another session's commit swept in files in progress</td><td>Sep 23, 50 files of another app</td></tr>
-          <tr><td>Do not kill processes by pattern</td><td>Project memory</td><td>Killed the calling shell</td><td>Oct 4, exit 144</td></tr>
-        </tbody>
-      </table></div>
-      <p>Three of the six lines in section 3 of the global instructions became the four rows above; the verification line splits into the release build and install rows. The other two lines are a working preference or fall outside what we publish; the secrets line comes up below. For a repository's AGENTS.md, see <a href="https://sugarmount21.com/en/ax/agents-md/">How to write AGENTS.md for an AI coding agent</a>; this note covers personal global instructions and project memory.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20When%20Claude%20breaks%20a%20rule%20written%20in%20CLAUDE.md%3A%20six%20incidents%20and%20what%20came%20back">Email us</a></p></aside>
-    <section aria-labelledby="scope">
-      <h2 id="scope">Two rules where the answer differs by project</h2>
-      <p>Going by exit 144 alone, putting every rule in the global instructions looks easy. The device and commit rules differ by project.</p>
-      <p>On October 5, 2026, 7 <code>minigame_check</code> checks failed on a Galaxy S21. At 12:17 the agent said it would check on the emulator whether the failures were real, and the same suite passed 58/58 there. The cause was another session launching its own app on the S21 mid-run. The agent wrote this up in project memory that day, with a diagnosis: look in the device logcat for <code>START u0</code> lines from foreign packages.</p>
-      <p>The game project's October 5 note calls the emulator a good fallback, while on October 11 the operator told the family app project not to start a PC emulator and to use the S20. Commits work the same way: the global instructions say not to commit unless asked, and on October 22 the game project reversed that and commits after each unit of work.</p>
-      <p>The documentation warns that instructions given only in conversation can disappear after compaction; what actually survived is in <a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">What survives Claude Code auto-compaction: the summary, recent files and the memory index</a>. This record comes from global instructions used by one person; we haven't tried it on instructions shared by a team.</p>
-    </section>
-    <section aria-labelledby="no-incident">
-      <h2 id="no-incident">Two rules that came from near misses</h2>
-      <p>The secrets rule came from a close call. At 08:47 on October 2 the agent printed the last 150 lines of the shell history to survey the setup, and an API key was in them. 47 seconds later the agent itself added a one-line rule against printing secrets to the global instructions, and at 08:55 the operator's request turned it into a rule with ways to check (<a href="https://sugarmount21.com/en/ax/secrets-three-layers/">Keeping secrets away from an AI coding agent: one rule for chat, logs and token permissions</a>).</p>
-      <p>The money rule is similar. On October 8, when the operator handed over all the marketing, the agent said it would start by creating the ad account; five minutes later came the instruction to ask before anything that costs money or looks odd (<a href="https://sugarmount21.com/en/ax/agent-permission-table/">A permission table for a scheduled AI agent: what it does alone, and which clicks a person makes</a>). Both went in before any damage that would be hard to undo. Don't wait for the incident: write money and secrets rules first.</p>
-    </section>
-    <section aria-labelledby="procedure">
-      <h2 id="procedure">Five steps after an incident</h2>
-      <ol>
-        <li>Write the rule in one line with a Why: the date, the command you ran, the result.</li>
-        <li>Count the symptom in your session logs. This script counts only tool results that start with the string you pass, so mentions in messages or notes don't count. Change the argument for other symptoms. Passing our unpublished folders as skip arguments gives 31.
-          <pre><code># python count_results.py "Exit code 144" [folder substrings to skip ...]
-import glob, json, os, sys
-needle, skip, ids = sys.argv[1], sys.argv[2:], set()
-for path in glob.glob(os.path.expanduser("~/.claude/projects/*/*.jsonl")):
-    if any(s in path for s in skip):
-        continue
-    for line in open(path, encoding="utf-8"):
-        if needle not in line:
-            continue
-        try:
-            content = json.loads(line).get("message", {}).get("content")
-        except (ValueError, AttributeError):
-            continue
-        for block in content if isinstance(content, list) else []:
-            if isinstance(block, dict) and block.get("type") == "tool_result":
-                body = block.get("content")
-                text = body if isinstance(body, str) else " ".join(
-                    x.get("text", "") for x in body or [] if isinstance(x, dict))
-                if text.startswith(needle):
-                    ids.add(block["tool_use_id"])
-print(len(ids))</code></pre>
-          Mind the scope: it reads only logs directly under the project folders, skips subagent logs and has no date limit. A relapse that leaves no tool result needs another method. For English replies, pull candidates by the Hangul share of each turn's last reply and read them all.
-        </li>
-        <li>Pick the scope. If it shows up in two or more projects, use the global instructions; if the right answer differs by project, use project memory.</li>
-        <li>If the rule bans a specific command, mark it as a deny rule or PreToolUse hook candidate, for example <code>{"permissions": {"deny": ["Bash(pkill *)"]}}</code>.</li>
-        <li>When it relapses, add the date and the new path to How to apply.</li>
-      </ol>
-      <p>If an incident happens twice, recount it from the logs before you edit the sentence.</p>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">The pkill line and relapses after October 24</h2>
-      <p>The pkill line is still not in the global instructions, only in two project memories. By step 3 it belongs there, but exit 144 has not appeared since the shell changed on October 18, so we haven't decided. The five dates are a lower bound: they count days the operator objected, up to October 24. The logs run to November 7, and the table above includes English replies from October 30, October 31 and November 1. The next recount will include sessions that run on their own.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20When%20Claude%20breaks%20a%20rule%20written%20in%20CLAUDE.md%3A%20six%20incidents%20and%20what%20came%20back">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <nav class="box ax-series-box" aria-label="Series contents"><p><strong><a href="https://sugarmount21.com/en/ax/series/agent-rules-memory/">Giving an agent rules and limits: all 5 parts</a></strong></p><ol><li value="1"><a href="https://sugarmount21.com/en/ax/agents-md/">How to write AGENTS.md: only the rules an AI coding agent gets wrong</a></li><li value="3"><a href="https://sugarmount21.com/en/ax/compaction-summary-memory/">What survives Claude Code auto-compaction: the summary, recent files and the memory index</a></li></ol></nav>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Why does Claude break rules written in CLAUDE.md?</summary><div><p>CLAUDE.md is read as context and is not enforced. In our logs, 4 sessions with the global instructions attached still answered in English.</p></div></details>
-        <details><summary>Should a rule go in the global CLAUDE.md or in project memory?</summary><div><p>Project memory doesn't load in sessions for other repositories. Use the global instructions when the same incident shows up across projects, and keep only rules whose answer differs by project, such as emulator use, in project memory.</p></div></details>
-        <details><summary>Why does pkill -f give exit 144 in Claude Code?</summary><div><p>The pattern matches the calling shell, so the shell gets cut off too. We find the exact PID instead, using a bracket trick such as <code>grep "[b]lock_full_e2e.py"</code>.</p></div></details>
-      </div>
-    </section>
-    <p class="note">Sources: the global instructions and project memory files, Claude Code session logs and the Claude Code documentation. Counts were rerun by script on November 7, 2026, leaving out unpublished folders and subagent logs. Times are KST.</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Mon, 09 Nov 2026 09:00:00 +0900</pubDate>
   </item>
 </channel>
 </rss>

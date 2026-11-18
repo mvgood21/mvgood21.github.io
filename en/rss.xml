@@ -6,7 +6,134 @@
   <description>Small Android apps that each do one thing simply, from shrinking photos and opening Korean HWP documents to checking Korean spelling and playing puzzle games.</description>
   <language>en</language>
   <atom:link href="https://sugarmount21.com/en/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Wed, 18 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Thu, 19 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Claude Code tapped a real AdMob ad during E2E – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/e2e-agent-real-ad-click-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>Claude Code tapped a real AdMob ad during E2E</h1>
+      <p class="lead">Our AdMob test-device setup applied only to debug builds, so a Claude Code agent testing a release APK on a real phone saw live ads and clicked one of them once.</p>
+      <p>A Claude Code agent was tapping through an Android app on a real phone when an interstitial ad came to the front, and its next tap landed on the ad. AdMob counts live impressions and clicks on a developer's own device as invalid traffic.</p>
+      <p>The setting that sends test ads to our development phones applied only to debug builds, so the release APK served live ads. The agent's screen-check guard read only the package name, so it took an ad screen opened inside the app for the app itself, and the tap that hit the ad never went through that guard at all. The next day the setting went into every build, but banners inside our own screens and ads from other networks are still not fully covered.</p>
+    </section>
+    <section aria-labelledby="chrome-opened">
+      <h2 id="chrome-opened">Chrome opened from behind an interstitial</h2>
+      <p>On the afternoon of September 28, 2026, the agent installed a release APK of our Korean spell checker <a href="https://sugarmount21.com/en/apps/sugarspeller/">SugarSpeller</a> on a Galaxy S21 and walked through the whole check flow. Its script force-stopped the app and relaunched it through a share intent for every check.</p>
+      <p>One agent command dumped the screen, read the coordinates of the result bubble and sent a tap there. The tap landed at 16:19:55, when the dump finished, and a tenth of a second later logcat showed Chrome opening a shopping advertiser's page. When the agent dumped the screen again, the script stopped with "foreground is not our app": Chrome's first-run screen was in front.</p>
+      <p>After Chrome was closed, an interstitial in the Google Mobile Ads SDK's <code>AdActivity</code> was still up inside the app. The agent wrote that it would close the ad with BACK only and never tap it. After BACK, a second ad screen was underneath, from another ad network, Liftoff (formerly Vungle). Twenty-nine minutes later it told the operator it had clicked a real ad once, an invalid click, and recorded the same in the changelog's incident line.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/e2e-agent-real-ad-click-1-en.webp" width="1200" height="847" alt="Step diagram: E2E on a release APK, app restart per check, a guard that checks only the package name, a raw tap outside the guard, and Chrome opening at 16:19:55 for one real ad click" loading="lazy"><figcaption>The steps up to Chrome opening at 16:19:55. The guard read only the package name, and the tap that hit the ad never went through it.</figcaption></figure>
+    </section>
+    <section aria-labelledby="guard">
+      <h2 id="guard">The guard only checked the package name</h2>
+      <p>At 14:56 that day the agent had added a guard to its screen dump and screenshot script. It read the topResumedActivity line, the activity in front, and carried on if the app's package name appeared there. Ad SDK screens run inside the app's process, so that line reads like <code>com.sugarmount.sugarspeller/com.google.android.gms.ads.AdActivity</code> and passes. The guard also sat only in front of the dump and screenshot commands; the tap that clicked the ad was a raw command that never went through it.</p>
+      <p>The guard changed twice within two minutes of the click.</p>
+      <div class="table-wrap"><table><thead><tr><th>Time</th><th>Rule</th><th>What happened</th></tr></thead><tbody><tr><td>14:56 (v1)</td><td>Continue if the app's package name is on the front-screen line</td><td>Ad screens passed. Taps ran outside the guard</td></tr><tr><td>16:20 (v2)</td><td>Stop if the name contains <code>AdActivity</code> or <code>gms.ads</code>; move taps into the script, only with numeric coordinates more than 250 px below the top</td><td>After BACK, Liftoff's <code>VungleActivity</code> underneath was not on the name list</td></tr><tr><td>16:21 (v3)</td><td>Continue only if the front screen is one of the app's own classes; otherwise stop and close with BACK</td><td>At 16:44 it blocked a tap in front of a Liftoff ad</td></tr></tbody></table></div>
+      <p>The v2 assumption was that ad screens can be recognized by name. With mediation, where several ad networks bid for the same slot, each network brings its own screen name, and an unlisted one appeared 13 seconds after v2 went in. v3 lists what is allowed instead of what is blocked. The agent also removed the force-stop from each check that day, because every relaunch showed an app-open ad.</p>
+    </section>
+    <section aria-labelledby="debug-only">
+      <h2 id="debug-only">The test-device list was wired to debug builds only</h2>
+      <p>The app had a test-device list in code, but a September 11 fix applied it only inside a <code>BuildConfig.DEBUG</code> check, which is true only in debug builds. A release APK on a real phone skipped the list entirely, and the S21 was not on it anyway.</p>
+      <p>The next night, while instrumentation tests (Android tests that launch the app on the phone itself) ran on the S21, the operator asked whether the account would get suspended, since ads kept showing during testing. The agent first answered that the instrumentation tests were debug builds using test ad units, so there was no risk. That was wrong. This app's debug build deliberately uses the real ad units so the bidding partners can be verified, and a comment in the same file said so. The logcat the agent then checked had three copies of the SDK hint that only unlisted devices get: call setTestDeviceIds to get test ads on this device.</p>
+      <p>Twenty-seven minutes after the question, commit <code>ec5f400</code> moved the call out of the debug condition. Only listed devices get test ads, so real users are unaffected. The commit added the S21 and a unit test checking that the S21 is on the list and that the configuration carries the whole list.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/e2e-agent-real-ad-click-shot2-en.webp" width="1200" height="729" alt="Excerpt of the ec5f400 diff: the setRequestConfiguration call moves out of the BuildConfig.DEBUG block and a Galaxy S21 line joins the test-device list, with three hashes covered by black boxes" loading="lazy"><figcaption>Diff excerpt of commit ec5f400 (2026-09-29) from git history. The three test-device SDK hashes are covered with solid boxes.</figcaption></figure>
+      <p>The two days of developer-phone testing also show in AdMob reporting. When we pulled daily banner requests again, September 29 alone had more than twice the usual thousand or so requests, and the match rate (the share of ad requests that actually got an ad) fell below half.</p>
+      <p>Our October 1 monitoring note says all of the extra requests came from version 1.6.024 and puts them down to the S21 and S23 running instrumentation tests against real ad units. In the raw data, every unmatched request on September 28 and 29 but one came from that version too. That version number was shared by the development builds and the Play release at the time, so the version alone does not single out the devices.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/e2e-agent-real-ad-click-shot1-en.webp" width="1200" height="620" alt="Stacked bar chart of banner ad requests for the spell checker app, Sep 20 to Oct 6: 1,561 at 74% match on Sep 28, 2,402 at 48% on Sep 29, 1,645 at 95% on Sep 30, 92 to 100% on other days" loading="lazy"><figcaption>Raw AdMob network report data (queried 2026-11-18, banner requests and matched requests only). Unmatched requests jumped only on September 28 and 29.</figcaption></figure>
+      <p>The S23 was on the list and still got live ads. Resetting a phone's advertising ID also changes the test-device value the SDK uses, and the code still held the value from before the reset. The agent said the test-device ID is the MD5 of the advertising ID and computed it, but the result did not match the log, and neither did an MD5 of the Android ID. On the operator's instruction, the code got the value the SDK printed in logcat.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20tapped%20a%20real%20AdMob%20ad%20during%20E2E">Email us</a></p></aside>
+    <section aria-labelledby="choices">
+      <h2 id="choices">We put the test-device list in every build and the console</h2>
+      <p>Five fixes came up. The agent objected to two from the operator's side, and the operator stopped the build flag the agent was writing.</p>
+      <div class="table-wrap"><table><thead><tr><th>Option</th><th>Raised by</th><th>Outcome</th></tr></thead><tbody><tr><td>Turn the app's debug constant on for testing and off for release</td><td>Operator</td><td>Agent objected: the constant also forces a premium subscription, and forgetting to turn it off would give every user test ads and free premium</td></tr><tr><td>Build flag for test ad units that fails the Play upload (AAB) build if left on</td><td>Agent</td><td>Operator stopped it mid-test and switched to console registration. Never built (not in the repository as of November 18)</td></tr><tr><td>Switch the debug build to test ad units</td><td>(Sep 11 review)</td><td>Dropped: test units skip mediation, so bidding partners can't be verified</td></tr><tr><td>Watch a few live ads to check, then ship</td><td>Operator question</td><td>Agent objected: live impressions and clicks on a developer device are invalid traffic at any count</td></tr><tr><td>Apply the code list to every build and register devices in the console</td><td>Agent, operator</td><td>Chosen. Code in <code>ec5f400</code>; console registration left to the operator</td></tr></tbody></table></div>
+      <p>On the morning of September 30 the operator asked whether the S21 was registered as an AdMob test device too. The agent said only in code. The code list only covers builds that contain it. If an older version from Play is installed on a developer phone, only the test-device registration in the AdMob console protects it. The console takes the raw advertising ID and the code takes the SDK hash, so both values went into a per-device table in the repository docs (<code>4595dce</code>).</p>
+    </section>
+    <section aria-labelledby="worktree">
+      <h2 id="worktree">An ad ID file copied into a worktree</h2>
+      <p>About a week later the same risk came in by another route in our puzzle game <a href="https://sugarmount21.com/en/apps/arrow-knots/">Arrow Knots</a>. The game keeps its real ad IDs in one settings file that git ignores, and a release build uses the file whenever it exists. At 01:28 on October 4, the Claude Code session handling ads got the IDs from the operator and, without asking, copied the file into another session's working folder (a git worktree). Twenty-one minutes later that session built what it took to be a test release APK.</p>
+      <p>At 02:06 that session passed on the ad session's warning that random-tap testing must never run on a real-ID build, wrote that its own workspace had no real-ID file and would build with test ads only, so it was safe, and then installed the APK on an S20. A file check in the same command printed that the file was there. The session uninstalled the app without ever opening it, moved the file aside, and rebuilt with test ads. No ad request or click happened.</p>
+      <p>The game's test-ads flag only allowed test IDs when the file was missing; it did not ignore a file that was present. Commit <code>68d501e</code> the next day made the build read the file from its original location through a build argument, so a worktree never needs a copy. Our block puzzle, built in the same days, has a test-ads flag that ignores the file entirely; what its real-ID check still missed is in <a href="https://sugarmount21.com/en/ax/release-ad-id-grep/">Why R8 kept 5 AdMob test IDs in a release AAB</a>.</p>
+    </section>
+    <section aria-labelledby="liftoff-and-banners">
+      <h2 id="liftoff-and-banners">The September 30 check still logged the Liftoff app-open ad as live</h2>
+      <p>The tap guard only checks whether the front screen is one of our activities, so it cannot see a banner or native ad placed inside our own screen. If coordinates happen to land on a banner, the guard lets the tap through. That is why the order below puts test-device registration ahead of the tap rule.</p>
+      <p>The code list only covers AdMob ads. At 08:57 on September 30 the operator said the console registration was done, but the records do not say which consoles or which devices. In the S21 check that followed, AdMob served test ads; the Liftoff app-open ad was still live and did not close with BACK, so the app was force-stopped to close it. The session judged it live from what was on screen and asked the operator to recheck the test-device setting in the Liftoff dashboard.</p>
+    </section>
+    <section aria-labelledby="before-device-e2e">
+      <h2 id="before-device-e2e">Register test devices before any device E2E</h2>
+      <p>Do not run automated taps on a real device with any build that can serve live ads. This is the order we put together from this incident. Of these, using the logcat value and applying the list to every build (steps 1 and 2) are already in the app repository's rules, and tapping only on our own screen (step 5) and never copying the real-ID file into another worktree (step 6) are already in the agent's memory.</p>
+      <ol class="steps"><li><p>Connect the device, launch the app once, and copy the value from the <code>setTestDeviceIds(Arrays.asList("…"))</code> line in logcat. Don't compute it.</p></li><li><p>Add that value to the app's test-device list and keep the <code>MobileAds.setRequestConfiguration</code> call outside any build-type condition. Add a unit test that checks the device is on the list.</p></li><li><p>Register the same phone's raw advertising ID as a test device in the AdMob console and in each mediation partner's console.</p></li><li><p>Relaunch the app, check that ads carry the test-ad label, and confirm the "to get test ads on this device" line no longer shows in logcat.</p></li><li><p>Inside the tap script's tap command, tap only if the activity name from <code>adb shell dumpsys activity activities | grep -m1 topResumedActivity</code> starts with one of the app's own classes, such as <code>&lt;package&gt;/.</code>; otherwise send BACK. Relaunch the app only when you must.</p></li><li><p>Keep the real ad ID file in one place and pass its path to the build. Never copy it into another session's worktree.</p></li><li><p>The next day, check match rate and request counts in the AdMob report. Leaked developer-device traffic shows there first.</p></li></ol>
+      <p>Random-tap crash hunting is in <a href="https://sugarmount21.com/en/ax/fresh-install-monkey-test/">VIBRATE crash and the fresh-install monkey test</a>; we run that only on test-ad builds as well.</p>
+    </section>
+    <p class="note">As of 2026-11-18. App repository git history (ec5f400, 536ce09, 4595dce, ff7a5aa; changelog entries for Sep 28 and Sep 30), game repository git history (68d501e) and agent memory, Claude Code session logs (Sep 28 to 30, Oct 4), and banner request and matched-request counts pulled again from the AdMob Network Report API (2026-11-18).</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20tapped%20a%20real%20AdMob%20ad%20during%20E2E">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/naver-speller-highlight-missing/">Claude Code fix: Naver spelling highlights missing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Thu, 19 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Play Console in-app price VAT: 7,500 became 8,000 – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/play-iap-price-vat/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/play-iap-price-vat/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/play-iap-price-vat-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Short note</span>
+      <h1>Play Console in-app price VAT: 7,500 became 8,000</h1>
+      <p class="lead">The Korea price field in Play Console takes the amount before VAT, so typing KRW 7,500 for our one-time in-app product made the buyer price 8,000 won.</p>
+      <p>We typed 7,500 won into Play Console, and the next day the Pro price on the app's settings screen read 8,000. This was October 2026, while setting up the one-time Pro purchase for <a href="https://sugarmount21.com/en/apps/doc-viewer/">SugarDoc</a>, our viewer for Korean HWP documents. The AI coding agent had guessed the field was tax-inclusive, while the owner's first take, that Play adds 10% to the console price, was the right one.</p>
+    </section>
+    <section aria-labelledby="api-stored-7500">
+      <h2 id="api-stored-7500">We sent 6,900 and Play stored 7,500</h2>
+      <p>On October 5 a Claude Code agent created the product through the Play Developer API (Google's API for doing Play Console work from code) and sent the owner's chosen price of 6,900 won. Reading the product back, the Korea price was 7,500. The agent took that for a conversion bug and tried to overwrite it with 6,900; the auto-mode permission classifier blocked the edit because it changes what real buyers pay.</p>
+      <p>The owner answered on the spot that 6,750 in the console would come to 7,500 for buyers once Play added 10%. The agent replied that 6,750 plus 10% is 7,425, so the numbers did not match, and labeled as a guess that the stored 7,500 was probably already the tax-inclusive buyer price. In the same reply it explained 7,500 as 6,900 plus 10% (7,590) rounded down to a price point, yet left rounding out when it checked the owner's 6,750. The owner typed 7,500 into the console, and the agent updated the docs from the owner's message without reading the stored price again.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/play-iap-price-vat-1-en.webp" width="1200" height="664" alt="KRW 6,900, 7,500 and 5,000 going in and being stored as 7,500, 8,000 and 5,500" loading="lazy"><figcaption>The stored price was higher than what went in every time.</figcaption></figure>
+      <p>On October 6 the on-device end-to-end (E2E) report caught 8,000 won on the settings screen. The app never hard-codes a price; it shows whatever Play returns, so the console value went straight to the screen.</p>
+      <p>On October 8 the agent put the two input and stored pairs side by side and wrote that its tax-inclusive guess had been wrong. The owner typed 5,000, the Korea price the API returned was 5,500, and the agent fixed the docs within the same minute.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Play%20Console%20in-app%20price%20VAT%3A%207%2C500%20became%208%2C000">Email us</a></p></aside>
+    <section aria-labelledby="tax-exclusive-input">
+      <h2 id="tax-exclusive-input">The conversion API takes a pre-tax price and returns a taxed one</h2>
+      <p>Google Play's help page on tax rates lists South Korea among the countries where the price shown to buyers must include tax. The API reference for <code>convertRegionPrices</code> describes its input price as "Tax exclusive" and each converted region price as "tax inclusive."</p>
+    </section>
+    <section aria-labelledby="read-back">
+      <h2 id="read-back">Write down the price you read back</h2>
+      <p>Since the classifier block on October 5, the owner changes prices in the console and the agent only reads them.</p>
+      <ol class="steps"><li><p>Take the Korea price you want buyers to pay and divide by 1.1; that goes in the console (5,000 for 5,500). If the result is not a round number, the stored price may be moved to a nearby price point.</p></li><li><p>After saving, read the buyer price from the product GET's regionCode KR entry or from the store listing.</p></li><li><p>Record both numbers, for example "buyer 5,500 won (console 5,000)."</p></li><li><p>If you create products through the conversion API, note in a code comment that its input is pre-tax.</p></li></ol>
+      <figure><img src="https://sugarmount21.com/assets/ax/play-iap-price-vat-shot1-en.webp" width="1200" height="376" alt="Read-only re-query on 2026-11-18: product ACTIVE in 174 regions, KR 5500 won, US 3.69 dollars" loading="lazy"><figcaption>Where step 2 reads: the units value under regionCode KR is the buyer price. Play Developer API read-only GET, 2026-11-18 19:19 KST.</figcaption></figure>
+      <p>Update a documented price only from the value you read back after saving. A different Play API result we failed to check before acting is in <a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">Play staged rollout API: 20% went out as 100%</a>.</p>
+      <p>These records cover one one-time product in October 2026; we have not checked subscriptions or accounts that file Korean VAT themselves as a local business. The console path, where 7,500 typed in became 8,000, is something we observed; we could not confirm from the help pages that the same rounding rule applies there. The product script overwrites only the Korea price with the buyer price, while converting every other region from that same number as if it were pre-tax, so other regions may be priced higher than intended. We have not rerun it to check.</p>
+    </section>
+    <p class="note">As of 2026-11-18. Sources: app repository git history (commit 2cc25d1, PRD and implementation plan), agent session logs (2026-10-05 to 10-08), a read-only Play Developer API query, Google Play Console Help and the Android Publisher API reference.</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Play%20Console%20in-app%20price%20VAT%3A%207%2C500%20became%208%2C000">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/play-store-title-aso-no-clear-gain/">Play Store title keywords: two weeks, no verdict</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/naver-speller-highlight-missing/">Claude Code fix: Naver spelling highlights missing</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Thu, 19 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>Claude Code Android: a build gate for zero ads – SugarMount</title>
     <link>https://sugarmount21.com/en/ax/ads-free-release-gate/</link>
@@ -76,10 +203,10 @@ onVariants(selector().withBuildType("release")) { variant -&gt;
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/play-iap-price-vat/">Play Console in-app price VAT: 7,500 became 8,000</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-store-title-aso-no-clear-gain/">Play Store title keywords: two weeks, no verdict</a></li>
         <li><a href="https://sugarmount21.com/en/ax/google-ads-break-even-cpi/">Four Google Ads app campaigns, $36.4, 105 installs, about 3% ROAS: CPI ran 30 times break-even</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/interstitial-frequency-timeline/">We set interstitial frequency from device timelines, and tutorials don&#x27;t count</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
         <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
       </ul>
@@ -621,10 +748,10 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>Give the 
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/">Claude Code tapped a real AdMob ad during E2E</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
         <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
       </ul>
@@ -695,11 +822,11 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>Give the 
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/play-iap-price-vat/">Play Console in-app price VAT: 7,500 became 8,000</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-ad-creatives-from-play-recordings/">App campaign ad assets from gameplay recordings</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/">Claude Code tapped a real AdMob ad during E2E</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/store/">All notes on Play Store and monetization</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -782,7 +909,7 @@ grep -rn "getMessagesPage\|MessageCursor" lib/</code></pre></li><li><p>Give the 
         <li><a href="https://sugarmount21.com/en/ax/20-days-4-apps/">Claude Code for Android app development: 4 apps in 20 days</a></li>
         <li><a href="https://sugarmount21.com/en/ax/retention-cohort-break/">Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/">Claude Code tapped a real AdMob ad during E2E</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/retro/">All notes on Retrospectives and numbers</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -1495,8 +1622,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/">Claude Code tapped a real AdMob ad during E2E</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2164,7 +2291,7 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/">Claude Code tapped a real AdMob ad during E2E</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3220,7 +3347,7 @@ while True:
         <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
         <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/play-store-title-aso-no-clear-gain/">Play Store title keywords: two weeks, no verdict</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/">Claude Code tapped a real AdMob ad during E2E</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4778,8 +4905,8 @@ print("first", shows[:1], "gaps", [b - a for a, b in zip(inter, inter[1:])],
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/play-iap-price-vat/">Play Console in-app price VAT: 7,500 became 8,000</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/play-store-title-aso-no-clear-gain/">Play Store title keywords: two weeks, no verdict</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5685,8 +5812,8 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/">Claude Code tapped a real AdMob ad during E2E</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/naver-speller-highlight-missing/">Claude Code fix: Naver spelling highlights missing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
@@ -5897,255 +6024,6 @@ depth(board):                   # peel
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
         <li><a href="https://sugarmount21.com/en/ax/naver-speller-highlight-missing/">Claude Code fix: Naver spelling highlights missing</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Fri, 30 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>App retention drop: five years of GA4 cohorts – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/retention-cohort-break/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/retention-cohort-break/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/retention-cohort-break-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · Measurement</span>
-      <h1>Daily users rose after the redesign while organic D1 retention fell from 15.2% to 11.2%</h1>
-      <p class="lead">Daily users can rise after a redesign while new users stay less. Our spelling app's organic day-1 retention fell from 15.2% to 11.2% after its 2025 redesign and has not recovered in over a year.</p>
-    <p class="note ax-series-line"><a href="https://sugarmount21.com/en/ax/series/sugarspeller-maintenance/">Reworking a long-running spelling app</a> 2/8</p>
-      <p>When daily active users climb the month after a big redesign, the redesign looks like a win. <a href="https://sugarmount21.com/en/apps/sugarspeller/">SugarSpeller</a>, our Korean spell-checking app, had its best month of 2025 right after its August redesign. A year later we pulled the GA4 data again and found that people who arrived after the redesign were staying less. This note shows how we found the break with organic (search) cohorts from the GA4 Data API, how we split the lost daily users by how long ago they first opened the app, and why we still cannot name the cause.</p>
-    </section>
-    <section aria-labelledby="cohort-step">
-      <h2 id="cohort-step">26 months of organic cohorts: D1 from 15.2% to 11.2%</h2>
-      <p>We built monthly cohorts by first session date with the GA4 Data API cohort request and kept only users whose first channel was Organic Search. Devices with no brand, OnePlus8 models and <code>sdk_gphone</code> emulators (Play's pre-launch test bots) were filtered out. Plain averages for the 14 months before the redesign and the 12 months after:</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Organic monthly cohorts</th><th>Avg size</th><th>D1</th><th>D7 (days 6-8)</th><th>D30 (days 28-30)</th></tr></thead>
-        <tbody>
-          <tr><td>Jul 2024 to Aug 2025 (14)</td><td>1,066</td><td>15.2%</td><td>7.0%</td><td>4.2%</td></tr>
-          <tr><td>Sep 2025 to Aug 2026 (12)</td><td>900</td><td>11.2%</td><td>4.9%</td><td>2.6%</td></tr>
-        </tbody>
-      </table></div>
-      <p>Weighting by cohort size gives 15.4% to 11.2% on D1 and 4.3% to 2.6% on D30, so the picture holds. We also checked for a seasonal dip. In 2024 the September cohort's D1 fell to 14.7% and the October cohort was back at 16.3%. In 2025 the numbers were 13.6% in September, 12.3% in October and 12.3% in November, and every cohort through August 2026 stayed between 7.7% and 12.6%.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/retention-cohort-break-1-en.webp" width="1200" height="768" alt="Bar chart: the average organic monthly cohort fell from 15.2% to 11.2% on D1, 7.0% to 4.9% on D7, and 4.2% to 2.6% on D30." loading="lazy"><figcaption>From the September 2025 cohort on, D1, D7 and D30 all dropped a step and stayed there.</figcaption></figure>
-      <p>Weekly cohorts show where the step is. The 11 organic weekly cohorts from the week of June 2 to the week of August 11, 2025 averaged 16.4% on D1 (range 13.4% to 21.7%); the 13 from the week of September 1 to the week of November 24 averaged 12.6% (9.1% to 16.6%). A weekly cohort here is 176 to 423 people, so single weeks swing widely, and we made the call on monthly averages.</p>
-    </section>
-    <section aria-labelledby="dau-masked">
-      <h2 id="dau-masked">New users nearly doubled in September, and DAU went up</h2>
-      <p>For months after the redesign, rising DAU kept the break out of sight; the repository has no record of the post-redesign cohorts being cut separately before October 2026. New users across all channels were 2,304 in August 2025 and 3,053 in September, against 1,381 in June and 1,596 in July. Monthly average DAU rose to 765 in August and 780 in September. It then dropped to 654 in October and kept sliding, from 582 in January 2026 to 408 in September.</p>
-      <p>Splitting DAU by first session date shows which users went missing. These are daily averages over the same calendar window, September 20 to October 17, in each year.</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Time since first session</th><th>2024</th><th>2025</th><th>2026</th></tr></thead>
-        <tbody>
-          <tr><td>Same day (new)</td><td>43</td><td>64</td><td>34</td></tr>
-          <tr><td>1-7 days</td><td>24</td><td>26</td><td>12</td></tr>
-          <tr><td>8-30 days</td><td>43</td><td>41</td><td>15</td></tr>
-          <tr><td>31-90 days</td><td>87</td><td>95</td><td>33</td></tr>
-          <tr><td>91-365 days</td><td>253</td><td>169</td><td>97</td></tr>
-          <tr><td>Over a year (1-2 years + over 2)</td><td>293</td><td>292</td><td>251</td></tr>
-          <tr><td>Total DAU</td><td>744</td><td>688</td><td>442</td></tr>
-        </tbody>
-      </table></div>
-      <p>Each cell is rounded to the nearest user, so a column can be one off from its total. Of the 302 daily users lost between 2024 and 2026, 211 (70%) were people 31 to 365 days past their first session. Same-day new users fell by 9. Users older than a year went from 39% of DAU to 57%, yet their count fell from 293 to 251; the share rose because the younger group emptied out.</p>
-      <p>In the 2026 window, the 31-365 day group is made up only of people who first opened the app between late September 2025 and mid-September 2026, all of them post-break cohorts. That group fell 62%, from 340 to 130. New users across all channels in the two periods when this group first opened the app fell about 25%, from roughly 20,000 to roughly 15,100 (monthly new users prorated by day). Fewer arrivals cannot account for a 62% drop; the rest is people who came in and stayed less. We did not measure how much retention fell further after day 30.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/retention-cohort-break-2-en.webp" width="1200" height="524" alt="Bar chart: DAU fell by 302, from 744 to 442; users 31 to 365 days old account for 211 of it, users in their first 30 days for 49, and users over a year old for 42." loading="lazy"><figcaption>70% of the lost daily users were people who had first opened the app 31 to 365 days earlier.</figcaption></figure>
-    </section>
-    <section aria-labelledby="same-weeks">
-      <h2 id="same-weeks">Ad changes and a wave of new users landed in the same weeks</h2>
-      <p>Version 1.6.007 was built from 27 commits (merges included) between August 7 and 18, 2025, touching 129 files with 6,864 lines added and 2,476 removed. Its first commit, "ChatGPT-style UI, complete overhaul", is the first commit in this repository with a Claude <code>Co-Authored-By</code> trailer; six commits in the range carry one. One of their subject lines reads "UI/UX perfectly identical to ChatGPT, complete". How this app's commit messages changed over the following year is in <a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits</a>. Neither the commit messages in the range nor the working notes at the release say anything about watching retention or cohorts after shipping.</p>
-      <p>The screen was not the only change in that release. Three changes are worth setting against the retention data.</p>
-      <ul>
-        <li>Default screen: <code>getBoolean("opt.uiMode", true)</code> made chat the default. Earlier versions had no such setting at all, so existing users who updated also opened into the chat screen.</li>
-        <li>An ad shown when the user exits the app with the back button.</li>
-        <li>Chunking, which splits long text into pieces before sending it to the checker.</li>
-      </ul>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/apps/sugarspeller/shot3.webp" width="360" height="620" alt="SugarSpeller's Korean screen: the top menu offers Chat (switch to chat mode) and Classic (switch to classic mode), with Chat checked." loading="lazy"><figcaption>The top menu switches between the Chat and Classic screens (store screenshot of the Korean UI; the small lines read "switch to chat mode" and "switch to classic mode"). From 1.6.007 the app opens in Chat.</figcaption></figure>
-      <p>A separate hotfix for the app-open ad (version 1.6.008) shipped on August 26, and the surge in new users above fell in the same August and September. Weekly engagement time per user dropped from 377 seconds in the week of August 18 to 297 the next week and 253 by the week of September 8. Active users in those weeks rose from 3,072 to 3,400, though, so that metric mixes the screen change with a different set of users.</p>
-    </section>
-    <section aria-labelledby="recheck">
-      <h2 id="recheck">Three things we corrected in the AI-assisted strategy document</h2>
-      <p>The break was first written up in a strategy document committed on October 18, 2026. The commit carries a Claude co-author trailer and includes the GA4 analysis scripts and their output files alongside the document. Recomputing from the same output files for this note turned up several things to fix; these are the three largest.</p>
-      <ol>
-        <li>The document labeled D30 as the day 28-30 average and gave 2.4%. That 2.4% was the average of the single day-30 values; the day 28-30 average is 2.5%. Its range also included the September 2026 cohort. The data ended on October 17, so anyone who joined after September 17 had not reached day 30, and that cohort showed a D30 of 1.0%. Without it the figure is 2.6%.</li>
-        <li>The document listed 1.6.007's three changes and the August 26 hotfix, then called them "the only change that coincides with the break." It left out the surge in new users in the same weeks, and it reads as if the bundle were a single candidate cause.</li>
-        <li>The document used engagement time per user, 377 to 253 seconds, as evidence of the break. The denominator changed under that metric; the organic cohorts are the cleaner evidence.</li>
-      </ol>
-      <p>None of the three reverses the finding, but item 2 narrowed the candidates to one release when three changes and a wave of new users had landed in the same weeks. The document itself concluded that causation could not be established and left the decision to start a default-screen test to the operator.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Daily%20users%20rose%20after%20the%20redesign%20while%20organic%20D1%20retention%20fell%20from%2015.2%25%20to%2011.2%25">Email us</a></p></aside>
-    <section aria-labelledby="hold-rollback">
-      <h2 id="hold-rollback">We are not switching the default back yet; a new-install A/B test comes first</h2>
-      <p>The fastest response would be to make the older Classic screen the default again. On September 24, 2026 the operations log held the opposite proposal: remove Classic and move everyone to chat. That day's 28-day numbers showed Classic users running 7.6 checks per user against 4.5 for chat, and a return rate of 76% against 64%. In an app whose default is chat, though, Classic users are people who went looking for the switch, so the gap cannot be read as the effect of the screen. Moving existing users, who have had over a year on chat, back again has its own cost.</p>
-      <p>Comparing before and after on all-channel cohorts was also dropped. All-channel D1 fell as low as 8.0% in August 2023 and recovered to 12.5% to 15.1% in October to December of that year. Paid search brought 77% of new users in 2022 and 42% in 2023, and D1 moved along with that shift in channel mix. Paid (Cross-network) share was similar in 2025 and 2026, at 22% and 23%, but we compared organic users only.</p>
-      <p>What can separate the causes is an A/B test that gives half of new installs a different default screen. New installs run at about 185 a week, so detecting a 10-point difference needs about 350 per group, and two first-run experiments (judged on November 8 and around November 15) are already splitting those installs. Running three at once would leave all three unreadable, so the plan is to start after November 16. The bar is D7 up 2 points after four weeks.</p>
-      <p>When you ship a large redesign, cut out the D1 of the cohorts that install from that week on and track it for four weeks. In a month when installs jump, DAU will not show you the regression.</p>
-    </section>
-    <section aria-labelledby="quiz-loop">
-      <h2 id="quiz-loop">What we added while waiting: a morning quiz notification</h2>
-      <p>Version 1.6.024 started sending a morning spelling-quiz notification on September 26, 2026. Before that, zero users a day opened the quiz from a notification; between October 9 and 17 it was 70 to 97 a day. Returning users per day, with bots excluded, went from 365 in the week of September 7 to 447 in the week of October 12, up 82 or 22%. How much of the 82 the notification caused is not measured yet; an experiment that sends more notifications to one group (<code>qr_extra</code>) reads that out in active days per user on October 31.</p>
-      <p>The notifications skewed another number. From version 1.6.030, events sent by a background alarm pushed GA4 <code>totalUsers</code> from 1,500 on October 17 to 2,400-2,900 on October 19-22, while <code>activeUsers</code> stayed near 500 (found on October 23). Every DAU figure in this note uses <code>activeUsers</code>. How we filter out test phones and bots is in <a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 said 19 installs yesterday and 8 were real</a>.</p>
-    </section>
-    <section aria-labelledby="cohort-steps">
-      <h2 id="cohort-steps">A GA4 cohortSpec and filter JSON for organic cohorts</h2>
-      <ol>
-        <li>Send a <code>runReport</code> with a <code>cohortSpec</code>. Give each cohort <code>dimension: "firstSessionDate"</code> and a one-month <code>dateRange</code>; set <code>cohortsRange</code> to <code>DAILY</code>, days 0 to 30, <code>accumulate: false</code>. Dimensions are <code>cohort</code> and <code>cohortNthDay</code>; metrics are <code>cohortActiveUsers</code> and <code>cohortTotalUsers</code>. We sent six months per request.</li>
-        <li>Filter on first channel and bots with <code>dimensionFilter</code>.<pre><code>{"andGroup": {"expressions": [
-  {"filter": {"fieldName": "firstUserDefaultChannelGroup", "stringFilter": {"value": "Organic Search"}}},
-  {"notExpression": {"filter": {"fieldName": "mobileDeviceBranding", "stringFilter": {"value": "(not set)"}}}},
-  {"notExpression": {"filter": {"fieldName": "deviceModel", "stringFilter": {"matchType": "CONTAINS", "value": "OnePlus8"}}}},
-  {"notExpression": {"filter": {"fieldName": "deviceModel", "stringFilter": {"matchType": "BEGINS_WITH", "value": "sdk_gphone"}}}}
-]}}</code></pre></li>
-        <li>Use day 1 for D1, and the day 6-8 and day 28-30 averages for D7 and D30. Say in the table header which one you used.</li>
-        <li>If a cohort's last day plus 30 days falls after the end of your data, leave it out of the D30 average.</li>
-        <li>Put each month next to the same month a year earlier, to see whether a September dip happens every year and whether the next month recovers.</li>
-        <li>Line up weekly cohort D1 around the date of a large release to see when a break starts. Use the same filter as the monthly cohorts (our weekly script only had the brand filter).</li>
-        <li>Pull DAU with both <code>date</code> and <code>firstSessionDate</code>, bucket the gap (same day, 1-7 days, 8-30, 31-90, 91-365, 1-2 years, over 2 years), and compare the same calendar window across years. A request like this is enough:<pre><code>{"dateRanges": [{"startDate": "2026-09-20", "endDate": "2026-10-17"}],
- "dimensions": [{"name": "date"}, {"name": "firstSessionDate"}],
- "metrics": [{"name": "activeUsers"}],
- "limit": 250000}</code></pre>For each row, bucket (date minus firstSessionDate), sum, and divide by the number of days in the window.</li>
-        <li>Count users with <code>activeUsers</code>. If any feature sends events in the background, <code>totalUsers</code> will run high.</li>
-      </ol>
-    </section>
-    <section aria-labelledby="organic-only">
-      <h2 id="organic-only">Organic users only, and it needs cohorts in the hundreds</h2>
-      <p>Paid cohorts are not in this comparison. Monthly cohorts need a few hundred users before the averages settle. The staged rollout percentage and dates for 1.6.007 are not on record, so we could not confirm why the weekly break shows up in the week of September 1 rather than August 18. The script that split DAU by first session date had no bot filter, so the 34 same-day new users in 2026 may include pre-launch bots. That barely touches the conclusion about the 31-365 day group.</p>
-      <p>Search interest fell too. On Google Trends (South Korea), the 2026 average for "맞춤법 검사기" (spelling checker) was 38% below the 2025 average (checked October 18, 2026). That is a 2026 trend and cannot explain a step that starts with the September 2025 cohort, and we could not separate how much of it went into later drops such as the July 2026 cohort's D1 of 7.7%.</p>
-    </section>
-    <section aria-labelledby="after-oct31">
-      <h2 id="after-oct31">Numbers the notification readout and the default-screen test will log</h2>
-      <p>At the October 31 <code>qr_extra</code> readout we will look at whether the group with more notifications gains at least 10% in active days per user while uninstalls and notification blocks stay within 2 points. Once the default-screen test starts after November 16, we will log D1, D7, checks in the first seven days, and uninstall rate per group for four weeks. Until those results are in, we will not call the chat screen the cause of the break.</p>
-      <p>Added November 9, 2026: the October 31 <code>qr_extra</code> readout could not be called. The split was 50:50, yet GA4 logged 2,188 active users in control and 1,061 in the extra-notification group. The group property recorded the arm a user was actually receiving, so people the fatigue guard had moved to morning-only and users who never opened the app were counted as control. Raw uninstall rates were 7.8% for control and 18.9% for the extra group, and with that mix-up we do not read the gap as cause and effect. A property that stores the arm a user was first assigned (<code>qr_arm</code>) is now in place, and the re-readout is set for November 15, 2026. The per-route numbers are in <a href="https://sugarmount21.com/en/ax/quiz-reach-entry-point-push/">Quiz reach rose from 2.6% to 17.7%, and 63% of quiz opens came from one morning notification</a>.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Daily%20users%20rose%20after%20the%20redesign%20while%20organic%20D1%20retention%20fell%20from%2015.2%25%20to%2011.2%25">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <nav class="box ax-series-box" aria-label="Series contents"><p><strong><a href="https://sugarmount21.com/en/ax/series/sugarspeller-maintenance/">Reworking a long-running spelling app: all 8 parts</a></strong></p><ol><li value="1"><a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits: from &quot;complete&quot; to cause and verification</a></li><li value="3"><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li></ol></nav>
-    <section aria-labelledby="faq">
-      <h2 id="faq">Frequently asked questions</h2>
-      <div class="faq">
-        <details><summary>How do I see retention for organic users only in GA4?</summary><div><p>Add <code>firstUserDefaultChannelGroup = "Organic Search"</code> to the <code>dimensionFilter</code> of a Data API cohort request. It is based on the first channel, so a user who later returns through an ad still counts as organic.</p></div></details>
-        <details><summary>Why use the day 28-30 average for D30 instead of the day-30 value?</summary><div><p>Single days swing with the weekday and small samples. This app's September 2024 organic cohort had a day-30 value of 2.8% and a day 28-30 average of 3.2%. Pick one, name it in the table header, and do not mix them.</p></div></details>
-        <details><summary>Can DAU go up while retention goes down?</summary><div><p>Yes. In September 2025 this app took in 3,053 new users and DAU rose to 780, while that month's organic cohort had a D1 of 13.6%, below the year before, and later cohorts did not recover.</p></div></details>
-      </div>
-    </section>
-    <p class="note">Sources: the app repository's git history, the GA4 Data API scripts and output files committed with the October 18, 2026 strategy document (data through October 17, 2026), and the operations log. Cohort averages were recomputed from those files on October 29, 2026.</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Fri, 30 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>&quot;6.7&quot; &lt; &quot;6.11&quot; is false: a version string bug – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/string-version-compare/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/string-version-compare/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/string-version-compare-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX note · Incident</span>
-      <h1>"6.7" &lt; "6.11" is false: comparing Remote Config versions as strings froze content updates</h1>
-      <p class="lead">Compare version strings with &lt; and "6.7" comes out greater than "6.11". That is how our spelling app stopped delivering Remote Config content to devices with 6.2 to 6.9 stored.</p>
-    <p class="note ax-series-line"><a href="https://sugarmount21.com/en/ax/series/sugarspeller-maintenance/">Reworking a long-running spelling app</a> 4/8</p>
-      <p>Storing an app or content version as a string like "6.7" and comparing it with &lt; is common. It gives the right answer while the part after the dot has one digit, then silently gives the wrong one at 6.10. In <a href="https://sugarmount21.com/en/apps/sugarspeller/">SugarSpeller</a>, our Korean spelling app, that comparison kept the quiz bank and notices sent through Remote Config from reaching some devices. It surfaced on September 25, 2026, when the operator held the 6.7 shown in a device's drawer up against the 6.11 on the server. Below: the cause, three agent commits that walked past the check, the replacement function, and how to verify the fix on an existing install.</p>
-    </section>
-    <section aria-labelledby="symptom">
-      <h2 id="symptom">The drawer said 6.7; Remote Config said 6.11</h2>
-      <p>The app ships its quiz bank, notices and FAQ as one JSON value in Firebase Remote Config (RC below). On the splash screen, <code>ActivityEmpty</code> compares RC's <code>info_version</code> and <code>clip_version</code> with the version stored in the device's Room database. If RC is newer, it deletes the local content and inserts the new set. The (6.7/2.2) at the bottom of the drawer is that stored version.</p>
-      <p>One suspect was the build. Debug builds of this app read the RC of a separate development Firebase project, so a debug build on the device could show numbers that differ from production. Production RC really was 6.11/2.3, which ruled that out and left the comparison code.</p>
-      <pre><code>// ActivityEmpty, just before the fix
-if (res[0].infoVersion &lt; infoVer || res[0].clipVersion &lt; clipVer) {
-    repo.setVersion(VersionT(infoVer, clipVer))
-    // delete and re-insert content
-}</code></pre>
-      <p><code>infoVersion</code> is a String field. Kotlin compares strings lexicographically, character by character, so "6.7" and "6.11" first differ at the third character: '7' against '1'. '7' is larger, "6.7" &lt; "6.11" evaluates to false, and the app concluded that RC held the older version.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/apps/sugarspeller/long-text-check-1-ko.webp" width="360" height="763" alt="SugarSpeller's Korean screen: under a check result, a bubble labelled &quot;Today's spelling quiz&quot; with a fill-in-the-blank question and two choices." loading="lazy"><figcaption>The "Today's spelling quiz" bubble under a check result, in the app's Korean UI. Its questions come from the quiz bank that Remote Config delivers and the device stores. Devices whose updates froze never got the corrected questions.</figcaption></figure>
-    </section>
-    <section aria-labelledby="why-silent">
-      <h2 id="why-silent">With one digit after the dot, both orders agree</h2>
-      <p>String comparison has been there since the app first connected to Remote Config in 2020. The current form, <code>infoVersion &lt; infoVer</code>, appeared on May 6, 2023, when a commit flipped the comparison to the right direction; the clip condition was added two days later. While the minor part ran from 6.1 to 6.9, lexicographic order and numeric order were the same, and the check always gave the right answer. It broke when RC moved to 6.10. We recomputed what the old expression returns for each stored value:</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Stored on the device</th><th>RC at 6.10</th><th>RC at 6.11</th></tr></thead>
-        <tbody>
-          <tr><td>6.1</td><td>updates</td><td>updates</td></tr>
-          <tr><td>6.2 to 6.9</td><td>skips</td><td>skips</td></tr>
-          <tr><td>6.10</td><td>equal</td><td>updates</td></tr>
-        </tbody>
-      </table></div>
-      <p>"6.1" is a prefix of "6.10", so the shorter string sorts first; 6.2 through 6.9 all win at the third character. From the day RC reached 6.10, a device stuck in that range ignored every <code>info_version</code> bump (unless <code>clip_version</code> also went up). The quiz bank review document also records that notices changed on September 13, 20 and 22 without any change to <code>info_version</code>, which stayed at 6.10. Those three notices reached no existing user, string comparison or not.</p>
-      <p>Fresh installs never showed the bug. On first run there is no stored version row, so the app inserts the RC content without comparing anything and starts on the latest set.</p>
-    </section>
-    <section aria-labelledby="agents">
-      <h2 id="agents">Three agent commits, none of them fixed the content check</h2>
-      <p>Counting only the times an agent touched or reasoned about the version check itself, the git history shows three. On August 9, 2025 at 15:32, a commit generated with Claude Code blamed a "persistent update notice" on the string comparison of <code>app_version</code> and switched major, minor and patch to integer comparison. The app was at 1.5.031, so major and minor were one character each and the string comparison gave the same answer anyway. At 17:51 that day a commit whose message just says "fix" put the string comparison back. No reason was recorded. Neither commit touched the content version check.</p>
-      <p>On December 11, 2025, an RC sync refactor (co-authored by Claude Opus 4.5) added 11 tests (its message says 13). One of them, <code>versionComparison_isCorrect</code>, asserts that "5.0" &lt; "5.1". It uses single-digit values and calls no app code, only Kotlin's String operator, so it passes whatever the production check does. How we find tests that stay green when the guarded code is deleted is in <a href="https://sugarmount21.com/en/ax/guard-removal-test/">3,066 green tests hid a line that breaks opening the database</a>.</p>
-      <p>On the morning of September 25, 2026, the agent reviewing all 124 quiz items (Claude Opus 5.5) wrote into the publishing steps of its 11:08 commit: the splash screen compares versions as strings, so bump <code>info_version</code> to 7.0. Fifteen minutes later the value that went up was 6.11, and the document now said that 6.10 to 6.11 is larger even as a string, so 6.10 users would update. The document still said a 6.9 to 6.10 bump is not recognized, but said nothing about what to do for devices stuck below 6.10. The 11:23 commit also added a rule to the project's agent instruction file (CLAUDE.md), that a bump which changes the number of digits is not seen as an update, and left the comparison code as it was.</p>
-      <p>Devices below 6.10 surfaced only when the operator put the drawer's 6.7/2.2 next to production RC. The 12:14 fix was also written by an agent (Claude Fable 5.1), this time after the operator had pointed out that the device and RC values differed. How this incident shows up in the commit messages is covered, along with other cases, in <a href="https://sugarmount21.com/en/ax/commit-messages-701/">A year of AI coding in 701 commits</a>.</p>
-    </section>
-    <section aria-labelledby="fix">
-      <h2 id="fix">One VersionCompare for both content and app versions</h2>
-      <p>Setting RC to 7.0 would have unblocked 6.x devices for now, since "6.x" &lt; "7.0" is true. It would break again at 7.10, and everyone editing content would have to remember never to make a bump that adds a digit, so we dropped it as a permanent rule.</p>
-      <p>Comparing all three parts as integers, as in August 2025, did not fit either. This app looks only at the major and minor parts of <code>app_version</code> and ignores the patch on purpose; comparing the patch would send every user on an older patch to the store after each patch release. The 12:14 fix keeps one function and routes both the content version check and the major/minor checks of <code>app_version</code> through it.</p>
-      <pre><code>object VersionCompare {
-    fun compare(a: String, b: String): Int {
-        val pa = parts(a); val pb = parts(b)
-        for (i in 0 until maxOf(pa.size, pb.size)) {
-            val x = pa.getOrElse(i) { 0 }; val y = pb.getOrElse(i) { 0 }
-            if (x != y) return x.compareTo(y)
-        }
-        return 0
-    }
-    fun isNewer(remote: String, local: String) = compare(remote, local) &gt; 0
-    private fun parts(v: String) = v.trim().split('.').map { it.trim().toIntOrNull() ?: 0 }
-}</code></pre>
-      <p>The four tests in <code>VersionCompareTest</code> cover the values that failed ("6.11" against "6.7"), equal values, parts of different lengths or counts ("1.10.0" against "1.9.9", "6.11" against "6.11.0") and non-numeric input. The first test also asserts that "6.7" &lt; "6.11" is false. 112 unit tests passed at that commit. Do not write a new version check with a string &lt;; that rule is in CLAUDE.md now.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20%226.7%22%20%3C%20%226.11%22%20is%20false%3A%20comparing%20Remote%20Config%20versions%20as%20strings%20froze%20content%20updates">Email us</a></p></aside>
-    <section aria-labelledby="force">
-      <h2 id="force">The force flag in the same JSON went on before adoption</h2>
-      <p>The RC <code>version</code> JSON that holds the content versions also holds <code>app_version</code> and <code>force</code>, and since that fix the major/minor check of <code>app_version</code> goes through <code>VersionCompare</code> too. The splash screen decides in this order: if the installed version matches <code>app_version</code> character for character, let the user in; otherwise compare major and minor only; finally, if <code>force</code> is true, override the result and show the update dialog.</p>
-      <p>A September 18 note records that a device with 1.6.017 showed "A new version has been released!", and the code was the first suspect. The real cause was an RC <code>app_version</code> that did not match the shipped version. A patch bump (1.6.017 to 1.6.018) is not rescued by the major/minor check, so the dialog goes away only when the RC value matches the shipped version exactly.</p>
-      <p>On that same September 18, <code>force</code> went on while few users had the new version, and sessions for the day were down 25% five hours later. A September 13 case is left out here: a note written that day corrected an earlier reading as GA4 standard-report lag rather than a lockout, while later documents list it as a lockout again. Since 1.6.019 (September 19), our monitoring script reads the RC <code>version</code> JSON and prints, from GA4 for yesterday and today, the share of active users on exactly the <code>app_version</code> string. If <code>force</code> is true and that share is under 90%, it warns that the rest are stuck behind the splash dialog right now. A separate rollout incident, where a staged percentage went out wrong, is in <a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%</a>.</p>
-    </section>
-    <section aria-labelledby="steps">
-      <h2 id="steps">One git grep, a test with the failing values, a check on an old install</h2>
-      <ol>
-        <li>Find lines that compare version-like names with &lt; or &gt;. Run on our revision from before the fix, it found the two lines in the splash screen and three in the December 2025 test (run on 2026-10-29).
-          <pre><code>git grep -nE '[Vv]er[A-Za-z]*(\[[0-9]\])?\s*[&lt;&gt;]=?\s*[A-Za-z.\[]*[Vv]er' -- '*.kt' '*.java'</code></pre></li>
-        <li>Move every hit into one function and test it with the values that failed. At minimum: "6.11" against "6.7" and "1.10.0" against "1.9.9".</li>
-        <li>Do not verify on a fresh install. Install the build from before the fix and run it once with RC at 6.9 so the stored version is 6.9. Install the fixed build over it without clearing data, raise RC to 6.10, and check that the stored version shown on screen becomes 6.10. A bump that keeps the digit count, such as 6.15 to 6.16, passes under the old comparison too and proves nothing.</li>
-        <li>When content changes, bump <code>info_version</code>.</li>
-        <li>Before turning <code>force</code> on, check in GA4 the share of active users whose appVersion equals the RC <code>app_version</code>. Under 90%, leave it off.</li>
-      </ol>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">Builds already installed still compare strings</h2>
-      <p>The comparison runs on the device, so a device that has not updated to the fixed build keeps comparing strings. RC has since gone to 6.12 (October 1), 6.13 (October 9), 6.14 (October 10) and 6.15 (October 24), but on an old build with 6.2 to 6.9 stored, "6.7" &lt; "6.15" is still false.</p>
-      <p>One server-side way to reach those devices is a one-time bump of the RC value to 7.0. On old builds "6.7" &lt; "7.0" is true, and on new builds <code>VersionCompare</code> also sees 7.0 as newer than 6.15, so both paths update. We dropped 7.0 as a permanent rule, but as a one-time migration while old builds remain it is the right tool; after it, bumps should stay within 7.1 to 7.9 until old builds are rare enough. As of October 24 the RC value is 6.15, and there is no record of this app moving to 7.0. Because the old condition is an OR, raising <code>clip_version</code> would also make it true, but we do not know why those devices did not update at clip 2.3, so we do not count that path as a confirmed fix.</p>
-      <p><code>VersionCompare</code> reads any non-numeric part as 0. A typo such as "6.l1" in RC would read as 6.0 and the update would be skipped silently; the test only confirms that "6.7" is newer than "abc" and raises no warning. "6.11" and "6.11.0" count as the same version.</p>
-      <p>For 1.6.023 a release APK on an API 34 emulator showed 6.11/2.3 in the drawer, but the record does not say whether that was a fresh install. If it was, the check never ran. <code>clip_version</code> is an open question too: stored 2.2, RC 2.3. "2.2" &lt; "2.3" is true even as strings and the old condition was an OR, so the clip side should have triggered an update. The history does not say when clip became 2.3, so string comparison alone does not fully explain why this device stayed at 6.7/2.2.</p>
-      <p>Writing the version row before the content was another defect on the same update path. On September 28, on a physical S21, a first run while offline left the quiz bank empty until the next <code>info_version</code>; a fix now refills the bank when it is empty even if the version matches.</p>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">The old rule is still in the instruction file</h2>
-      <p>As of October 29, 2026, the app's agent instruction file (CLAUDE.md) still says in one place that the comparison is a string comparison and a bump that adds a digit is not seen as an update, and says in another that versions are compared numerically with <code>VersionCompare</code>. An agent that reads the first rule could believe the code still compares strings and pick bump values to suit it. The old sentence should become the one-time 7.0 migration rule for old builds, and "always bump info_version" stays. <code>versionComparison_isCorrect</code>, which calls no app code, is also still in the test suite. When you fix code like this, fix the instruction file's old description in the same commit.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20%226.7%22%20%3C%20%226.11%22%20is%20false%3A%20comparing%20Remote%20Config%20versions%20as%20strings%20froze%20content%20updates">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <nav class="box ax-series-box" aria-label="Series contents"><p><strong><a href="https://sugarmount21.com/en/ax/series/sugarspeller-maintenance/">Reworking a long-running spelling app: all 8 parts</a></strong></p><ol><li value="3"><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li><li value="5"><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li></ol></nav>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Why is "6.7" &lt; "6.11" false in Kotlin?</summary><div><p>String comparison is lexicographic, character by character. At the third character '7' is greater than '1', so "6.7" sorts after "6.11".</p></div></details>
-        <details><summary>Wouldn't bumping the version to 7.0 work with string comparison?</summary><div><p>For now, yes. It breaks again at 7.10, and everyone editing content has to avoid bumps that add a digit.</p></div></details>
-        <details><summary>When is it safe to turn on Remote Config's force flag?</summary><div><p>Once at least 90% of active users run exactly the app_version string. This app turned it on with low adoption and lost 25% of the day's sessions.</p></div></details>
-      </div>
-    </section>
-    <p class="note">Sources: the app repository's git history, CHANGELOG entries 1.6.019 and 1.6.023, the quiz bank review document and the monitoring script, rechecked on 2026-10-29. Remote Config template numbers and project identifiers are left out.</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/structured-data-after-faq-rich-results/">Structured data after FAQ rich results ended: what we kept for GEO</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
