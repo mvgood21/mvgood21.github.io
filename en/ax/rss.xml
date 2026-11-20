@@ -6,7 +6,7 @@
   <description>Notes from shipping Android apps on Google Play with an AI coding agent: release gates, R8 crashes, staged rollouts, agent permissions. Dated numbers from git.</description>
   <language>en</language>
   <atom:link href="https://sugarmount21.com/en/ax/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Fri, 20 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Sat, 21 Nov 2026 09:00:00 +0900</lastBuildDate>
   <item>
     <title>Claude Code data analysis: a 130% payback was 76% – SugarMount</title>
     <link>https://sugarmount21.com/en/ax/ads-payback-mixed-sources/</link>
@@ -86,7 +86,96 @@
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
-    <pubDate>Fri, 20 Nov 2026 09:00:00 +0900</pubDate>
+    <pubDate>Sat, 21 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Claude Code scheduled runs: state left behind – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/scheduled-run-leftover-state/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/scheduled-run-leftover-state/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/scheduled-run-leftover-state-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>Claude Code scheduled runs: state left behind</h1>
+      <p class="lead">One Claude Code scheduled run exited 0 but left two uncommitted files that blocked the same app's next runs, so the next run now moves leftovers to a rescue branch and carries on.</p>
+      <p>A Claude Code run on our unattended harness finished with exit code 0, and the same app's next runs then refused to start. The run had ended with two files half edited, and from the next evening a second, harness-wide cause landed on top, so that app did not run for three days. A week later, over about a day, four social posting runs posted nothing, and those runs also exited 0.</p>
+      <p>Both runs exited cleanly; what stopped the next ones was the state they left behind: the git work tree in the first case, the browser connection in the second.</p>
+    </section>
+    <section aria-labelledby="ten-minutes">
+      <h2 id="ten-minutes">The subagent was stopped 10 minutes after the commit</h2>
+      <p>On November 3 at 09:05 KST, the morning job (the "daily") for our Korean spelling app started. It runs as <code>claude -p</code>, the print mode that takes one prompt, answers, and exits without a chat window. At 09:11 the agent committed the day's checks as <code>890de43</code> and handed the production of two short videos to a subagent running in the background. Its last message, in Korean, said: commit pushed; when the video agent finishes, it would continue with an independent review, the queue, and the Notion report.</p>
+      <p>The next line in the log was printed by Claude Code itself.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/scheduled-run-leftover-state-shot2-en.webp" width="1200" height="516" alt="Harness log excerpt: the Nov 3 daily starts, the agent&#x27;s last message with an English gloss, Claude Code&#x27;s notice that background tasks are stopped after 10 minutes, the run ending status=ok exit=0, and the next morning&#x27;s prepare failure listing two uncommitted files. Local paths are covered with black boxes" loading="lazy"><figcaption>The Nov 3 run stopped its subagent and still ended with status=ok; the next morning's run refused to start because of the two files left behind. The octal escapes are git's way of printing Korean path names. Harness run log, Nov 3 to 4, 2026.</figcaption></figure>
+      <p>In the version we ran then, if background tasks were still running 10 minutes after the last turn, <code>-p</code> stopped them and exited. The notice also named the environment variable that makes it wait to the end, <code>CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0</code>. The run was logged as a normal exit 10 minutes and 7 seconds after the commit. The subagent had been editing the video generator script and a production log CSV, and both files stayed uncommitted in the work tree.</p>
+    </section>
+    <section aria-labelledby="two-stalls">
+      <h2 id="two-stalls">One app stopped 30 hours before the rest</h2>
+      <p>Before each run, the harness checks the work tree in a step called prepare. Uncommitted changes make it refuse with <code>DirtyWorktree</code> and exit 3. The README at the time said these changes are not cleaned up automatically. The spelling app's 14:00 social run on November 3 was the first one refused, and four runs in total failed to start for this reason alone.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/scheduled-run-leftover-state-shot1-en.webp" width="1200" height="760" alt="Top: commits per day in the spelling app repo, with zero on Nov 4 and 5. Bottom: results of six app jobs on Nov 3 to 6. The spelling app&#x27;s two jobs are refused from Nov 3 at 14:00 because of the work tree; every job is refused from the evening of Nov 4 because of uncommitted harness code" loading="lazy"><figcaption>The spelling app stopped first, for its own reason, and a harness-wide stall landed on top of it. Git history and harness run logs, Nov 1 to 16, 2026.</figcaption></figure>
+      <p>From the evening of November 4 a second cause stacked on top: uncommitted edits in the harness's own code stopped every app's jobs for about 38 hours. That stall is covered in <a href="https://sugarmount21.com/en/ax/windows-harness-task-scheduler/">Schedule Claude Code with Windows Task Scheduler</a>. The alerts on the mornings of November 5 and 6 said the same thing for all three apps, "exit 3, prepare failed", which reads like one big outage.</p>
+      <p>The game and utilities apps ran normally until their evening runs on November 4, while the spelling app had been stuck since 14:00 the day before, 30 hours earlier, for a different reason. Committing the harness code would not have freed it; the two files would still have been in its work tree. The harness README at the time said that after a <code>DirtyWorktree</code> exit 3, "that repo's jobs keep stopping the next day too", and that a person has to clean up. The November 4 alert did list only the spelling app as failing, but it gave no reason.</p>
+      <p>The repository shows the result: one commit on November 3, none on the 4th or 5th, and no videos produced or posted in between.</p>
+    </section>
+    <section aria-labelledby="next-run-guess">
+      <h2 id="next-run-guess">The next run guessed wrong too</h2>
+      <p>On the morning of November 6, the two leftover changes were committed to a separate branch (<code>004f642</code>), and less than a minute later the harness runner got a setting that waits for subagents to finish (<code>1ac160a</code>). A few minutes after that the scheduler re-ran the spelling app's daily, and it finished normally. The rescue commit came from a chat session, but the records do not say which conversation it was or who reset that day's run state before the re-run.</p>
+      <p>The restarted run described the gap in its notes: the leftover changes "appear to have been reverted before the 11-06 start; only the q005 and q006 mp4 files remain". In fact they had been moved to a branch, not reverted, and the work tree had gone back to the original commit. The run's own commit, <code>e795981</code>, sits on top of the November 3 commit, not the rescue commit. All the November 6 run could see was the work tree and the app's own notes, and nothing in them mentioned the rescue branch.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20scheduled%20runs%3A%20state%20left%20behind">Email us</a></p></aside>
+    <section aria-labelledby="browser">
+      <h2 id="browser">Four social runs saw only a different browser</h2>
+      <p>The second incident began on the evening of November 11. Social runs post to TikTok, Instagram and YouTube by driving a dedicated harness Chrome through the Claude in Chrome extension. That evening's first run posted normally, but from the next run until the following evening, four social runs across the three apps reported "only Browser 1 was connected" and posted nothing. In the connected Chrome, TikTok showed a login screen. It was not the harness browser.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/scheduled-run-leftover-state-shot3-en.webp" width="1200" height="746" alt="Harness log excerpt: the Nov 12 20:00 game social run reporting 0/3 and writing a failure per channel, ending status=ok exit=0, and a Nov 13 08:13 indexing run calling the harness Chrome &quot;Browser 1&quot;. Local paths are covered with black boxes" loading="lazy"><figcaption>On Nov 12, Browser 1 was a different browser; the morning after reconnection, the harness browser itself was Browser 1. Harness run logs, Nov 12 to 13, 2026.</figcaption></figure>
+      <p>The rule at the time said to look for the harness browser's device ID (the unique value the connection list shows for each browser) and, if it was missing, to skip rather than pick another. The social runs followed it and left Browser 1 alone. But the rule only covered the error the tool raises when several browsers are connected and none is selected; with exactly one browser connected, the tool went straight to it without asking (harness record). On the night of November 12 an indexing job took that path and opened Search Console in a Chrome signed in to a different account. The rule and the reports called the harness browser "Browser 2", but that label follows connection order, and the morning after reconnection the harness Chrome was "Browser 1".</p>
+      <p>The rule changed that night (<code>e9fc042</code>). Before the first Chrome step a job lists the connected browsers, looks only at the device ID, and calls no Chrome tool at all if that ID is missing. A run a few minutes before the change noted that the harness browser was connected again. Nobody recorded who reconnected it or how.</p>
+      <p>The game and utilities runs wrote each failed channel into their posting queue table, for example "2026-11-12 20 Instagram failed: Chrome not connected", and committed it. The next runs filled those cells first: utilities posted its two missing channels on November 13, and the game had posted all three planned channels by November 14. The spelling app's run did not touch its queue and made no commit, so the next day's daily noted "no posting record or commit for the 11-12 14:00 social run" and held off judging.</p>
+    </section>
+    <section aria-labelledby="fix">
+      <h2 id="fix">Keep leftovers on a rescue branch; pick the browser by device ID only</h2>
+      <div class="table-wrap"><table><thead><tr><th>Approach</th><th>What happens</th><th>Decision</th></tr></thead><tbody><tr><td>Subagents run in the foreground and the run exits after committing (the daily's own note)</td><td>Works only if the agent obeys</td><td>Not added to the harness's shared prompts</td></tr><tr><td><code>CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0</code> (Nov 6)</td><td>Waits for subagents; the job timeout is the ceiling (5,400 s for a daily)</td><td>Adopted</td></tr><tr><td>Stop on a dirty tree and let a person clean up (old README)</td><td>The alert gave no reason; three days lost</td><td>Dropped</td></tr><tr><td>Delete leftover changes and continue</td><td>The subagent's generator edits would be gone</td><td>Not used</td></tr><tr><td>Commit leftovers to a rescue branch, reset to the base commit, continue (Nov 7)</td><td>Only one job runs on a given work tree at a time, so leftovers are treated as a dead earlier run's</td><td>Adopted</td></tr><tr><td>Pick by device ID only when the "several browsers connected" error appears (Nov 8)</td><td>With one browser connected there is no error and the tool goes to it (on Nov 12 it opened Search Console in another account's Chrome)</td><td>Dropped</td></tr><tr><td>Call the harness browser "Browser 2" in the rule and reports (Nov 8)</td><td>Labels follow connection order; after reconnection the harness browser was Browser 1</td><td>Dropped (display names ignored)</td></tr><tr><td>Check the list before the first Chrome step and call no Chrome tool without the device ID (Nov 12); log a failure per channel in the queue (Nov 11)</td><td>The next run fills empty channels first</td><td>Adopted</td></tr></tbody></table></div>
+      <p>If a scheduled run uses subagents, do not rely on a prompt rule alone. Force the wait in the runner's settings and the cleanup in the next run's prepare step.</p>
+    </section>
+    <section aria-labelledby="gate">
+      <h2 id="gate">Checks for the end and start of a run</h2>
+      <p>The harness now moves a leftover work tree to a rescue branch in the next run's prepare step, checks the browser before the first Chrome step, and writes unfinished work where the next run reads it. The steps below add an end-of-run check on top (step 2 is not in this harness yet):</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/scheduled-run-leftover-state-1-en.webp" width="1200" height="727" alt="Comparison: on the left, runs that ended with exit code 0 (the Nov 3 daily, four social runs on Nov 11 and 12, a status board with zero failures); on the right, what the next run checks: work tree, browser ID, failure record" loading="lazy"><figcaption>Exit code 0 only covers what happened inside the run. Whether the next run can start is a separate check.</figcaption></figure>
+      <ol class="steps"><li><p>Set <code>CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0</code> in the runner's environment and give every job a timeout. A <code>Background tasks still running</code> line in the log means the run left work unfinished.</p></li><li><p>Count a run as complete only when <code>git status --porcelain</code> is empty and nothing is left unpushed. Otherwise record the leftover file list as the failure reason.</p></li><li><p>In the next run's prepare step, do not delete a dirty tree. Commit it to a branch such as <code>harness-rescue/&lt;time&gt;-&lt;job&gt;</code>, reset to the base commit, then continue, and put the file list and branch name in the alert.</p></li><li><p>For jobs that need a browser, call the Claude in Chrome tool <code>list_connected_browsers</code> before the first Chrome step and pick with <code>select_browser</code> only when the expected device ID is there. If it is not, call no Chrome tool. Ignore display names.</p></li><li><p>Write unfinished work where the next run reads it, as "date hour channel failed: reason", and commit it. The next run starts from those cells.</p></li></ol>
+      <p>If you call <code>claude -p</code> straight from Task Scheduler without a harness, steps 1 to 3 fit around the call like this. We ran the rescue and completion parts in a scratch repository on November 21 with PowerShell 5.1: two leftover files moved to the rescue branch and left the tree clean, and an edited file or an unpushed commit made the script exit 4.</p>
+      <pre><code>$env:CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS = '0'
+# Before the run: move leftovers to a rescue branch instead of deleting them
+if (git status --porcelain) {
+  $b = "harness-rescue/$(Get-Date -Format yyyyMMdd-HHmm)-daily"
+  git switch -q --create $b
+  git add -A
+  git commit -q -m "rescue: leftovers from the previous run"
+  git switch -q -
+}
+claude -p "..."
+# After the run: done only if the tree is clean and nothing is unpushed
+if ((git status --porcelain) -or (git log '@{u}..' --oneline)) { exit 4 }</code></pre>
+      <p><code>git add -A</code> also picks up new untracked files, so put large generated output such as videos in <code>.gitignore</code> first. On a branch with no upstream the last line's unpushed check is skipped, so link it with <code>git push -u</code> first. Writing a verdict line at the end of each report is covered in <a href="https://sugarmount21.com/en/ax/windows-harness-game-marketing/">17 days of a Claude Code harness: how to start</a>.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">A dropped browser still needs a person to reconnect it</h2>
+      <p>Waiting for subagents makes runs longer, and a run that hits its timeout is killed by the runner, which can leave the same kind of leftovers. The next prepare step moves them to a rescue branch; if that fails (a commit hook, say), the job stops as before. Rescue branches pile up and a person has to delete them.</p>
+      <p>Automatic rescue assumes leftovers belong to a dead earlier run. If a person edits in the same work tree the scheduled jobs use, those edits get moved to a rescue branch too, so keep a separate work tree for operations. This harness runs from its own copies, apart from the trees people edit in.</p>
+      <p>The device ID check stops a job from using the wrong browser; it does not reconnect the right one. On November 12 several alerts asked a person to check the Chrome extension connection, and the browser came back only that night. Runs still exit 0, too: the daily status boards for November 11 and 12 reported "0 failed or missed" and counted these runs as partial failures. Next to check: why the connection dropped, and whether the 10-minute default wait is the same in later Claude Code versions.</p>
+    </section>
+    <p class="note">As of 2026-11-20. Harness run logs and alert log (Nov 1 to 16, 2026), git history of the spelling, game and utilities app repos, harness repository commits and README. Rescue and completion script re-run in a scratch repository on 2026-11-21.</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20scheduled%20runs%3A%20state%20left%20behind">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Sat, 21 Nov 2026 09:00:00 +0900</pubDate>
   </item>
   <item>
     <title>Claude Code tapped a real AdMob ad during E2E – SugarMount</title>
@@ -676,7 +765,7 @@ adb -s &lt;device&gt; reverse tcp:8180 tcp:8180</code></pre></li><li><p>Have the
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/scheduled-run-leftover-state/">Claude Code scheduled runs: state left behind</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
       </ul>
@@ -1338,7 +1427,7 @@ light/temp4 #ee4b4b on #fafdff = 3.58:1</code></pre>
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/scheduled-run-leftover-state/">Claude Code scheduled runs: state left behind</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2373,86 +2462,6 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
         <li><a href="https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/">Claude Code tapped a real AdMob ad during E2E</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Wed, 11 Nov 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Schedule Claude Code with Windows Task Scheduler – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/windows-harness-task-scheduler/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/windows-harness-task-scheduler/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/windows-harness-task-scheduler-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · How-to</span>
-      <h1>Schedule Claude Code with Windows Task Scheduler</h1>
-      <p class="lead">One register-job.ps1 line makes Windows Task Scheduler run Claude Code's hello job at 09:05 every day. Each morning, the status table shows the last result, the next run and whether you need to log in again.</p>
-      <p class="note">Windows harness series, part 7 of 11 <span aria-hidden="true">·</span> Previous <a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Download the kit and run a first job</a> <span aria-hidden="true">·</span> Next <a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">A morning GA4 report job</a></p>
-      <p>This part puts the hello job from part 6 into Windows Task Scheduler, the scheduling tool built into Windows. Once it is registered, hello runs by itself at the same time every day, as long as the PC is on and you are logged on.</p>
-      <p>You keep using the <code>$HOME\harness</code> folder from part 6. You do not need an administrator window. The kit's console lines and the status table are in Korean, and this page translates them; to get English answers from Claude, point a job card at the English prompts in <code>prompts/en</code> as shown in part 6, step 3.</p>
-      <div class="box"><p><strong>When you finish this part</strong></p><ul><li>Result: hello runs by itself at 09:05 every day (while the PC is on and you are logged on).</li><li>You need: a PC that has finished part 6 (hello ran by hand).</li><li>Cost: none. Scheduled runs use the Claude plan you logged in with in part 4.</li></ul></div>
-    </section>
-    <section aria-labelledby="step-1">
-      <h2 id="step-1">Step 1: Register hello for 09:05 every day</h2>
-      <ol class="steps"><li><p>Open a new PowerShell window and go to the kit folder.</p><pre><code>cd $HOME\harness</code></pre></li><li><p>Paste the execution policy line from part 6, step 4. <code>register-job.ps1</code> is a script too, so this window has to allow it.</p><pre><code>Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force</code></pre></li><li><p>Register hello. After <code>-At</code>, give the time as hours:minutes.</p><pre><code>.\register-job.ps1 -Name hello -At 09:05</code></pre></li></ol>
-      <div class="note note--positive"><p><strong>You are done when</strong></p><p>You see <code>TaskName : hello</code> and a <code>NextRunTime</code> line with the next run time. On our Korean-language PC it read <code>2026-11-12 오전 9:05:00</code> (오전 means AM); your date and format will differ.</p></div>
-      <p><code>register-job.ps1</code> registers the job with these settings. The values below were read back from Task Scheduler after registering.</p>
-      <div class="table-wrap"><table><thead><tr><th>Setting</th><th>Kit value</th><th>In plain words</th></tr></thead><tbody><tr><td>Time</td><td>Daily at 09:05</td><td>Starts at the same time every day.</td></tr><tr><td>Missed runs (StartWhenAvailable)</td><td>On</td><td>If the PC was off or asleep at that time, the job runs once after it is back on.</td></tr><tr><td>Battery</td><td>Starts on battery, keeps running</td><td>By Windows default, a task does not start on battery and stops if the PC switches to battery. The kit lets it run on a laptop battery.</td></tr><tr><td>Overlap (MultipleInstances)</td><td>IgnoreNew</td><td>If the previous run is still going, the new one is dropped.</td></tr><tr><td>Run limit (ExecutionTimeLimit)</td><td>Job card limit + 10 minutes, at least 1 hour</td><td>The job card (the job definition file in the jobs folder) sets a time limit; the kit adds 10 minutes. Past this, Task Scheduler stops the job. The Windows default is 72 hours. In our test a 300-second job got 1 hour and a 5,400-second job got 1 hour 40 minutes.</td></tr><tr><td>Logon (LogonType)</td><td>Interactive</td><td>Runs only while you are logged on. No password is stored.</td></tr><tr><td>Rights (RunLevel)</td><td>Limited</td><td>Runs with normal rights, not as administrator.</td></tr></tbody></table></div>
-      <p>At run time, Task Scheduler starts PowerShell with a hidden window (<code>-WindowStyle Hidden</code>) and with the same Bypass execution policy as part 6 (<code>-ExecutionPolicy Bypass</code>), then runs <code>run-job.ps1</code>. That is why scheduled runs do not need the line from part 6. Even with the window hidden, a window may flash briefly as the run starts.</p>
-      <p>Registering the same name again replaces the earlier schedule, so to change the time, run the same command with the new time. The schedule goes into a folder named <code>\my-harness\</code> inside Task Scheduler.</p>
-    </section>
-    <section aria-labelledby="step-2">
-      <h2 id="step-2">Step 2: Start it once now</h2>
-      <p>Instead of waiting for 09:05, start the scheduled job right away.</p>
-      <ol class="steps"><li><p>Start the job now. This command only starts it and returns at once.</p><pre><code>Start-ScheduledTask -TaskPath '\my-harness\' -TaskName hello</code></pre></li><li><p>Wait about 15 seconds, then look at the last-run information. In our test it started at 2:22:05 AM, and the status table's finished-at time was 02:22:13.</p><pre><code>Get-ScheduledTaskInfo -TaskPath '\my-harness\' -TaskName hello</code></pre></li><li><p>Check that new start and end lines were added to the log.</p><pre><code>Get-Content .\logs\hello.log</code></pre></li></ol>
-      <div class="note note--positive"><p><strong>You are done when</strong></p><p><code>LastRunTime</code> shows the time you just started it, and the last log line shows <code>status=ok exit=0</code>.</p></div>
-      <p><code>LastTaskResult</code> is the result the last run returned. It was 0 in our test, and the state file said ok at the same time. Microsoft's docs do not list what each number means, so judge a run by the log and the state file.</p>
-    </section>
-    <section aria-labelledby="step-3">
-      <h2 id="step-3">Step 3: Check the status table each morning</h2>
-      <p>The status table is what <code>status.ps1</code> shows: one row per job with its last result, finish time, next run and a sign-in warning. There are two ways to open it.</p>
-      <h3>Way 1: double-click status.cmd in File Explorer</h3>
-      <ol class="steps"><li><p>In File Explorer, open the <code>harness</code> folder inside your user folder. If a PowerShell window is open, this line opens it too.</p><pre><code>explorer $HOME\harness</code></pre></li><li><p>Double-click <code>status.cmd</code>. A black window shows the status table, and the last line reads <code>Press any key to continue . . .</code>.</p></li><li><p>Read the table, then press any key to close the window.</p></li></ol>
-      <p><code>status.cmd</code> calls <code>status.ps1</code> with the Bypass execution policy, so it needs no execution policy line. We ran it through cmd on our PC and saw the table and that last line.</p>
-      <h3>Way 2: in a PowerShell window</h3>
-      <ol class="steps"><li><p>Open a window, enter <code>cd $HOME\harness</code> and the execution policy line, then show the table.</p><pre><code>.\status.ps1</code></pre><figure><img src="https://sugarmount21.com/assets/ax/windows-harness-task-scheduler-shot1-ko.webp" width="1200" height="837" alt="A Windows PowerShell window. From the top: the register-job.ps1 command with TaskName hello and NextRunTime 2026-11-12 9:05 AM, then Start-ScheduledTask and Get-ScheduledTaskInfo with LastRunTime 2:22:05 AM and a green LastTaskResult 0. In the status table that follows, only the hello row is filled, in yellow: ok, finished 2026-11-12T02:22:13, next run 9:05 AM and a re-login notice; the ads-check, ga4-daily and shorts-plan rows show - for result and time and 등록 안 됨 (not registered) for the next run. At the bottom are the remove-job.ps1 command and a green Korean line saying the hello schedule was removed; the user name in the prompt path is covered by a grey box." loading="lazy"><figcaption>Real output from a scheduling test with a freshly unzipped kit on our PC, Nov 12, 2026 at 02:22. Because it was a test we added -Folder '\my-harness-test\' to each command; you do not. Only hello was registered and run, so the other three rows are empty. This is our Korean-language Windows PC running the Korean kit: 오전 means AM, the table headings are translated below, and the last line reads hello 예약을 지웠습니다 (hello schedule removed).</figcaption></figure></li></ol>
-      <p>The table headings are in Korean. Read them left to right:</p>
-      <ul><li>작업 (job): the job card name from the <code>jobs</code> folder.</li><li>마지막결과 (last result): the result from the state file (ok, error or timeout). A job that has never run shows <code>-</code>.</li><li>끝난시각 (finished at): when the last run ended.</li><li>다음예약 (next run): when Task Scheduler will run it next. A job that is not scheduled shows <code>등록 안 됨</code> (not registered).</li><li>로그인경고 (login warning): <code>다시 로그인 필요</code> (log in again) appears if the last run printed the login expiry warning. Log in again as in part 4, step 5.</li></ul>
-      <p>A last result of ok only tells you the run ended without an error. Every kit prompt ends its report with a verdict line, <code>판정: 완료</code> (done) or <code>판정: 일부 실패(reason)</code> (partly failed), or <code>Verdict: done</code> / <code>Verdict: partial failure (reason)</code> with the English prompts, so read that line too. Open the most recent report with this line:</p>
-      <pre><code>notepad .\reports\latest-hello.md</code></pre>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Schedule%20Claude%20Code%20with%20Windows%20Task%20Scheduler">Email us</a></p></aside>
-    <section aria-labelledby="step-4">
-      <h2 id="step-4">Step 4: Schedule other jobs, and remove one</h2>
-      <p>You register ga4-daily, ads-check and shorts-plan one at a time in parts 8 to 10. In each part you add your data and run the job once by hand, then register it with the same <code>register-job.ps1</code> command, spacing the times apart (for example 09:30, 09:40 and 10:00). On the practice data, all three jobs finished within 20 seconds.</p>
-      <p>To remove a schedule, use the line below. It prints a Korean line saying the hello schedule was removed, and the kit files stay where they are. Afterwards the next-run column in the status table reads <code>등록 안 됨</code> again. Removing a schedule that does not exist ends with an error, and that line is not printed.</p>
-      <pre><code>.\remove-job.ps1 -Name hello</code></pre>
-    </section>
-    <section aria-labelledby="trouble">
-      <h2 id="trouble">If you get stuck</h2>
-      <div class="table-wrap"><table><thead><tr><th>If you see</th><th>Why</th><th>Do this</th></tr></thead><tbody><tr><td><code>running scripts is disabled on this system</code></td><td>The new window does not have the execution policy line.</td><td>Paste the line from part 6, step 4 and run again.</td></tr><tr><td><code>파일이 없습니다. 작업 이름을 확인하세요.</code> (the file does not exist, check the job name)</td><td>The name after <code>-Name</code> does not match a file in <code>jobs</code>.</td><td>Use the file name from <code>jobs</code> without <code>.json</code>.</td></tr><tr><td>Registered, but the next-run column says <code>등록 안 됨</code></td><td>You registered into another folder with <code>-Folder</code>.</td><td>Add the same <code>-Folder</code> to <code>status.ps1</code>.</td></tr><tr><td>It did not run at the scheduled time</td><td>The PC was off, or you were not logged on.</td><td>A missed run fires once after the PC is back on. Stay logged on.</td></tr><tr><td><code>remove-job.ps1</code> prints an error starting <code>CIM 서버 에서 Root/Microsoft/Windows/TaskScheduler/...</code> (on our Korean-language PC)</td><td>There is no such schedule: it was already removed, or the name or <code>-Folder</code> differs.</td><td>Check the next-run column in the status table.</td></tr><tr><td>The login warning column says <code>다시 로그인 필요</code></td><td>The last run printed the login expiry warning.</td><td>Log in again in the separate settings folder, as in part 4, step 5.</td></tr></tbody></table></div>
-    </section>
-    <section aria-labelledby="real">
-      <h2 id="real">In the real harness</h2>
-      <p>As of Nov 11, 2026, the SugarMount harness had 14 jobs registered in one Task Scheduler folder, and that morning every LastResult in the list was 0.</p>
-      <figure><img src="https://sugarmount21.com/assets/ax/windows-harness-task-scheduler-shot2-ko.webp" width="1200" height="387" alt="A PowerShell-style window showing the -List output of the real harness&#x27;s install script, with columns Task, State, Triggers, LastRun, LastResult and NextRun. Eight rows, including ax-index, ax-notes, harness-release, harness-watch, sugar-daily and three per-app social jobs, are all Ready with LastResult 0. A Korean comment in the header says six rows such as blog jobs were left out." loading="lazy"><figcaption>The real harness's registered jobs on the morning of Nov 11, 2026. We kept the 8 app and notes rows out of 14. Jobs that repeat every 15 minutes show the time the repetition started (13:55) under Triggers. The PC runs Korean-language Windows, so dates show 오전 (AM) and 오후 (PM).</figcaption></figure>
-      <p>The kit is a cut-down version of this harness. The real one has extra safeguards added after something went wrong; two of them came from these events.</p>
-      <div class="table-wrap"><table><thead><tr><th>Safeguard</th><th>What happened</th><th>In the kit</th></tr></thead><tbody><tr><td>Separate production copy</td><td>From the evening of Nov 4 to the morning of Nov 6, about 38 hours, every job stopped at a pre-run check. Harness code that was being edited had not been committed (recorded as final) in the repository. Since Nov 7, production runs from a separate copy, and only changes that pass checks reach it.</td><td>None</td></tr><tr><td>Verdict line</td><td>On Nov 10 one app's social job posted nothing because there was no video queued, yet its status was ok, and that night's daily summary said zero failures or misses. Since Nov 11 every job ends with a verdict line.</td><td>Yes, in all four prompts</td></tr></tbody></table></div>
-      <p>The way the window is hidden also differs. The real harness starts PowerShell through <code>conhost.exe --headless</code>, but we found no official documentation for that option, and security tools sometimes treat it as a warning sign, so the kit does not use it.</p>
-    </section>
-    <nav class="box" aria-label="Series contents"><p><strong>Windows harness series: all 11 parts</strong></p><ul><li><a href="https://sugarmount21.com/en/ax/windows-harness-overview/">1. What a harness is</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">2. Before you start: PowerShell</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-install/">3. Install Git and Claude Code</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">4. Log in and ask a first unattended question</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-docker-desktop/">5. Install Docker Desktop</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">6. Download the kit and run a first job</a></li><li><strong aria-current="page">7. Schedule it to run every day</strong></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">8. A morning GA4 report job</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">9. Ad budget checks and approvals</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-shorts/">10. Planning TikTok, Reels and Shorts</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-game-marketing/">11. Two weeks of running it, and the safeguards</a></li></ul><p>Next: <a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">A morning GA4 report job</a></p></nav>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Schedule%20Claude%20Code%20with%20Windows%20Task%20Scheduler">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-    <h2 id="faq">FAQ</h2>
-    <div class="faq"><details><summary>What happens to a scheduled job if the PC is off?</summary><div><p>It does not run at that time. The kit registers missed runs to fire once after the PC is back on, and even then you need to be logged on.</p></div></details><details><summary>Do scheduled jobs run on a laptop battery?</summary><div><p>With the kit, they do. By Windows default a task does not start on battery, but <code>register-job.ps1</code> sets it to start on battery and keep running.</p></div></details></div>
-    </section>
-    <p class="note">As of Nov 12, 2026. Microsoft documentation (the PowerShell ScheduledTasks module and Task Scheduler settings pages), output from a scheduling test on our PC, and the harness's registered-job list and state files (Nov 11, 2026).</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>

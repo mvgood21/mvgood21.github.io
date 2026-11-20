@@ -6,7 +6,7 @@
   <description>Small Android apps that each do one thing simply, from shrinking photos and opening Korean HWP documents to checking Korean spelling and playing puzzle games.</description>
   <language>en</language>
   <atom:link href="https://sugarmount21.com/en/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Fri, 20 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Sat, 21 Nov 2026 09:00:00 +0900</lastBuildDate>
   <item>
     <title>Claude Code data analysis: a 130% payback was 76% – SugarMount</title>
     <link>https://sugarmount21.com/en/ax/ads-payback-mixed-sources/</link>
@@ -86,7 +86,96 @@
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
-    <pubDate>Fri, 20 Nov 2026 09:00:00 +0900</pubDate>
+    <pubDate>Sat, 21 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Claude Code scheduled runs: state left behind – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/scheduled-run-leftover-state/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/scheduled-run-leftover-state/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/scheduled-run-leftover-state-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>Claude Code scheduled runs: state left behind</h1>
+      <p class="lead">One Claude Code scheduled run exited 0 but left two uncommitted files that blocked the same app's next runs, so the next run now moves leftovers to a rescue branch and carries on.</p>
+      <p>A Claude Code run on our unattended harness finished with exit code 0, and the same app's next runs then refused to start. The run had ended with two files half edited, and from the next evening a second, harness-wide cause landed on top, so that app did not run for three days. A week later, over about a day, four social posting runs posted nothing, and those runs also exited 0.</p>
+      <p>Both runs exited cleanly; what stopped the next ones was the state they left behind: the git work tree in the first case, the browser connection in the second.</p>
+    </section>
+    <section aria-labelledby="ten-minutes">
+      <h2 id="ten-minutes">The subagent was stopped 10 minutes after the commit</h2>
+      <p>On November 3 at 09:05 KST, the morning job (the "daily") for our Korean spelling app started. It runs as <code>claude -p</code>, the print mode that takes one prompt, answers, and exits without a chat window. At 09:11 the agent committed the day's checks as <code>890de43</code> and handed the production of two short videos to a subagent running in the background. Its last message, in Korean, said: commit pushed; when the video agent finishes, it would continue with an independent review, the queue, and the Notion report.</p>
+      <p>The next line in the log was printed by Claude Code itself.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/scheduled-run-leftover-state-shot2-en.webp" width="1200" height="516" alt="Harness log excerpt: the Nov 3 daily starts, the agent&#x27;s last message with an English gloss, Claude Code&#x27;s notice that background tasks are stopped after 10 minutes, the run ending status=ok exit=0, and the next morning&#x27;s prepare failure listing two uncommitted files. Local paths are covered with black boxes" loading="lazy"><figcaption>The Nov 3 run stopped its subagent and still ended with status=ok; the next morning's run refused to start because of the two files left behind. The octal escapes are git's way of printing Korean path names. Harness run log, Nov 3 to 4, 2026.</figcaption></figure>
+      <p>In the version we ran then, if background tasks were still running 10 minutes after the last turn, <code>-p</code> stopped them and exited. The notice also named the environment variable that makes it wait to the end, <code>CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0</code>. The run was logged as a normal exit 10 minutes and 7 seconds after the commit. The subagent had been editing the video generator script and a production log CSV, and both files stayed uncommitted in the work tree.</p>
+    </section>
+    <section aria-labelledby="two-stalls">
+      <h2 id="two-stalls">One app stopped 30 hours before the rest</h2>
+      <p>Before each run, the harness checks the work tree in a step called prepare. Uncommitted changes make it refuse with <code>DirtyWorktree</code> and exit 3. The README at the time said these changes are not cleaned up automatically. The spelling app's 14:00 social run on November 3 was the first one refused, and four runs in total failed to start for this reason alone.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/scheduled-run-leftover-state-shot1-en.webp" width="1200" height="760" alt="Top: commits per day in the spelling app repo, with zero on Nov 4 and 5. Bottom: results of six app jobs on Nov 3 to 6. The spelling app&#x27;s two jobs are refused from Nov 3 at 14:00 because of the work tree; every job is refused from the evening of Nov 4 because of uncommitted harness code" loading="lazy"><figcaption>The spelling app stopped first, for its own reason, and a harness-wide stall landed on top of it. Git history and harness run logs, Nov 1 to 16, 2026.</figcaption></figure>
+      <p>From the evening of November 4 a second cause stacked on top: uncommitted edits in the harness's own code stopped every app's jobs for about 38 hours. That stall is covered in <a href="https://sugarmount21.com/en/ax/windows-harness-task-scheduler/">Schedule Claude Code with Windows Task Scheduler</a>. The alerts on the mornings of November 5 and 6 said the same thing for all three apps, "exit 3, prepare failed", which reads like one big outage.</p>
+      <p>The game and utilities apps ran normally until their evening runs on November 4, while the spelling app had been stuck since 14:00 the day before, 30 hours earlier, for a different reason. Committing the harness code would not have freed it; the two files would still have been in its work tree. The harness README at the time said that after a <code>DirtyWorktree</code> exit 3, "that repo's jobs keep stopping the next day too", and that a person has to clean up. The November 4 alert did list only the spelling app as failing, but it gave no reason.</p>
+      <p>The repository shows the result: one commit on November 3, none on the 4th or 5th, and no videos produced or posted in between.</p>
+    </section>
+    <section aria-labelledby="next-run-guess">
+      <h2 id="next-run-guess">The next run guessed wrong too</h2>
+      <p>On the morning of November 6, the two leftover changes were committed to a separate branch (<code>004f642</code>), and less than a minute later the harness runner got a setting that waits for subagents to finish (<code>1ac160a</code>). A few minutes after that the scheduler re-ran the spelling app's daily, and it finished normally. The rescue commit came from a chat session, but the records do not say which conversation it was or who reset that day's run state before the re-run.</p>
+      <p>The restarted run described the gap in its notes: the leftover changes "appear to have been reverted before the 11-06 start; only the q005 and q006 mp4 files remain". In fact they had been moved to a branch, not reverted, and the work tree had gone back to the original commit. The run's own commit, <code>e795981</code>, sits on top of the November 3 commit, not the rescue commit. All the November 6 run could see was the work tree and the app's own notes, and nothing in them mentioned the rescue branch.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20scheduled%20runs%3A%20state%20left%20behind">Email us</a></p></aside>
+    <section aria-labelledby="browser">
+      <h2 id="browser">Four social runs saw only a different browser</h2>
+      <p>The second incident began on the evening of November 11. Social runs post to TikTok, Instagram and YouTube by driving a dedicated harness Chrome through the Claude in Chrome extension. That evening's first run posted normally, but from the next run until the following evening, four social runs across the three apps reported "only Browser 1 was connected" and posted nothing. In the connected Chrome, TikTok showed a login screen. It was not the harness browser.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/scheduled-run-leftover-state-shot3-en.webp" width="1200" height="746" alt="Harness log excerpt: the Nov 12 20:00 game social run reporting 0/3 and writing a failure per channel, ending status=ok exit=0, and a Nov 13 08:13 indexing run calling the harness Chrome &quot;Browser 1&quot;. Local paths are covered with black boxes" loading="lazy"><figcaption>On Nov 12, Browser 1 was a different browser; the morning after reconnection, the harness browser itself was Browser 1. Harness run logs, Nov 12 to 13, 2026.</figcaption></figure>
+      <p>The rule at the time said to look for the harness browser's device ID (the unique value the connection list shows for each browser) and, if it was missing, to skip rather than pick another. The social runs followed it and left Browser 1 alone. But the rule only covered the error the tool raises when several browsers are connected and none is selected; with exactly one browser connected, the tool went straight to it without asking (harness record). On the night of November 12 an indexing job took that path and opened Search Console in a Chrome signed in to a different account. The rule and the reports called the harness browser "Browser 2", but that label follows connection order, and the morning after reconnection the harness Chrome was "Browser 1".</p>
+      <p>The rule changed that night (<code>e9fc042</code>). Before the first Chrome step a job lists the connected browsers, looks only at the device ID, and calls no Chrome tool at all if that ID is missing. A run a few minutes before the change noted that the harness browser was connected again. Nobody recorded who reconnected it or how.</p>
+      <p>The game and utilities runs wrote each failed channel into their posting queue table, for example "2026-11-12 20 Instagram failed: Chrome not connected", and committed it. The next runs filled those cells first: utilities posted its two missing channels on November 13, and the game had posted all three planned channels by November 14. The spelling app's run did not touch its queue and made no commit, so the next day's daily noted "no posting record or commit for the 11-12 14:00 social run" and held off judging.</p>
+    </section>
+    <section aria-labelledby="fix">
+      <h2 id="fix">Keep leftovers on a rescue branch; pick the browser by device ID only</h2>
+      <div class="table-wrap"><table><thead><tr><th>Approach</th><th>What happens</th><th>Decision</th></tr></thead><tbody><tr><td>Subagents run in the foreground and the run exits after committing (the daily's own note)</td><td>Works only if the agent obeys</td><td>Not added to the harness's shared prompts</td></tr><tr><td><code>CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0</code> (Nov 6)</td><td>Waits for subagents; the job timeout is the ceiling (5,400 s for a daily)</td><td>Adopted</td></tr><tr><td>Stop on a dirty tree and let a person clean up (old README)</td><td>The alert gave no reason; three days lost</td><td>Dropped</td></tr><tr><td>Delete leftover changes and continue</td><td>The subagent's generator edits would be gone</td><td>Not used</td></tr><tr><td>Commit leftovers to a rescue branch, reset to the base commit, continue (Nov 7)</td><td>Only one job runs on a given work tree at a time, so leftovers are treated as a dead earlier run's</td><td>Adopted</td></tr><tr><td>Pick by device ID only when the "several browsers connected" error appears (Nov 8)</td><td>With one browser connected there is no error and the tool goes to it (on Nov 12 it opened Search Console in another account's Chrome)</td><td>Dropped</td></tr><tr><td>Call the harness browser "Browser 2" in the rule and reports (Nov 8)</td><td>Labels follow connection order; after reconnection the harness browser was Browser 1</td><td>Dropped (display names ignored)</td></tr><tr><td>Check the list before the first Chrome step and call no Chrome tool without the device ID (Nov 12); log a failure per channel in the queue (Nov 11)</td><td>The next run fills empty channels first</td><td>Adopted</td></tr></tbody></table></div>
+      <p>If a scheduled run uses subagents, do not rely on a prompt rule alone. Force the wait in the runner's settings and the cleanup in the next run's prepare step.</p>
+    </section>
+    <section aria-labelledby="gate">
+      <h2 id="gate">Checks for the end and start of a run</h2>
+      <p>The harness now moves a leftover work tree to a rescue branch in the next run's prepare step, checks the browser before the first Chrome step, and writes unfinished work where the next run reads it. The steps below add an end-of-run check on top (step 2 is not in this harness yet):</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/scheduled-run-leftover-state-1-en.webp" width="1200" height="727" alt="Comparison: on the left, runs that ended with exit code 0 (the Nov 3 daily, four social runs on Nov 11 and 12, a status board with zero failures); on the right, what the next run checks: work tree, browser ID, failure record" loading="lazy"><figcaption>Exit code 0 only covers what happened inside the run. Whether the next run can start is a separate check.</figcaption></figure>
+      <ol class="steps"><li><p>Set <code>CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0</code> in the runner's environment and give every job a timeout. A <code>Background tasks still running</code> line in the log means the run left work unfinished.</p></li><li><p>Count a run as complete only when <code>git status --porcelain</code> is empty and nothing is left unpushed. Otherwise record the leftover file list as the failure reason.</p></li><li><p>In the next run's prepare step, do not delete a dirty tree. Commit it to a branch such as <code>harness-rescue/&lt;time&gt;-&lt;job&gt;</code>, reset to the base commit, then continue, and put the file list and branch name in the alert.</p></li><li><p>For jobs that need a browser, call the Claude in Chrome tool <code>list_connected_browsers</code> before the first Chrome step and pick with <code>select_browser</code> only when the expected device ID is there. If it is not, call no Chrome tool. Ignore display names.</p></li><li><p>Write unfinished work where the next run reads it, as "date hour channel failed: reason", and commit it. The next run starts from those cells.</p></li></ol>
+      <p>If you call <code>claude -p</code> straight from Task Scheduler without a harness, steps 1 to 3 fit around the call like this. We ran the rescue and completion parts in a scratch repository on November 21 with PowerShell 5.1: two leftover files moved to the rescue branch and left the tree clean, and an edited file or an unpushed commit made the script exit 4.</p>
+      <pre><code>$env:CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS = '0'
+# Before the run: move leftovers to a rescue branch instead of deleting them
+if (git status --porcelain) {
+  $b = "harness-rescue/$(Get-Date -Format yyyyMMdd-HHmm)-daily"
+  git switch -q --create $b
+  git add -A
+  git commit -q -m "rescue: leftovers from the previous run"
+  git switch -q -
+}
+claude -p "..."
+# After the run: done only if the tree is clean and nothing is unpushed
+if ((git status --porcelain) -or (git log '@{u}..' --oneline)) { exit 4 }</code></pre>
+      <p><code>git add -A</code> also picks up new untracked files, so put large generated output such as videos in <code>.gitignore</code> first. On a branch with no upstream the last line's unpushed check is skipped, so link it with <code>git push -u</code> first. Writing a verdict line at the end of each report is covered in <a href="https://sugarmount21.com/en/ax/windows-harness-game-marketing/">17 days of a Claude Code harness: how to start</a>.</p>
+    </section>
+    <section aria-labelledby="limits">
+      <h2 id="limits">A dropped browser still needs a person to reconnect it</h2>
+      <p>Waiting for subagents makes runs longer, and a run that hits its timeout is killed by the runner, which can leave the same kind of leftovers. The next prepare step moves them to a rescue branch; if that fails (a commit hook, say), the job stops as before. Rescue branches pile up and a person has to delete them.</p>
+      <p>Automatic rescue assumes leftovers belong to a dead earlier run. If a person edits in the same work tree the scheduled jobs use, those edits get moved to a rescue branch too, so keep a separate work tree for operations. This harness runs from its own copies, apart from the trees people edit in.</p>
+      <p>The device ID check stops a job from using the wrong browser; it does not reconnect the right one. On November 12 several alerts asked a person to check the Chrome extension connection, and the browser came back only that night. Runs still exit 0, too: the daily status boards for November 11 and 12 reported "0 failed or missed" and counted these runs as partial failures. Next to check: why the connection dropped, and whether the 10-minute default wait is the same in later Claude Code versions.</p>
+    </section>
+    <p class="note">As of 2026-11-20. Harness run logs and alert log (Nov 1 to 16, 2026), git history of the spelling, game and utilities app repos, harness repository commits and README. Rescue and completion script re-run in a scratch repository on 2026-11-21.</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20scheduled%20runs%3A%20state%20left%20behind">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Sat, 21 Nov 2026 09:00:00 +0900</pubDate>
   </item>
   <item>
     <title>Claude Code tapped a real AdMob ad during E2E – SugarMount</title>
@@ -676,7 +765,7 @@ adb -s &lt;device&gt; reverse tcp:8180 tcp:8180</code></pre></li><li><p>Have the
         <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/scheduled-run-leftover-state/">Claude Code scheduled runs: state left behind</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
       </ul>
@@ -1338,7 +1427,7 @@ light/temp4 #ee4b4b on #fafdff = 3.58:1</code></pre>
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/scheduled-run-leftover-state/">Claude Code scheduled runs: state left behind</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2691,7 +2780,7 @@ AppOpen: cold: entitlement answered in 4139 ms</code></pre></li>
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/scheduled-run-leftover-state/">Claude Code scheduled runs: state left behind</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3053,10 +3142,10 @@ adb reboot                       # clears the two log.tag values</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/scheduled-run-leftover-state/">Claude Code scheduled runs: state left behind</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
       </ul>
@@ -4139,7 +4228,7 @@ thinkingConfig: { thinkingBudget: 0 },</code></pre>
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/scheduled-run-leftover-state/">Claude Code scheduled runs: state left behind</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4388,7 +4477,7 @@ adb -s emulator-5554 logcat -d -b crash</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/scheduled-run-leftover-state/">Claude Code scheduled runs: state left behind</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ads-payback-mixed-sources/">Claude Code data analysis: a 130% payback was 76%</a></li>
       </ul>
@@ -5899,98 +5988,6 @@ assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Sat, 31 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Splash hang from addOnCompleteListener at onStop – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/splash-listener-onstop/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/splash-listener-onstop/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/splash-listener-onstop-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · Incident</span>
-      <h1>A splash that never moved on: addOnCompleteListener(this) and onStop</h1>
-      <p class="lead">Put the code that opens your next screen inside addOnCompleteListener(this), and a launch with the screen off can leave the app stuck on its splash. That listener is removed at onStop.</p>
-    <p class="note ax-series-line"><a href="https://sugarmount21.com/en/ax/series/sugarspeller-maintenance/">Reworking a long-running spelling app</a> 5/8</p>
-      <p>Many apps fetch Remote Config on a splash screen and move on when the fetch completes; Firebase's own sample is written that way. Our Korean spelling app <a href="https://sugarmount21.com/en/apps/sugarspeller/">SugarSpeller</a> tied that callback to the activity, so when the app launched with the screen off, it stayed on a black splash even after the phone was unlocked. The line had been there since the repository's first commit in 2020. Below: how a pre-release device check on October 11, 2026 missed the hang once and then reproduced it, the cause and the fix, and a search plus a device test for finding the same defect.</p>
-    </section>
-    <section aria-labelledby="removed-at-onstop">
-      <h2 id="removed-at-onstop">A listener removed at onStop is not called when the user comes back</h2>
-      <p>The splash activity, <code>ActivityEmpty</code>, starts one Remote Config (RC) fetch in <code>onCreate</code>. When the fetch completes, it checks versions and calls <code>checkMyPermission()</code>, which moves on to the next screen. That completion listener was the only path to the next screen.</p>
-      <pre><code>// ActivityEmpty just before the fix, abridged (same line since the first commit, 2020-12-16)
-// [START fetch_config_with_callback]
-remoteConfig.fetchAndActivate().addOnCompleteListener(this) { task -&gt;
-    ...
-    checkMyPermission()   // (annotation) every branch moves on from here
-}</code></pre>
-      <p>The Task reference says of the overload that takes an Activity: "The listener will be automatically removed during onStop." If the screen turns off or the user switches apps before the fetch finishes, onStop comes first and the listener is gone. No lifecycle log from that day shows exactly when onStop arrived while the screen was off, so this step rests on the documentation and on reproducing the hang before and after the fix.</p>
-      <p>Nothing retried on return, either. The activity was still alive, so <code>onCreate</code> did not run again, and <code>onStart</code> only set system bar flags. The app stayed on the splash until the process was killed. On the test phone, the GA4 debug log showed first_open, session_start, screen_view and two app-open ad events, then nothing.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/apps/sugarspeller/shot1.webp" width="360" height="620" alt="SugarSpeller's Korean main screen: a &quot;Hello!&quot; greeting asking what text to check today and, below it, a box for the sentence to check." loading="lazy"><figcaption>The main screen the splash should hand over to (store screenshot of the Korean UI; the greeting reads "Hello! What text shall I check for you today?"). Users caught by the hang never got here until they force-stopped the app.</figcaption></figure>
-      <p>The <code>[START fetch_config_with_callback]</code> marker in the comment also appears in the Remote Config sample of Firebase's quickstart-android, which calls <code>addOnCompleteListener(this)</code> too. The marker and the line match, so the code most likely came from that sample. The other way this splash locked users out, through the RC force-update flag, is in <a href="https://sugarmount21.com/en/ax/string-version-compare/">"6.7" &lt; "6.11" is false</a>.</p>
-    </section>
-    <section aria-labelledby="first-sighting">
-      <h2 id="first-sighting">The first hang was force-stopped and set aside</h2>
-      <p>The operator asked for a deeper device check before production. A Claude Code agent ran it on the S21 with ad domains blocked by DNS: an update install, rotations, 15 round trips to the home screen, and three 5,000-event monkey runs with zero app crashes and zero app ANRs.</p>
-      <p>Around 14:37 the agent woke the S21 from sleep and found vc95, installed about ten minutes earlier, stuck on the splash after the lock screen was dismissed. The log does not show when or how the app was launched. The agent force-stopped it, relaunched, saw the main screen, and noted in its own progress notes that this was a vc95 problem to check later on vc96. A relaunch after a force stop starts again from onCreate with the screen on, so that check could not show the cause.</p>
-      <p>Forty minutes later the agent deliberately launched vc96 with the screen off. It hung again, and only then did the agent open the code. The line was the same in both versions.</p>
-    </section>
-    <section aria-labelledby="when-started">
-      <h2 id="when-started">Unscope the listener, defer only the navigation</h2>
-      <p>The 15:43 fix drops <code>this</code> from the listener so it no longer depends on the activity, and adds an <code>isFinishing || isDestroyed</code> check as its first line. Every call that opens the next screen goes through a new helper, <code>whenStarted</code>.</p>
-      <pre><code>fun whenStarted(owner: LifecycleOwner, block: () -&gt; Unit) {
-    owner.lifecycleScope.launch { owner.lifecycle.withStarted(block) }
-}</code></pre>
-      <p>If the activity is visible (STARTED or later), the block runs now. If it is stopped, the block runs once when it becomes visible again. If the activity is destroyed first, it never runs. Five call sites were wrapped: three <code>checkMyPermission()</code> calls on the splash, the callback after the app-open ad wait, and <code>goIntent</code> on the logo screen (<code>ActivityIntro</code>). The agent wrote the three <code>whenStarted</code> unit tests first and ran them against an empty function, where 2 failed, before writing the body.</p>
-      <p>Removing <code>this</code> and nothing else was not enough. The listener would fire, but it would start the next activity from a stopped screen, and as the commit comment puts it, that <code>startActivity</code> is blocked or late. A user who went home during the splash might also see the app jump back over the home screen. The post-fix device check included "does not pop up over home".</p>
-      <p>Re-adding the listener in <code>onStart</code> would also work for the fetch: the reference says a listener added to a completed Task is scheduled immediately. It fixes only the RC Task, though. Two of the five wrapped sites, the ad-wait callback and the logo screen's Timer, are not Tasks. Using <code>Task.await()</code> in a coroutine would mean adding kotlinx-coroutines-play-services; the app's build.gradle has only coroutines-android and lifecycle, and the log shows no sign this path was weighed that day.</p>
-      <p>Don't hang navigation on <code>addOnCompleteListener(this)</code>. Receive the result regardless of the activity, and defer only the screen change to the lifecycle.</p>
-      <p><code>whenStarted</code> has its own limit: if the user never comes back, the next screen never opens. If the activity is destroyed in the meantime, the block is dropped, and reopening the app runs <code>onCreate</code> and a fresh fetch. That last part is a reading of the code, not something we tested on a device.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20splash%20that%20never%20moved%20on%3A%20addOnCompleteListener%28this%29%20and%20onStop">Email us</a></p></aside>
-    <section aria-labelledby="device-steps">
-      <h2 id="device-steps">One grep and a screen-off launch test</h2>
-      <p>Start by finding listeners scoped to an activity. The first line below is the search the agent ran that day; it found nothing else in the main sources. The second line widens it to fragments' <code>requireActivity()</code> and Canceled listeners; it was not used that day. The risky ones are listeners that navigate.</p>
-      <pre><code>git grep -nE "addOn(Complete|Success|Failure)Listener\(this"
-git grep -nE "addOn(Complete|Success|Failure|Canceled)Listener\((this|requireActivity\(\)|activity)"</code></pre>
-      <p>Then test on a device with an R8 release build. Steps 1-2 were run on vc96 before the fix and on the fixed build; steps 3-4 on the fixed build.</p>
-      <ol>
-        <li>Turn the screen off with <code>adb shell input keyevent SLEEP</code>, wait 3 seconds, and launch with <code>adb shell monkey -p &lt;package&gt; -c android.intent.category.LAUNCHER 1</code>.</li>
-        <li>Wait 20 seconds, wake the phone and dismiss the lock screen. <code>adb shell dumpsys window | grep mCurrentFocus</code> should name the main activity. Before the fix it named the splash; after, the main screen.</li>
-        <li>Launch, press Home right away, and launch again 12 seconds later. The phone should stay on the home screen in between and land on the main screen after. Repeat on the logo screen.</li>
-        <li>Press Back during the splash and check for crashes.</li>
-      </ol>
-      <p>The three <code>whenStarted</code> tests use Robolectric and <code>LifecycleRegistry.createUnsafe</code> to move the state from RESUMED to CREATED and back to STARTED. After the fix all 437 unit tests passed, and two monkey runs on the fixed build had zero crashes and ANRs. How the release carrying this fix, 1.6.029, went to 100% of users at once is in <a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%</a>.</p>
-    </section>
-    <section aria-labelledby="new-install-17">
-      <h2 id="new-install-17">How much of the 17% new-install drop-off this explains is unknown</h2>
-      <p>A baseline written the day before the fix found that of 739 new users from September 12 to October 9, 611 (82.7%) reached the main screen within 24 hours. The CHANGELOG says only that this bug "may be part of" the 17% who did not.</p>
-      <p>A check on October 15 counted 107 of 120 new 1.6.029 installs (89%) reaching the main screen. That number cannot isolate the bug. The baseline used main-screen views, while 1.6.029 used the <code>main_shown</code> event added in 1.6.028; the same release also started an A/B test that removes the app-open ad from the first session for half of new installs; and the sample is 120 people. No event records a hang, so we cannot count how many users hit it.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/splash-listener-onstop-1-en.webp" width="1200" height="588" alt="Bar chart: before the fix, 611 of 739 new users (82.7%) reached the main screen within 24 hours; on 1.6.029, 107 of 120 first_open users (89%) reached main_shown." loading="lazy"><figcaption>The two values use different yardsticks and samples, so the gap cannot be counted as the effect of fixing the hang.</figcaption></figure>
-      <p>The device check covered one S21 with ads blocked by DNS. We did not test live ads, other makers' lock screens, or returning after the process was killed in the background.</p>
-    </section>
-    <section aria-labelledby="wiring-test">
-      <h2 id="wiring-test">Still open: no test guards the five call sites</h2>
-      <p>The unit tests cover <code>whenStarted</code> itself. The release notes say so: the wiring, whether ActivityEmpty and ActivityIntro actually call whenStarted, could not be guarded by unit tests and was checked on the device. If someone adds a new navigation call to the splash without <code>whenStarted</code>, today's tests still pass; only a device test that launches with the screen off or leaves the app during the splash would catch it.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20splash%20that%20never%20moved%20on%3A%20addOnCompleteListener%28this%29%20and%20onStop">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <nav class="box ax-series-box" aria-label="Series contents"><p><strong><a href="https://sugarmount21.com/en/ax/series/sugarspeller-maintenance/">Reworking a long-running spelling app: all 8 parts</a></strong></p><ol><li value="4"><a href="https://sugarmount21.com/en/ax/string-version-compare/">&quot;6.7&quot; &lt; &quot;6.11&quot; is false: comparing Remote Config versions as strings froze content updates</a></li><li value="6"><a href="https://sugarmount21.com/en/ax/play-staged-rollout-completed/">A 20% staged rollout went out at 100%: a completed release in the Play Publisher API cannot go back to staged</a></li></ol></nav>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>When does addOnCompleteListener(activity, …) remove the listener?</summary><div><p>At the activity's onStop. The Task reference says so, and in this app a screen turning off during the fetch was enough to lose the result.</p></div></details>
-        <details><summary>Doesn't an unscoped listener leak the activity?</summary><div><p>Here the listener returns at once if isFinishing or isDestroyed, and whenStarted skips the navigation when the activity is gone. We did not measure leaks separately.</p></div></details>
-        <details><summary>Why didn't monkey testing catch it?</summary><div><p>That day's monkey runs kept the screen on and sent no Home key. The hang needs onStop to arrive before the fetch completes, so it only shows up in a test that turns the screen off or leaves the app during the fetch.</p></div></details>
-      </div>
-    </section>
-    <p class="note">Sources: the app repository's git history, CHANGELOG 1.6.029, the device-check notes in the release document, the agent session log from that day, and the Google Play services Task reference, rechecked on 2026-10-30.</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
     <pubDate>Sat, 31 Oct 2026 09:00:00 +0900</pubDate>
   </item>
