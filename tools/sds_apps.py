@@ -29,9 +29,9 @@ SUBSETS_JSON = os.path.join(ROOT, 'tools', 'fonts', 'pretendard-subsets.json')
 FONT_URL = 'pretendard/'          # relative to assets/fonts/pretendard.css
 
 # Neutral surfaces (site.css ref tokens)
-BASEMENT, DEFAULT = '#F6F8FB', '#FFFFFF'
-D_BASEMENT, D_DEFAULT, D_FLOATING = '#0F1622', '#172131', '#1D2940'
-WHITE, D_INK = '#FFFFFF', '#0F1622'
+BASEMENT, DEFAULT = '#F7FAFE', '#FFFFFF'
+D_BASEMENT, D_DEFAULT, D_FLOATING = '#0E1217', '#161A1F', '#24282E'
+WHITE, D_INK = '#FFFFFF', '#0E1217'
 TARGET = 4.6
 
 # The nine accent tokens, in output order. site.css :root declares the same nine (T1 gate).

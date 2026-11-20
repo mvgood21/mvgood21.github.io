@@ -1,0 +1,63 @@
+<!-- title: Running Claude Code agents in parallel: a guide -->
+<!-- h1: Running Claude Code agents in parallel: how many at once, what breaks, and how to brief and check them -->
+<!-- lead: Three code-writing agents at once was our ceiling, set by build memory and two shared test phones. After the merge, a review of the combined code confirmed 12 defects that per-branch reviews had missed. -->
+<!-- desc: Measured notes on running Claude Code subagents and sessions in parallel: 10 workstreams, 3 at once, file owners, 12 integration defects, briefs. -->
+<section aria-labelledby="pw-answer">
+  <h2 id="pw-answer">The short answer: builds and devices set the limit, not the agent count</h2>
+  <p>A Claude Code main session can start many subagents at once, but at SugarMount, a solo app studio, no more than three code-writing agents ever ran at the same time. On October 3, 2026 the operator said "use hundreds of agents if you like." The ceiling came from 4 GB of free RAM (out of 13 GB) and two test phones shared by five sessions. Research and design agents, which never build, reached 11 to 14 at once.</p>
+  <p>The repository logged 59 commits that day, and a single integration agent merged ten workstreams stage by stage. The 41 implementation agents reported "all complete, no failures," and the app crashed on its first launch on a real phone. In a second app, 13 branches each passed their own review and CI, yet a review that read only the merged code confirmed 12 blocker or major defects (11 distinct, since one was found from two sides). The rules below come from these measurements.</p>
+</section>
+<section aria-labelledby="pw-split">
+  <h2 id="pw-split">How many agents should run at once, and how do you split the work?</h2>
+  <ol>
+    <li><strong>Set concurrency by the memory one build needs and the devices you have.</strong> Every code-writing agent had to pass unit tests and a debug build before each commit, so three was the cap. Over two days, 114 of the 148 messages between sessions were about taking turns on the two phones. Evidence: <a href="/en/ax/parallel-agent-workstreams/">memory and test phones set the limit</a></li>
+    <li><strong>Define "done" as a build running on a real device.</strong> The 41 "done" reports covered only JVM tests and compilation. The crash appeared when the app was installed a minute after the report: the build tools had stripped a trailing .gz from asset names, so the level file was missing. Evidence: <a href="/en/ax/parallel-agent-workstreams/">41 "done" reports and a first-launch crash</a></li>
+    <li><strong>Give every shared file exactly one owner.</strong> On September 23, 2026, a release-fix commit swept in 50 files another session in the same working tree was still writing. A later app wrote an owner table first and merged 13 branches in 2 minutes 11 seconds; even so, 7 merges needed a hand and 8 branches edited a file someone else owned. Evidence: <a href="/en/ax/file-owner-table/">the file owner table</a></li>
+    <li><strong>In a shared working tree, no unrequested commit, stash, reset or gradlew --stop.</strong> One session's launch-check script ran gradlew --stop, and two clean builds in another session on the same PC died. Evidence: <a href="/en/ax/file-owner-table/">two sessions in one working tree</a></li>
+    <li><strong>After merging, run a separate review that reads only the merged code.</strong> On an integration branch where all 2,115 tests passed, six review agents raised 32 findings; of the 12 blockers and majors confirmed by refutation, 10 were broken agreements between code from two different packages. Evidence: <a href="/en/ax/integration-review-defects/">12 defects after every branch passed review</a></li>
+  </ol>
+</section>
+<section aria-labelledby="pw-brief">
+  <h2 id="pw-brief">How do you brief agents, and what should they leave behind?</h2>
+  <ol start="6">
+    <li><strong>Tell subagents where and when to write raw evidence.</strong> Between September 7 and 10, 2026, five subagents stopped at a usage limit with nearly empty reports. The agents that took over finished from the logs, screenshots and edited files left on disk. The bans in the 33-line shared brief held: 13 reports wrote "approval needed" instead of installing anything. Evidence: <a href="/en/ax/subagent-brief-rules/">what survives a subagent cut-off</a></li>
+    <li><strong>Write the reason for a decision into a memory file when you make it.</strong> One 13-day session was auto-compacted nine times, keeping 2.6% to 8.2% of its tokens each time. None of the nine summaries kept why the ad budget differed from the runbook. Evidence: <a href="/en/ax/compaction-summary-memory/">what survives auto-compaction</a></li>
+    <li><strong>Treat CLAUDE.md as context, not enforcement.</strong> Write only the rules an agent gets wrong, with the reason (our four-app repository's AGENTS.md is 96 lines), and turn the rules that must hold into tests or settings. A global "reply in Korean" rule still broke on five later dates. Evidence: <a href="/en/ax/claude-md-rule-incidents/">six CLAUDE.md rule incidents</a></li>
+    <li><strong>Put the rules for unattended runs in the one file every run reads.</strong> Our scheduled agent runs four times a day and reads a table first: what it does alone, what it does after approval, and the clicks a person makes. Even an ad restart the operator had approved was blocked by the tool's permission check, and a person switched it on. Evidence: <a href="/en/ax/agent-permission-table/">a permission table for a scheduled agent</a></li>
+    <li><strong>Where an agent can spend money, a missing value should mean no spending.</strong> A 2,500 KRW stop line in code undercounted 62 calls that ended without a response and missed a 2,956 KRW bill. Evidence: <a href="/en/ax/vertex-test-cost-hard-cap/">a cost cap that missed the bill</a></li>
+  </ol>
+  <p>How to check each result an agent hands back is covered in <a href="/en/ax/topic/quality/">what to check when an AI coding agent says tests pass</a>.</p>
+</section>
+<section aria-labelledby="pw-order">
+  <h2 id="pw-order">Reading order</h2>
+  <p>The parallel-work notes also form the series <a href="/en/ax/series/multi-agent-one-repo/">Many agents, one repository</a>, and the rules-and-memory notes form <a href="/en/ax/series/agent-rules-memory/">Giving an agent rules and limits</a>.</p>
+  <ol>
+    <li><a href="/en/ax/parallel-agent-workstreams/">How many agents can run at once</a>: the memory and phone arithmetic behind three.</li>
+    <li><a href="/en/ax/subagent-brief-rules/">Five subagents cut off by usage limits</a>: raw files on disk, not reports, made the handovers work.</li>
+    <li><a href="/en/ax/file-owner-table/">One owner per shared file</a>: 50 swept-in files and the result of 13 merges.</li>
+    <li><a href="/en/ax/stale-doc-phantom-session/">Claude Code session handoff</a>: the "dev session" the docs pointed at had stopped 25 hours earlier, so ownership goes in memory, not in a doc.</li>
+    <li><a href="/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome and Google Ads</a>: two browser sessions got the same budget correction 24 minutes 40 seconds apart, which is why setting values go into a memory file before the chat.</li>
+    <li><a href="/en/ax/number-one-app-agent-instruction/">A vague instruction to Claude Code agents</a>: told to build a No. 1 app, the agent measured the baseline before splitting the work, and production promotion still stopped at the permission checker.</li>
+    <li><a href="/en/ax/static-site-check-gate/">One --check before every commit</a>: catching problems that only appear once separate work is combined.</li>
+    <li><a href="/en/ax/integration-review-defects/">12 defects in merged code</a>: a review for what branch reviews cannot see.</li>
+    <li><a href="/en/ax/agent-review-refutation/">Fix only what survives refutation</a>: the procedure for filtering review findings.</li>
+    <li><a href="/en/ax/three-designs-three-judges/">Three designs, three judges</a>: 45 agents picking a design in 59 minutes, before any code.</li>
+    <li><a href="/en/ax/agents-md/">How to write AGENTS.md</a>: only the rules an agent gets wrong.</li>
+    <li><a href="/en/ax/claude-md-rule-incidents/">CLAUDE.md rules and relapses</a>: counting how often written rules broke again.</li>
+    <li><a href="/en/ax/compaction-summary-memory/">Nine auto-compactions and the memory index</a>: what a summary keeps and what it drops.</li>
+    <li><a href="/en/ax/agent-permission-table/">What the agent does alone, what a person clicks</a>: three lanes for unattended runs.</li>
+    <li><a href="/en/ax/secrets-three-layers/">Secrets in chat, logs and tokens</a>: say where a secret is and what kind, never its value.</li>
+    <li><a href="/en/ax/co-authored-by-trailer-audit/">29 commits without a trailer</a>: the agent made 26 of them.</li>
+    <li><a href="/en/ax/ga4-zero-report-reversed/">A GA4 zero and the total row</a>: a wrong report the agent withdrew after 10 minutes 26 seconds.</li>
+    <li><a href="/en/ax/gcloud-blocked-app-impersonation/">gcloud "This app is blocked"</a>: the same block three times, then a fix with no key file.</li>
+    <li><a href="/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs</a>: safe defaults for money an agent can spend.</li>
+    <li><a href="/en/ax/wsl-to-windows-claude-code/">From WSL to native Windows</a>: five things the agent got wrong during a four-day move.</li>
+    <li><a href="/en/ax/windows-harness-overview/">What a harness is</a>: part 1 of the Windows harness series, and whether it fits you.</li>
+    <li><a href="/en/ax/windows-harness-powershell-basics/">Open PowerShell</a>: part 2, pasting a first command.</li>
+    <li><a href="/en/ax/windows-harness-claude-code-install/">Install Git and Claude Code</a>: part 3.</li>
+    <li><a href="/en/ax/windows-harness-claude-code-login/">Log in and ask a first unattended question</a>: part 4, one claude -p call that exits.</li>
+    <li><a href="/en/ax/windows-harness-docker-desktop/">Install Docker Desktop</a>: part 5, optional.</li>
+    <li><a href="/en/ax/windows-harness-first-job/">Run a first job with the kit</a>: part 6, one run by hand before scheduling.</li>
+    <li><a href="/en/ax/windows-harness-task-scheduler/">Run it daily with Task Scheduler</a>: part 7, the same time every day.</li>
+  </ol>
+</section>
