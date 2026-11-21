@@ -6,7 +6,177 @@
   <description>Notes from shipping Android apps on Google Play with an AI coding agent: release gates, R8 crashes, staged rollouts, agent permissions. Dated numbers from git.</description>
   <language>en</language>
   <atom:link href="https://sugarmount21.com/en/ax/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Sat, 21 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Sun, 22 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>GA4 custom dimension (not set) for numeric params – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/ga4-numeric-param-not-set/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/ga4-numeric-param-not-set/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/ga4-numeric-param-not-set-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Measurement</span>
+      <h1>GA4 custom dimension (not set) for numeric params</h1>
+      <p class="lead">Arrow Knots had a GA4 custom dimension registered for the level and still read (not set) for five weeks. Sending the same level number once more as a string made it readable in all 41 events from the new build.</p>
+      <p>Our Android puzzle game Arrow Knots had a level custom dimension registered in GA4, yet for more than five weeks after analytics went in on October 8 we couldn't see which level players quit on. The level column in every report read (not set). The registration was fine; the app was sending the level number as a number. Claude Code wrote that analytics code, and the record from that time shows no report ever split by the value.</p>
+      <p>The build we shipped on November 15 sends the same level number a second time, as a string. In the events it has sent since, the numeric slot is still empty and the string slot has a value every time.</p>
+    </section>
+    <section aria-labelledby="same-event">
+      <h2 id="same-event">41 events, the numeric level empty in every one</h2>
+      <p>Arrow Knots 1.2.6 puts the level number into its <code>level_up</code> event, sent the first time a campaign level is cleared, twice: once in the original numeric parameter <code>level</code>, once in a new string parameter <code>lv</code>. On November 21 we pulled the counts through the GA4 Data API (the official API for reading report data). Of the 41 <code>level_up</code> events from 1.2.6, all 41 had a value for <code>lv</code> and none had one for <code>level</code>. The numeric <code>stars</code> parameter, which holds the star rating, was empty in all of them too.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/ga4-numeric-param-not-set-1-en.webp" width="1200" height="588" alt="Bar chart: in 41 level_up events from Arrow Knots 1.2.6, numeric level and stars were readable in 0 events, string lv in all 41." loading="lazy"><figcaption>Same build, same events: the numeric parameter stayed empty and the string copy filled in.</figcaption></figure>
+      <p>What split the two slots is the type the value had going into Firebase. Firebase ships event values in a container called a <code>Bundle</code>, and the app's shared <code>Analytics.log</code> helper puts a Kotlin <code>Int</code> or <code>Long</code> in with the numeric <code>putLong</code>, a <code>Double</code> with <code>putDouble</code>, and everything else with the string <code>putString</code>. In this call, 1.2.6 changed the line like this:</p>
+      <pre><code>// up to 1.2.5: the level as a number only
+log(FirebaseAnalytics.Event.LEVEL_UP, FirebaseAnalytics.Param.LEVEL to level1, "stars" to stars)
+// 1.2.6: the same number again as the string lv
+log(FirebaseAnalytics.Event.LEVEL_UP, FirebaseAnalytics.Param.LEVEL to level1, "lv" to level1.toString(), "stars" to stars)</code></pre>
+      <p><code>level1</code> is the level number counted from 1, and <code>FirebaseAnalytics.Param.LEVEL</code> is just the string "level". From October 17, when the dimensions were registered, through November 20, numeric <code>level</code> and <code>stars</code> were readable in none of Arrow Knots' 3,319 <code>level_up</code> events. Test phones and emulators were excluded with the filter from <a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 installs: 11 of 19 were test devices</a>.</p>
+      <p>Our block puzzle, Block Turn, shows the same pattern. Its 972 <code>level_up</code> events also carry a string <code>pid</code>, the board ID (for example R001). <code>pid</code> was readable in 943 of them; numeric <code>level</code> and <code>stars</code> in none. <code>level</code> is a parameter name Firebase defines, but <code>stars</code> is one the app made up, and it was empty too, so what decided it was the type rather than the name.</p>
+    </section>
+    <section aria-labelledby="scene">
+      <h2 id="scene">October 27: looking for the last level before uninstall</h2>
+      <p>We found this while chasing a different question. Of six new Arrow Knots players who came in from ads on October 26, five uninstalled the same day. The next day's check, run by an agent, wrote down the task "collect the last level that uninstalling players reached" and queried GA4. In that query, <code>level</code> was (not set) for the whole history.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/ga4-numeric-param-not-set-shot1-en.webp" width="1200" height="560" alt="Daily bars from October 17 to November 20 for Arrow Knots level_up events. Grey bars are events from builds up to 1.2.5, where the level number isn&#x27;t readable; red segments from November 15 are events from 1.2.6, where the string lv carries it. Dashed lines mark October 27, when the problem was found, and November 15, when 1.2.6 shipped." loading="lazy"><figcaption>Grey: events from builds up to 1.2.5, level number not readable. Red: events from 1.2.6, level number readable through the string lv. Days with no bar had zero events. GA4 Data API, test devices excluded, queried 2026-11-21.</figcaption></figure>
+      <p>The first hypothesis was ten days older. During a deeper GA4 review on October 17 we registered event-scoped custom dimensions (scoped to values attached to a single event): 9 for Arrow Knots, 13 for Block Turn. The note said "data only accumulates from 10-17". Custom dimensions don't backfill, so the expectation was that values would show up from the day of registration. Nobody split a report by that dimension for ten days, and the first query on October 27 showed the expectation was wrong. The bars from October 17 to 26 in the chart are grey as well.</p>
+      <p>The agent's note on October 27 read: "Both apps' <code>Analytics.log</code> sends Int with <code>putLong</code>, so the numeric parameters appear not to be picked up by these dimensions." The same document had the fix: also send the level as a string, such as <code>lv</code> = "25", register a dimension under that name, and get the operator's approval before shipping. The same (not set) and the same fix are listed in the open items of <a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Puzzle game time limits: 3-star par by simulation</a>.</p>
+    </section>
+    <section aria-labelledby="cause">
+      <h2 id="cause">The dimensions were registered; the type split the values</h2>
+      <p>The GA4 Admin API lists the custom dimensions on the Arrow Knots property (GA4's container for one app's data). Today there are 10, all event-scoped, <code>level</code> and <code>stars</code> among them. The numeric <code>world</code> dimension never showed a value either, while string values on the ad impression event did.</p>
+      <p>We haven't confirmed why GA4 leaves numeric values out of these dimensions, and we never tried registering the value as a custom metric instead.</p>
+      <p>The AI's mistakes were the October 8 commit <code>5396a0c</code> (co-authored by Claude Code), which sent <code>Int</code> values as numbers, and the October 17 assumption that registering would make values appear from that day, which cost ten days of waiting.</p>
+      <p>The fix kept numeric <code>level</code>, added the string <code>lv</code> on the same event, and registered <code>lv</code> as a dimension. It is one line, and existing <code>level</code> data and milestone events stay as they were. Putting the number in the event name was already in use: tutorial steps fire <code>tut_N_done</code>, each with its own event name, so they need no dimension. That only works when there are few steps. The campaign has hundreds of levels and only four milestone events, which left levels 25 to 50 blank.</p>
+      <p>The milestone events exist so Google Ads can import conversions by event name, and those names stayed untouched. Removing numeric <code>level</code>, or keeping the name and switching it to a string, were also possible; the record shows we added a new name, <code>lv</code>, instead.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20GA4%20custom%20dimension%20%28not%20set%29%20for%20numeric%20params">Email us</a></p></aside>
+    <section aria-labelledby="release-without-lv">
+      <h2 id="release-without-lv">The 1.2.5 release the next day had no lv</h2>
+      <p>On October 28, the day after the fix was written down, Arrow Knots 1.2.5 was submitted to production (commit <code>c1f5811</code>). It changed the big button on the daily puzzle result screen and did not include <code>lv</code>. That day's write-up of the release only said that the numeric (not set) and the rewarded-interstitial events were still open. From October 30 the harness (agent runs that start on a schedule with no one at the keyboard) did only marketing work, such as ad budgets, videos and posting, and changed no app code.</p>
+      <p>The same October 28 document said nobody could tell why new Block Turn players didn't return the next day, because the last board they played wasn't visible. When we queried on November 21 for this note, Block Turn was sending the board ID <code>pid</code> as a string. <code>pid</code> was readable in 943 <code>level_up</code> events, so the last board a player solved could have been seen through it. "Not visible" had been judged by the numeric <code>level</code>.</p>
+      <p>The weekly check on November 15 raised it again. It noted all 1,306 <code>level_up</code> events from November 1 to 14, as counted then, read (not set), so there was no telling where between levels 25 and 50 players stopped.</p>
+      <p>That night the operator said, in effect, "if something is confirmed, ship a new version," and 1.2.6 went out as commit <code>64e4df1</code>. Pre-release tests (unit, on-device end-to-end, monkey on the release build) all passed. The end-to-end log shows only that the app sends <code>lv</code> from the device. Whether GA4 shows the value could only be checked after release, and that check is the 41 events above.</p>
+    </section>
+    <section aria-labelledby="split-before-release">
+      <h2 id="split-before-release">Split one report before release</h2>
+      <ol><li>Don't ship an instrumented build until a GA4 report split by the new parameter shows values. Use an Explore report or the Data API, not the device log.2. Check the type that goes into the Firebase <code>Bundle</code>. For any value sent with <code>putLong</code> or <code>putDouble</code> that you want to split reports by, also send a <code>putString</code> copy.</li><li>Custom dimensions don't fill in data from before registration, so query once the day after you register. Don't wait ten days.</li><li>Put the numeric and string versions on the same event, and a single build tells you which one GA4 shows.</li></ol>
+      <p>A request of this shape (test-device filter omitted), with the property number left as a placeholder. The <code>customEvent:</code> prefix is how the API names a custom dimension.</p>
+      <pre><code>POST https://analyticsdata.googleapis.com/v1beta/properties/&lt;property&gt;:runReport
+{
+  "dateRanges": [{"startDate": "2026-11-15", "endDate": "2026-11-20"}],
+  "dimensions": [{"name": "customEvent:lv"}, {"name": "appVersion"}],
+  "metrics": [{"name": "eventCount"}],
+  "dimensionFilter": {"filter": {"fieldName": "eventName",
+                                 "stringFilter": {"value": "level_up"}}}
+}</code></pre>
+      <p>Run it again with <code>customEvent:level</code> in place of <code>customEvent:lv</code> to see both slots for the same events and dates. Keeping <code>appVersion</code> in the dimensions shows which build the values start in. Counting test devices too, every version up to 1.2.5 had <code>level</code> as (not set), and all 44 events from 1.2.6 had a value in <code>lv</code>.</p>
+    </section>
+    <section aria-labelledby="before-the-verdict">
+      <h2 id="before-the-verdict">Before the level verdict</h2>
+      <p>A string dimension lets you group by level number as a category. Averages or sums of the level would need something else. The level numbers in the 3,278 events sent by builds other than 1.2.6 between October 17 and November 20 (including 1.2.5 events that kept arriving after November 15) will never be readable in GA4.</p>
+      <p>The sample is small. The 41 events fall on four days between November 15 and 19 (none on the 16th), and the levels in them sit in a few stretches: the first twenty, then a handful past level 100. That is not enough to say anything about drop-off per level.</p>
+      <p>After November 22, with more than a week of <code>lv</code> from 1.2.6, we look at where between levels 25 and 50 players stop. That is the check the November 15 review scheduled for one week after release.</p>
+      <p>Block Turn still sends the level number only as numeric <code>level</code>. Since the last board a player solved is already visible through <code>pid</code>, what remains is deciding whether it needs a string copy of the level number or whether <code>pid</code> is enough.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20GA4%20custom%20dimension%20%28not%20set%29%20for%20numeric%20params">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+    <h2 id="faq">FAQ</h2>
+    <div class="faq"><details><summary>Why does my GA4 custom dimension show (not set)?</summary><div><p>In this app it showed (not set) only for parameters the app sent as numbers (<code>putLong</code>). The dimensions were registered with event scope, and string parameters on the same events had values.</p></div></details><details><summary>Can I send a numeric parameter as a string?</summary><div><p>Yes, if you use it as a category to split reports by. Arrow Knots kept numeric <code>level</code> and sent the same value again as string <code>lv</code>, and all 41 events from that build showed it.</p></div></details></div>
+    </section>
+    <p class="note">As of 2026-11-21. Git history (analytics commit, 1.2.5 and 1.2.6 release commits), daily and weekly check documents, GA4 Data API and Admin API queries (read-only, test devices excluded).</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/naver-speller-highlight-missing/">Claude Code fix: Naver spelling highlights missing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Sun, 22 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Claude Code on Windows: CRLF broke four checks – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/windows-crlf-byte-checks/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/windows-crlf-byte-checks/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/windows-crlf-byte-checks-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>Claude Code on Windows: CRLF broke four checks</h1>
+      <p class="lead">On a Windows PC running Claude Code, core.autocrlf=true checks text files out with CRLF and breaks checks that count bytes. Which bytes ship decides what to fix.</p>
+      <p>Same repository, same file: one work tree built fine, the other failed after 35 seconds. The document viewer app's engine file was 11,548 bytes larger on disk, exactly one byte per line.</p>
+      <p>Our harness runs Claude Code on a Windows PC and checks out a fresh work tree for each repository. Git on Windows wrote the text files in those trees with CRLF line endings. The original work trees had been copied file by file from WSL and were still mostly LF, so the difference stayed hidden. In the month after the move, the same cause broke a check four times, in three different kinds of check, and the right fix was in a different place each time.</p>
+    </section>
+    <section aria-labelledby="rhwp">
+      <h2 id="rhwp">The engine file grew by 11,548 bytes and the build failed</h2>
+      <p>At 09:18 on November 4 (KST), the harness's daily run built a debug APK of SugarDoc, our Korean HWP document viewer for Android. The build failed at its asset check, <code>verifyRhwpAssets</code>. That task pins two rhwp engine files (rhwp.js and rhwp_bg.wasm) to the exact bytes of the npm release, pins the fonts, font CSS and license texts to the bytes recorded in an asset list, and compares size and SHA-512 on every build.</p>
+      <p>The first failure line read <code>rhwp.js: size 444510 != pinned 432962</code>. Within a minute the agent found <code>core.autocrlf=true</code>, Git's setting that rewrites line endings on checkout. <code>fonts.css</code> in the harness tree had CRLF; the same file in the original work tree had LF, and that tree had built the app on October 25.</p>
+      <p>On November 21 we rebuilt the situation in a throwaway clone. Of the 28 pinned files, 16 text files no longer matched. The 12 that still matched were 11 binaries (10 fonts, 1 wasm) and one license file, the Rust crates notice, whose original already mixes in CRLF, so Git left it alone. The output shows 31 files turned to CRLF, more than 16, because the same folder also holds files outside the pinned list: our own viewer code.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/windows-crlf-byte-checks-shot1-en.webp" width="1200" height="844" alt="Terminal output: in a temporary clone with core.autocrlf=true, the commit before the fix has 16 of 28 pinned files mismatched and rhwp.js at 444,510 bytes, a fresh clone of the fix commit has 0, and the site CSS is 41,055 bytes on disk vs 40,595 committed, failing the budget until the checker fix" loading="lazy"><figcaption>Real output, re-run in temporary clones on Nov 21, 2026. a and b are the viewer repository, s is the site repository. The pin comparison is the Gradle task's rule (size and SHA-512) ported to a Python script.</figcaption></figure>
+    </section>
+    <section aria-labelledby="two-trees">
+      <h2 id="two-trees">Copied trees kept LF; fresh checkouts got CRLF</h2>
+      <p>The <code>true</code> came from the system config file that Git for Windows installs. <code>git config --show-origin core.autocrlf</code> printed that file; neither the global nor the repository config set the value. With this setting, Git adds one CR per line when it checks out a text file that is stored with LF.</p>
+      <p>When we moved from WSL to Windows on October 18, we <a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">copied the repositories with rsync</a>, which carried the LF bytes over unchanged. The copied tree has 40 files today that are LF in the commit but CRLF on disk, but in a tree that Git on Windows checked out from scratch, most text files are CRLF. The <a href="https://sugarmount21.com/en/ax/windows-harness-overview/">harness</a> keeps a separate work tree per repository: the utility apps' tree appeared on October 25, the site's on the evening of November 1.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/windows-crlf-byte-checks-shot2-en.webp" width="1200" height="420" alt="Horizontal bars: in the same utility-app repository, the tree copied from WSL has 831 files that are LF in the commit and on disk and 40 that are LF in the commit but CRLF on disk; the harness tree checked out on Windows has 81 and 818" loading="lazy"><figcaption>Line endings in two work trees of one repository, counted with git ls-files --eol on Nov 21, 2026. The trees point at different commits, so the totals differ slightly.</figcaption></figure>
+      <p>The dates differ by tree. The CSS budget broke on the evening of November 1, when the site's harness tree appeared; the asset check broke on November 4, the first SugarDoc build in the utility apps' harness tree that the harness logs show. The October 23 failure happened before any harness tree existed, and the records do not say which tree it ran in, but the three viewer files that test reads (viewer.js, edit.js, protocol.js) are among the copied tree's 40 files that are LF in the commit but CRLF on disk. We did not check file by file when those 40 became CRLF.</p>
+    </section>
+    <section aria-labelledby="css-budget">
+      <h2 id="css-budget">The CSS budget failure was a 4-byte margin running out</h2>
+      <p>On the site, the failure shows up first in the 8 p.m. handover log of November 1. The build check raised <code>BUDGET-CSS</code> (site.css at 41,055 bytes against a 40,960-byte budget), and the log put it down to another session's layout commit, to be fixed before publishing.</p>
+      <p>The 23:13 run measured the committed file first. The blob, Git's stored copy, was 40,595 bytes, inside the budget, and the 460-byte gap to the disk size was the file's line count.</p>
+      <div class="table-wrap"><table><thead><tr><th>Commit</th><th>Committed size</th><th>Size checked out with CRLF</th><th>40,960-byte budget</th></tr></thead><tbody><tr><td>6ab2edb, before the layout</td><td>40,498</td><td>40,956</td><td>passes, 4 bytes left</td></tr><tr><td>33af6de, layout</td><td>40,595</td><td>41,055</td><td>fails</td></tr></tbody></table></div>
+      <p>The checker measured the CSS with <code>os.path.getsize</code>, the bytes on disk. Its HTML budget read pages in Python text mode, which turns CRLF into LF on read, so the same flaw was blocked on that path by accident. GitHub Pages serves the committed files, so the agent made the CSS check strip CRs before counting (eed841d).</p>
+      <p>About two minutes passed between the error and the commit, and the agent got two things wrong in that time. Its first test file stayed under the budget even with CRLF, so it could not exercise the fix; the agent made it larger before running it. Then, following an owner rule that a test which still passes with the guard removed is fake, it reverted the fix to watch the test fail. Its sed pattern was mis-escaped, nothing changed, and the test said OK. The agent printed the values, redid the revert by line number, and only then saw the failure.</p>
+      <p>The site's tools now turn CRLF into LF in six places, added separately on four different days between October 18 and November 15.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20on%20Windows%3A%20CRLF%20broke%20four%20checks">Email us</a></p></aside>
+    <section aria-labelledby="regex">
+      <h2 id="regex">Regex tests expected \n and nothing else</h2>
+      <p>The third kind is a test that reads source files with a regular expression. On October 23 the utility apps' unit tests ran on Windows for the first time since the move and failed in five ways; one was the web viewer's security-policy test, whose LF pattern did not match a CRLF file. One line fixed it: replace <code>\r\n</code> with <code>\n</code> on read (62488f2).</p>
+      <p>On November 16 the agent writing these notes hit the same thing while <a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">re-running the E2E isolation test of AXFamily</a>, our family-schedule app, on an old commit unpacked with <code>git archive</code> (which writes a commit out as a folder). That test removes one safety guard at a time and expects the checker to catch it. One removal regex expected lines to end in <code>\n</code> only, so on a CRLF copy it removed nothing.</p>
+      <p>Re-run on November 21: 20 of 21 passed on the CRLF copy, 21 of 21 on the LF copy.</p>
+      <p>The failure message was "the case did not change the file". Because the test asserts that its substitution actually happened, it failed loudly. The revert check on November 1 had no such assertion, so it printed OK even though nothing had been substituted (the cause there was the sed escaping, not CRLF).</p>
+    </section>
+    <section aria-labelledby="which-bytes">
+      <h2 id="which-bytes">Which bytes ship decides what you fix</h2>
+      <p>An APK packs whatever is on disk at build time. Built from the CRLF tree, the app would have carried an rhwp.js that differs from the npm release, so the asset check failed correctly and the files had to change. The site is the opposite: deployment uses the committed files, so the disk-size check was the thing that was wrong.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/windows-crlf-byte-checks-1-en.webp" width="1200" height="732" alt="Comparison: on the left, viewer assets that go into the APK from disk (16 of 28 engine, font and license files mismatched, fixed in the files with -text); on the right, the site CSS served from the committed files (41,055 bytes on disk, 40,595 committed, fixed in the checker)" loading="lazy"><figcaption>The viewer assets ship from disk, so we fixed the files; the site CSS ships from the commit, so we fixed the checker.</figcaption></figure>
+      <p>Don't switch every byte check to "measure the committed blob". On the APK asset check, that would have passed an APK whose 16 text assets carried CRLF.</p>
+      <p>In the table, <code>.gitattributes</code> is the repository file that tells Git how to treat each path, and <code>-text</code> marks a path as not text, so Git never rewrites its line endings.</p>
+      <div class="table-wrap"><table><thead><tr><th>Approach</th><th>Where</th><th>Result</th><th>Limit</th></tr></thead><tbody><tr><td><code>-text</code> per path in <code>.gitattributes</code></td><td>viewer assets (bcb1f2f)</td><td>fresh clone: all 28 match</td><td>only for vendored files pinned byte for byte; on source you edit, CRLF written by Windows editors gets committed as is</td></tr><tr><td>checker strips CRs</td><td>site CSS budget (eed841d)</td><td>0 errors</td><td>wrong where the disk file ships</td></tr><tr><td>turn <code>\r\n</code> into <code>\n</code> on read</td><td>security-policy test (62488f2)</td><td>125 web tests, 0 failed</td><td>only for tests about content</td></tr><tr><td><code>git -c core.autocrlf=false archive</code></td><td>E2E re-run (Nov 16)</td><td>21 passed</td><td>covers that one command</td></tr><tr><td>clone with <code>core.autocrlf=false</code></td><td>tried Nov 21 (commit before the fix)</td><td>all 28 match</td><td>set per clone or per PC; nothing stays in the repository</td></tr><tr><td><code>text=auto eol=lf</code></td><td>tried Nov 21</td><td>checked-out bytes match</td><td>renormalising changes the Rust crates notice</td></tr><tr><td><code>text eol=lf</code></td><td>tried Nov 21</td><td>checked-out bytes match</td><td>renormalising changes 12 files, fonts and wasm included</td></tr></tbody></table></div>
+      <p><code>eol=lf</code> asks Git to write LF line endings on checkout. <code>-text</code> leaves the Rust crates notice alone, but with <code>eol=lf</code> a <code>git add --renormalize</code> (which reapplies the current attributes to files already committed) stages the notice's original CRLF lines without their CRs. The November 4 records show neither <code>eol=lf</code> nor <code>core.autocrlf=false</code> being considered; the last three rows of the table were tried separately on November 21.</p>
+    </section>
+    <section aria-labelledby="refresh">
+      <h2 id="refresh">Changing attributes did not rewrite files already checked out</h2>
+      <p>On November 4 the agent wrote <code>.gitattributes</code> (one comment, two <code>-text</code> lines) and ran <code>git checkout-index -f</code> to check the files out again. They stayed CRLF and the build failed again. Tried on its own, fonts.css stayed at 6,465 bytes instead of its pinned 6,410, and a temporary clone on November 21 behaved the same.</p>
+      <p>The agent then stripped every CR from the text files in that folder with sed. <code>git diff --stat</code> showed a file that should not have changed: the Rust crates notice, where sed had removed the 81 CRs that belong to the original. The agent wrote that one file back from its committed bytes, and the build passed at 09:22.</p>
+      <p>The day's ops log noted that a fresh checkout was not re-tested. On November 21, a tree already checked out with CRLF only matched after the folder was moved away and checked out again.</p>
+    </section>
+    <section aria-labelledby="before-trusting">
+      <h2 id="before-trusting">What to look at in a fresh work tree before trusting a byte check</h2>
+      <ol class="steps"><li><p>See which file sets the value.</p><pre><code>git config --show-origin core.autocrlf</code></pre></li><li><p>Count the files changed on checkout. <code>i/lf w/crlf</code> means LF in the commit, CRLF on disk.</p><pre><code>git ls-files --eol | cut -f1 | sort | uniq -c</code></pre></li><li><p>Measure one checked file on disk and in the commit.</p><pre><code>wc -c &lt; assets/site.css
+git cat-file -s HEAD:assets/site.css</code></pre></li><li><p>For every check that counts bytes, write down whether the disk file or the committed file ships, and pick the fix from the table above.</p></li><li><p>After changing <code>.gitattributes</code>, move the affected folder out of the work tree, check it out again, and repeat steps 2 and 3 (Git 2.45.2, checked Nov 21, 2026).</p><pre><code>git checkout-index -a -u</code></pre></li><li><p>When you remove a guard to watch a test fail, first confirm that the removal actually changed the file.</p></li></ol>
+      <p>The asset check in this re-run is the Gradle rule ported to Python; we did not rebuild a fresh clone with Gradle. We did not measure Linux or macOS checkouts. We have not listed the byte-counting checks in the game and spelling apps' harness trees. The utility apps' harness tree existed from October 25, and we only know that the harness logs show no build there before November 4, not why.</p>
+    </section>
+    <p class="note">As of Nov 21, 2026. Git history (utility-app repository 62488f2 and bcb1f2f; site repository 6ab2edb, 33af6de and eed841d), harness session logs (Nov 1 and Nov 4), the daily ops log written in the Nov 4 run, the desk's drafting memo (Nov 16), output re-run in temporary clones (git 2.45.2.windows.1).</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20on%20Windows%3A%20CRLF%20broke%20four%20checks">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Sun, 22 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>Claude Code data analysis: a 130% payback was 76% – SugarMount</title>
     <link>https://sugarmount21.com/en/ax/ads-payback-mixed-sources/</link>
@@ -78,9 +248,9 @@
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/adversarial-review-other-paths/">Claude Code re-review: the bug survived via HTTP</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
       </ul>
@@ -247,9 +417,9 @@ if ((git status --porcelain) -or (git log '@{u}..' --oneline)) { exit 4 }</code>
         <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://sugarmount21.com/en/ax/naver-speller-highlight-missing/">Claude Code fix: Naver spelling highlights missing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-numeric-param-not-set/">GA4 custom dimension (not set) for numeric params</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/adversarial-review-other-paths/">Claude Code re-review: the bug survived via HTTP</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -460,9 +630,9 @@ onVariants(selector().withBuildType("release")) { variant -&gt;
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/windows-crlf-byte-checks/">Claude Code on Windows: CRLF broke four checks</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
@@ -541,11 +711,11 @@ onVariants(selector().withBuildType("release")) { variant -&gt;
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/scheduled-run-leftover-state/">Claude Code scheduled runs: state left behind</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ads-payback-mixed-sources/">Claude Code data analysis: a 130% payback was 76%</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -712,7 +882,7 @@ adb -s &lt;device&gt; reverse tcp:8180 tcp:8180</code></pre></li><li><p>Have the
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-numeric-param-not-set/">GA4 custom dimension (not set) for numeric params</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
       </ul>
@@ -762,8 +932,8 @@ adb -s &lt;device&gt; reverse tcp:8180 tcp:8180</code></pre></li><li><p>Have the
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/windows-crlf-byte-checks/">Claude Code on Windows: CRLF broke four checks</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://sugarmount21.com/en/ax/scheduled-run-leftover-state/">Claude Code scheduled runs: state left behind</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
@@ -1167,7 +1337,7 @@ OK  en head  26/30 1,000 brain-teasing levels</code></pre>
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-numeric-param-not-set/">GA4 custom dimension (not set) for numeric params</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>
@@ -1221,7 +1391,7 @@ OK  en head  26/30 1,000 brain-teasing levels</code></pre>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/windows-crlf-byte-checks/">Claude Code on Windows: CRLF broke four checks</a></li>
         <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
@@ -1699,7 +1869,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-numeric-param-not-set/">GA4 custom dimension (not set) for numeric params</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2156,8 +2326,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2311,157 +2481,6 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Wed, 11 Nov 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>17 days of a Claude Code harness: how to start – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/windows-harness-game-marketing/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/windows-harness-game-marketing/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/windows-harness-game-marketing-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · How-to</span>
-      <h1>17 days of a Claude Code harness: how to start</h1>
-      <p class="lead">Take reports only for the first week, log failures by date, read the verdict line instead of trusting "ok", put the sign-in expiry date on your calendar, then add jobs one at a time.</p>
-      <p class="note">Windows harness series, part 11 of 11 <span aria-hidden="true">·</span> Previous <a href="https://sugarmount21.com/en/ax/windows-harness-shorts/">Planning TikTok, Reels and Shorts</a></p>
-      <p>In Parts 6 to 10 you built four jobs with the kit. This part takes SugarMount's own harness log from October 25 to November 10, 2026 (17 days) and turns it into a start-up order and a morning check routine for your kit.</p>
-      <div class="box"><p><strong>When you finish this part</strong></p><ul><li>Result: each morning you check the harness with the status table and the verdict line, and you know which job to switch on next.</li><li>You need: hello scheduled (Parts 6-7) and the ga4-daily job (Part 8).</li><li>Cost: nothing extra.</li></ul></div>
-    </section>
-    <section aria-labelledby="step-1">
-      <h2 id="step-1">Step 1: Take reports only for the first week</h2>
-      <p>Shadow running means the AI analyzes and reports but changes nothing. The kit's three report jobs tell Claude "do not edit or create files" and allow only reading tools (Read, Glob), so using the kit as shipped is already shadow running.</p>
-      <ol class="steps"><li><p>Open PowerShell and go to the kit folder.</p><pre><code>cd $HOME\harness</code></pre></li><li><p>Allow scripts in this window only (Part 6). Do this first every time you open a new window.</p><pre><code>Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force</code></pre></li><li><p>Schedule ga4-daily for 09:30 every day. Skip this if you already registered it in Part 8.</p><pre><code>.\register-job.ps1 -Name ga4-daily -At 09:30</code></pre></li><li><p>From the next day, for a week, put that morning's GA4 CSV into the data\ga4 folder before the scheduled time, with a name that starts with today's date, such as <code>2026-11-12-events.csv</code> (Part 8).</p></li><li><p>After the scheduled time, open the latest report.</p><pre><code>notepad .\reports\latest-ga4-daily.md</code></pre></li><li><p>Pick three numbers tagged <code>[GA4 CSV]</code> in the report and find the same numbers in the original CSV in the data\ga4 folder.</p></li></ol>
-      <div class="note note--positive"><p><strong>It worked if</strong></p><p>For a whole week, every number you picked matches the CSV. If even one doesn't, don't move on to the next job yet.</p></div>
-      <div class="note"><p><strong>From SugarMount's log</strong></p><p>SugarMount's harness ran in shadow mode for three days, October 25 to 27, and the reports went wrong at least twice in that time. Once a failure-rate calculation used the wrong denominator, and a correction line was added. Another time a report said the old chat-session schedule "appears not to have run"; in fact the AI had searched the records with a date-only query that missed that day, and the next day's report corrected it.</p></div>
-    </section>
-    <section aria-labelledby="step-2">
-      <h2 id="step-2">Step 2: Look at failures by date</h2>
-      <p>Writing results down by date shows whether a failure repeats, and whether several jobs failed on the same day.</p>
-      <ol class="steps"><li><p>Each morning, double-click <code>status.cmd</code> in the harness folder in File Explorer to open the status table (Part 7). From PowerShell, this line opens the folder:</p><pre><code>explorer $HOME\harness</code></pre></li><li><p>For any job whose 마지막결과 (last result) column isn't <code>ok</code>, open its log in a PowerShell window (after the <code>cd</code> line from Step 1).</p><pre><code>Get-Content .\logs\ga4-daily.log</code></pre></li><li><p>Write the date, the job and the last result on one line in Notepad.</p></li></ol>
-      <p>In a PowerShell window, the two lines from Step 1 followed by <code>.\status.ps1</code> show the same status table.</p>
-      <div class="note note--positive"><p><strong>It worked if</strong></p><p>The table shows <code>ok</code> under 마지막결과 (last result), today's date under 끝난시각 (finished at), and tomorrow's time under 다음예약 (next run). The kit prints these column names in Korean.</p></div>
-      <p>The number after <code>exit</code> in the chart below is an exit code: the number a program leaves behind when it ends. 0 means it finished without an error. The Nov 6 cells are green because that morning's failed runs were rerun the same day and succeeded.</p>
-      <figure><img src="https://sugarmount21.com/assets/ax/windows-harness-game-marketing-shot1-en.webp" width="1200" height="340" alt="Grid chart with 17 date columns from 10/25 to 11/10 and three rows: Korean app, Utilities, Games. Cells are green for ok and red for failed. The seven red cells are all three on 10/30 (exit 1), the Korean app on 11/04 (exit 3), and all three on 11/05 (exit 3)." loading="lazy"><figcaption>Results of the three app jobs for 17 days, Oct 25 to Nov 10, drawn from SugarMount's harness run records: 7 of 51 cells are red. The morning failure on 11/06 was kept in a separate file; a rerun the same day succeeded, so that cell is green.</figcaption></figure>
-      <div class="note"><p><strong>From SugarMount's log</strong></p><p>7 of the 51 cells failed. On October 30 all three jobs hit the plan's weekly usage limit (<code>You've hit your weekly limit</code>). On November 4 only the Korean app stopped, because the previous day's run had left changed files behind. Right after that, for about 38 hours, uncommitted edits to the harness code stopped every scheduled job at the preparation step (Part 7).</p></div>
-    </section>
-    <section aria-labelledby="step-3">
-      <h2 id="step-3">Step 3: Don't read "ok" as success</h2>
-      <p><code>ok</code> in the status table only means the run ended without an error. Whether the work got done is in the verdict line that all four kit jobs write at the end of each report. With the default Korean prompts it reads <code>판정: 완료</code> (done) or <code>판정: 일부 실패(reason)</code> (partly failed). If you switched a job to the English prompts in prompts/en (Part 8), it reads <code>Verdict: done</code> or <code>Verdict: partial failure (reason)</code>.</p>
-      <ol class="steps"><li><p>Open that day's report.</p><pre><code>notepad .\reports\latest-ga4-daily.md</code></pre></li><li><p>Near the bottom, find the line that starts with <code>판정:</code> or <code>Verdict:</code>.</p></li><li><p>If it says partly failed, read the reason in brackets. "No file" (<code>파일 없음</code>) means there is no CSV in the data\ga4 folder; "no file for today" (<code>오늘 넣은 파일 없음</code>) means no file name starts with today's date.</p></li></ol>
-      <div class="note note--positive"><p><strong>It worked if</strong></p><p>You see <code>판정: 완료</code> or <code>Verdict: done</code>.</p></div>
-      <div class="note"><p><strong>From SugarMount's log</strong></p><p>On November 10, 2026, the utility app's social job found its video queue empty and posted nothing, yet the runner recorded <code>ok</code>, and that night's daily summary showed "0 failed or missed". From November 11 every job ends with a verdict line, and all four kit prompts carry the same line.</p></div>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%2017%20days%20of%20a%20Claude%20Code%20harness%3A%20how%20to%20start">Email us</a></p></aside>
-    <section aria-labelledby="step-4">
-      <h2 id="step-4">Step 4: Put the sign-in expiry on your calendar</h2>
-      <p>A Claude Code sign-in has an end date, and without a sign-in a run fails. Before it ends, sign in again in the separate settings folder for scheduled jobs (<code>.claude-harness</code>).</p>
-      <ol class="steps"><li><p>If the 로그인경고 (sign-in warning) column shows <code>다시 로그인 필요</code> (sign in again), open that job's log. It has a Korean line from the runner, <code>주의: Claude 로그인 만료 예고가 나왔습니다. 전용 설정 폴더에서 다시 로그인하세요</code> (sign-in expiry notice: sign in again in the jobs' settings folder), and a line that starts with <code>Warning: this sign-in ends between</code>. Read the two dates in the second one; it appears only in the log, not in the report.</p><pre><code>Get-Content .\logs\hello.log</code></pre></li><li><p>Pick a day before the first date and write "Claude sign-in" on your calendar.</p></li><li><p>On that day, open a new PowerShell window and point it at the jobs' settings folder (Part 4).</p><pre><code>$env:CLAUDE_CONFIG_DIR = "$env:USERPROFILE\.claude-harness"</code></pre></li><li><p>In the same window, start Claude Code, type <code>/login</code>, and follow the browser steps.</p><pre><code>claude</code></pre></li></ol>
-      <div class="note note--positive"><p><strong>It worked if</strong></p><p>The terminal shows <code>Login successful</code>. Press <kbd>Enter</kbd> to continue.</p></div>
-      <div class="note"><p><strong>From SugarMount's log</strong></p><p>On November 12, 2026, every run that used the real harness's settings folder printed this line at the top of its answer:</p><pre><code>Warning: this sign-in ends between 2026-11-18 and 2026-11-21 (in 7 days at the earliest). Renewing it does not move those dates. Run claude auth login before then, or use claude setup-token for unattended jobs.</code></pre><p>The <code>claude setup-token</code> it suggests creates a one-year token but does not save it anywhere (official docs), so you would have to store the token yourself. This series recommends signing in again instead.</p></div>
-    </section>
-    <section aria-labelledby="step-5">
-      <h2 id="step-5">Step 5: Add jobs one at a time</h2>
-      <p>After the shadow week, switch on one job at a time and move to the next row only when the condition is met. Space out the start times so runs don't overlap.</p>
-      <div class="table-wrap"><table><thead><tr><th>Order</th><th>Switch on</th><th>Move on when</th></tr></thead><tbody><tr><td>1</td><td>hello, scheduled (Parts 6-7)</td><td>The status table shows <code>ok</code> and a next run time</td></tr><tr><td>2</td><td>ga4-daily at 09:30 (Part 8)</td><td>For a week the report's numbers match the CSV</td></tr><tr><td>3</td><td>ads-check at 09:40 (Part 9)</td><td>A person reads each suggestion and writes down what they changed</td></tr><tr><td>4</td><td>shorts-plan at 10:00 (Part 10)</td><td>A person posts the video and logs views in posted.csv</td></tr><tr><td>5</td><td>Approval inbox (beyond this series)</td><td>Only requests a person approved get carried out</td></tr><tr><td>6</td><td>Automatic changes within limits (beyond this series)</td><td>Set caps first. The real harness caps daily ad budgets at 5,000 Korean won per app and 12,000 won in total</td></tr></tbody></table></div>
-    </section>
-    <section aria-labelledby="trouble">
-      <h2 id="trouble">Common problems once it's running</h2>
-      <div class="table-wrap"><table><thead><tr><th>If you see this</th><th>Why</th><th>What to do</th></tr></thead><tbody><tr><td>Several jobs end within seconds and the log says <code>You've hit your weekly limit</code></td><td>Your Claude plan's weekly usage limit was reached</td><td>Once the limit resets, run the job by hand, for example <code>.\run-job.ps1 -Name ga4-daily</code></td></tr><tr><td>Last result is <code>ok</code> but the report says <code>판정: 일부 실패</code> or <code>Verdict: partial failure</code></td><td>The run ended without an error but didn't finish the work</td><td>Read the reason in brackets and check the data folder</td></tr><tr><td>No report file for today</td><td>The runner writes a report only for runs that end <code>ok</code></td><td>Open the log and check the status in its last <code>종료</code> (end) line</td></tr><tr><td>The sign-in warning column says <code>다시 로그인 필요</code></td><td>The settings folder's sign-in is about to expire</td><td>Sign in again as in Step 4</td></tr></tbody></table></div>
-    </section>
-    <section aria-labelledby="real">
-      <h2 id="real">In the real harness</h2>
-      <p>SugarMount's harness sorts work into three permission levels:</p>
-      <ul><li>Do it now: free marketing, store listing text, documents, and releases that passed their checks.</li><li>Ask first (queued for a person to approve): money, new or paused campaigns, ad settings, permissions, app names, prices, and big changes.</li><li>Never (blocked by a check that runs just before each command): force-overwriting code history, printing secrets, installing packages, and 100% rollouts.</li></ul>
-      <p>How that split was decided is written up in <a href="https://sugarmount21.com/en/ax/agent-permission-table/">A permission table for a scheduled AI agent</a>.</p>
-    </section>
-    <nav class="box" aria-label="Series contents"><p><strong>Windows harness series: all 11 parts</strong></p><ul><li><a href="https://sugarmount21.com/en/ax/windows-harness-overview/">1. What a harness is</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">2. Before you start: PowerShell</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-install/">3. Install Git and Claude Code</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">4. Log in and ask a first unattended question</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-docker-desktop/">5. Install Docker Desktop</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">6. Download the kit and run a first job</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-task-scheduler/">7. Schedule it to run every day</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">8. A morning GA4 report job</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">9. Ad budget checks and approvals</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-shorts/">10. Planning TikTok, Reels and Shorts</a></li><li><strong aria-current="page">11. Two weeks of running it, and the safeguards</strong></li></ul><p>This is the last part.</p></nav>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%2017%20days%20of%20a%20Claude%20Code%20harness%3A%20how%20to%20start">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-    <h2 id="faq">FAQ</h2>
-    <div class="faq"><details><summary>How long should shadow running last?</summary><div><p>SugarMount ran it for three days (October 25 to 27) and switched on live changes on October 27; adjusting daily ad budgets was handed over separately, on October 30 (Part 9). The reports went wrong at least twice even in those three days, so this series suggests a full week when you start.</p></div></details><details><summary>Can a job show "ok" when the work didn't happen?</summary><div><p>Yes. On November 10, 2026, one of SugarMount's posting jobs had no video to post and posted nothing, yet its status was ok. Read the report's verdict line as well.</p></div></details></div>
-    </section>
-    <p class="note">As of Nov 12, 2026. SugarMount harness run state files and logs (Oct 25 to Nov 10, 2026), the shadow-run comparison reports (Oct 26 and 27, 2026), kit output run on Nov 12, 2026, and the Claude Code official docs (code.claude.com).</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/greeting-card-removal/">10,001 lines of greeting cards: built with an AI agent, removed with one</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Wed, 11 Nov 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Claude Code harness: run it unattended every day – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/windows-harness-overview/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/windows-harness-overview/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/windows-harness-overview-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · How-to</span>
-      <h1>Claude Code harness: run it unattended every day</h1>
-      <p class="lead">A harness runs Claude Code at set times with nobody watching, saves every result to a file and hands anything risky to a person. On November 10, 2026, ours ran its upkeep jobs 284 times.</p>
-      <p class="note">Windows harness series, part 1 of 11 <span aria-hidden="true">·</span> Next <a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">Before you start: PowerShell</a></p>
-      <p>If you handle marketing for a game app, your mornings tend to start the same way: open GA4, check that no ad budget is leaking, pick today's short video. This series hands those chores to Claude Code on one Windows PC, so the reports are waiting as files when you sit down, in 11 short parts. Part 1 installs nothing: you see what you will end up with and decide whether your PC and accounts are ready.</p>
-      <div class="box"><p><strong>When you finish this part</strong></p><ul><li>Result: you know what a harness is, what this series builds, and whether it suits you.</li><li>You need: nothing yet.</li><li>Cost: none. From Part 4 (signing in) on you need a paid Claude plan (Step 4).</li></ul></div>
-    </section>
-    <section aria-labelledby="step-1">
-      <h2 id="step-1">Step 1: See one day of a harness</h2>
-      <p>A harness is the whole setup around an AI that runs it at fixed times without a person, records results and failures, and blocks risky actions. In this series the AI is Claude Code, a program that lets you use Anthropic's Claude from a command window.</p>
-      <p>The chart below shows when SugarMount's own harness actually ran on November 10, 2026.</p>
-      <figure><img src="https://sugarmount21.com/assets/ax/windows-harness-overview-shot1-en.webp" width="1200" height="620" alt="Bar chart with a time axis from 00:00 to 24:00. Rows from the top: Korean-spelling app daily, Utility apps daily, Game daily (GA4, ads, creatives), three social-posting rows, Dev-notes publishing, Search indexing requests, Blog jobs (4 kinds), Social-network drafts, and Every 15 min: 3 upkeep jobs (284 runs). The three daily bars follow each other between 09:00 and 10:30; the two game rows are orange, other apps blue, everything else grey, and the bottom row is a dense comb of thin ticks." loading="lazy"><figcaption>When each job ran on Nov 10, 2026, drawn from the harness runner logs. The two orange bars are the game app's jobs. At the bottom, one tick is drawn for each upkeep run, and runs close together in time overlap.</figcaption></figure>
-      <p>How to read it:</p>
-      <ul><li>From 09:11 the three apps' morning jobs ("dailies") run one after another, never at the same time.</li><li>The game daily started at 10:07 and took 13.8 minutes. It checks GA4 numbers, ads, and promo video material.</li><li>The game's social job ran at 20:07. It posts a video to TikTok, Instagram and YouTube.</li><li>The ticks at the bottom are three upkeep jobs that run every 15 minutes: 284 runs that day.</li></ul>
-    </section>
-    <section aria-labelledby="step-2">
-      <h2 id="step-2">Step 2: Know how it differs from a chat AI</h2>
-      <div class="table-wrap"><table><thead><tr><th>Question</th><th>Chat AI</th><th>Harness</th></tr></thead><tbody><tr><td>How do you ask?</td><td>Open a window and type</td><td>Write the task into files ahead of time</td></tr><tr><td>When does it work?</td><td>While you sit at the window</td><td>At the times on its timetable, with nobody there</td></tr><tr><td>Where is the result?</td><td>On screen</td><td>In log and report files you open later</td></tr><tr><td>What must be running?</td><td>An open chat</td><td>A PC that is on, with you signed in to Windows</td></tr></tbody></table></div>
-      <p>"Signed in" (Windows calls it logged on) means your Windows account is in use on the PC. The kit schedules jobs to run only while you are signed in, so it never stores your password. A schedule set up inside a chat session stops when you close that session; with a harness, Windows itself keeps the time.</p>
-      <p>The harness calls Claude Code as <code>claude -p</code>. The <code>-p</code> flag answers one request without opening a chat window and then exits, which is called headless mode. You try it yourself in Part 4.</p>
-    </section>
-    <section aria-labelledby="step-3">
-      <h2 id="step-3">Step 3: Learn the kit's four parts</h2>
-      <p>The kit you download in Part 6 has four moving parts. An office comparison helps:</p>
-      <div class="table-wrap"><table><thead><tr><th>Part</th><th>Office comparison</th><th>In the kit</th><th>What it does</th></tr></thead><tbody><tr><td>Task Scheduler</td><td>Timetable</td><td>registered by <code>register-job.ps1</code></td><td>The scheduler built into Windows. It wakes the runner, for example at 09:05 every day</td></tr><tr><td>Job card</td><td>One card per task</td><td><code>jobs</code> folder</td><td>A job card (a job definition file in the jobs folder) says which instructions, which model, which tools are allowed, and the time limit</td></tr><tr><td>Prompt</td><td>Work order</td><td><code>prompts</code> folder</td><td>What Claude should do. Report jobs use only numbers found in the files, and every job ends with a "verdict" line</td></tr><tr><td>Runner</td><td>The clerk who runs it</td><td><code>run-job.ps1</code></td><td>Runs one job, blocks overlapping runs, enforces the time limit, and writes the work log (<code>logs</code>, <code>reports</code>, <code>state</code> folders)</td></tr></tbody></table></div>
-      <p>The kit was written in Korean. Its default prompts, the line the runner prints when a job ends, and the status table's column names are Korean. English prompts sit in <code>prompts/en</code>; to use one, change the job card's "prompt" to <code>prompts/en/&lt;job&gt;.md</code>. A <code>.ps1</code> file is a PowerShell script: a file of saved commands. "Model" means which Claude model a job uses; the kit uses haiku for its test job and sonnet for the rest.</p>
-      <p>SugarMount's real harness has more parts that this series does not build:</p>
-      <div class="table-wrap"><table><thead><tr><th>Only in the real harness</th><th>What it does</th></tr></thead><tbody><tr><td>Dispatcher</td><td>Wakes every 15 minutes, runs the app dailies in order, and carries out approved requests</td></tr><tr><td>Approval inbox</td><td>A Notion table where anything the AI must not do alone (money, accounts, big changes) waits for a person</td></tr><tr><td>Guard hook</td><td>Checks each tool call just before Claude makes it and blocks dangerous commands</td></tr><tr><td>Watcher</td><td>Reads only state and log files, with no model, and reports failures and missed runs</td></tr><tr><td>Data collection server</td><td>Gathers the previous day's ad and GA4 numbers at 09:00 every day (runs in Docker)</td></tr></tbody></table></div>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20harness%3A%20run%20it%20unattended%20every%20day">Email us</a></p></aside>
-    <section aria-labelledby="step-4">
-      <h2 id="step-4">Step 4: Check what you need and what it costs</h2>
-      <ul><li>PC: one Windows 11 PC. Claude Code's documented minimum is Windows 10 1809 or later, 4 GB of RAM or more, an x64 or ARM64 processor, and an internet connection. Part 2 shows how to check your version.</li><li>Claude plan: Pro is $20 a month ($17 a month billed yearly), Max is $100 a month, Ultra is $200 a month (<a href="https://claude.com/pricing">claude.com/pricing</a>, checked Nov 11, 2026). The free plan does not include Claude Code.</li><li>A PC that stays on: at job time the PC must be on and you must be signed in.</li><li>Marketing accounts: GA4 (downloading a report needs the Viewer role on the property), Google Ads, and your TikTok, Instagram and YouTube channels.</li><li>Docker Desktop: optional. The kit runs without it (Part 5).</li></ul>
-      <div class="note note--positive"><p><strong>It worked if</strong></p><p>You can answer yes four times: the PC runs Windows 10 1809 or later; you can pay for a Claude plan; the PC can stay on at the morning job time; you can sign in to GA4 or Google Ads. Then go on to Part 2.</p></div>
-    </section>
-    <section aria-labelledby="step-5">
-      <h2 id="step-5">Step 5: Look at the series map</h2>
-      <div class="table-wrap"><table><thead><tr><th>Group</th><th>Parts</th><th>What you have at the end</th></tr></thead><tbody><tr><td>Install</td><td>2 to 5</td><td>PowerShell open, Git and Claude Code installed, signed in, and a first unattended question answered. Docker is optional</td></tr><tr><td>Automate</td><td>6 to 7</td><td>The kit downloaded, a first job run by hand, then scheduled for the same time every day</td></tr><tr><td>Marketing</td><td>8 to 10</td><td>A morning GA4 report, ad budget suggestions, and a plan for TikTok, Reels and Shorts videos</td></tr><tr><td>Operate</td><td>11</td><td>A start-up order and a morning check routine taken from a 17-day record of real runs</td></tr></tbody></table></div>
-      <p>The kit never touches your ad account; it writes suggestions. It never uploads videos; it writes plans. A person makes the changes and does the posting.</p>
-    </section>
-    <section aria-labelledby="trouble">
-      <h2 id="trouble">When this setup doesn't fit</h2>
-      <div class="table-wrap"><table><thead><tr><th>If this is you</th><th>Why</th><th>What to do</th></tr></thead><tbody><tr><td>Your PC is off most of the time, or nobody is signed in</td><td>Kit jobs run only while you are signed in. A missed run fires once after the PC is back on</td><td>Keep the PC on at job time, or schedule jobs after the time you usually switch it on</td></tr><tr><td>You want the AI to own the ad budget or posting outright</td><td>The kit only suggests and plans. Even the real harness sends money and account decisions to a person</td><td>Start with suggestions you read and apply yourself (Part 9)</td></tr><tr><td>You only have the free Claude plan</td><td>The free plan has no Claude Code</td><td>You need Pro or higher</td></tr><tr><td>Your Windows is 32-bit</td><td>Claude Code does not support 32-bit Windows</td><td>Use a 64-bit Windows PC</td></tr><tr><td>You can't download GA4 and ad numbers by hand each day</td><td>The kit reads only CSV files you download and drop in</td><td>Automatic collection is outside this series; run the report on the days you do download</td></tr></tbody></table></div>
-    </section>
-    <section aria-labelledby="real">
-      <h2 id="real">In the real harness</h2>
-      <p>SugarMount's harness started on October 25, 2026. An older harness that ran in a Linux environment was stopped and rewritten for Windows from scratch, keeping the lessons but none of the code.</p>
-      <p>As of November 11, 14 jobs were registered in Task Scheduler; the dispatcher calls the rest in order. Each job names its model: opus for the app dailies, which involve the most judgment, sonnet for fixed screen work such as posting, and haiku for self-checks.</p>
-    </section>
-    <nav class="box" aria-label="Series contents"><p><strong>Windows harness series: all 11 parts</strong></p><ul><li><strong aria-current="page">1. What a harness is</strong></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">2. Before you start: PowerShell</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-install/">3. Install Git and Claude Code</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">4. Log in and ask a first unattended question</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-docker-desktop/">5. Install Docker Desktop</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">6. Download the kit and run a first job</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-task-scheduler/">7. Schedule it to run every day</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">8. A morning GA4 report job</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">9. Ad budget checks and approvals</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-shorts/">10. Planning TikTok, Reels and Shorts</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-game-marketing/">11. Two weeks of running it, and the safeguards</a></li></ul><p>Next: <a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">Before you start: PowerShell</a></p></nav>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20harness%3A%20run%20it%20unattended%20every%20day">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-    <h2 id="faq">FAQ</h2>
-    <div class="faq"><details><summary>Can I run a harness on the free Claude plan?</summary><div><p>No. Claude Code needs a Pro, Max, Ultra, Team, Enterprise or Console account; the free claude.ai plan does not include it (official docs, Nov 11, 2026).</p></div></details><details><summary>What happens to a scheduled job if my PC is off?</summary><div><p>It does not run at that time. The kit schedules a missed run to fire once after the PC is back on and you are signed in. Part 7 walks through each setting.</p></div></details><details><summary>Do I need any programming experience?</summary><div><p>The series is written for people who are opening a command window for the first time. Part 2 starts with how to open PowerShell and paste a command.</p></div></details></div>
-    </section>
-    <p class="note">As of Nov 12, 2026. Claude Code official docs (code.claude.com), claude.com/pricing (checked Nov 11, 2026), Microsoft Task Scheduler docs, SugarMount harness runner logs (Nov 10, 2026) and job list (Nov 11, 2026), and the kit used in this series.</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/">Claude Code tapped a real AdMob ad during E2E</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>

@@ -6,7 +6,177 @@
   <description>Small Android apps that each do one thing simply, from shrinking photos and opening Korean HWP documents to checking Korean spelling and playing puzzle games.</description>
   <language>en</language>
   <atom:link href="https://sugarmount21.com/en/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Sat, 21 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Sun, 22 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>GA4 custom dimension (not set) for numeric params – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/ga4-numeric-param-not-set/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/ga4-numeric-param-not-set/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/ga4-numeric-param-not-set-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Measurement</span>
+      <h1>GA4 custom dimension (not set) for numeric params</h1>
+      <p class="lead">Arrow Knots had a GA4 custom dimension registered for the level and still read (not set) for five weeks. Sending the same level number once more as a string made it readable in all 41 events from the new build.</p>
+      <p>Our Android puzzle game Arrow Knots had a level custom dimension registered in GA4, yet for more than five weeks after analytics went in on October 8 we couldn't see which level players quit on. The level column in every report read (not set). The registration was fine; the app was sending the level number as a number. Claude Code wrote that analytics code, and the record from that time shows no report ever split by the value.</p>
+      <p>The build we shipped on November 15 sends the same level number a second time, as a string. In the events it has sent since, the numeric slot is still empty and the string slot has a value every time.</p>
+    </section>
+    <section aria-labelledby="same-event">
+      <h2 id="same-event">41 events, the numeric level empty in every one</h2>
+      <p>Arrow Knots 1.2.6 puts the level number into its <code>level_up</code> event, sent the first time a campaign level is cleared, twice: once in the original numeric parameter <code>level</code>, once in a new string parameter <code>lv</code>. On November 21 we pulled the counts through the GA4 Data API (the official API for reading report data). Of the 41 <code>level_up</code> events from 1.2.6, all 41 had a value for <code>lv</code> and none had one for <code>level</code>. The numeric <code>stars</code> parameter, which holds the star rating, was empty in all of them too.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/ga4-numeric-param-not-set-1-en.webp" width="1200" height="588" alt="Bar chart: in 41 level_up events from Arrow Knots 1.2.6, numeric level and stars were readable in 0 events, string lv in all 41." loading="lazy"><figcaption>Same build, same events: the numeric parameter stayed empty and the string copy filled in.</figcaption></figure>
+      <p>What split the two slots is the type the value had going into Firebase. Firebase ships event values in a container called a <code>Bundle</code>, and the app's shared <code>Analytics.log</code> helper puts a Kotlin <code>Int</code> or <code>Long</code> in with the numeric <code>putLong</code>, a <code>Double</code> with <code>putDouble</code>, and everything else with the string <code>putString</code>. In this call, 1.2.6 changed the line like this:</p>
+      <pre><code>// up to 1.2.5: the level as a number only
+log(FirebaseAnalytics.Event.LEVEL_UP, FirebaseAnalytics.Param.LEVEL to level1, "stars" to stars)
+// 1.2.6: the same number again as the string lv
+log(FirebaseAnalytics.Event.LEVEL_UP, FirebaseAnalytics.Param.LEVEL to level1, "lv" to level1.toString(), "stars" to stars)</code></pre>
+      <p><code>level1</code> is the level number counted from 1, and <code>FirebaseAnalytics.Param.LEVEL</code> is just the string "level". From October 17, when the dimensions were registered, through November 20, numeric <code>level</code> and <code>stars</code> were readable in none of Arrow Knots' 3,319 <code>level_up</code> events. Test phones and emulators were excluded with the filter from <a href="https://sugarmount21.com/en/ax/ga4-test-device-filter/">GA4 installs: 11 of 19 were test devices</a>.</p>
+      <p>Our block puzzle, Block Turn, shows the same pattern. Its 972 <code>level_up</code> events also carry a string <code>pid</code>, the board ID (for example R001). <code>pid</code> was readable in 943 of them; numeric <code>level</code> and <code>stars</code> in none. <code>level</code> is a parameter name Firebase defines, but <code>stars</code> is one the app made up, and it was empty too, so what decided it was the type rather than the name.</p>
+    </section>
+    <section aria-labelledby="scene">
+      <h2 id="scene">October 27: looking for the last level before uninstall</h2>
+      <p>We found this while chasing a different question. Of six new Arrow Knots players who came in from ads on October 26, five uninstalled the same day. The next day's check, run by an agent, wrote down the task "collect the last level that uninstalling players reached" and queried GA4. In that query, <code>level</code> was (not set) for the whole history.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/ga4-numeric-param-not-set-shot1-en.webp" width="1200" height="560" alt="Daily bars from October 17 to November 20 for Arrow Knots level_up events. Grey bars are events from builds up to 1.2.5, where the level number isn&#x27;t readable; red segments from November 15 are events from 1.2.6, where the string lv carries it. Dashed lines mark October 27, when the problem was found, and November 15, when 1.2.6 shipped." loading="lazy"><figcaption>Grey: events from builds up to 1.2.5, level number not readable. Red: events from 1.2.6, level number readable through the string lv. Days with no bar had zero events. GA4 Data API, test devices excluded, queried 2026-11-21.</figcaption></figure>
+      <p>The first hypothesis was ten days older. During a deeper GA4 review on October 17 we registered event-scoped custom dimensions (scoped to values attached to a single event): 9 for Arrow Knots, 13 for Block Turn. The note said "data only accumulates from 10-17". Custom dimensions don't backfill, so the expectation was that values would show up from the day of registration. Nobody split a report by that dimension for ten days, and the first query on October 27 showed the expectation was wrong. The bars from October 17 to 26 in the chart are grey as well.</p>
+      <p>The agent's note on October 27 read: "Both apps' <code>Analytics.log</code> sends Int with <code>putLong</code>, so the numeric parameters appear not to be picked up by these dimensions." The same document had the fix: also send the level as a string, such as <code>lv</code> = "25", register a dimension under that name, and get the operator's approval before shipping. The same (not set) and the same fix are listed in the open items of <a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Puzzle game time limits: 3-star par by simulation</a>.</p>
+    </section>
+    <section aria-labelledby="cause">
+      <h2 id="cause">The dimensions were registered; the type split the values</h2>
+      <p>The GA4 Admin API lists the custom dimensions on the Arrow Knots property (GA4's container for one app's data). Today there are 10, all event-scoped, <code>level</code> and <code>stars</code> among them. The numeric <code>world</code> dimension never showed a value either, while string values on the ad impression event did.</p>
+      <p>We haven't confirmed why GA4 leaves numeric values out of these dimensions, and we never tried registering the value as a custom metric instead.</p>
+      <p>The AI's mistakes were the October 8 commit <code>5396a0c</code> (co-authored by Claude Code), which sent <code>Int</code> values as numbers, and the October 17 assumption that registering would make values appear from that day, which cost ten days of waiting.</p>
+      <p>The fix kept numeric <code>level</code>, added the string <code>lv</code> on the same event, and registered <code>lv</code> as a dimension. It is one line, and existing <code>level</code> data and milestone events stay as they were. Putting the number in the event name was already in use: tutorial steps fire <code>tut_N_done</code>, each with its own event name, so they need no dimension. That only works when there are few steps. The campaign has hundreds of levels and only four milestone events, which left levels 25 to 50 blank.</p>
+      <p>The milestone events exist so Google Ads can import conversions by event name, and those names stayed untouched. Removing numeric <code>level</code>, or keeping the name and switching it to a string, were also possible; the record shows we added a new name, <code>lv</code>, instead.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20GA4%20custom%20dimension%20%28not%20set%29%20for%20numeric%20params">Email us</a></p></aside>
+    <section aria-labelledby="release-without-lv">
+      <h2 id="release-without-lv">The 1.2.5 release the next day had no lv</h2>
+      <p>On October 28, the day after the fix was written down, Arrow Knots 1.2.5 was submitted to production (commit <code>c1f5811</code>). It changed the big button on the daily puzzle result screen and did not include <code>lv</code>. That day's write-up of the release only said that the numeric (not set) and the rewarded-interstitial events were still open. From October 30 the harness (agent runs that start on a schedule with no one at the keyboard) did only marketing work, such as ad budgets, videos and posting, and changed no app code.</p>
+      <p>The same October 28 document said nobody could tell why new Block Turn players didn't return the next day, because the last board they played wasn't visible. When we queried on November 21 for this note, Block Turn was sending the board ID <code>pid</code> as a string. <code>pid</code> was readable in 943 <code>level_up</code> events, so the last board a player solved could have been seen through it. "Not visible" had been judged by the numeric <code>level</code>.</p>
+      <p>The weekly check on November 15 raised it again. It noted all 1,306 <code>level_up</code> events from November 1 to 14, as counted then, read (not set), so there was no telling where between levels 25 and 50 players stopped.</p>
+      <p>That night the operator said, in effect, "if something is confirmed, ship a new version," and 1.2.6 went out as commit <code>64e4df1</code>. Pre-release tests (unit, on-device end-to-end, monkey on the release build) all passed. The end-to-end log shows only that the app sends <code>lv</code> from the device. Whether GA4 shows the value could only be checked after release, and that check is the 41 events above.</p>
+    </section>
+    <section aria-labelledby="split-before-release">
+      <h2 id="split-before-release">Split one report before release</h2>
+      <ol><li>Don't ship an instrumented build until a GA4 report split by the new parameter shows values. Use an Explore report or the Data API, not the device log.2. Check the type that goes into the Firebase <code>Bundle</code>. For any value sent with <code>putLong</code> or <code>putDouble</code> that you want to split reports by, also send a <code>putString</code> copy.</li><li>Custom dimensions don't fill in data from before registration, so query once the day after you register. Don't wait ten days.</li><li>Put the numeric and string versions on the same event, and a single build tells you which one GA4 shows.</li></ol>
+      <p>A request of this shape (test-device filter omitted), with the property number left as a placeholder. The <code>customEvent:</code> prefix is how the API names a custom dimension.</p>
+      <pre><code>POST https://analyticsdata.googleapis.com/v1beta/properties/&lt;property&gt;:runReport
+{
+  "dateRanges": [{"startDate": "2026-11-15", "endDate": "2026-11-20"}],
+  "dimensions": [{"name": "customEvent:lv"}, {"name": "appVersion"}],
+  "metrics": [{"name": "eventCount"}],
+  "dimensionFilter": {"filter": {"fieldName": "eventName",
+                                 "stringFilter": {"value": "level_up"}}}
+}</code></pre>
+      <p>Run it again with <code>customEvent:level</code> in place of <code>customEvent:lv</code> to see both slots for the same events and dates. Keeping <code>appVersion</code> in the dimensions shows which build the values start in. Counting test devices too, every version up to 1.2.5 had <code>level</code> as (not set), and all 44 events from 1.2.6 had a value in <code>lv</code>.</p>
+    </section>
+    <section aria-labelledby="before-the-verdict">
+      <h2 id="before-the-verdict">Before the level verdict</h2>
+      <p>A string dimension lets you group by level number as a category. Averages or sums of the level would need something else. The level numbers in the 3,278 events sent by builds other than 1.2.6 between October 17 and November 20 (including 1.2.5 events that kept arriving after November 15) will never be readable in GA4.</p>
+      <p>The sample is small. The 41 events fall on four days between November 15 and 19 (none on the 16th), and the levels in them sit in a few stretches: the first twenty, then a handful past level 100. That is not enough to say anything about drop-off per level.</p>
+      <p>After November 22, with more than a week of <code>lv</code> from 1.2.6, we look at where between levels 25 and 50 players stop. That is the check the November 15 review scheduled for one week after release.</p>
+      <p>Block Turn still sends the level number only as numeric <code>level</code>. Since the last board a player solved is already visible through <code>pid</code>, what remains is deciding whether it needs a string copy of the level number or whether <code>pid</code> is enough.</p>
+    </section>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20GA4%20custom%20dimension%20%28not%20set%29%20for%20numeric%20params">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="faq">
+    <h2 id="faq">FAQ</h2>
+    <div class="faq"><details><summary>Why does my GA4 custom dimension show (not set)?</summary><div><p>In this app it showed (not set) only for parameters the app sent as numbers (<code>putLong</code>). The dimensions were registered with event scope, and string parameters on the same events had values.</p></div></details><details><summary>Can I send a numeric parameter as a string?</summary><div><p>Yes, if you use it as a category to split reports by. Arrow Knots kept numeric <code>level</code> and sent the same value again as string <code>lv</code>, and all 41 events from that build showed it.</p></div></details></div>
+    </section>
+    <p class="note">As of 2026-11-21. Git history (analytics commit, 1.2.5 and 1.2.6 release commits), daily and weekly check documents, GA4 Data API and Admin API queries (read-only, test devices excluded).</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/naver-speller-highlight-missing/">Claude Code fix: Naver spelling highlights missing</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Sun, 22 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
+  <item>
+    <title>Claude Code on Windows: CRLF broke four checks – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/windows-crlf-byte-checks/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/windows-crlf-byte-checks/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/windows-crlf-byte-checks-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>Claude Code on Windows: CRLF broke four checks</h1>
+      <p class="lead">On a Windows PC running Claude Code, core.autocrlf=true checks text files out with CRLF and breaks checks that count bytes. Which bytes ship decides what to fix.</p>
+      <p>Same repository, same file: one work tree built fine, the other failed after 35 seconds. The document viewer app's engine file was 11,548 bytes larger on disk, exactly one byte per line.</p>
+      <p>Our harness runs Claude Code on a Windows PC and checks out a fresh work tree for each repository. Git on Windows wrote the text files in those trees with CRLF line endings. The original work trees had been copied file by file from WSL and were still mostly LF, so the difference stayed hidden. In the month after the move, the same cause broke a check four times, in three different kinds of check, and the right fix was in a different place each time.</p>
+    </section>
+    <section aria-labelledby="rhwp">
+      <h2 id="rhwp">The engine file grew by 11,548 bytes and the build failed</h2>
+      <p>At 09:18 on November 4 (KST), the harness's daily run built a debug APK of SugarDoc, our Korean HWP document viewer for Android. The build failed at its asset check, <code>verifyRhwpAssets</code>. That task pins two rhwp engine files (rhwp.js and rhwp_bg.wasm) to the exact bytes of the npm release, pins the fonts, font CSS and license texts to the bytes recorded in an asset list, and compares size and SHA-512 on every build.</p>
+      <p>The first failure line read <code>rhwp.js: size 444510 != pinned 432962</code>. Within a minute the agent found <code>core.autocrlf=true</code>, Git's setting that rewrites line endings on checkout. <code>fonts.css</code> in the harness tree had CRLF; the same file in the original work tree had LF, and that tree had built the app on October 25.</p>
+      <p>On November 21 we rebuilt the situation in a throwaway clone. Of the 28 pinned files, 16 text files no longer matched. The 12 that still matched were 11 binaries (10 fonts, 1 wasm) and one license file, the Rust crates notice, whose original already mixes in CRLF, so Git left it alone. The output shows 31 files turned to CRLF, more than 16, because the same folder also holds files outside the pinned list: our own viewer code.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/windows-crlf-byte-checks-shot1-en.webp" width="1200" height="844" alt="Terminal output: in a temporary clone with core.autocrlf=true, the commit before the fix has 16 of 28 pinned files mismatched and rhwp.js at 444,510 bytes, a fresh clone of the fix commit has 0, and the site CSS is 41,055 bytes on disk vs 40,595 committed, failing the budget until the checker fix" loading="lazy"><figcaption>Real output, re-run in temporary clones on Nov 21, 2026. a and b are the viewer repository, s is the site repository. The pin comparison is the Gradle task's rule (size and SHA-512) ported to a Python script.</figcaption></figure>
+    </section>
+    <section aria-labelledby="two-trees">
+      <h2 id="two-trees">Copied trees kept LF; fresh checkouts got CRLF</h2>
+      <p>The <code>true</code> came from the system config file that Git for Windows installs. <code>git config --show-origin core.autocrlf</code> printed that file; neither the global nor the repository config set the value. With this setting, Git adds one CR per line when it checks out a text file that is stored with LF.</p>
+      <p>When we moved from WSL to Windows on October 18, we <a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">copied the repositories with rsync</a>, which carried the LF bytes over unchanged. The copied tree has 40 files today that are LF in the commit but CRLF on disk, but in a tree that Git on Windows checked out from scratch, most text files are CRLF. The <a href="https://sugarmount21.com/en/ax/windows-harness-overview/">harness</a> keeps a separate work tree per repository: the utility apps' tree appeared on October 25, the site's on the evening of November 1.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/windows-crlf-byte-checks-shot2-en.webp" width="1200" height="420" alt="Horizontal bars: in the same utility-app repository, the tree copied from WSL has 831 files that are LF in the commit and on disk and 40 that are LF in the commit but CRLF on disk; the harness tree checked out on Windows has 81 and 818" loading="lazy"><figcaption>Line endings in two work trees of one repository, counted with git ls-files --eol on Nov 21, 2026. The trees point at different commits, so the totals differ slightly.</figcaption></figure>
+      <p>The dates differ by tree. The CSS budget broke on the evening of November 1, when the site's harness tree appeared; the asset check broke on November 4, the first SugarDoc build in the utility apps' harness tree that the harness logs show. The October 23 failure happened before any harness tree existed, and the records do not say which tree it ran in, but the three viewer files that test reads (viewer.js, edit.js, protocol.js) are among the copied tree's 40 files that are LF in the commit but CRLF on disk. We did not check file by file when those 40 became CRLF.</p>
+    </section>
+    <section aria-labelledby="css-budget">
+      <h2 id="css-budget">The CSS budget failure was a 4-byte margin running out</h2>
+      <p>On the site, the failure shows up first in the 8 p.m. handover log of November 1. The build check raised <code>BUDGET-CSS</code> (site.css at 41,055 bytes against a 40,960-byte budget), and the log put it down to another session's layout commit, to be fixed before publishing.</p>
+      <p>The 23:13 run measured the committed file first. The blob, Git's stored copy, was 40,595 bytes, inside the budget, and the 460-byte gap to the disk size was the file's line count.</p>
+      <div class="table-wrap"><table><thead><tr><th>Commit</th><th>Committed size</th><th>Size checked out with CRLF</th><th>40,960-byte budget</th></tr></thead><tbody><tr><td>6ab2edb, before the layout</td><td>40,498</td><td>40,956</td><td>passes, 4 bytes left</td></tr><tr><td>33af6de, layout</td><td>40,595</td><td>41,055</td><td>fails</td></tr></tbody></table></div>
+      <p>The checker measured the CSS with <code>os.path.getsize</code>, the bytes on disk. Its HTML budget read pages in Python text mode, which turns CRLF into LF on read, so the same flaw was blocked on that path by accident. GitHub Pages serves the committed files, so the agent made the CSS check strip CRs before counting (eed841d).</p>
+      <p>About two minutes passed between the error and the commit, and the agent got two things wrong in that time. Its first test file stayed under the budget even with CRLF, so it could not exercise the fix; the agent made it larger before running it. Then, following an owner rule that a test which still passes with the guard removed is fake, it reverted the fix to watch the test fail. Its sed pattern was mis-escaped, nothing changed, and the test said OK. The agent printed the values, redid the revert by line number, and only then saw the failure.</p>
+      <p>The site's tools now turn CRLF into LF in six places, added separately on four different days between October 18 and November 15.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20on%20Windows%3A%20CRLF%20broke%20four%20checks">Email us</a></p></aside>
+    <section aria-labelledby="regex">
+      <h2 id="regex">Regex tests expected \n and nothing else</h2>
+      <p>The third kind is a test that reads source files with a regular expression. On October 23 the utility apps' unit tests ran on Windows for the first time since the move and failed in five ways; one was the web viewer's security-policy test, whose LF pattern did not match a CRLF file. One line fixed it: replace <code>\r\n</code> with <code>\n</code> on read (62488f2).</p>
+      <p>On November 16 the agent writing these notes hit the same thing while <a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">re-running the E2E isolation test of AXFamily</a>, our family-schedule app, on an old commit unpacked with <code>git archive</code> (which writes a commit out as a folder). That test removes one safety guard at a time and expects the checker to catch it. One removal regex expected lines to end in <code>\n</code> only, so on a CRLF copy it removed nothing.</p>
+      <p>Re-run on November 21: 20 of 21 passed on the CRLF copy, 21 of 21 on the LF copy.</p>
+      <p>The failure message was "the case did not change the file". Because the test asserts that its substitution actually happened, it failed loudly. The revert check on November 1 had no such assertion, so it printed OK even though nothing had been substituted (the cause there was the sed escaping, not CRLF).</p>
+    </section>
+    <section aria-labelledby="which-bytes">
+      <h2 id="which-bytes">Which bytes ship decides what you fix</h2>
+      <p>An APK packs whatever is on disk at build time. Built from the CRLF tree, the app would have carried an rhwp.js that differs from the npm release, so the asset check failed correctly and the files had to change. The site is the opposite: deployment uses the committed files, so the disk-size check was the thing that was wrong.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/windows-crlf-byte-checks-1-en.webp" width="1200" height="732" alt="Comparison: on the left, viewer assets that go into the APK from disk (16 of 28 engine, font and license files mismatched, fixed in the files with -text); on the right, the site CSS served from the committed files (41,055 bytes on disk, 40,595 committed, fixed in the checker)" loading="lazy"><figcaption>The viewer assets ship from disk, so we fixed the files; the site CSS ships from the commit, so we fixed the checker.</figcaption></figure>
+      <p>Don't switch every byte check to "measure the committed blob". On the APK asset check, that would have passed an APK whose 16 text assets carried CRLF.</p>
+      <p>In the table, <code>.gitattributes</code> is the repository file that tells Git how to treat each path, and <code>-text</code> marks a path as not text, so Git never rewrites its line endings.</p>
+      <div class="table-wrap"><table><thead><tr><th>Approach</th><th>Where</th><th>Result</th><th>Limit</th></tr></thead><tbody><tr><td><code>-text</code> per path in <code>.gitattributes</code></td><td>viewer assets (bcb1f2f)</td><td>fresh clone: all 28 match</td><td>only for vendored files pinned byte for byte; on source you edit, CRLF written by Windows editors gets committed as is</td></tr><tr><td>checker strips CRs</td><td>site CSS budget (eed841d)</td><td>0 errors</td><td>wrong where the disk file ships</td></tr><tr><td>turn <code>\r\n</code> into <code>\n</code> on read</td><td>security-policy test (62488f2)</td><td>125 web tests, 0 failed</td><td>only for tests about content</td></tr><tr><td><code>git -c core.autocrlf=false archive</code></td><td>E2E re-run (Nov 16)</td><td>21 passed</td><td>covers that one command</td></tr><tr><td>clone with <code>core.autocrlf=false</code></td><td>tried Nov 21 (commit before the fix)</td><td>all 28 match</td><td>set per clone or per PC; nothing stays in the repository</td></tr><tr><td><code>text=auto eol=lf</code></td><td>tried Nov 21</td><td>checked-out bytes match</td><td>renormalising changes the Rust crates notice</td></tr><tr><td><code>text eol=lf</code></td><td>tried Nov 21</td><td>checked-out bytes match</td><td>renormalising changes 12 files, fonts and wasm included</td></tr></tbody></table></div>
+      <p><code>eol=lf</code> asks Git to write LF line endings on checkout. <code>-text</code> leaves the Rust crates notice alone, but with <code>eol=lf</code> a <code>git add --renormalize</code> (which reapplies the current attributes to files already committed) stages the notice's original CRLF lines without their CRs. The November 4 records show neither <code>eol=lf</code> nor <code>core.autocrlf=false</code> being considered; the last three rows of the table were tried separately on November 21.</p>
+    </section>
+    <section aria-labelledby="refresh">
+      <h2 id="refresh">Changing attributes did not rewrite files already checked out</h2>
+      <p>On November 4 the agent wrote <code>.gitattributes</code> (one comment, two <code>-text</code> lines) and ran <code>git checkout-index -f</code> to check the files out again. They stayed CRLF and the build failed again. Tried on its own, fonts.css stayed at 6,465 bytes instead of its pinned 6,410, and a temporary clone on November 21 behaved the same.</p>
+      <p>The agent then stripped every CR from the text files in that folder with sed. <code>git diff --stat</code> showed a file that should not have changed: the Rust crates notice, where sed had removed the 81 CRs that belong to the original. The agent wrote that one file back from its committed bytes, and the build passed at 09:22.</p>
+      <p>The day's ops log noted that a fresh checkout was not re-tested. On November 21, a tree already checked out with CRLF only matched after the folder was moved away and checked out again.</p>
+    </section>
+    <section aria-labelledby="before-trusting">
+      <h2 id="before-trusting">What to look at in a fresh work tree before trusting a byte check</h2>
+      <ol class="steps"><li><p>See which file sets the value.</p><pre><code>git config --show-origin core.autocrlf</code></pre></li><li><p>Count the files changed on checkout. <code>i/lf w/crlf</code> means LF in the commit, CRLF on disk.</p><pre><code>git ls-files --eol | cut -f1 | sort | uniq -c</code></pre></li><li><p>Measure one checked file on disk and in the commit.</p><pre><code>wc -c &lt; assets/site.css
+git cat-file -s HEAD:assets/site.css</code></pre></li><li><p>For every check that counts bytes, write down whether the disk file or the committed file ships, and pick the fix from the table above.</p></li><li><p>After changing <code>.gitattributes</code>, move the affected folder out of the work tree, check it out again, and repeat steps 2 and 3 (Git 2.45.2, checked Nov 21, 2026).</p><pre><code>git checkout-index -a -u</code></pre></li><li><p>When you remove a guard to watch a test fail, first confirm that the removal actually changed the file.</p></li></ol>
+      <p>The asset check in this re-run is the Gradle rule ported to Python; we did not rebuild a fresh clone with Gradle. We did not measure Linux or macOS checkouts. We have not listed the byte-counting checks in the game and spelling apps' harness trees. The utility apps' harness tree existed from October 25, and we only know that the harness logs show no build there before November 4, not why.</p>
+    </section>
+    <p class="note">As of Nov 21, 2026. Git history (utility-app repository 62488f2 and bcb1f2f; site repository 6ab2edb, 33af6de and eed841d), harness session logs (Nov 1 and Nov 4), the daily ops log written in the Nov 4 run, the desk's drafting memo (Nov 16), output re-run in temporary clones (git 2.45.2.windows.1).</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20on%20Windows%3A%20CRLF%20broke%20four%20checks">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Sun, 22 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>Claude Code data analysis: a 130% payback was 76% – SugarMount</title>
     <link>https://sugarmount21.com/en/ax/ads-payback-mixed-sources/</link>
@@ -78,9 +248,9 @@
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/adversarial-review-other-paths/">Claude Code re-review: the bug survived via HTTP</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
       </ul>
@@ -247,9 +417,9 @@ if ((git status --porcelain) -or (git log '@{u}..' --oneline)) { exit 4 }</code>
         <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://sugarmount21.com/en/ax/naver-speller-highlight-missing/">Claude Code fix: Naver spelling highlights missing</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-numeric-param-not-set/">GA4 custom dimension (not set) for numeric params</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/adversarial-review-other-paths/">Claude Code re-review: the bug survived via HTTP</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -460,9 +630,9 @@ onVariants(selector().withBuildType("release")) { variant -&gt;
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
+        <li><a href="https://sugarmount21.com/en/ax/windows-crlf-byte-checks/">Claude Code on Windows: CRLF broke four checks</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://sugarmount21.com/en/ax/market-check-before-app/">We built three photo apps before checking the market: this year&#x27;s new apps had a median of 1,166 installs</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
@@ -541,11 +711,11 @@ onVariants(selector().withBuildType("release")) { variant -&gt;
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/scheduled-run-leftover-state/">Claude Code scheduled runs: state left behind</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ads-payback-mixed-sources/">Claude Code data analysis: a 130% payback was 76%</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/workflow/">All notes on Working with agents</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -712,7 +882,7 @@ adb -s &lt;device&gt; reverse tcp:8180 tcp:8180</code></pre></li><li><p>Have the
         <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-numeric-param-not-set/">GA4 custom dimension (not set) for numeric params</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
       </ul>
@@ -762,8 +932,8 @@ adb -s &lt;device&gt; reverse tcp:8180 tcp:8180</code></pre></li><li><p>Have the
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/windows-crlf-byte-checks/">Claude Code on Windows: CRLF broke four checks</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
         <li><a href="https://sugarmount21.com/en/ax/scheduled-run-leftover-state/">Claude Code scheduled runs: state left behind</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
@@ -1167,7 +1337,7 @@ OK  en head  26/30 1,000 brain-teasing levels</code></pre>
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-numeric-param-not-set/">GA4 custom dimension (not set) for numeric params</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>
@@ -1221,7 +1391,7 @@ OK  en head  26/30 1,000 brain-teasing levels</code></pre>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
         <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/windows-crlf-byte-checks/">Claude Code on Windows: CRLF broke four checks</a></li>
         <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
@@ -1699,7 +1869,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/vertex-test-cost-hard-cap/">Capping Vertex AI test costs: a 2,500 KRW stop line missed a 2,956 KRW bill, so we changed the defaults</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-numeric-param-not-set/">GA4 custom dimension (not set) for numeric params</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2156,8 +2326,8 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2657,8 +2827,8 @@ assumeTrue(dir != null &amp;&amp; dir.isDirectory)</code></pre></li>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
-        <li><a href="https://sugarmount21.com/en/ax/local-e2e-harness-three-rounds/">Claude Code real-device E2E: 31 fixes in 3 rounds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3144,8 +3314,8 @@ adb reboot                       # clears the two log.tag values</code></pre>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/scheduled-run-leftover-state/">Claude Code scheduled runs: state left behind</a></li>
         <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/windows-crlf-byte-checks/">Claude Code on Windows: CRLF broke four checks</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
         <li><a href="https://sugarmount21.com/en/ax/android-theme-color-leak/">No XML file said white, yet the dialog buttons vanished: three places a theme colour leaked</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
       </ul>
@@ -3515,9 +3685,9 @@ while True:
         <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
         <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/result-card-tap-through/">Rapid taps and an unlocked Retry button: a 600 ms result-card lock, and the 28 crashes a stress run found next</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-numeric-param-not-set/">GA4 custom dimension (not set) for numeric params</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/">Claude Code tapped a real AdMob ad during E2E</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/games/">All notes on Game development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -3671,7 +3841,7 @@ Report: what you fixed, what remains uncertain.</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/gsc-sitemap-couldnt-fetch/">Search Console showed &#x27;Couldn&#x27;t fetch&#x27; for ten days; a new domain property processed the same sitemaps in seconds</a></li>
         <li><a href="https://sugarmount21.com/en/ax/ai-region-privacy-policy/">Privacy policy AI processing location (cross-border transfer): a notice fixed twice in one day, then tied to code</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-store-title-aso-no-clear-gain/">Play Store title keywords: two weeks, no verdict</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/android7-java-time-crash/">A launch crash only on Android 7: one java.time call in a shared module and a NewApi lint gate</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/topic/web/">All notes on Website and search</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -4340,7 +4510,7 @@ adb shell "dumpsys window | grep mCurrentFocus"</code></pre>
         <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
         <li><a href="https://sugarmount21.com/en/ax/game-feel-frame-review/">Mobile game feel: frame timing showed our heart penalty landing 109 ms before the collision</a></li>
         <li><a href="https://sugarmount21.com/en/ax/block-puzzle-bot-playtest/">Block puzzle difficulty: how simulation bots caught a game you could never lose</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/puzzle-time-limit-simulation/">Testers said the time was &quot;too long, so it&#x27;s easy&quot;: checking that with a simulation before cutting puzzle par times by 30%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/arrow-puzzle-level-generator/">A reverse-construction generator and the gate behind 1,100 arrow-puzzle levels</a></li>
         <li><a href="https://sugarmount21.com/en/ax/play-store-title-aso-no-clear-gain/">Play Store title keywords: two weeks, no verdict</a></li>
         <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
       </ul>
@@ -5203,8 +5373,8 @@ Severity is exactly one of Blocker, High, Medium, Low</code></pre>
     <section aria-labelledby="ax-related-heading">
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
         <li><a href="https://sugarmount21.com/en/ax/spell-rain-difficulty-recall/">We slowed a mini game down twice before checking why it was hard: players couldn&#x27;t recall the answers</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/co-authored-by-trailer-audit/">Commits without a Co-Authored-By trailer: the agent made 26 of the 29 we could check</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -5803,191 +5973,6 @@ expect(all.sort()).toEqual(files.sort());</code></pre>
       <h2 id="contact">Contact</h2>
       <p>If something isn't working or you have a question, email us.</p>
       <p>Email: <a href="mailto:sugarmount21@gmail.com">sugarmount21@gmail.com</a> · Package name: <code>com.sugarmount.trimbox</code></p>
-    </section>]]></description>
-    <pubDate>Sat, 31 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Our .gz Android assets hit FileNotFoundException – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/android-assets-gz-suffix/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/android-assets-gz-suffix/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/android-assets-gz-suffix-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · Measurement</span>
-      <h1>Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</h1>
-      <p class="lead">Our pre-gzipped level packs were each 18 bytes larger than the APK's own compressed copies, and the build dropped the trailing .gz, so the files could not be opened on the device.</p>
-      <p>A common trick for text data in an Android app's assets folder is to gzip it ahead of time to keep the APK small. In the 1,000-level update of our puzzle game <a href="https://sugarmount21.com/en/apps/arrow-knots/">Arrow Knots</a>, five level packs shipped that way cost us twice: each was 18 bytes larger than the APK's own compressed copy, and the build stripped the trailing .gz from the names, so the app crashed with <code>FileNotFoundException</code> on its first launch.</p>
-      <p>When that crash hit a real phone (a Galaxy S21) on the night of October 3, 2026, every JVM test that read the same packs had passed. Below: the size measurement, why the tests missed it, and how to check your own APK.</p>
-    </section>
-    <section aria-labelledby="size">
-      <h2 id="size">705,234 bytes as gz files, 705,144 inside the APK</h2>
-      <p>We opened the release APK built on October 28, 2026, read the raw and compressed size of each of the five level packs, and set them next to the <code>.gz</code> files the repository held until the fix. The pack contents haven't changed since, and each old <code>.gz</code>, decompressed, has the same SHA-1 as its plain pack, so these are the same bytes.</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Pack</th><th>Raw</th><th>Old .gz file</th><th>Compressed in release APK</th><th>Difference</th></tr></thead>
-        <tbody>
-          <tr><td>p1 (1-200)</td><td>122,966</td><td>25,896</td><td>25,878</td><td>18</td></tr>
-          <tr><td>p2 (201-500)</td><td>524,852</td><td>111,113</td><td>111,095</td><td>18</td></tr>
-          <tr><td>p3 (501-700)</td><td>679,344</td><td>147,461</td><td>147,443</td><td>18</td></tr>
-          <tr><td>p4 (701-1000)</td><td>1,397,319</td><td>310,108</td><td>310,090</td><td>18</td></tr>
-          <tr><td>endless (1001-1100)</td><td>492,814</td><td>110,656</td><td>110,638</td><td>18</td></tr>
-          <tr><td>Total</td><td>3,217,295</td><td>705,234</td><td>705,144</td><td>90</td></tr>
-        </tbody>
-      </table></div>
-      <p>Every pack differs by exactly 18 bytes. A gzip file wraps deflate data in a 10-byte header and an 8-byte trailer (CRC32 and original length), so the compressed bodies are the same size and the gap is the gzip wrapper. Don't pre-gzip text assets.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/android-assets-gz-suffix-1-en.webp" width="1200" height="588" alt="Bar chart: the five level packs are 3,217,295 bytes raw, 1,195,288 bytes compressed in the debug APK, 705,234 bytes as the old gz files, and 705,144 bytes compressed in the release APK." loading="lazy"><figcaption>The release APK's deflate alone came out 90 bytes smaller than the pre-gzipped files.</figcaption></figure>
-      <p>In the debug APK the same packs take 1,195,288 bytes, about 1.7 times the release figure. We haven't checked why. Measure asset sizes in a release APK.</p>
-    </section>
-    <section aria-labelledby="wrong-pair">
-      <h2 id="wrong-pair">The design's 4.4× compared the wrong pair</h2>
-      <p>The case for gzip was one line in a design draft an agent wrote that afternoon: "300 levels = 535 KB raw / 121 KB gz (4.4×)", with an estimate of 0.7 to 0.85 MB gzipped for 1,000 levels. Raw sizes never ship, since the APK compresses the plain packs too. The pair to compare was the gz files against the plain packs as the APK compresses them.</p>
-      <p>The format went into the update spec committed at 17:18 that day. Several agents had cross-checked it, and it still put the packs in assets as <code>.pack.gz</code> and had the app read them with <code>GZIPInputStream</code>. At 18:32 the five packs were generated in that format, and the work of 41 agents (implementation, review and merges) finished at 22:27 with "none failed". Why that "done" meant JVM tests and a debug build is covered in <a href="https://sugarmount21.com/en/ax/parallel-agent-workstreams/">How many AI coding agents can run at once?</a>.</p>
-    </section>
-    <section aria-labelledby="apk-list">
-      <h2 id="apk-list">The APK listing had only arrows-p1.pack</h2>
-      <p>The fresh-install monkey test caught it first; it ran because the operator's first request said to install on the S21 and run E2E. The script clears app data and sends 800 random events with seeds 7, 21 and 99. Seeds 7 and 21 each logged two fatal exceptions, and every one that made it into the log had the same message:</p>
-      <pre><code>E AndroidRuntime: java.lang.RuntimeException: Unable to start activity
-  ComponentInfo{…/sugar.arrows.MainActivity}:
-  java.io.FileNotFoundException: arrows-p1.pack.gz</code></pre>
-      <p>Thirty seconds later the agent listed the assets inside the debug APK. The source folder had <code>arrows-p1.pack.gz</code> at 25,896 bytes; the APK had <code>assets/arrows-p1.pack</code> at 122,966 bytes. All five packs looked like that: no <code>.gz</code> in the name, stored at their decompressed size. The commit message attributes this to aapt.</p>
-    </section>
-    <section aria-labelledby="why-green">
-      <h2 id="why-green">The tests opened the same files through a different function</h2>
-      <p>The app and the tests share <code>PackStore</code>, the class that reads packs, but each passes in its own way to open a file. <code>MainActivity</code> uses <code>PackStore(open = assets::open)</code>. <code>ProgressTest</code> uses <code>PackStore(open = { FileInputStream(File(ASSETS, it)) })</code>, where <code>ASSETS</code> is <code>src/main/assets</code>. The tests read the repository files as they are, so they see the <code>.gz</code> name and the gzip bytes. The generator module's test helper <code>Shipped</code> even carried the comment "read the way the app and tools read them". The app reads through AssetManager.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Pre-gzipping%20Android%20assets%2C%20measured%3A%20zero%20APK%20savings%2C%20and%20.pack.gz%20became%20.pack%20with%20a%20FileNotFoundException">Email us</a></p></aside>
-    <section aria-labelledby="fix">
-      <h2 id="fix">Plain packs, and what renaming the extension would have kept</h2>
-      <p>At 22:31, the fix commit decompressed the packs into plain <code>.pack</code> files and removed <code>GZIPInputStream</code> from <code>Levels.kt</code>. The generator's <code>writeGz</code> became <code>writePack</code>, which writes text. The same commit deleted <code>arrows-v2.pack</code> (534,864 bytes), an old pack the app no longer read; two tests still did, and were moved to the new packs. Before the commit, 256 tests passed (engine 83, generator 40, app 133). At 22:34 the reinstalled app on the S21 had 0 fatal exceptions on all three monkey seeds and got through the tutorial to level 1.</p>
-      <p>Two other fixes were possible. Renaming the extension to something else would keep the build away from the name, so gzip could stay. But the table shows there is no size to gain, and all that would remain is <code>GZIPInputStream</code> plus the mtime-0 header the generator wrote to keep builds byte-identical. Keeping <code>.gz</code> in the source and having only the app open <code>.pack</code> would work on a device, but the tests would go on reading a different name and format than the app, which is how this crash got through. Neither alternative was tried in the repository; this comparison is our judgment while writing the note.</p>
-    </section>
-    <section aria-labelledby="test-limits">
-      <h2 id="test-limits">What the 19-line name test doesn't look at</h2>
-      <p>The body of <code>AssetNamesTest</code>, added in the fix, is two statements. It was run before the fix and failed at 22:29 with <code>no asset name ends in gz FAILED</code>.</p>
-      <pre><code>val gz = File("src/main/assets").listFiles().orEmpty().map { it.name }.filter { it.endsWith(".gz") }
-assertTrue(gz.isEmpty(), "aapt renames these on install: $gz")</code></pre>
-      <p><code>listFiles()</code> doesn't descend into subfolders, so a file like <code>assets/levels/x.gz</code> slips past. Other source sets such as <code>src/debug/assets</code>, and the assets of the other app module in the same repository, aren't checked either. The "on install" in the message is also wrong: the APK listing showed <code>.pack</code> before anything was installed, so the rename happens at build time. We haven't confirmed which step of AGP 9.4.1 does it. The size result comes from 1,100 levels of text packs only; files that deflate can't shrink are outside it.</p>
-    </section>
-    <section aria-labelledby="how-to">
-      <h2 id="how-to">Checking asset names and sizes in your own APK</h2>
-      <ol>
-        <li>Put the release APK listing next to the source folder: <code>unzip -l app-release.apk | grep assets/</code> and <code>ls src/main/assets</code>. If names or counts differ, find the code that opens those files.</li>
-        <li>Add a JVM test that fails on any asset name ending in <code>.gz</code>, and watch it fail before you fix anything. If you have subfolders, use <code>walkTopDown()</code>.</li>
-        <li>Decide whether to pre-compress from the compressed sizes inside the release APK. In Python, add up <code>compress_size</code> over <code>zipfile.ZipFile(apk).infolist()</code> and compare with your gz files.</li>
-        <li>Open the first screen on a real device from a fresh install with app data cleared. The script is in <a href="https://sugarmount21.com/en/ax/fresh-install-monkey-test/">the fresh-install monkey test note</a>.</li>
-      </ol>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">Still to do: .pack.gz left in the spec</h2>
-      <p>As of October 29, 2026, the update spec still names <code>.pack.gz</code> five times, on four lines, and still says the packs are read with <code>GZIPInputStream</code>. The helper that reads the plain packs is still called <code>Shipped.gzLines</code>. When the spec gets fixed, we'll also decide how far <code>AssetNamesTest</code> should look.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Pre-gzipping%20Android%20assets%2C%20measured%3A%20zero%20APK%20savings%2C%20and%20.pack.gz%20became%20.pack%20with%20a%20FileNotFoundException">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Why does opening a .gz file from Android assets throw FileNotFoundException?</summary><div><p>Because this project's build (AGP 9.4.1) dropped the trailing .gz and stored the file decompressed: the APK listing showed a decompressed <code>x.pack</code> instead of <code>x.pack.gz</code>. Open the name without .gz and drop GZIPInputStream.</p></div></details>
-        <details><summary>Does pre-gzipping assets make the APK smaller?</summary><div><p>Not for our 1,100 levels of text packs. The release APK's deflate came to 705,144 bytes; the pre-gzipped files were 705,234 bytes, larger by the 18-byte gzip header and trailer per pack.</p></div></details>
-        <details><summary>Can a JVM unit test catch this kind of packaging problem?</summary><div><p>It can enforce the naming rule. Whether AssetManager actually opens the file is only confirmed by running the app on a device or emulator.</p></div></details>
-      </div>
-    </section>
-    <p class="note">Checked 2026-10-30. The game repository's git history, the monkey log and APK listing in that day's agent session record, and compressed sizes read with Python's zipfile from release and debug APKs built on October 28.</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/jpeg-target-size-search/">Fitting a JPEG under a file size limit: quality binary search, a predicted long edge, and a final check against the original</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/splash-listener-onstop/">A splash that never moved on: addOnCompleteListener(this) and onStop</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/naver-speller-highlight-missing/">Claude Code fix: Naver spelling highlights missing</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/wsl-to-windows-claude-code/">Claude Code on WSL vs native Windows: what changed after the move</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Sat, 31 Oct 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>market:// store chooser on SKT-sold Samsung phones – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/market-uri-store-chooser/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/market-uri-store-chooser/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/market-uri-store-chooser-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX note · How-to</span>
-      <h1>A market:// link opens a store chooser on SKT-sold Samsung phones: set the Play package first</h1>
-      <p class="lead">On two Samsung phones sold by SKT in Korea (Galaxy S21 and S20), three store apps answer a market:// link. Pointing the intent at the Play Store app first skips the chooser and opens the Play listing.</p>
-      <p>"More apps" and "rate us" buttons usually open the Play listing with a <code>market://details?id=…</code> link. On Samsung phones sold by the Korean carrier SKT, that link may not go straight to Play: a sheet asks whether to open ONE store (a Korean app store), Galaxy Store (Samsung's store) or Play. If your app is only on Play, users who pick another store land on an empty page.</p>
-      <p>We ran into that sheet on October 9, 2026, tapping through a new menu of our puzzle games in the drawer of <a href="https://sugarmount21.com/en/apps/sugarspeller/">SugarSpeller</a> on a Galaxy S21. All 300 unit tests had already passed. Fifty-nine minutes later the store link targeted Play first.</p>
-    </section>
-    <section aria-labelledby="three-handlers">
-      <h2 id="three-handlers">Three store apps answer one market:// link</h2>
-      <p>On October 30 we asked two SKT-sold phones which apps handle <code>market://details?id=…</code>. A Galaxy S21 on Android 15 and a Galaxy S20 on Android 13 both listed three: Play, Galaxy Store and ONE store, each with isDefault=true, meaning its filter accepts implicit intents (it declares CATEGORY_DEFAULT). When such an intent has more than one candidate and no default app is set, Android asks the user to choose.</p>
-      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/market-uri-store-chooser-1-en.webp" width="1200" height="580" alt="Bar chart: on a Galaxy S21, three apps accept a market:// link with no target app, one app accepts it with the Play package set, and two apps accept the Play https listing URL." loading="lazy"><figcaption>Setting the Play package cuts the candidates from three to one, so no chooser appears (adb query, 2026-10-30).</figcaption></figure>
-      <p>The drawer links to <a href="https://sugarmount21.com/en/apps/blocks/">Block Turn</a>, Arrow Knots and SugarCard, and all three are on Play only. The game links carry the referrer <code>utm_source=sugarspeller&amp;utm_medium=crosspromo&amp;utm_campaign=drawer</code>, which only Play reads and reports in the Play Console acquisition report. A user who picks another store lands on a page with no app, and even an install that follows doesn't count as cross-promotion.</p>
-    </section>
-    <section aria-labelledby="wrong-assumption">
-      <h2 id="wrong-assumption">The old code read a failure as "no Play"</h2>
-      <p>The first version opened <code>market://</code> and fell back to the https address on <code>ActivityNotFoundException</code>. The comment on that branch said the device had no Play Store app. The assumption was that only Play opens market:// links. That code first went in with the SugarCard menu on September 20, and on October 9 it moved unchanged into a launcher shared by the games and SugarCard. Claude co-authored both commits.</p>
-      <p>On SKT-sold Samsung phones that assumption means the fallback never runs. With three candidates there is no exception; the chooser appears, and the code treats the store as opened. The same check showed that the SugarCard menu had carried the same problem since the September 20 code.</p>
-    </section>
-    <section aria-labelledby="missed">
-      <h2 id="missed">Why 300 unit tests and two reviews missed it</h2>
-      <p>The store test in the games-menu commit compared the started intent's URI and never looked at its package. Robolectric has no other store apps installed, and by default startActivity doesn't fail there. In the same piece of work, three analysis agents and two adversarial reviews found and closed three test gaps (a missing <code>&lt;queries&gt;</code> entry, hiding the rows on Android 6.0, and the Classic drawer wiring). None of them questioned the market:// assumption.</p>
-      <p>The chooser showed up when we tapped the menu on the S21 itself. The repository's working notes say runtime checks are done on a release APK, and the check after the fix ran on one (the routine is written up in <a href="https://sugarmount21.com/en/ax/release-gate/">the release gate note</a>).</p>
-    </section>
-    <section aria-labelledby="fix-order">
-      <h2 id="fix-order">Try Play, then plain market, then https</h2>
-      <p>The fix keeps three candidates in a list and opens them in order, moving on only when one throws.</p>
-<pre><code>val attempts = listOf(
-    view("market://details?$query").setPackage(PLAY_STORE),
-    view("market://details?$query"),                           // no Play: any store
-    view("https://play.google.com/store/apps/details?$query"), // no store app: browser
-)</code></pre>
-      <p>An intent pinned to the Play package throws on a device without Play, which gives the list the failure signal the old code never had. The existing test gained an assertion that the started intent's package is Play, and a new test checks that with only another store present (checkActivities(true)) the plain market:// address opens with no package. Unit tests went to 301/301. Delete the setPackage call and the package comes back null, so the assertion fails (the same check we describe in <a href="https://sugarmount21.com/en/ax/guard-removal-test/">deleting the guard</a>).</p>
-      <p>On the S21 release APK that day, the installed Arrow Knots launched straight away, Block Turn, not installed, opened in Play with no chooser, and SugarCard went to Play as well. The GA4 log showed <code>game_open{game=arrows,installed=1}</code>, <code>{game=blocks,installed=0}</code> and <code>sugarcard_open{installed=0}</code>. The fix went into the 1.6.026 release branch, so the game menu pointed at Play from the first build users got, published the same morning.</p>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20market%3A//%20link%20opens%20a%20store%20chooser%20on%20SKT-sold%20Samsung%20phones%3A%20set%20the%20Play%20package%20first">Email us</a></p></aside>
-    <section aria-labelledby="alternatives">
-      <h2 id="alternatives">Keeping the chooser, or opening https first</h2>
-      <p>We dropped the idea of leaving the chooser alone because the apps are on Play only. Pinning Play with nothing after it would open nothing on a phone without Play, so plain market and https stay as fallbacks.</p>
-      <p>On the S21 on October 30, Play and Chrome both handle the Play https listing, and play.google.com is a system-verified link for Play, so opening https first would probably have opened Play too (we didn't tap it to check). But a browser accepts https on nearly every phone, so there is no exception, and which app opens depends on the device's settings. That doesn't fit a list that moves on when a candidate fails, so https stays last.</p>
-    </section>
-    <section aria-labelledby="limits">
-      <h2 id="limits">Don't pin Play if your app is on other stores too</h2>
-      <p>If you send Korean users to an app that is only on Play, set the Play package on the market:// intent. If the app is also on ONE store or Galaxy Store, don't: the pin pulls those stores' users over to Play. On a phone without Play, the second candidate opens another store, which doesn't list our apps. We checked that path only in a Robolectric test; we have no such phone. We also checked only two Samsung phones sold by SKT, not KT or LG U+ models, unlocked models or other makers.</p>
-    </section>
-    <section aria-labelledby="check">
-      <h2 id="check">Two adb queries and one package assertion</h2>
-      <ol>
-        <li>Connect the phone and run <code>adb shell cmd package query-activities --brief -a android.intent.action.VIEW -d "market://details?id=com.example.app"</code>. If the first line says 2 or more activities found, the phone can show a chooser; each candidate also shows its isDefault value.</li>
-        <li>Run it again with the Play Store app's package, <code>-p com.android.vending</code>, at the end. You should get one.</li>
-        <li>Change the store link to try Play, then plain market, then https, catching only <code>ActivityNotFoundException</code> to move to the next one.</li>
-        <li>Assert the started intent's <code>package</code> in a unit test, and check once that the test fails when you remove setPackage.</li>
-        <li>Put the release APK on a phone sold in Korea and tap the link yourself.</li>
-      </ol>
-    </section>
-    <section aria-labelledby="next">
-      <h2 id="next">Still open: UTM installs and 16 drawer E2E tests</h2>
-      <p>From October 9 to 22 the game rows were tapped 33 times in GA4 (Block Turn 5, Arrow Knots 16, and 12 from 1.6.026 with no game value). Whether those taps became installs is only in the Play Console acquisition report, and we haven't judged it yet. On the S21, 16 E2E tests that open the drawer fail, and they fail the same way on the build from before the change, so the game-row E2E tests never ran on the device and we tapped the rows by hand instead. Finding the cause of those failures comes next.</p>
-    </section>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20A%20market%3A//%20link%20opens%20a%20store%20chooser%20on%20SKT-sold%20Samsung%20phones%3A%20set%20the%20Play%20package%20first">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-      <h2 id="faq">FAQ</h2>
-      <div class="faq">
-        <details><summary>Why does a Galaxy phone ask which store to use when I open a Play link?</summary><div><p>More than one store app on the phone handles market:// addresses. On SKT-sold Galaxy S21 and S20 phones on 2026-10-30, Play, Galaxy Store and ONE store all did, and when the link names no target app, Android asks the user to pick.</p></div></details>
-        <details><summary>How do I open the Play Store listing directly from my app?</summary><div><p>Set the Play Store app as the package of the market://details intent with setPackage. On a device without Play that intent throws ActivityNotFoundException, so keep plain market:// and the https address as fallbacks, in that order.</p></div></details>
-      </div>
-    </section>
-    <p class="note">Checked 2026-10-30. The SugarSpeller repository's git history and CHANGELOG (1.6.026), GA4 monitoring notes, and adb queries run again on a Galaxy S21 and S20.</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/hwpx-octet-stream-intent-filter/">On Android, HWPX can arrive as application/octet-stream: an 18-row intent matrix and the intent filter that fits it</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/e2e-agent-real-ad-click/">Claude Code tapped a real AdMob ad during E2E</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/compose-korean-line-break/">Jetpack Compose splits Korean between syllables, but the stacked &#x27;R/u/l/e&#x27; label came from how a Row measures</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/ads-free-release-gate/">Claude Code Android: a build gate for zero ads</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/subscription-details-94-percent/">A month of &#x27;temporary error&#x27;: our subscription details screen never waited for products, and 1 of 16 users started checkout</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/topic/android/">All notes on Android development</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
     <pubDate>Sat, 31 Oct 2026 09:00:00 +0900</pubDate>
   </item>
