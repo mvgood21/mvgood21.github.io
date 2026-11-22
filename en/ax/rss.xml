@@ -6,7 +6,73 @@
   <description>Notes from shipping Android apps on Google Play with an AI coding agent: release gates, R8 crashes, staged rollouts, agent permissions. Dated numbers from git.</description>
   <language>en</language>
   <atom:link href="https://sugarmount21.com/en/ax/rss.xml" rel="self" type="application/rss+xml"/>
-  <lastBuildDate>Sun, 22 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <lastBuildDate>Mon, 23 Nov 2026 09:00:00 +0900</lastBuildDate>
+  <item>
+    <title>Claude Code self-graded a wrong-screen short 9/10 – SugarMount</title>
+    <link>https://sugarmount21.com/en/ax/self-graded-shorts-mismatch/</link>
+    <guid isPermaLink="true">https://sugarmount21.com/en/ax/self-graded-shorts-mismatch/</guid>
+    <description><![CDATA[<section class="hero">
+    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/self-graded-shorts-mismatch-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
+      <span class="eyebrow">AX notes · Incident</span>
+      <h1>Claude Code self-graded a wrong-screen short 9/10</h1>
+      <p class="lead">A Claude Code session graded its own promo short 9/10 while it showed the wrong app screen, and a stale pass mark kept it queued for 13 days. The maker no longer grades its own work.</p>
+      <p>Halfway through a 19-second promo short for our Korean spelling-checker app, the caption fixes one word while the app screen behind it fixes a different one. The caption corrects the common misspelling 왠일로 to 웬일로 ("what brings you here"); the app screen corrects 몇일 to 며칠 ("how many days"). The short passed our quality bar at 9/10 and went up on TikTok and YouTube on the afternoon of November 2. The grader was the same Claude Code session that had made the video.</p>
+      <p>The grading rules changed that night, but the video already carried a pass mark in the posting queue; it stayed there for 13 days and was only stopped on November 15 by a different agent. That agent also reported an error that is not in the video, and the next morning's run copied that claim into the record as the reason for discarding it.</p>
+    </section>
+    <section aria-labelledby="self-score">
+      <h2 id="self-score">The session that made the video also scored it</h2>
+      <p>The app posts one vertical short a day about a single Korean spelling pair, on TikTok, Instagram and YouTube. A morning run renders the video and appends a row to a queue document; a 2 p.m. run takes the row and uploads it. Both are Claude Code sessions started on a schedule by a small personal runner (the "harness").</p>
+      <p>On the evening of November 1 the operator introduced a quality bar called Q2: six required items (sound, motion in the first second, text kept out of the platform UI margins, a large real app screen, length and loop, and so on) plus a few scored ones, 10 points in all, with 9 needed to enter the queue. The run that made a video graded it, under the instruction "don't be generous; when in doubt, deduct."</p>
+      <p>On the morning of November 2 that run wrote a new generator, <code>daily_short_q2.py</code>, and rendered q004. The generator used one fixed screen recording of the real app behind every topic, and that recording showed the 몇일 to 며칠 fix. The run knew this: in the same commit (4a778de) it wrote "limitation: the recording is a fixed real app screen (몇일 to 며칠), so it differs from the topic sentence" into the generator's README, and its final report said:</p>
+      <p>&gt; Weakness: the app recording is a fixed screen (몇일 to 며칠) and differs from the video's topic. That is why the 9 sits right on the threshold.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/self-graded-shorts-mismatch-shot1-en.webp" width="1200" height="787" alt="Three frames re-extracted from the q004 video: the opening sentence with 왠일로 underlined at 0.6 s, the caption correcting 왠일로 to 웬일로 over an app sheet showing 몇일 corrected to 며칠 at 11.5 s, and the TIP caption at 15.5 s" loading="lazy"><figcaption>Frames re-extracted on 2026-11-22 from the q004 file posted on Nov 2 (19.1 s, 2,907,714 bytes, the same size as the Nov 2 render log). Every caption is correct; the app screen in the middle is not.</figcaption></figure>
+      <p>The scoring sheet of the day had no required item for "does the screen match the topic." The weakness could not fail the video, and the score landed right on 9. The 2 p.m. run posted to TikTok and YouTube; Instagram failed because the browser denied the site a permission, so that cell stayed empty.</p>
+    </section>
+    <section aria-labelledby="gate-changed">
+      <h2 id="gate-changed">The gate changed that night; the pass mark stayed</h2>
+      <p>Around 10 p.m. the operator asked for a proper fix. The Claude Code session that maintains the harness opened that day's four Q2 videos with ffmpeg, saw that q004 sat on another topic's recording, and rebuilt the gate in commit 427279e.</p>
+      <p>Stage one is a mechanical check, <code>q2_check.py</code>, that measures resolution, length, silence, motion in the first second and any freeze longer than 1.5 seconds. q004 passes it: all five items are measurements, and none of them reads the sentence on screen. In stage two the run that makes a video no longer grades it; a fresh subagent gets the frames, the topic spec and the scoring sheet. A new required item, M7 "content matches and is factual", joined the list, and any required item at zero fails the video whatever the total.</p>
+      <figure class="ax-fig"><img src="https://sugarmount21.com/assets/ax/self-graded-shorts-mismatch-1-en.webp" width="1200" height="978" alt="Step diagram: a self-graded 9/10 and two posts on Nov 2, the gate replaced that night, the defect logged Nov 6, the Instagram run stopping Nov 15 after 13 days, and the row discarded Nov 16" loading="lazy"><figcaption>The queued pass mark went unchallenged for 13 days, until the Nov 15 stop.</figcaption></figure>
+      <p>The new gate applied "from tomorrow's 9 a.m. run". Nobody re-reviewed the 9/10 pass mark on the q004 row that was already in the queue. On November 6 a run logged "q004 M7 defect" in the WATCH file (where experiments and known defects are tracked) and added <code>record_topic.py</code>, which records the app in an emulator for each topic. In that same commit the q004 queue row did not change by a single character.</p>
+      <p>The defect lived in one file and the pass mark in another, with no step joining them. To the posting run, q004 with its empty Instagram cell remained a passed video waiting to go out.</p>
+      <div class="table-wrap"><table><thead><tr><th>Method</th><th>When</th><th>Outcome</th></tr></thead><tbody><tr><td>Maker grades, told "don't be generous"</td><td>Nov 1 to 2</td><td>Noted the flaw and still gave 9. Dropped</td></tr><tr><td>One fixed recording behind every topic</td><td>Oct 31 to Nov 2</td><td>The cause of q004. Dropped; M7 says make the video without a recording if there is no per-topic one</td></tr><tr><td>Mechanical check <code>q2_check.py</code></td><td>from Nov 2 night</td><td>Kept</td></tr><tr><td>Fresh subagent review, any required zero fails</td><td>from Nov 3 (first actual review Nov 6)</td><td>Kept</td></tr><tr><td>Per-topic emulator recording <code>record_topic.py</code></td><td>from Nov 6</td><td>Kept. Frames are checked against the topic's wrong and right sentence</td></tr><tr><td>Re-review queued rows when the gate changes</td><td>not done</td><td>Why this took 13 days</td></tr></tbody></table></div>
+      <p>With independent review, 19 of 36 videos passed as of the November 7 record, and from November 8 each app makes one short a day instead of two, putting the second slot's time into planning and reworking the first. Self-grading has not come back.</p>
+    </section>
+    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20self-graded%20a%20wrong-screen%20short%209/10">Email us</a></p></aside>
+    <section aria-labelledby="false-claim">
+      <h2 id="false-claim">The agent that caught it added an error that isn't there</h2>
+      <p>On November 11 the posting rule changed to fill empty channel cells one channel at a time. At 2 p.m. on November 15 the run found nothing left for TikTok or YouTube, and q004 was the only Q2 row still missing on Instagram. It dropped the file into Instagram's upload dialog, looked at a half-scale screenshot (784x389), and stopped.</p>
+      <p>The reason it wrote into the queue was "screen shows 몇일 to 며칠, and the TIP '웬은 웬지에만 써요' is factually wrong." The TIP is the tip caption near the end of the video, at 15.5 seconds, and it actually reads "'왠'은 '왠지'에만 써요": the spelling 왠 appears only in the word 왠지 ("somehow"), which is correct. The harness session on the night of November 2 had pulled the very same frame and raised nothing about the TIP. The next morning's run discarded the row without opening the video and carried the claim into the discard note.</p>
+      <figure><img src="https://sugarmount21.com/assets/ax/self-graded-shorts-mismatch-shot2-en.webp" width="1200" height="875" alt="The q004 queue row read at five commits: 4a778de empty posting cell, 2caf99e TikTok and YouTube posted with Instagram denied, e795981 unchanged, 58206e9 Instagram failure citing a TIP error, 8f9d3a3 row discarded with private recommended" loading="lazy"><figcaption>The q004 row read with git show at each commit, re-run on 2026-11-22. The red Korean text is the Nov 15 reason, including the false TIP claim, and the Nov 16 discard note; the pass mark is unchanged through Nov 15.</figcaption></figure>
+      <p>The first draft of this note nearly made the same mistake. The idea we started from was "a spelling app's short got a spelling rule wrong in its TIP, and an independent AI review passed it at 9/10." Both halves were wrong. There was no independent review on the morning of November 2, and the TIP is right: we pulled the 15.5-second frame again from the posted video file. Written from the queue and WATCH records alone, this note would have been the third place to repeat the misreading.</p>
+    </section>
+    <section aria-labelledby="procedure">
+      <h2 id="procedure">What to do on the day you change a gate</h2>
+      <ol class="steps"><li><p>Never let the producing session grade. Give a fresh subagent the frames, the spec and the scoring sheet, and nothing of the maker's opinion or expected score.</p></li><li><p>Make "the screen content matches the topic" a required item that fails on zero regardless of total. As a deduction it produced a 9.</p></li><li><p>In the commit that changes the gate, list everything that already passed and is queued or published, run it through the new gate, and strip the pass mark until it does.</p></li><li><p>Fix the defect log and the queue row in the same commit.</p></li><li><p>A run that copies another run's record opens the original once before copying it.</p></li><li><p>Attach a timestamp and a full-resolution frame to any defect claim. Checking this TIP took one command: <code>ffmpeg -ss 15.5 -i q004_ko_9x16.mp4 -frames:v 1 tip.png</code>.</p></li><li><p>Hand published items to a person as a list.</p></li></ol>
+      <p>The app itself is on the <a href="https://sugarmount21.com/en/apps/sugarspeller/">SugarSpeller page</a>. We wrote about making one agent's findings survive another agent's refutation in <a href="https://sugarmount21.com/en/ax/agent-review-refutation/">AI code review: fix only what survives refutation</a>.</p>
+    </section>
+    <section aria-labelledby="remaining">
+      <h2 id="remaining">Two posts and a wrong reason are still out there</h2>
+      <p>The November 16 run did not make anything private itself; it recommended setting the two TikTok and YouTube posts to private "after the user confirms." As of November 22 the repository has no record that this happened. The discard note in the queue still says "TIP factually wrong", so the next run that reads that row can repeat the misreading.</p>
+      <p>Re-checking frames needs the video file. The mp4s are kept out of git and live only in the harness working tree; this time the November 2 file was still there. The background recording is outside git too, so we have not checked whether the same video can be rebuilt on a fresh checkout. Whether re-reviewing queued rows becomes an actual harness step is not decided yet.</p>
+    </section>
+    <p class="note">As of 2026-11-22. App repository git history (queue document and WATCH.md at 4a778de, 2caf99e, e795981, 58206e9, 8f9d3a3; generator README), harness repository git history (scoring rules and posting rules at f3969d4, 427279e, 118e426, 98440e9, 7d583b0), Claude Code session logs (Nov 2, 15 and 16), frames re-extracted from the q004 video file (2,907,714 bytes).</p>
+    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
+    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Claude%20Code%20self-graded%20a%20wrong-screen%20short%209/10">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
+    <section aria-labelledby="ax-related-heading">
+      <h2 id="ax-related-heading">More AX notes</h2>
+      <ul>
+        <li><a href="https://sugarmount21.com/en/ax/adversarial-review-other-paths/">Claude Code re-review: the bug survived via HTTP</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ads-payback-mixed-sources/">Claude Code data analysis: a 130% payback was 76%</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/ga4-numeric-param-not-set/">GA4 custom dimension (not set) for numeric params</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
+      </ul>
+      <p><a href="https://sugarmount21.com/en/ax/topic/quality/">All notes on Testing and release</a> · <a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
+    </section>]]></description>
+    <pubDate>Mon, 23 Nov 2026 09:00:00 +0900</pubDate>
+  </item>
   <item>
     <title>GA4 custom dimension (not set) for numeric params – SugarMount</title>
     <link>https://sugarmount21.com/en/ax/ga4-numeric-param-not-set/</link>
@@ -249,8 +315,8 @@ git cat-file -s HEAD:assets/site.css</code></pre></li><li><p>For every check tha
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/adversarial-review-other-paths/">Claude Code re-review: the bug survived via HTTP</a></li>
         <li><a href="https://sugarmount21.com/en/ax/hwp-hancom-resave-check/">Seven edited HWP files in Hancom&#x27;s Android apps: 7 of 7 opened, and the re-save waited for a human sign-in</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/self-graded-shorts-mismatch/">Claude Code self-graded a wrong-screen short 9/10</a></li>
         <li><a href="https://sugarmount21.com/en/ax/realism-score-not-3d/">Verifying an AI agent&#x27;s &quot;done&quot; report: 95.2% vs a 92.3% cap</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
         <li><a href="https://sugarmount21.com/en/ax/privacy-policy-code-audit/">App privacy policy templates: we threw ours out and rewrote it from a code audit</a></li>
         <li><a href="https://sugarmount21.com/en/ax/claude-chrome-google-ads-campaigns/">Claude in Chrome set up 4 Google Ads campaigns</a></li>
       </ul>
@@ -2227,7 +2293,7 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
       <h2 id="ax-related-heading">More AX notes</h2>
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/ndk-16kb-page-blue-tint/">Android 16 KB page size: add the linker flag before you upgrade the NDK (NDK 27 and 29 tinted our photos blue)</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/android-assets-gz-suffix/">Pre-gzipping Android assets, measured: zero APK savings, and .pack.gz became .pack with a FileNotFoundException</a></li>
+        <li><a href="https://sugarmount21.com/en/ax/self-graded-shorts-mismatch/">Claude Code self-graded a wrong-screen short 9/10</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
@@ -2400,87 +2466,6 @@ val pick = e.drops.sortedByDescending { it.y }.firstOrNull { d -&gt;
       <ul>
         <li><a href="https://sugarmount21.com/en/ax/ads-payback-mixed-sources/">Claude Code data analysis: a 130% payback was 76%</a></li>
         <li><a href="https://sugarmount21.com/en/ax/docviewer-malicious-file-set/">A malicious file set for a document viewer: ZIP bombs, CFB loops and XSS, generated and wired into tests</a></li>
-      </ul>
-      <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
-    </section>]]></description>
-    <pubDate>Wed, 11 Nov 2026 09:00:00 +0900</pubDate>
-  </item>
-  <item>
-    <title>Install Docker Desktop on Windows with WSL 2 – SugarMount</title>
-    <link>https://sugarmount21.com/en/ax/windows-harness-docker-desktop/</link>
-    <guid isPermaLink="true">https://sugarmount21.com/en/ax/windows-harness-docker-desktop/</guid>
-    <description><![CDATA[<section class="hero">
-    <figure class="ax-cover-art"><img src="https://sugarmount21.com/assets/ax/cover/windows-harness-docker-desktop-en.webp" width="1200" height="900" alt="" fetchpriority="high" decoding="async"></figure>
-      <span class="eyebrow">AX notes · How-to</span>
-      <h1>Install Docker Desktop on Windows with WSL 2</h1>
-      <p class="lead">You can skip this part: the kit from part 6 runs without Docker. Install it only if you want a helper program, such as a server that collects ad numbers every day, to run in a container.</p>
-      <p class="note">Windows harness series, part 5 of 11 <span aria-hidden="true">·</span> Previous <a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">Log in and ask a first unattended question</a> <span aria-hidden="true">·</span> Next <a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Download the kit and run a first job</a></p>
-      <p>You can skip this part. The kit you use from part 6 on runs on Claude Code and PowerShell alone and never touches Docker.</p>
-      <p>Docker Desktop is a Windows app that runs programs in containers: self-contained bundles that run apart from the rest of your PC. You need it only to run something like a server that collects ad numbers every day, or an MCP server, which connects Claude Code to outside services such as GitHub, in a container.</p>
-      <div class="box"><p><strong>What you will have</strong></p><ul><li>Result: <code>docker run --rm hello-world</code> prints <code>Hello from Docker!</code></li><li>You need: a PC that meets the table in step 1 (Windows Pro, Enterprise or Education) and an account that can use administrator rights</li><li>Cost: free for personal use and small businesses (under 250 employees and under $10 million in annual revenue); larger companies need a paid subscription for professional use (Docker docs, checked Nov 11, 2026)</li></ul></div>
-    </section>
-    <section aria-labelledby="step-1">
-      <h2 id="step-1">Step 1: Check that your PC qualifies</h2>
-      <p>These are the conditions Docker's documentation sets for an install on WSL 2. If your PC misses any of them, skip this part.</p>
-      <ol class="steps"><li><p>Press <kbd>Win</kbd>+<kbd>R</kbd>, type <code>winver</code> and press <kbd>Enter</kbd>.</p></li><li><p>Compare the edition (Pro, Home and so on) and build number in that window with the table below.</p></li></ol>
-      <div class="table-wrap"><table><thead><tr><th>Item</th><th>Docker's requirement</th></tr></thead><tbody><tr><td>Windows 11</td><td>64-bit Pro, Enterprise or Education, 23H2 (build 22631) or later</td></tr><tr><td>Windows 10</td><td>64-bit Pro, Enterprise or Education, 22H2 (build 19045)</td></tr><tr><td>Memory</td><td>8 GB RAM</td></tr><tr><td>Virtualization</td><td>Hardware virtualization turned on in BIOS/UEFI (your PC's firmware settings)</td></tr><tr><td>WSL</td><td>2.1.5 or later (checked in step 2)</td></tr></tbody></table></div>
-      <p>Windows Home is not in this list (see the FAQ). The full requirements are in the System requirements section of <a href="https://docs.docker.com/desktop/setup/install/windows-install/">Docker's install page</a>.</p>
-    </section>
-    <section aria-labelledby="step-2">
-      <h2 id="step-2">Step 2: Install WSL from an administrator PowerShell</h2>
-      <p>WSL (Windows Subsystem for Linux) runs Linux inside Windows. By default Docker Desktop runs its containers on WSL 2.</p>
-      <ol class="steps"><li><p>Click Start and type <code>PowerShell</code>.</p></li><li><p>Right-click Windows PowerShell in the results and choose "Run as administrator".</p></li><li><p>Enter the line below in the administrator window. It turns on the features WSL needs and installs Ubuntu, a Linux distribution.</p><pre><code>wsl --install</code></pre></li><li><p>When it finishes, restart the PC.</p></li><li><p>When the Ubuntu window first opens after the restart, wait while it unpacks its files, then create a user name and password for Linux. The Linux password stays invisible while you type it.</p></li><li><p>Open an ordinary (non-administrator) PowerShell window and check the WSL version.</p><pre><code>wsl --version</code></pre></li></ol>
-      <div class="note note--positive"><p><strong>It worked if</strong></p><p>The WSL version on the first line is 2.1.5 or later. On this PC, set to Korean, it read <code>WSL 버전: 2.1.5.0</code> ("WSL version").</p></div>
-      <p>If <code>wsl --install</code> only prints help text, WSL is already installed. Run <code>wsl --update</code> in the same administrator window and check <code>wsl --version</code> again.</p>
-      <div class="note note--warning"><p><strong>Note</strong></p><p>This step uses administrator rights to install Windows features and restarts the PC. Save any open documents first.</p></div>
-    </section>
-    <section aria-labelledby="step-3">
-      <h2 id="step-3">Step 3: Download the Docker Desktop installer</h2>
-      <ol class="steps"><li><p>Open <a href="https://docs.docker.com/desktop/setup/install/windows-install/">Docker Desktop's Windows install page</a> in your browser.</p></li><li><p>Click the blue "Docker Desktop for Windows - x86_64" button, the one for ordinary Intel and AMD PCs. On a PC with an Arm processor, click the third button, "Docker Desktop for Windows - Arm (Early Access)".</p></li><li><p>Your browser downloads <code>Docker Desktop Installer.exe</code>.</p></li></ol>
-    </section>
-    <section aria-labelledby="step-4">
-      <h2 id="step-4">Step 4: Install with WSL 2 and launch it</h2>
-      <ol class="steps"><li><p>Double-click the downloaded <code>Docker Desktop Installer.exe</code>.</p></li><li><p>Leave the installation mode on per-user, which is selected by default. It installs and updates without administrator rights.</p></li><li><p>On the Configuration page, choose <strong>WSL 2</strong> as the backend (what actually runs the containers). Version 4.97 and later list WSL 2 and Docker VMM (Beta) as options; older installers show a "Use WSL 2 instead of Hyper-V" checkbox instead.</p></li><li><p>When the installation finishes, click Close.</p></li><li><p>Docker Desktop does not start on its own after installing. Click Start, type <code>Docker</code> and open Docker Desktop from the results.</p></li><li><p>Click Accept on the Docker Subscription Service Agreement. Docker Desktop will not run until you do.</p></li><li><p>You do not need to sign in to a Docker account (see the FAQ).</p></li></ol>
-      <div class="note note--warning"><p><strong>Note</strong></p><p>Do not pick the all-users install; it asks for administrator rights. Turning on WSL 2 for the first time on a PC needs administrator rights once (Docker docs).</p></div>
-    </section>
-    <aside class="ax-cta ax-cta--inline"><p>Running into the same problem? Email us what you are seeing and we will reply. <a href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Install%20Docker%20Desktop%20on%20Windows%20with%20WSL%202">Email us</a></p></aside>
-    <section aria-labelledby="step-5">
-      <h2 id="step-5">Step 5: Check it with hello-world</h2>
-      <p>With Docker Desktop open, start a new ordinary PowerShell window.</p>
-      <ol class="steps"><li><p>Check the version. You want both a Client section (the side that sends commands) and a Server section (the Docker engine).</p><pre><code>docker version</code></pre></li><li><p>Run a test container. <code>--rm</code> deletes the container when it finishes; the first run downloads the hello-world image (the template a container starts from) from the internet.</p><pre><code>docker run --rm hello-world</code></pre><figure><img src="https://sugarmount21.com/assets/ax/windows-harness-docker-desktop-shot2-ko.webp" width="1052" height="1078" alt="A Windows PowerShell window. The top part is the full docker version output: a Client block with Version 26.0.0 and OS/Arch windows/amd64, then Server: Docker Desktop 4.29.0 with an Engine block showing Version 26.0.0 and OS/Arch linux/amd64, followed by containerd, runc and docker-init versions. At the bottom, docker run --rm hello-world prints Hello from Docker! and This message shows that your installation appears to be working correctly. The user name is covered in grey." loading="lazy"><figcaption>This PC, Nov 12, 2026: the two commands from this step. Seeing both a Client and a Server block means the engine is running, and Hello from Docker! at the bottom confirms the install. The version numbers are this PC's; a fresh install shows higher ones.</figcaption></figure></li></ol>
-      <div class="note note--positive"><p><strong>It worked if</strong></p><p>You see <code>Hello from Docker!</code> and <code>This message shows that your installation appears to be working correctly.</code></p></div>
-      <p>The hello-world check comes from Docker Engine's Linux install docs; Docker Desktop's own getting-started guide uses a different example, welcome-to-docker.</p>
-    </section>
-    <section aria-labelledby="step-6">
-      <h2 id="step-6">Step 6: Cap the memory (optional)</h2>
-      <p>Docker Desktop runs on WSL 2, so a memory cap on WSL also caps Docker. Do this only if Docker has to share memory with other heavy work. The values below are the ones this PC has used since Oct 22, 2026.</p>
-      <ol class="steps"><li><p>In an ordinary PowerShell window, check whether a <code>.wslconfig</code> settings file already exists. <code>False</code> means go on; <code>True</code> means a file is already there, so stop here rather than overwrite it.</p><pre><code>Test-Path "$HOME\.wslconfig"</code></pre></li><li><p>Create the file. This is a single line.</p><pre><code>Set-Content -Path "$HOME\.wslconfig" -Value '[wsl2]','memory=3GB','processors=2','swap=1GB','[experimental]','autoMemoryReclaim=dropCache'</code></pre></li><li><p>Check the contents. You should see six lines.</p><pre><code>Get-Content "$HOME\.wslconfig"</code></pre></li><li><p>Restart the PC. The settings apply the next time WSL starts.</p></li></ol>
-      <p>According to the notes in this PC's settings file, memory is WSL's memory cap, processors the number of logical processors, swap a small spare space that keeps WSL from being killed when memory runs short, and autoMemoryReclaim=dropCache hands Linux's cache back to Windows while WSL is idle.</p>
-      <p>Do not run <code>wsl --shutdown</code> to stop WSL. It shuts down all of WSL, and the Docker engine and any running containers go down with it.</p>
-    </section>
-    <section aria-labelledby="trouble">
-      <h2 id="trouble">If you get stuck</h2>
-      <div class="table-wrap"><table><thead><tr><th>If you see this</th><th>Why</th><th>Do this</th></tr></thead><tbody><tr><td><code>wsl --version</code> shows a WSL version below 2.1.5</td><td>WSL is out of date</td><td>Run <code>wsl --update</code> in an administrator window</td></tr><tr><td>No "Use WSL 2 instead of Hyper-V" checkbox on the Configuration page</td><td>Since 4.97 the backends are a list of options</td><td>Pick WSL 2 from the list</td></tr><tr><td>No Hyper-V option on the Configuration page</td><td>Hyper-V is only offered in an all-users install</td><td>Pick WSL 2</td></tr></tbody></table></div>
-    </section>
-    <section aria-labelledby="real">
-      <h2 id="real">In the real harness</h2>
-      <p>SugarMount's harness uses Docker for two things. The first is a data-collection server. Every day at 09:00 Korea time it gathers the previous day's AdMob, GA4 and Google Ads numbers, and the game app's daily job reads them.</p>
-      <p>The second is GitHub's MCP server. Each Claude session starts its own container, and on the morning of Nov 11, 2026 seven were running, so count them when you check memory use.</p>
-      <p>The step 6 values fit this PC, which shares its memory with Android app builds. <code>wsl --shutdown</code> turns off all of WSL and takes Docker down with it, and <code>wsl --unregister</code> deletes a distribution along with its data. So the harness blocks both commands just before Claude can run them.</p>
-    </section>
-    <nav class="box" aria-label="Series contents"><p><strong>Windows harness series: all 11 parts</strong></p><ul><li><a href="https://sugarmount21.com/en/ax/windows-harness-overview/">1. What a harness is</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-powershell-basics/">2. Before you start: PowerShell</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-install/">3. Install Git and Claude Code</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-claude-code-login/">4. Log in and ask a first unattended question</a></li><li><strong aria-current="page">5. Install Docker Desktop</strong></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">6. Download the kit and run a first job</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-task-scheduler/">7. Schedule it to run every day</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-ga4-report/">8. A morning GA4 report job</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-google-ads/">9. Ad budget checks and approvals</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-shorts/">10. Planning TikTok, Reels and Shorts</a></li><li><a href="https://sugarmount21.com/en/ax/windows-harness-game-marketing/">11. Two weeks of running it, and the safeguards</a></li></ul><p>Next: <a href="https://sugarmount21.com/en/ax/windows-harness-first-job/">Download the kit and run a first job</a></p></nav>
-    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">Questions or ideas?</p><p>Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.</p><p><a class="button" href="mailto:sugarmount21@gmail.com?subject=%5BAX%20notes%5D%20Install%20Docker%20Desktop%20on%20Windows%20with%20WSL%202">Email us</a> <span class="muted">sugarmount21@gmail.com</span></p></aside>
-    <section aria-labelledby="faq">
-    <h2 id="faq">FAQ</h2>
-    <div class="faq"><details><summary>Does Docker Desktop work on Windows 11 Home?</summary><div><p>We have not tested it. Docker's requirements list only Pro, Enterprise and Education; Home appears only in the Windows containers note, which says Home can run Linux containers only. With nothing that settles it either way, this series does not recommend installing on Home. On Home, skip this part.</p></div></details><details><summary>Do I need a Docker account?</summary><div><p>By default you can use Docker Desktop without signing in. Signing in matters only for some features, such as pushing images to Docker Hub, Docker's image library.</p></div></details></div>
-    </section>
-    <p class="note">As of Nov 12, 2026. Docker Desktop's Windows install and license documentation, Docker Engine's install documentation, Microsoft's WSL install documentation (all checked Nov 11), output from commands run on this PC (Nov 11 and 12), this PC's WSL settings file, harness operating records.</p>
-    <p class="muted">This note is written from values SugarMount measured itself; an AI coding agent was used to draft it.</p>
-    <section aria-labelledby="ax-related-heading">
-      <h2 id="ax-related-heading">More AX notes</h2>
-      <ul>
-        <li><a href="https://sugarmount21.com/en/ax/number-one-app-agent-instruction/">Claude Code agents told to build a No. 1 app</a></li>
-        <li><a href="https://sugarmount21.com/en/ax/three-designs-three-judges/">Three agent designs, three judges: the market judge alone would have picked the one that crashed on every KakaoTalk file</a></li>
       </ul>
       <p><a href="https://sugarmount21.com/en/ax/">All AX notes</a></p>
     </section>]]></description>
