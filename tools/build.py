@@ -29,6 +29,7 @@ import checks  # noqa: E402  (site gates run by --check)
 import legal_chrome  # noqa: E402  (isolated header/footer for legal pages an app opens; standalone pages)
 import ax_extras  # noqa: E402  (AX hub search, note types, inquiry boxes, figures)
 import app_shots  # noqa: E402  (store screenshots on an app page once their files exist)
+import app_install  # noqa: E402  (install button and status line from data/apps.json: "coming soon" until play is true)
 import noindex  # noqa: E402  (which pages are noindex)
 import ax_pillar  # noqa: E402  (hand-written guide text on AX topic and series pages)
 import ads  # noqa: E402  (AdSense on AX notes: modes, eligibility, placement, page budget)
@@ -1485,6 +1486,11 @@ def wrap_hand(relpath):
             lds.append(ld); og = app_og(a, lang)
             if BLOCK_RE("shots").search(main):  # only where the page placed the marker (app_shots)
                 main = set_block(main, "shots", app_shots.block(a, lang, t["shots_label"].format(name=a[lang]["name"])))
+            if BLOCK_RE("status").search(main):
+                main = set_block(main, "status", app_install.status(a, lang, t["status"][a["status"]], a[lang].get("store_title") or ""))
+            if BLOCK_RE("install").search(main):
+                main = set_block(main, "install", app_install.button(
+                    a, lang, play_link(a, lang, "app_page") if a.get("play") else None, t["get_play"]))
             main = set_block(main, "tasks", tasks_block(a, lang), after_hero(main))
             main = set_block(main, "extra", app_extra(a, lang, relpath))
         if re.search(r'^\s*<section class="facts"', dates.strip_build_blocks(main), re.M):
@@ -1507,6 +1513,9 @@ def wrap_hand(relpath):
         main = set_block(main, "meta", meta_line(lang, relpath, main), after_lead(main))
         main = set_block(main, "toc", toc_inner(main, lang), after_hero(main))
         main = set_block(main, "extra", "") if BLOCK_RE("extra").search(main) else main
+        if a and BLOCK_RE("install").search(main):
+            main = set_block(main, "install", app_install.button(
+                a, lang, play_link(a, lang, "howto") if a.get("play") else None, t["play_of"].format(name=a[lang]["name"])))
     elif parts[0] == "privacy" and len(parts) in (2, 3):
         a = BY_PRIVACY_PATH.get(parts[1]); current = "privacy"; og_type = "article"; og = f"/assets/og/privacy-{lang}.png"
         name = a[lang]["name"] if a else headline
@@ -1803,7 +1812,7 @@ def feed_body(content, page_url):
     body = re.sub(r"<script\b.*?</script>", "", body, flags=re.S)
     body = re.sub(r"<!-- /?build:[\w-]+ -->", "", body)
     # feed readers drop page CSS and the hidden attribute: no stylesheet links, notes to editors, hidden links
-    # (axfamily's Play button waits hidden until launch) or decorative SVG (it would show at full width)
+    # (a page may keep a link hidden) or decorative SVG (it would show at full width)
     body = re.sub(r"<link\b[^>]*>|<!--.*?-->", "", body, flags=re.S)
     body = re.sub(r"<a\b[^>]*\shidden\b[^>]*>.*?</a>", "", body, flags=re.S)
     body = re.sub(r'<svg\b[^>]*aria-hidden="true"[^>]*>.*?</svg>', "", body, flags=re.S)
@@ -2071,6 +2080,18 @@ def validate():
             if slug in seen: errors.append(f"data/ax.json: {slug} is in two series ({seen[slug]}, {sr['id']})")
             seen[slug] = sr["id"]
         if not os.path.isfile(rel(f"ax/{slug}/index.html")): errors.append(f"data/ax.json: note {slug} has no ax/{slug}/index.html")
+    # no hand-written <main> links to a store page that is not public yet: such a page uses <!-- build:install -->
+    # (app_install), which turns into the Play button when the app's entry gets "play": true. Only <main> outside
+    # build blocks is read: that is what authors write; <head> JSON-LD and the blocks are rebuilt from apps.json.
+    unlisted = {a["package"]: a["id"] for a in APPS if not a.get("play")}
+    for p in all_pages():
+        if not exists(p): continue
+        mm = re.search(r"<main[\s>].*?</main>", read(p), re.S)
+        body = dates.strip_build_blocks(mm.group(0)) if mm else ""
+        for pkg in re.findall(r"play\.google\.com/store/apps/details\?id=([\w.]+)", body):
+            if pkg in unlisted:
+                errors.append(f"{p}: links to Google Play for {unlisted[pkg]}, whose listing is not public (play is false); "
+                              "use <!-- build:install --><!-- /build:install -->")
     known = {a.get("privacy_path") for a in APPS} | {a.get("app_path") for a in APPS}
     for p in all_pages():
         parts = p.split("/")

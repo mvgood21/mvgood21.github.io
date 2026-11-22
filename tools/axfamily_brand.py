@@ -13,11 +13,14 @@ make_brand.py; brand fixed 2026-11-09, symbol "lit window"). This script only re
                                                             + descriptor), drawn by make_brand.draw_lockup at T = 240 px,
                                                             tight, on Apricot. tools/og.py scales it into the share cards
 
---shots: docs/store/assets/screenshots/{ko,en}/01..08.png (1080x1920 store captures with their caption band) ->
-assets/apps/axfamily/shots/{ko,en}/01..08.webp, 360 px wide, lossy (under checks.py BUDGET shot, 80 KB). It refuses while
-docs/store/screenshots.json says the captures are older than the captions (assets_storyboard != storyboard), so the
-site never shows the old storyboard under the new captions. Then run python tools/build.py: tools/app_shots.py puts
-every file that exists on the page (alt = data/apps.json shot_captions) and in the JSON-LD.
+--shots: docs/store/assets/screenshots/{ko,en}/NN.png (1080x1920 store captures with their caption band) ->
+assets/apps/axfamily/shots/{ko,en}/NN.webp, 360 px wide, lossy (under checks.py BUDGET shot, 80 KB). screenshots.json
+marks each language on its own (assets.<lang>, app repo since 2026-11-15): only the captures in assets.<lang>.publish
+are copied (en has 01, 02, 07, 08 until its AI screens are re-shot with real model output), and a site copy of a
+capture that language no longer publishes is removed. It refuses while a language's captures are older than the
+captions (assets.<lang>.assets_storyboard != storyboard), so the site never shows the old storyboard under the new
+captions. Then run python tools/build.py: tools/app_shots.py puts every file that exists on the page (alt =
+data/apps.json shot_captions, by store number) and in the JSON-LD.
 
 Fonts: the wordmark uses tools/fonts/nanumsquareeb.ttf (ExtraBold, the same file the app repo uses); the descriptor
 needs NanumSquare Bold, which this repository does not carry, so pass it with --font-mid (default: the sugar-utils
@@ -61,24 +64,32 @@ def shots(axf):
     import json
     from PIL import Image
     meta = json.load(open(os.path.join(axf, "docs", "store", "screenshots.json"), encoding="utf-8"))
-    if meta.get("assets_storyboard") != meta.get("storyboard"):
-        raise SystemExit(f"screenshots.json: captures are {meta.get('assets_storyboard')}, captions {meta.get('storyboard')}; "
-                         "re-shoot first (app repo tools/store/README.md)")
-    if meta.get("ai_text") != "model":
-        print(f"note: screenshots.json ai_text={meta.get('ai_text')!r} (AI screens are not real model output yet)")
     caps = {x["id"]: x for x in json.load(open(os.path.join(ROOT, "data", "apps.json"), encoding="utf-8"))["apps"]}["axfamily"]
     for lang in ("ko", "en"):
+        # per-language marks (assets.<lang>); an older file has one set at the top level for both languages
+        side = (meta.get("assets") or {}).get(lang) or {k: meta.get(k) for k in ("assets_storyboard", "ai_text")}
+        if side.get("assets_storyboard") != meta.get("storyboard"):
+            raise SystemExit(f"screenshots.json {lang}: captures are {side.get('assets_storyboard')}, captions "
+                             f"{meta.get('storyboard')}; re-shoot first (app repo tools/store/README.md)")
+        if side.get("ai_text") not in ("model", "none"):
+            print(f"note: screenshots.json {lang} ai_text={side.get('ai_text')!r} (AI screens are not real model output yet)")
         want = len(caps[lang].get("shot_captions") or [])
+        publish = set(side.get("publish") or (f"{n:02d}" for n in range(1, want + 1)))
         out_dir = os.path.join(ROOT, "assets", "apps", "axfamily", "shots", lang)
         os.makedirs(out_dir, exist_ok=True)
+        done = []
         for n in range(1, want + 1):
+            out = os.path.join(out_dir, f"{n:02d}.webp")
+            if f"{n:02d}" not in publish:
+                if os.path.exists(out): os.remove(out)
+                continue
             im = Image.open(os.path.join(axf, "docs", "store", "assets", "screenshots", lang, f"{n:02d}.png")).convert("RGB")
             im = im.resize((360, round(im.height * 360 / im.width)), Image.LANCZOS)
-            out = os.path.join(out_dir, f"{n:02d}.webp")
             for q in (80, 72, 64, 56):
                 im.save(out, "WEBP", quality=q, method=6)
                 if os.path.getsize(out) <= 80 * 1024: break
-        print(f"ok: {want} {lang} screenshots in assets/apps/axfamily/shots/{lang}/")
+            done.append(f"{n:02d}")
+        print(f"ok: {lang} screenshots {', '.join(done)} in assets/apps/axfamily/shots/{lang}/")
 
 
 if __name__ == "__main__":
