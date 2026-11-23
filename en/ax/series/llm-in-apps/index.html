@@ -57,7 +57,7 @@
       <p class="menu-title" id="m-photo">Photo &amp; video</p>
       <ul class="app-tiles" aria-labelledby="m-photo"><li><a class="app-tile" data-app="sugaralbum" href="/en/apps/sugaralbum/"><img class="app-icon" src="/assets/apps/sugaralbum/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarAlbum</span></a></li><li><a class="app-tile" data-app="sugarcompress" href="/en/apps/image-compress/"><img class="app-icon" src="/assets/apps/sugarcompress/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Compress Image</span></a></li><li><a class="app-tile" data-app="sugarflip" href="/en/apps/image-flip/"><img class="app-icon" src="/assets/apps/sugarflip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Flip &amp; Rotate Image</span></a></li><li><a class="app-tile" data-app="sugarconvert" href="/en/apps/image-convert/"><img class="app-icon" src="/assets/apps/sugarconvert/icon.webp" width="48" height="48" alt="" loading="lazy"><span>Convert Image JPG PNG WEBP</span></a></li></ul>
       <p class="menu-title" id="m-document">Documents &amp; text</p>
-      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li></ul>
+      <ul class="app-tiles" aria-labelledby="m-document"><li><a class="app-tile" data-app="sugarspeller" href="/en/apps/sugarspeller/"><img class="app-icon" src="/assets/apps/sugarspeller/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarSpeller</span></a></li><li><a class="app-tile" data-app="sugarclip" href="/en/apps/sugarclip/"><img class="app-icon" src="/assets/apps/sugarclip/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarClip</span></a></li><li><a class="app-tile" data-app="sugardoc" href="/en/apps/doc-viewer/"><img class="app-icon" src="/assets/apps/sugardoc/icon.webp" width="48" height="48" alt="" loading="lazy"><span>HWP Viewer SugarDoc</span></a></li><li><a class="app-tile" data-app="axfamily" href="/en/apps/axfamily/"><img class="app-icon" src="/assets/apps/axfamily/icon.webp" width="48" height="48" alt="" loading="lazy"><span>AXFamily</span></a></li></ul>
       <p class="menu-title" id="m-everyday">Everyday</p>
       <ul class="app-tiles" aria-labelledby="m-everyday"><li><a class="app-tile" data-app="sugarcard" href="/en/apps/sugarcard/"><img class="app-icon" src="/assets/apps/sugarcard/icon.webp" width="48" height="48" alt="" loading="lazy"><span>SugarCard</span></a></li><li><a class="app-tile" data-app="trimbox" href="/en/apps/trimbox/"><img class="app-icon" src="/assets/apps/trimbox/icon.webp" width="48" height="48" alt="" loading="lazy"><span>TrimBox</span></a></li></ul>
       <p class="menu-title" id="m-games">Games</p>
@@ -89,6 +89,21 @@
         </ul>
         <p>This series is for solo developers adding an LLM feature for the first time. The parts follow the real order of work: pick a model (Part 1), design the cache (Part 2), cap spending during development (Part 3), disclose processing before launch (Part 4). If the feature is already live, read Part 2 if you cache responses and Part 3 if an agent runs your evals. Part 1 also covers why all 59 eval calls first failed with HTTP 402: the AI Studio key was not tied to our cloud credit.</p>
       </section>
+      <section aria-labelledby="ship-h">
+        <h2 id="ship-h">Checks we now run before an LLM feature ships</h2>
+        <p>Each part ends with its own steps. Read together, they fall into the order below. Every check here is one we added after something went wrong in that part, not a general best practice.</p>
+        <ol>
+          <li>Make one real call through the path that bills your cloud account before writing anything else. A 402 or 403 means the billing path is wrong; in Part 1 it was an AI Studio key that never touched the free-trial credit.</li>
+          <li>Confirm the model exists in the location you plan to use with countTokens, which is not billed. In Part 4 the two chosen models returned 404 in Seoul and Tokyo, and only the global endpoint answered.</li>
+          <li>Pick the model with about 50 cases from your own test data, and write the pass mark before the run. Set the thinking budget of a thinking model to 0, or its thinking can use up a small output limit before any answer appears (Part 1).</li>
+          <li>List the fields the model sees next to the fields in the cache key. Any field the model sees but the key leaves out is a path for one user's text to become every user's answer (Part 2). Measure whether that field helps before you keep it.</li>
+          <li>Put the model name and prompt version in the cache key, so a model change never serves old answers (Part 2).</li>
+          <li>Make a missing value mean no spending: a daily cap of 0 in code, a dry run unless a flag says otherwise, and a call with no token count charged at the full cap (Part 3). Count thinking tokens as output; they are billed at the output rate.</li>
+          <li>Treat an eval runner's own ledger as a lower bound and check billing the next day. Ours said 1,584 KRW for the main run while the October bill reached 2,956 KRW (Part 3).</li>
+          <li>Keep the processing location in one constant and have CI compare it with the in-app notice and the privacy policy. The policy should not name a location until a real call has answered there (Part 4).</li>
+        </ol>
+        <p>These checks come from two apps, a spelling checker and a family planner, both calling Gemini models on Vertex AI for Korean users. The billing and location details are specific to Google Cloud; the cache-key and missing-value rules carry over to any provider.</p>
+      </section>
     </div>
 
     <section aria-labelledby="parts-h">
@@ -112,7 +127,7 @@
       </div>
       <nav aria-labelledby="f-apps">
         <p class="footer-title" id="f-apps">Apps</p>
-        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/trimbox/">TrimBox</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
+        <ul><li><a href="/en/apps/sugaralbum/">SugarAlbum</a></li><li><a href="/en/apps/image-compress/">Compress Image</a></li><li><a href="/en/apps/image-flip/">Flip &amp; Rotate Image</a></li><li><a href="/en/apps/image-convert/">Convert Image JPG PNG WEBP</a></li><li><a href="/en/apps/sugarspeller/">SugarSpeller</a></li><li><a href="/en/apps/sugarclip/">SugarClip</a></li><li><a href="/en/apps/doc-viewer/">HWP Viewer SugarDoc</a></li><li><a href="/en/apps/axfamily/">AXFamily</a></li><li><a href="/en/apps/sugarcard/">SugarCard</a></li><li><a href="/en/apps/trimbox/">TrimBox</a></li><li><a href="/en/apps/arrow-knots/">Arrow Knots</a></li><li><a href="/en/apps/blocks/">Block Turn</a></li></ul>
       </nav>
       <nav aria-labelledby="f-site">
         <p class="footer-title" id="f-site">Site</p>
