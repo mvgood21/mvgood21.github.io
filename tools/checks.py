@@ -56,7 +56,11 @@ BUDGET = {
     # take ~20.9 KB of @font-face rules that cannot shrink without dropping glyph coverage, so the gate sits at 24 KB
     # (deliberate raise, 2026-10-18 final review; the spec owner should confirm or lower it).
     "font_css": 24 * KB,
+    # in-browser tools: owner decision 2026-11-24 (conversation session). Only pages that load a script under
+    # assets/tools/ (tools/page_tools.py adds it for a data-tool section) get this budget; every other page keeps "js".
+    "js_tool": 16 * KB,
 }
+TOOL_JS_PREFIX = "assets/tools/"
 LEN = {  # IA 3.1, Python len()
     "ko": {"topic": 30, "title": 44, "desc": (60, 110), "lead": (40, 90)},
     "en": {"topic": 50, "title": 65, "desc": (110, 160), "lead_words": (25, 45)},
@@ -809,7 +813,7 @@ def check_page_budget(page, report, file_mode):
         (report.warn if file_mode else report.error)("BUDGET-HTML", p, f"{size} B > {limit} B")
     scope = page.main if file_mode else page.dom
     if scope is None: return
-    js = 0
+    js, tool = 0, False
     for s in scope.find_all("script"):
         typ = (s.get("type") or "").lower()
         if typ == "application/ld+json": continue
@@ -823,12 +827,14 @@ def check_page_budget(page, report, file_mode):
                     report.error("ORIGIN", p, f"external script {src}")
                 continue
             js += site.size(lk.relpath) or 0
+            tool = tool or lk.relpath.startswith(TOOL_JS_PREFIX)
             if "defer" not in s.attrs and "async" not in s.attrs and (s.get("type") or "") != "module":
                 report.warn("JS-DEFER", p, f"script {src} without defer")
         else:
             js += len("".join(c for c in s.children if isinstance(c, str)).encode("utf-8"))
-    if js > BUDGET["js"]:
-        report.error("BUDGET-JS", p, f"{js} B of JavaScript > {BUDGET['js']} B")
+    js_limit = BUDGET["js_tool"] if tool else BUDGET["js"]
+    if js > js_limit:
+        report.error("BUDGET-JS", p, f"{js} B of JavaScript > {js_limit} B" + (" (in-browser tool page)" if tool else ""))
     for l in scope.find_all("link"):
         rels = set((l.get("rel") or "").lower().split())
         if "preload" in rels and (l.get("as") or "").lower() == "font":

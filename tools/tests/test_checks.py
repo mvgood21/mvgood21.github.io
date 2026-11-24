@@ -488,6 +488,27 @@ class Budgets(Base):
         f = self.edit(self.files(), "apps/index.html", "</main>", "<script>" + "1;" * 600 + "</script></main>")
         self.assertGate(f, "BUDGET-JS")
 
+    def test_js_budget_tool_page(self):
+        """Only a page that loads a script under assets/tools/ gets BUDGET["js_tool"] (in-browser tools, 2026-11-24);
+        the same bytes from any other path, or inline, still fail the general 1 KB budget on that or another page."""
+        six_kb, tag = "1;" * 3000, '<script src="/assets/tools/photo-size.js" defer></script></main>'
+        f = self.files(); f["assets/tools/photo-size.js"] = six_kb
+        f = self.edit(f, "apps/index.html", "</main>", tag)
+        self.assertGreater(len(six_kb), checks.BUDGET["js"])
+        self.assertNotIn("BUDGET-JS", run(f).codes(), "tool page under the tool budget")
+        # a non-tool page on the same site still fails at > 1 KB
+        g = self.edit(dict(f), "apps/foo/index.html", "</main>", "<script>" + "1;" * 600 + "</script></main>")
+        bad = {i.path for i in run(g).errors if i.code == "BUDGET-JS"}
+        self.assertEqual(bad, {"apps/foo/index.html"})
+        # the same 6 KB outside assets/tools/ is not a tool
+        f = self.files(); f["assets/big.js"] = six_kb
+        f = self.edit(f, "apps/index.html", "</main>", '<script src="/assets/big.js" defer></script></main>')
+        self.assertGate(f, "BUDGET-JS")
+        # and a tool page over the tool budget fails
+        f = self.files(); f["assets/tools/photo-size.js"] = "1;" * (checks.BUDGET["js_tool"] // 2 + 10)
+        f = self.edit(f, "apps/index.html", "</main>", tag)
+        self.assertGate(f, "BUDGET-JS")
+
     def test_external_stylesheet(self):
         f = self.edit(self.files(), "apps/index.html", '<link rel="stylesheet"', '<link rel="stylesheet" href="https://fonts.example.com/a.css"><link rel="stylesheet"')
         self.assertGate(f, "ORIGIN")

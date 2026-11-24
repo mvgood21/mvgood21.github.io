@@ -33,6 +33,7 @@ import app_install  # noqa: E402  (install button and status line from data/apps
 import noindex  # noqa: E402  (which pages are noindex)
 import ax_pillar  # noqa: E402  (hand-written guide text on AX topic and series pages)
 import ads  # noqa: E402  (AdSense on AX notes: modes, eligibility, placement, page budget)
+import page_tools  # noqa: E402  (in-browser tools: head stylesheet + deferred script for data-tool pages)
 from html.parser import HTMLParser  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -1648,6 +1649,7 @@ def wrap_hand(relpath):
         h = ax_css(h); main_cls = ""
     if main_cls.startswith("ax-note"):
         h = h.replace("</head>", f'  <link rel="stylesheet" href="/assets/ax.css?v={CSSV}">\n</head>')
+    h = page_tools.add_head(h, ROOT, main)  # in-browser tool pages only (data-tool marker in <main>)
     # body class (site.css "layout"): hubs use the full width like home; app pages grid main themselves (app-layout);
     # everything else is a reading page (text column, side TOC when there is one)
     body = ' class="page-hub"' if parts == ["ax"] else "" if main_cls == "app-layout" else ' class="page-read"'
