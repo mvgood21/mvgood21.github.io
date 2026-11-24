@@ -1410,7 +1410,9 @@ PLAY_HREF_RE = re.compile(r'href="https://play\.google\.com/store/apps/details\?
 def hand_source(relpath):
     """A hand-written file as the build reads it. The one rewrite: Play install links on app pages and help articles
     get the site's install referrer (IA spec 9.2, WP-A 12), so every Play button has the same UTM format whoever
-    wrote the page. Idempotent; dates hash this text, so the rewrite never moves a page's modified date twice."""
+    wrote the page. Idempotent; dates hash this text, so the rewrite never moves a page's modified date twice.
+    Exception: a link whose referrer already carries utm_content (a campaign landing such as apps/trimbox/<slug>/,
+    one utm_content per landing) is kept as written, so each landing stays measurable on its own."""
     s = read(relpath)
     parts = bare_of(relpath)[:-len("index.html")].strip("/").split("/") if relpath.endswith("index.html") else []
     if parts and parts[0] == "apps" and len(parts) in (2, 3):
@@ -1418,6 +1420,7 @@ def hand_source(relpath):
         lang = lang_of(relpath)
         def fix(m):
             a = BY_PACKAGE.get(m.group(1))
+            if "utm_content%3D" in m.group(0): return m.group(0)
             return f'href="{esc(play_link(a, lang, medium))}"' if a and a.get("play") else m.group(0)
         s = PLAY_HREF_RE.sub(fix, s)
     return s
