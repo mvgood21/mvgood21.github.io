@@ -1085,6 +1085,7 @@ def ax_related(path, lang, tp, pool, n):
     first (0, 1-2, 3+), and ties are spread per page by a stable hash so every note does not point at the same few.
     Only indexable notes are offered (2026-11-25: after the 35/66 split, 72 of 102 related links on the kept ko notes
     led to noindex notes); the noindex ones stay reachable from the topic, series and all-notes lists."""
+    has_topic = n > 2 and any(tp and ax_topic_of(x[0]) is tp for x in pool)  # n == 2: series note, no topic link; the "all notes on this topic" link stays either way
     pool = [x for x in pool if x[0].lstrip("/") + "index.html" not in NOINDEX_PATHS]
     inl = ax_inlinks(lang)
     def key(x):

@@ -21,7 +21,8 @@ class AxRelated(unittest.TestCase):
             self.assertTrue(any(noindex(u) for u, _ in arts))  # otherwise the check below proves nothing
             for path, _ in arts:
                 pool = [x for x in arts if x[0] != path]
-                got, _ = build.ax_related(path, lang, build.ax_topic_of(path), pool, build.AX_RELATED)
+                got, has_topic = build.ax_related(path, lang, build.ax_topic_of(path), pool, build.AX_RELATED)
+                self.assertTrue(has_topic, path)  # games: every note is noindex, the topic link must stay
                 self.assertEqual(len(got), build.AX_RELATED, path)
                 self.assertEqual([u for u, _ in got if noindex(u)], [], path)
 
