@@ -1092,7 +1092,7 @@ def ax_related(path, lang, tp, pool, n):
         return (0 if k == 0 else 1 if k <= 2 else 2, hashlib.sha1((path + x[0]).encode()).hexdigest())
     same = sorted((x for x in pool if tp and ax_topic_of(x[0]) is tp), key=key)[:max(n - 2, 0)]
     rest = sorted((x for x in pool if x not in same), key=key)
-    return same + rest[:n - len(same)], bool(same)
+    return same + rest[:n - len(same)], has_topic
 
 
 def ax_slug(u): return u.rstrip("/").rsplit("/", 1)[-1]
