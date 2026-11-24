@@ -10,7 +10,10 @@ import hashlib, os, re
 
 DIR = "assets/tools"
 CSS = DIR + "/tools.css"  # shared by every tool
-TOOLS = {"photo-size": DIR + "/photo-size.js"}  # data-tool name -> script
+TOOLS = {  # data-tool name -> script
+    "photo-size": DIR + "/photo-size.js",
+    "png-to-jpg": DIR + "/png-to-jpg.js",
+}
 MARK_RE = re.compile(r'<section\b[^>]*\bclass="tool\b[^"]*"[^>]*\bdata-tool="([a-z0-9-]+)"')
 
 

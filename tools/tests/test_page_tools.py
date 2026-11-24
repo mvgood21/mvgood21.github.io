@@ -40,6 +40,11 @@ class PageTools(unittest.TestCase):
         with open(js, "wb") as f: f.write(b"2;\n")
         self.assertNotEqual(a, page_tools.head_tags(self.root, MAIN))
 
+    def test_every_registered_script_is_in_the_repo(self):
+        root = os.path.dirname(os.path.dirname(HERE))
+        for name, rp in page_tools.TOOLS.items():
+            self.assertTrue(os.path.isfile(os.path.join(root, rp)), name)
+
     def test_unknown_tool_stops_the_build(self):
         with self.assertRaises(SystemExit):
             page_tools.used('<section class="tool" data-tool="nope">')
