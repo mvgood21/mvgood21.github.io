@@ -1065,11 +1065,13 @@ _AX_INLINKS = {}
 
 def ax_inlinks(lang):
     """{note url: how many other notes link to it from their hand-written body} (build blocks stripped, so the
-    related lists this build writes do not feed back into the next build's choice)."""
+    related lists this build writes do not feed back into the next build's choice). Links from noindex notes do not
+    count: they are the pages this ranking must not rely on (2026-11-25)."""
     if lang not in _AX_INLINKS:
         prefix = "/en/ax/" if lang == "en" else "/ax/"
         cnt = {}
         for u, _, _ in ax_articles(lang):
+            if u.lstrip("/") + "index.html" in NOINDEX_PATHS: continue
             body = dates.strip_build_blocks(read(u.lstrip("/") + "index.html"))
             for v in set(re.findall(r'href="(%s[a-z0-9-]+/)"' % re.escape(prefix), body)):
                 if v != u: cnt[v] = cnt.get(v, 0) + 1
@@ -1080,7 +1082,10 @@ def ax_inlinks(lang):
 def ax_related(path, lang, tp, pool, n):
     """Pick n related notes for the note at path (2026-11-15 SEO audit: "newest first" left older, well-ranking notes
     linked only from noindex lists). Same topic first; inside each group the notes with the fewest in-body links come
-    first (0, 1-2, 3+), and ties are spread per page by a stable hash so every note does not point at the same few."""
+    first (0, 1-2, 3+), and ties are spread per page by a stable hash so every note does not point at the same few.
+    Only indexable notes are offered (2026-11-25: after the 35/66 split, 72 of 102 related links on the kept ko notes
+    led to noindex notes); the noindex ones stay reachable from the topic, series and all-notes lists."""
+    pool = [x for x in pool if x[0].lstrip("/") + "index.html" not in NOINDEX_PATHS]
     inl = ax_inlinks(lang)
     def key(x):
         k = inl.get(x[0], 0)
