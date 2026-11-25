@@ -40,16 +40,18 @@
   function isHeic(f) { return /\.(heic|heif)$/i.test(f.name) || /hei[cf]/i.test(f.type); }
 
   function load(f) {
+    run++;  // a conversion of the previous photo must not land on this one
     revoke(); out.hidden = true; heic.hidden = true; img = null; src = f;
-    if (!f) return;
+    if (!f) { say(""); return; }
     if (f.type && !/^image\//.test(f.type) && !isHeic(f)) { say(msg("bad"), true); return; }
     var u = URL.createObjectURL(f), im = new Image();
     im.onload = function () {
       URL.revokeObjectURL(u);
+      if (src !== f) return;  // another photo was chosen while this one was loading
       if (!im.naturalWidth) return fail();
       img = im; go();
     };
-    im.onerror = function () { URL.revokeObjectURL(u); fail(); };
+    im.onerror = function () { URL.revokeObjectURL(u); if (src === f) fail(); };
     say(msg("read"));
     im.src = u;
     function fail() {
@@ -76,7 +78,7 @@
     for (var tries = 0; tries < 24; tries++) {
       if (s.p) { var k = Math.max(1, Math.floor(s.k * scale + 1e-9)); w = k * s.p[0]; h = k * s.p[1]; }
       else { w = Math.max(1, Math.round(s.w * scale)); h = Math.max(1, Math.round(s.h * scale)); }
-      if (Math.max(w, h) < MIN_EDGE) return null;
+      if (shrunk && Math.max(w, h) < MIN_EDGE) return null;
       cv.width = w; cv.height = h;
       cx.fillStyle = "#fff"; cx.fillRect(0, 0, w, h);  // transparent PNG/WebP areas become white, as in the app
       cx.imageSmoothingQuality = "high";
@@ -107,14 +109,14 @@
     if (!img) return;
     var t = target(), id = ++run;
     revoke(); out.hidden = true;  // never leave a result on screen that does not match the current settings
+    if (shift) shift.closest("[data-shift]").hidden = !ratio();  // pages without the crop fieldset have no slider
     if (!t) { say(msg("range"), custom.value !== ""); return; }
     var W = img.naturalWidth, H = img.naturalHeight, r = ratio(), s = rect(W, H, r), res;
-    shift.closest("[data-shift]").hidden = !r;
     if (!r && src.size <= t && /^image\/jpe?g$/i.test(src.type)) {
       res = { b: src, w: W, h: H, same: true };  // already small enough: hand back the original bytes untouched
     } else {
       say(msg("work"));
-      res = await encode(s, t, id);
+      try { res = await encode(s, t, id); } catch (e) { if (id === run) say(msg("bad"), true); return; }
       if (res === 0) return;  // a newer run took over
     }
     if (!res || res.b.size > t) { say(msg("fail", { t: size(t) }), true); return; }
@@ -144,13 +146,18 @@
   // wiring
   root.querySelectorAll("[data-nojs]").forEach(function (e) { e.remove(); });
   form.hidden = false;
-  form.addEventListener("submit", function (e) { e.preventDefault(); go(); });
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (img) go();
+    else if (!src && file.files[0]) load(file.files[0]);  // the browser restored the choice after a reload
+    else if (!src) say(msg("none"), true);
+  });
   file.addEventListener("change", function () { load(file.files[0]); });
   form.addEventListener("change", function (e) {
     if (e.target === file) return;
     go();
   });
-  custom.addEventListener("focus", function () { $("#ps-t-custom").checked = true; });
+  custom.addEventListener("input", function () { $("#ps-t-custom").checked = true; });
   ["dragenter", "dragover"].forEach(function (n) {
     drop.addEventListener(n, function (e) { e.preventDefault(); drop.classList.add("is-over"); });
   });
@@ -160,6 +167,6 @@
   drop.addEventListener("drop", function (e) {
     e.preventDefault();
     var f = e.dataTransfer && e.dataTransfer.files[0];
-    if (f) load(f);
+    if (f) { file.value = ""; load(f); }
   });
 })();
