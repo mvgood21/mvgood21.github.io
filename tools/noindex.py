@@ -5,7 +5,8 @@ Fixed pages (404, the /design/ demo) are always noindex. A site adds more in dat
   (paths without the en/ prefix; both languages match). "except" lifts single pages out of a prefix rule: a topic
   page with a hand-written pillar guide (tools/ax_pillar.py, 2026-11-15) is indexed.
 Owner decision 2026-11-13 (AdSense "replicated / low value content"): policies (one template per app), AX topic
-and board pages (lists of notes that are indexed themselves) and AX notes folded into a sibling are noindex.
+and board pages (lists of notes that are indexed themselves) and AX notes folded into a sibling are noindex;
+series pages joined them 2026-11-28 (owner instruction: they bundle notes already noindexed on 11-24).
 They stay reachable and linked. Noindex pages get no canonical, og:url, hreflang, breadcrumbs or JSON-LD, and stay
 out of the sitemap, RSS, llms.txt and IndexNow (IA spec 2)."""
 import json, os

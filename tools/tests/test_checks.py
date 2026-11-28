@@ -886,6 +886,16 @@ class Helpers(unittest.TestCase):
         self.assertNotIn("ax/topic/android/index.html", n); self.assertNotIn("en/ax/topic/android/index.html", n)
         self.assertIn("ax/topic/games/index.html", n)
 
+    def test_site_series_pages_are_noindex(self):
+        """2026-11-28 owner instruction: series pages bundle notes noindexed on 11-24, so data/noindex.json keeps them
+        out of the index in both languages; the AX hub stays indexed."""
+        import noindex
+        n = noindex.NoIndex()  # the repository's data/noindex.json
+        for p in ["ax/series/windows-harness/index.html", "en/ax/series/r8-release-only/index.html"]:
+            self.assertIn(p, n)
+        for p in ["ax/index.html", "en/ax/index.html", "about/index.html"]:
+            self.assertNotIn(p, n)
+
 
 if __name__ == "__main__":
     unittest.main()

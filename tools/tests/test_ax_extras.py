@@ -57,6 +57,14 @@ class AxExtrasTest(unittest.TestCase):
         html_ = ax_extras.cta_end("en", "a@b.c", "My note")
         self.assertIn("subject=%5BAX%20notes%5D%20My%20note", html_)
 
+    def test_cta_end_invites_consulting_and_links_the_ax_feed(self):
+        ko, en = ax_extras.cta_end("ko", "a@b.c", "t"), ax_extras.cta_end("en", "a@b.c", "t")
+        self.assertIn('<a href="/ax/rss.xml">RSS 구독</a>', ko)
+        self.assertIn('<a href="/en/ax/rss.xml">Subscribe via RSS</a>', en)
+        self.assertIn("상담", ko); self.assertIn("협업", ko)
+        self.assertIn("consulting", en); self.assertIn("collaboration", en)
+        self.assertNotRegex(ko + en, r"tel:|\+82|010-")  # email and feed only, never a phone number
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -5,7 +5,10 @@
   (and its font budget) does not grow with each new note.
 - type: the note's eyebrow "AX 노트 · 사고 기록" names its type; the hub and search show it.
 - inquiry: two boxes per note, one before the middle h2 and one at the end (<!-- build:cta-mid -->, <!-- build:cta -->).
-  Plain mailto with a subject that names the note, so no form and no personal data stored on the site.
+  Plain mailto with a subject that names the note, so no form and no personal data stored on the site. The end box
+  invites questions on the note, app-development / AI-agent adoption consulting and collaboration (owner request
+  2026-11-28: email and the AX RSS feed only; never a phone number, real name or company name) and links the AX feed.
+  Bytes count too: a note near the 40 KB page budget loses its AdSense loader (ads.py R6), so keep both boxes short.
   Common syllables only: the box is on every note and counts toward each note's 470 KB font budget.
 - figures: <figure> images in a note's <main> under /assets/ax/ (made by tools/ax_figures.py) go into the Article
   JSON-LD image list.
@@ -23,17 +26,19 @@ T = {
         "search_label": "AX 노트 검색", "search_ph": "예: 테스트, R8, 출시, 에이전트",
         "search_hint": "제목, 요약, 주제, 글 유형에서 찾습니다.",
         "cta_mid": "이 글과 비슷한 문제를 겪고 있다면 메일로 상황을 알려 주세요. 읽고 답하겠습니다.",
-        "cta_h": "질문이나 제안이 있나요?",
-        "cta_p": "글에 적은 방법을 직접 적용해 보다 막힌 곳, 숫자에 대한 질문, 다뤄 줬으면 하는 주제를 메일로 보내 주세요.",
+        "cta_h": "질문, 상담, 협업 문의",
+        "cta_p": "이 글에 대한 질문, 앱 개발이나 Claude Code 같은 AI 에이전트 도입 상담, 협업 제안을 메일로 보내 주세요.",
         "cta_btn": "메일로 문의하기", "cta_subject": "[AX 노트] {title}",
+        "cta_rss": "RSS 구독", "cta_rss_url": "/ax/rss.xml",
     },
     "en": {
         "search_label": "Search AX notes", "search_ph": "e.g. tests, R8, release, agents",
         "search_hint": "Matches titles, summaries, topics and note types.",
         "cta_mid": "Running into the same problem? Email us what you are seeing and we will reply.",
-        "cta_h": "Questions or ideas?",
-        "cta_p": "Send us where you got stuck applying this, a question about the numbers, or a topic you would like covered.",
+        "cta_h": "Questions, consulting or collaboration",
+        "cta_p": "Email us with a question about this note, consulting on app development or on adopting AI agents such as Claude Code, or a collaboration idea.",
         "cta_btn": "Email us", "cta_subject": "[AX notes] {title}",
+        "cta_rss": "Subscribe via RSS", "cta_rss_url": "/en/ax/rss.xml",
     },
 }
 
@@ -90,7 +95,7 @@ def cta_end(lang, email, title):
     href = f"mailto:{email}?subject={quote(t['cta_subject'].format(title=title))}"
     return (f'\n    <aside class="ax-cta" aria-labelledby="ax-cta-h"><p class="ax-cta-title" id="ax-cta-h">{t["cta_h"]}</p>'
             f'<p>{t["cta_p"]}</p><p><a class="button" href="{html.escape(href)}">{t["cta_btn"]}</a> '
-            f'<span class="muted">{email}</span></p></aside>\n    ')
+            f'<span class="muted">{email}</span> · <a href="{t["cta_rss_url"]}">{t["cta_rss"]}</a></p></aside>\n    ')
 
 
 def middle_h2(main):
