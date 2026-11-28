@@ -14,6 +14,7 @@ TOOLS = {  # data-tool name -> script
     "photo-size": DIR + "/photo-size.js",
     "png-to-jpg": DIR + "/png-to-jpg.js",
     "flip-photo": DIR + "/flip-photo.js",
+    "heic-to-jpg": DIR + "/heic-to-jpg.js",
 }
 MARK_RE = re.compile(r'<section\b[^>]*\bclass="tool\b[^"]*"[^>]*\bdata-tool="([a-z0-9-]+)"')
 
